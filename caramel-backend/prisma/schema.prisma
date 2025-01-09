@@ -1,0 +1,33 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Coupon {
+  id              String       @id @default(cuid())
+  code            String
+  site            String
+  title           String
+  description     String       @db.Text
+  rating          Float
+  discount_type   DiscountType @default(PERCENTAGE)
+  discount_amount Float?
+  expiry          String
+  expired         Boolean      @default(false)
+  timesUsed       Int          @default(0)
+  last_time_used  DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+
+  @@unique([code, site])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  CASH
+  SAVE
+}
