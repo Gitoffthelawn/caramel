@@ -31,7 +31,6 @@ app.use('/seed-coupons', cors(seederCorsOptions));
 
 app.post('/seed-coupons', apiKeyMiddleware, async (req, res) => {
     let coupons = req.body;
-    console.log(coupons.length);
     if (!Array.isArray(coupons)) {
         return res.status(400).json({ message: 'Invalid data format. Expected an array.' });
     }
@@ -81,9 +80,6 @@ app.get("/coupons", async (req, res) => {
         if (limit) {
             queryParams.take = parseInt(limit, 10);
         }
-
-        // Log the full queryParams object for debugging
-        console.log("Query Params:", JSON.stringify(queryParams, null, 2));
 
         const coupons = await prisma.coupon.findMany(queryParams);
         res.json(coupons);
