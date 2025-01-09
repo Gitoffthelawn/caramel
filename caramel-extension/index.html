@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caramel</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="loading-container fade-out" id="loading-container">
+    <img src="sparkle.svg" alt="loading" style="width: 70px; height: 70px; animation: sparkle 2s infinite;">
+</div>
+<div class="theme-container light-mode">
+    <div class="container">
+        <header class="header-container">
+            <img src="assets/full-logo-no-bg.png" alt="Caramel Logo" class="logo">
+            <div class="icons-container">
+                <button class="theme-toggler" id="themeToggler">
+                    <span class="icon light-mode-icon">&#9790;</span>
+                    <span class="icon dark-mode-icon">&#9728;</span>
+                </button>
+                <div class="settings-icon">⚙️</div>
+            </div>
+        </header>
+        <main>
+            <h4 id="current-website"></h4>
+        </main>
+    </div>
+</div>
+<script src="shared-utils.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
