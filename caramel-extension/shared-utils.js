@@ -90,7 +90,7 @@ async function startApplyingCoupons(site) {
     // 2. Fetch coupons from your backend
     const coupons = await fetchCoupons(site,keywords);
     if (!coupons || coupons.length === 0) {
-        showFinalModal(0, "No better price found. This is already the best you can get!");
+        showFinalModal(0, null,"No better price found. This is already the best you can get!");
         return;
     }
 
@@ -98,6 +98,7 @@ async function startApplyingCoupons(site) {
     await showTestingModal();
     let bestCode = null;
     let bestDifference = 0;
+    let couponType = null;
 
     // Store the original total to compare against
     let originalTotal = null;
@@ -131,6 +132,7 @@ async function startApplyingCoupons(site) {
         if (difference > bestDifference) {
             bestDifference = difference;
             bestCode = code;
+            couponType = coupons[i].discount_type;
         }
     }
 
@@ -139,10 +141,10 @@ async function startApplyingCoupons(site) {
 
     // 6. Show final results
     if (bestDifference > 0) {
-        showFinalModal(bestDifference, "We found a coupon that saves you money!");
+        showFinalModal(bestDifference, couponType, "We found a coupon that saves you money!");
         console.log("Caramel: Best coupon code:", bestCode, "Saved:", bestDifference);
     } else {
-        showFinalModal(0, "No better price found. This is already the best you can get!");
+        showFinalModal(0, couponType,"No better price found. This is already the best you can get!");
     }
 }
 
@@ -273,7 +275,7 @@ function hideTestingModal() {
 }
 
 
-async function showFinalModal(savingsAmount, message) {
+async function showFinalModal(savingsAmount, discountType,message) {
     // Create overlay
     const overlay = document.createElement("div");
     overlay.id = "caramel-final-overlay";
@@ -301,10 +303,10 @@ async function showFinalModal(savingsAmount, message) {
 
     // Determine if user saved money
     const isSuccess = savingsAmount > 0;
-
+    const savingAmountLabel = discountType === "PERCENTAGE" ? "%" : "$";
     // If no savings found, encourage the user that it's already the best price
     const defaultMessage = isSuccess
-        ? `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+        ? `We found a coupon that saves you ${savingAmountLabel}${savingsAmount.toFixed(2)}!`
         : "Looks like you're already getting the best deal. Go ahead and buy!";
 
     // You can decide whether to use `message` or `defaultMessage` or combine them
