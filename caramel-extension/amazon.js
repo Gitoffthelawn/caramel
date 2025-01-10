@@ -17,9 +17,9 @@ function getAmazonCartKeywords() {
 function applyCouponForAmazon(code) {
     return new Promise((resolve) => {
         // Example selectors - these may be incorrect for the real Amazon flow
-        const promoInput = document.querySelector("#promoCode");
-        const applyButton = document.querySelector('input[name="applyPromo"]');
-
+        const promoInput = document.querySelector('input[name="ppw-claimCode"]');
+        const applyButton = document.querySelector('input[name="ppw-claimCodeApplyPressed"]');
+        console.log(promoInput, applyButton);
         if (!promoInput || !applyButton) {
             // If the user’s in a checkout stage without a promo code field
             return resolve({ success: false, newTotal: NaN });

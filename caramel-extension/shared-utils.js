@@ -95,8 +95,7 @@ async function startApplyingCoupons(site) {
     }
 
     // 3. Show a “Testing Coupons” modal to the user
-    showTestingModal();
-
+    await showTestingModal();
     let bestCode = null;
     let bestDifference = 0;
 
@@ -109,8 +108,8 @@ async function startApplyingCoupons(site) {
 
     // 4. Apply each coupon in turn
     for (let i = 0; i < coupons.length; i++) {
-        const code = coupons[i].code; // or however your backend returns codes
-        updateTestingModal(i + 1, coupons.length, code);
+        const code = coupons[i].code;
+        await updateTestingModal(i + 1, coupons.length, code);
 
         let  success = false;
         let newTotal = null;
@@ -140,7 +139,7 @@ async function startApplyingCoupons(site) {
 
     // 6. Show final results
     if (bestDifference > 0) {
-        showFinalModal(bestDifference, `We found a coupon that saves you $${bestDifference.toFixed(2)}!`);
+        showFinalModal(bestDifference, "We found a coupon that saves you money!");
         console.log("Caramel: Best coupon code:", bestCode, "Saved:", bestDifference);
     } else {
         showFinalModal(0, "No better price found. This is already the best you can get!");
@@ -148,7 +147,7 @@ async function startApplyingCoupons(site) {
 }
 
 async function fetchCoupons(site,keywords) {
-    const url = `http://localhost:3000/coupons?&site=${site}&key_words=${encodeURIComponent(keywords)}`;
+    const url = ` http://localhost:3000/coupons?&site=${site}&key_words=${encodeURIComponent(keywords)}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -163,8 +162,8 @@ async function fetchCoupons(site,keywords) {
 }
 
 
-function showTestingModal() {
-    // Create an overlay
+async function showTestingModal() {
+    // Create overlay
     const overlay = document.createElement("div");
     overlay.id = "caramel-testing-overlay";
     overlay.style.position = "fixed";
@@ -178,31 +177,94 @@ function showTestingModal() {
     overlay.style.justifyContent = "center";
     overlay.style.alignItems = "center";
 
-    // Create the modal
+    // Create the modal container
     const modal = document.createElement("div");
     modal.id = "caramel-testing-modal";
-    modal.style.backgroundColor = "#fff";
+
+    // Main modal styling
+    modal.style.position = "relative";
+    modal.style.backgroundColor = "#ea6925";  // Brand color
     modal.style.padding = "20px";
-    modal.style.borderRadius = "8px";
-    modal.style.width = "300px";
-    modal.style.boxShadow = "0 2px 10px rgba(0,0,0,0.4)";
+    modal.style.borderRadius = "12px";
+    modal.style.boxShadow = "0 4px 10px rgba(0, 0, 0, 0.3)";
+    modal.style.color = "white";
+    modal.style.width = "320px";
     modal.style.fontFamily = "Arial, sans-serif";
+    modal.style.textAlign = "center";
+    modal.style.animation = "fadeIn 0.5s ease-in-out, bounce 2s infinite";
+
+    // Fetch the Caramel logo
+    const logoUrl = currentBrowser.runtime.getURL("assets/logo-light.png");
+
+    // Inject HTML content (logo, heading, status text, progress bar)
     modal.innerHTML = `
-    <h2 style="margin-top: 0;">Applying Coupons...</h2>
-    <p id="caramel-test-status">Loading...</p>
+    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
+      <img src="${logoUrl}" alt="Caramel Logo" style="width: 40px; height: 40px; margin-right: 8px;" />
+      <h2 style="margin: 0; font-size: 18px;">Applying Coupons...</h2>
+    </div>
+
+    <p id="caramel-test-status" style="margin: 10px 0; font-size: 15px;">Loading...</p>
+    
+    <!-- Progress bar container -->
+    <div id="caramel-progress-container" style="
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      width: 100%;
+      height: 10px;
+      margin: 10px 0;
+      position: relative;
+      overflow: hidden;
+    ">
+      <!-- The actual progress bar -->
+      <div id="caramel-progress-bar" style="
+        background: #ffbf47; /* A slightly lighter brand tone or accent color */
+        width: 0%;
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.3s ease;
+      "></div>
+    </div>
   `;
 
+    // Add keyframe animations
+    const style = document.createElement("style");
+    style.textContent = `
+  @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+  }
+  `;
+    document.head.appendChild(style);
+
+    // Append modal to overlay, and overlay to body
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 }
 
-function updateTestingModal(currentIndex, total, code) {
+/**
+ * Updates the "Testing Coupons" modal:
+ *  - Changes the status text
+ *  - Updates the progress bar width based on current vs total
+ */
+async function updateTestingModal(currentIndex, total, code) {
+    // Update status text
     const statusEl = document.getElementById("caramel-test-status");
     if (statusEl) {
         statusEl.textContent = `Trying coupon ${currentIndex} of ${total} (${code})...`;
     }
-}
 
+    // Update progress bar
+    const progressBar = document.getElementById("caramel-progress-bar");
+    if (progressBar && total > 0) {
+        const progressPercent = Math.round((currentIndex / total) * 100);
+        progressBar.style.width = `${progressPercent}%`;
+    }
+}
 function hideTestingModal() {
     const overlay = document.getElementById("caramel-testing-overlay");
     if (overlay) {
@@ -211,7 +273,7 @@ function hideTestingModal() {
 }
 
 
-function showFinalModal(savingsAmount, message) {
+async function showFinalModal(savingsAmount, message) {
     // Create overlay
     const overlay = document.createElement("div");
     overlay.id = "caramel-final-overlay";
@@ -231,41 +293,77 @@ function showFinalModal(savingsAmount, message) {
     modal.style.backgroundColor = "#fff";
     modal.style.padding = "30px";
     modal.style.borderRadius = "12px";
-    modal.style.width = "320px";
+    modal.style.width = "400px";           // Increased width
     modal.style.boxShadow = "0 4px 15px rgba(0, 0, 0, 0.4)";
     modal.style.fontFamily = "Arial, sans-serif";
     modal.style.textAlign = "center";
+    modal.style.position = "relative";
 
-    // Success or no savings message styling
+    // Determine if user saved money
     const isSuccess = savingsAmount > 0;
-    const headerText = isSuccess ? "🎉 Savings Found!" : "No Savings Found";
-    const headerColor = "#ff9058"; // Green for success, red for no savings
 
+    // If no savings found, encourage the user that it's already the best price
+    const defaultMessage = isSuccess
+        ? `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+        : "Looks like you're already getting the best deal. Go ahead and buy!";
+
+    // You can decide whether to use `message` or `defaultMessage` or combine them
+    const finalMessage = message || defaultMessage;
+
+    // Caramel brand/logo
+    const brandColor = "#ea6925";
+    const logoUrl = currentBrowser.runtime.getURL("assets/logo.png"); // Adjust if needed
+
+    // Modal inner HTML
     modal.innerHTML = `
-    <div style="margin-bottom: 20px;">
-      <h2 style="margin: 10px 0 0 0; color: ${headerColor}; font-size: 22px;">${headerText}</h2>
+    <!-- Logo Section -->
+    <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+      <img 
+        src="${logoUrl}" 
+        alt="Caramel Logo" 
+        style="width: 60px; height: 60px;" 
+      />
     </div>
-    <p style="font-size: 16px; color: #333;">${message}</p>
+
+    <!-- Heading/Text Section -->
+    <h2 style="
+      margin: 0 0 15px 0; 
+      color: ${brandColor}; 
+      font-size: 24px; 
+      font-weight: bold;
+    ">
+      ${isSuccess ? "🎉 Savings Found!" : "Great News!"}
+    </h2>
+    <p style="font-size: 16px; color: #333; margin: 0 0 10px 0;">
+      ${finalMessage}
+    </p>
+    
+    <!-- If user saved money, show how much -->
     ${
         isSuccess
-            ? `<p style="font-size: 18px; color: #28a745; font-weight: bold;">You saved $${savingsAmount.toFixed(
-                2
-            )}!</p>`
+            ? `<p style="font-size: 18px; color: ${brandColor}; font-weight: bold;">
+            You saved $${savingsAmount.toFixed(2)}!
+          </p>`
             : ""
     }
-    <button id="caramel-final-ok-btn" style="
+
+    <!-- Action Button -->
+    <button 
+      id="caramel-final-ok-btn" 
+      style="
         margin-top: 20px; 
-        background: #ff9058; 
+        background: ${brandColor}; 
         border: none; 
         color: #fff; 
-        padding: 10px 20px; 
+        padding: 12px 24px; 
         border-radius: 8px; 
         cursor: pointer; 
         font-size: 16px; 
         font-weight: bold;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         transition: background 0.3s;
-    ">
+      "
+    >
       Proceed to Checkout
     </button>
   `;
@@ -274,18 +372,20 @@ function showFinalModal(savingsAmount, message) {
     const style = document.createElement("style");
     style.textContent = `
     #caramel-final-ok-btn:hover {
-        background: #ffbf47;
+      background: #ffbf47;
     }
-    `;
+  `;
     document.head.appendChild(style);
 
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
+    // Close the modal on button click
     modal.querySelector("#caramel-final-ok-btn").addEventListener("click", () => {
         document.body.removeChild(overlay);
     });
 }
+
 async function isSupported(domain) {
     let supportedDomains = [];
     try {
