@@ -14,34 +14,6 @@ function getAmazonCartKeywords() {
     return uniqueWords.join(",");
 }
 
-function applyCouponForAmazon(code) {
-    return new Promise((resolve) => {
-        // Example selectors - these may be incorrect for the real Amazon flow
-        const promoInput = document.querySelector('input[name="ppw-claimCode"]');
-        const applyButton = document.querySelector('input[name="ppw-claimCodeApplyPressed"]');
-        console.log(promoInput, applyButton);
-        if (!promoInput || !applyButton) {
-            // If the user’s in a checkout stage without a promo code field
-            return resolve({ success: false, newTotal: NaN });
-        }
-
-        // Insert the code
-        promoInput.value = code;
-        // Trigger an input event
-        promoInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-        // Click “Apply”
-        applyButton.click();
-
-        // Let Amazon process the code for a few seconds
-        setTimeout(() => {
-            // Check if the total changed
-            const updatedTotal = getAmazonOrderTotal();
-            resolve({ success: true, newTotal: updatedTotal });
-        }, 3000); // adjust timing as needed
-    });
-}
-
 function getAmazonOrderTotal() {
     const totalEl = document.querySelector("#sc-subtotal-amount-buybox .a-size-medium.a-color-base");
     if (!totalEl) {

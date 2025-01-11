@@ -1,10 +1,10 @@
-function initCouponFlow(site) {
+function initCouponFlow(domainRecord) {
     // Insert a small button/prompt for the user to click
     console.log("Caramel: Inserting prompt for coupons...");
-    insertCaramelPrompt(site);
+    insertCaramelPrompt(domainRecord);
 }
 
-async function insertCaramelPrompt(site) {
+async function insertCaramelPrompt(domainRecord) {
     // Avoid inserting the prompt more than once
     if (document.getElementById("caramel-small-prompt")) {
         return;
@@ -73,22 +73,52 @@ async function insertCaramelPrompt(site) {
             return;
         }
         // If the container itself is clicked, start applying coupons
-        startApplyingCoupons(site);
+        startApplyingCoupons(domainRecord);
         document.body.removeChild(container);
     });
 
     document.body.appendChild(container);
 }
 
-async function startApplyingCoupons(site) {
+
+function applyCoupon(code, domainRecord) {
+    return new Promise((resolve) => {
+        // Example selectors - these may be incorrect for the real Amazon flow
+        const promoInput = document.querySelector(`${domainRecord.couponInput}`);
+        const applyButton = document.querySelector(`${domainRecord.couponSubmit}`);
+        console.log(promoInput, applyButton);
+        if (!promoInput || !applyButton) {
+            // If the user’s in a checkout stage without a promo code field
+            return resolve({ success: false, newTotal: NaN });
+        }
+
+        // Insert the code
+        promoInput.value = code;
+        // Trigger an input event
+        promoInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // Click “Apply”
+        applyButton.click();
+
+        // Let Amazon process the code for a few seconds
+        setTimeout(() => {
+            // Check if the total changed
+            const updatedTotal = getAmazonOrderTotal();
+            resolve({ success: true, newTotal: updatedTotal });
+        }, 3000); // adjust timing as needed
+    });
+}
+
+
+async function startApplyingCoupons(domainRecord) {
     // 1. Gather keywords from the cart
     let keywords = "";
-    if(site === "amazon.com") {
+    if(domainRecord.domain === "amazon.com") {
         keywords = getAmazonCartKeywords();
     }
 
     // 2. Fetch coupons from your backend
-    const coupons = await fetchCoupons(site,keywords);
+    const coupons = await fetchCoupons(domainRecord.domain, keywords);
     if (!coupons || coupons.length === 0) {
         showFinalModal(0, null,"No better price found. This is already the best you can get!");
         return;
@@ -102,7 +132,7 @@ async function startApplyingCoupons(site) {
 
     // Store the original total to compare against
     let originalTotal = null;
-    if(site === "amazon.com") {
+    if(domainRecord.domain === "amazon.com") {
         originalTotal = parseFloat(getAmazonOrderTotal());
     }
     console.log("Caramel: Original total is:", originalTotal);
@@ -114,11 +144,9 @@ async function startApplyingCoupons(site) {
 
         let  success = false;
         let newTotal = null;
-        if(site === "amazon.com") {
-            const result = await applyCouponForAmazon(code);
-            success = result.success;
-            newTotal = result.newTotal
-        }
+        const result = await applyCoupon(code, domainRecord);
+        success = result.success;
+        newTotal = result.newTotal
         if (!success) {
             console.log(`Caramel: Coupon ${code} not successfully applied (or no discount field)`);
             // set the coupon as expired
@@ -388,7 +416,7 @@ async function showFinalModal(savingsAmount, discountType,message) {
     });
 }
 
-async function isSupported(domain) {
+async function getDomainRecord(domain) {
     let supportedDomains = [];
     try {
         const response = await fetch(currentBrowser.runtime.getURL('supported.json'));
@@ -400,6 +428,5 @@ async function isSupported(domain) {
     } catch (error) {
         console.error('Error loading supported.json:', error);
     }
-
-    return supportedDomains.includes(domain);
+    return supportedDomains.find((domainRecord) => domain.includes(domainRecord.domain));
 }

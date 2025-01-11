@@ -15,9 +15,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const url = new URL(tabs[0].url);
                 const domain = url.hostname;
 
-                const domainIsSupported = await isSupported(domain);
-                currentBrowser.storage.local.set({ domainSupported: domainIsSupported })
-                container.innerHTML = domainIsSupported
+                const domainIsSupported = await getDomainRecord(domain);
+                currentBrowser.storage.local.set({ domainSupported: domainIsSupported != null })
+                container.innerHTML = domainIsSupported != null
                     ? `Yippy! <span class="classy">${domain}</span> is supported by <span class="classy">Caramel</span>`
                     : `Oops! <span class="classy">${domain}</span> is not supported by <span class="classy">Caramel</span>`;
             });

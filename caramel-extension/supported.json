@@ -1,3 +1,14 @@
 {
-  "supported": ["www.amazon.com"]
+  "supported": [
+    {
+      "domain": "amazon.com",
+      "couponInput": "input[name='ppw-claimCode']",
+      "couponSubmit": "input[name='ppw-claimCodeApplyPressed']"
+    },
+    {
+      "domain":"ebay.com",
+      "couponInput": "input[name='redemptionCode']",
+      "couponSubmit": "button[data-test-id='INCENTIVES_ADD_BUTTON']"
+    }
+  ]
 }

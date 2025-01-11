@@ -17,7 +17,8 @@
     "webNavigation"
   ],
   "host_permissions": [
-    "https://www.amazon.com/*"
+    "https://www.amazon.com/*",
+    "https://*.ebay.com/*"
   ],
   "web_accessible_resources": [
     {
@@ -28,7 +29,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.amazon.com/*"
+        "https://www.amazon.com/*",
+        "https://*.ebay.com/*"
       ],
       "js": ["shared-utils.js", "inject.js", "amazon.js"]
     }
