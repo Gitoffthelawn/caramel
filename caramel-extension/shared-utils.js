@@ -105,16 +105,25 @@ function applyCoupon(code, domainRecord) {
             // Check if the total changed
             const updatedTotal = getAmazonOrderTotal();
             resolve({ success: true, newTotal: updatedTotal });
-        }, 3000); // adjust timing as needed
+        }, 3000);
     });
 }
 
 
 async function startApplyingCoupons(domainRecord) {
+
+    await showTestingModal();
+
     // 1. Gather keywords from the cart
     let keywords = "";
     if(domainRecord.domain === "amazon.com") {
-        keywords = getAmazonCartKeywords();
+        const response = await new Promise((resolve) => {
+            currentBrowser.runtime.sendMessage({ action: "scrapeAmazonCartKeywords" }, (response) => {
+                resolve(response);
+            });
+        });
+        keywords = response.keywords.join(",");
+        console.log("Caramel: Keywords from Amazon cart:", keywords);
     }
 
     // 2. Fetch coupons from your backend
@@ -124,8 +133,6 @@ async function startApplyingCoupons(domainRecord) {
         return;
     }
 
-    // 3. Show a “Testing Coupons” modal to the user
-    await showTestingModal();
     let bestCode = null;
     let bestDifference = 0;
     let couponType = null;
@@ -147,9 +154,9 @@ async function startApplyingCoupons(domainRecord) {
         const result = await applyCoupon(code, domainRecord);
         success = result.success;
         newTotal = result.newTotal
+        document.querySelector(`${domainRecord.couponInput}`).value = "";
         if (!success) {
             console.log(`Caramel: Coupon ${code} not successfully applied (or no discount field)`);
-            // set the coupon as expired
             continue;
         }
 
@@ -192,7 +199,7 @@ async function fetchCoupons(site,keywords) {
 }
 
 
-async function showTestingModal() {
+async function showTestingModal(title = "", noLoading = false) {
     // Create overlay
     const overlay = document.createElement("div");
     overlay.id = "caramel-testing-overlay";
@@ -226,14 +233,7 @@ async function showTestingModal() {
     // Fetch the Caramel logo
     const logoUrl = currentBrowser.runtime.getURL("assets/logo-light.png");
 
-    // Inject HTML content (logo, heading, status text, progress bar)
-    modal.innerHTML = `
-    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
-      <img src="${logoUrl}" alt="Caramel Logo" style="width: 40px; height: 40px; margin-right: 8px;" />
-      <h2 style="margin: 0; font-size: 18px;">Applying Coupons...</h2>
-    </div>
-
-    <p id="caramel-test-status" style="margin: 10px 0; font-size: 15px;">Loading...</p>
+    const loadingHTML =     ` <p id="caramel-test-status" style="margin: 10px 0; font-size: 15px;">Loading...</p>
     
     <!-- Progress bar container -->
     <div id="caramel-progress-container" style="
@@ -253,8 +253,15 @@ async function showTestingModal() {
         border-radius: 6px;
         transition: width 0.3s ease;
       "></div>
+    </div>`
+    modal.innerHTML = `
+    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
+      <img src="${logoUrl}" alt="Caramel Logo" style="width: 40px; height: 40px; margin-right: 8px;" />
+      <h2 style="margin: 0; font-size: 18px;text-align: center">
+        ${title ? title : "Applying Coupons..."}
+        </h2>
     </div>
-  `;
+   ${noLoading ? "" : loadingHTML}`;
 
     // Add keyframe animations
     const style = document.createElement("style");
@@ -429,4 +436,16 @@ async function getDomainRecord(domain) {
         console.error('Error loading supported.json:', error);
     }
     return supportedDomains.find((domainRecord) => domain.includes(domainRecord.domain));
+}
+
+async function filterKeywords(keywords) {
+    const specialChars = /[!@#$%^&*(),.?":{}|<>]/;
+    const lineBreaks = /[\n\r]/;
+    return Array.from(new Set(keywords))
+        .filter(keyword =>
+            keyword.length > 3 && // Length check
+            !specialChars.test(keyword) && // No special characters
+            !lineBreaks.test(keyword) && // No line breaks
+            keyword.trim() !== "" // Not empty or whitespace
+        );
 }
