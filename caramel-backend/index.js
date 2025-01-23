@@ -24,10 +24,10 @@ const apiKeyMiddleware = (req, res, next) => {
 app.set('trust proxy', true);
 app.use(bodyParser.json());
 
-app.use(cors({origin: "*"}));
 app.use(express.json());
 
 app.use('/seed-coupons', cors(seederCorsOptions));
+app.use(cors({origin: "*"}));
 
 app.post('/seed-coupons', apiKeyMiddleware, async (req, res) => {
     let coupons = req.body;
