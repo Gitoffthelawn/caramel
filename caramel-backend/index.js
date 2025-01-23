@@ -5,12 +5,6 @@ const bodyParser = require('body-parser');
 const app = express();
 const prisma = new PrismaClient();
 
-const seederCorsOptions = {
-    origin: '*',
-    methods: ['POST'],
-    allowedHeaders: ['Content-Type', 'X-SCRAPER-API-KEY'],
-};
-
 const apiKeyMiddleware = (req, res, next) => {
     const apiKey = req.headers['x-scraper-api-key'];
 
@@ -25,9 +19,11 @@ app.set('trust proxy', true);
 app.use(bodyParser.json());
 
 app.use(express.json());
-
-app.use('/seed-coupons', cors(seederCorsOptions));
-app.use(cors({origin: "*"}));
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-SCRAPER-API-KEY']
+}));
 
 app.post('/seed-coupons', apiKeyMiddleware, async (req, res) => {
     let coupons = req.body;
