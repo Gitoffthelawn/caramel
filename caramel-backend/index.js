@@ -21,7 +21,7 @@ const apiKeyMiddleware = (req, res, next) => {
 
     next();
 };
-
+app.set('trust proxy', true);
 app.use(bodyParser.json());
 
 app.use(cors({origin: "*"}));
