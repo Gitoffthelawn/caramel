@@ -6,7 +6,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 
-export default function layout({ children }) {
+export default function Layout({ children }) {
     const { isDarkMode } = useContext(ThemeContext)
     const ref = useRef(null)
   return (
