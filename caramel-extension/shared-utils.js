@@ -184,7 +184,7 @@ async function startApplyingCoupons(domainRecord) {
 }
 
 async function fetchCoupons(site,keywords) {
-    const url = ` http://localhost:3000/coupons?&site=${site}&key_words=${encodeURIComponent(keywords)}`;
+    const url = `https://dev.grabcaramel.com/coupons?&site=${site}&key_words=${encodeURIComponent(keywords)}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
