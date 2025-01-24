@@ -1,20 +1,25 @@
-import { Inter } from "next/font/google";
-import React from "react";
-import {ThemeProvider} from "@/context/ThemeContext";
+import React, {useContext, useRef} from "react";
 import Header from "@/layouts/Header/Header";
 import Footer from "@/layouts/Footer/Footer";
-
-const inter = Inter({ subsets: ["latin"] });
+import {ThemeContext} from "@/lib/contexts";
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 
 export default function RootLayout({ children }) {
+    const { isDarkMode } = useContext(ThemeContext)
+    const ref = useRef(null)
   return (
-      <div className={"h-screen bg-gray-50"}>
-    <ThemeProvider>
-          <Header />
-          {children}
-          <Footer />
-      </ThemeProvider>
+      <div
+            ref={ref}
+          className={`overflow-x-hidden h-screen ${
+              isDarkMode ? 'dark bg-darkBg' : 'light bg-gray-50'
+          } font-Roboto`}
+      >
+          <ToastContainer theme={isDarkMode ? 'dark' : 'light'}/>
+              <Header scrollRef={ref}/>
+              {children}
+              <Footer/>
       </div>
-  );
-}
+      );
+      }

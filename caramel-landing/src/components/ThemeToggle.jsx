@@ -1,17 +1,19 @@
-import React from "react";
-import {useTheme} from "@/context/ThemeContext";
+import React, {useContext} from "react";
+import {ThemeContext} from "@/lib/contexts";
 
 const ThemeToggle = ({ className }) => {
-    const { theme, toggleTheme } = useTheme();
+    const { isDarkMode, switchTheme } = useContext(ThemeContext)
 
     return (
         <button
             id="theme-toggle"
             className={`theme-toggle ${className || ""}`}
             title="Toggle light & dark"
-            aria-label={theme}
+            aria-label={isDarkMode ? "dark": "light"}
             aria-live="polite"
-            onClick={toggleTheme}
+            onClick={() => {
+                switchTheme();
+            }}
         >
             <svg
                 className="sun-and-moon"

@@ -26,8 +26,8 @@
     "react-fast-marquee": "^1.6.4",
     "react-icons": "^5.0.1",
     "react-lottie-player": "^1.5.6",
+    "react-toastify": "^10.0.5",
     "react-type-animation": "^3.2.0",
-    "react-use-scroll-direction": "^0.1.0",
     "sass": "^1.83.4"
   },
   "devDependencies": {

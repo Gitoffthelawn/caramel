@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import React from "react";
+import React, {useContext} from "react";
 import { motion } from "framer-motion";
+import {ThemeContext} from "@/lib/contexts";
 
 const supportedSites = [
     {
         name: "Amazon.com",
         desc: "World’s largest online retailer",
-        image: "/amazon.png"
+        image: "/amazon.png",
+        imageLight: "/amazon-light.png"
     },
     {
         name: "eBay.com",
@@ -23,7 +25,8 @@ const supportedSites = [
     {
         name: "Amazon.com",
         desc: "World’s largest online retailer",
-        image: "/amazon.png"
+        image: "/amazon.png",
+        imageLight: "/amazon-light.png"
     },
     {
         name: "eBay.com",
@@ -38,7 +41,8 @@ const supportedSites = [
     {
         name: "Amazon.com",
         desc: "World’s largest online retailer",
-        image: "/amazon.png"
+        image: "/amazon.png",
+        imageLight: "/amazon-light.png"
     },
     {
         name: "eBay.com",
@@ -57,14 +61,15 @@ export default function SupportedSection() {
     const angleStep = 360 / cardCount;
     const radius = 28;
 
+    const { isDarkMode } = useContext(ThemeContext)
     return (
-        <section className="py-16 bg-white w-full" >
+        <section className="py-16 dark:bg-darkBg  w-full" >
             <motion.div
                 className="
                         max-w-6xl mx-auto
                         px-6
                         text-5xl md:text-xl font-bold mb-6 justify-center
-                        bg-clip-text text-black/80"
+                        bg-clip-text dark:text-white text-black/80"
             >
                 Currently Supported Sites
             </motion.div>
@@ -83,8 +88,8 @@ export default function SupportedSection() {
                         const rotateY = index * angleStep;
                         return (
                             <motion.div
-                                key={site.name}
-                                className="absolute top-1/2 md:h-40 md:w-40 left-1/2 w-52 h-52 p-4 bg-gray-50 rounded-lg shadow-xl flex flex-col justify-center items-center text-center"
+                                key={site.name+index}
+                                className="absolute top-1/2 md:h-40 md:w-40 left-1/2 w-52 h-52 p-4 dark:bg-darkerBg bg-gray-50 rounded-lg shadow-xl flex flex-col justify-center items-center text-center"
                                 style={{
                                     transformStyle: "preserve-3d",
                                     transform: `
@@ -95,14 +100,14 @@ export default function SupportedSection() {
                                 }}
                             >
                                 <Image
-                                    src={site.image}
+                                    src={(isDarkMode && site.imageLight) ? site.imageLight : site.image}
                                     alt={site.name}
                                     width={80}
                                     height={80}
                                     className="mb-2 md:w-1/2 object-contain"
                                 />
                                 <h3 className="text-xl font-semibold md:text-xs text-caramel">{site.name}</h3>
-                                <p className="mt-2 text-sm md:text-xs text-gray-600">{site.desc}</p>
+                                <p className="mt-2 text-sm md:text-xs dark:text-white text-gray-600">{site.desc}</p>
                             </motion.div>
                         );
                     })}

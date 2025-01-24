@@ -10,7 +10,7 @@ export default function HeroSection() {
 
     return (
         <section
-            className="relative mt-[5rem] min-h-screen flex flex-col justify-center overflow-hidden px-6 py-16 bg-gray-50 text-gray-800"
+            className="relative mt-[5rem] min-h-screen dark:bg-darkBg dark:text-white flex flex-col justify-center overflow-hidden px-6 py-16 text-gray-800"
         >
             <div className="relative z-10 max-w-6xl mx-auto text-center">
                 <motion.h1
@@ -25,7 +25,7 @@ export default function HeroSection() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
                         className="
-                        m-auto text-black/70 drop-shadow-2xl"
+                        m-auto dark:text-white text-black/70 drop-shadow-2xl"
                     >
                         Welcome to
                     </motion.div>
@@ -41,7 +41,7 @@ export default function HeroSection() {
                     initial={{opacity: 0, y: 10}}
                     animate={{opacity: 1, y: 0}}
                     transition={{duration: 0.8}}
-                    className="text-xl md:text-sm text-gray-600 max-w-2xl mx-auto mb-8"
+                    className="text-xl md:text-sm text-gray-600 dark:text-white max-w-2xl mx-auto mb-8"
                 >
                     Caramel is the best way to save money on your online shopping. Our
                     browser extension automatically applies the best coupon code at

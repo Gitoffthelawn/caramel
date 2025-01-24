@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     screens: {
@@ -26,7 +27,11 @@ module.exports = {
     },
     extend: {
       colors: {
-        caramel: "#ea6925", // Our main brand color
+        caramel: "#ea6925",
+        caramelLight: "#da7f52",
+        darkBg: "#191A1C",
+        darkerBg: "#101010"
+
       },
     },
   },

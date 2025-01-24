@@ -1,40 +1,38 @@
-
-
 import L from "next/link";
-import {useScrollDirection} from "react-use-scroll-direction";
 import {AnimatePresence, motion} from "framer-motion";
 import React, {useEffect, useState} from "react";
 import {RiCloseFill, RiMenu3Fill} from "react-icons/ri";
 import Image from "next/image";
 import {usePathname} from "next/navigation";
 import {useWindowSize} from "@/hooks/useWindowSize";
+import ThemeToggle from "@/components/ThemeToggle";
+import {useScrollDirection} from "@/hooks/useScrollDirection";
 
 const links = [
     {name: "Home", url: "/"},
     {name: "Privacy", url: "/privacy"},
 ];
 
-const Link = motion(L);
+const Link = motion.create(L);
 
-export default function Header() {
+export default function Header({scrollRef}) {
     const [isInView, setIsInView] = useState(true);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const {isScrollingUp, isScrollingDown} = useScrollDirection();
+    const {isScrollingDown, isScrollingUp} = useScrollDirection(scrollRef);
     const {windowSize} = useWindowSize();
-    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
-        setIsMobile(windowSize < 1024)
     }, [windowSize]);
     const pathname = usePathname();
 
     useEffect(() => {
-        if (isScrollingUp) setIsInView(true);
-        if (isScrollingDown) {
+        if(isScrollingDown){
             setIsInView(false);
-            setIsMenuOpen(false);
         }
-    }, [isScrollingUp, isScrollingDown]);
+        if(isScrollingUp){
+            setIsInView(true);
+        }
+    }, [isScrollingDown, isScrollingUp]);
 
 
     return (
@@ -46,7 +44,7 @@ export default function Header() {
                 scale: isInView ? 1 : 1.05,
             }}
             transition={{duration: 0.3}}
-            className={`z-[999]  lg:bg-white lg:dark:bg-deepBlue lg:rounded-[28px] lg:shadow w-full max-w-[min(75rem,93svw)] sticky rounded-2xl p-4 px-8 flex items-center justify-between mx-auto top-4 lg:py-3 py-4`}
+            className={`  z-[999]  lg:bg-white lg:dark:bg-darkerBg lg:rounded-[28px] lg:shadow w-full max-w-[min(75rem,93svw)] sticky rounded-2xl p-4 px-8 flex items-center justify-between mx-auto top-4 lg:py-3 py-4`}
         >
             <Link
                 href="/"
@@ -61,7 +59,7 @@ export default function Header() {
                     />
             </Link>
             <motion.div
-                className={`px-[26px] py-[15px] lg:hidden w-full mx-auto bg-white rounded-[28px] shadow justify-center flex items-start gap-6`}>
+                className={`px-[26px] py-[15px] lg:hidden w-full mx-auto bg-white dark:bg-darkerBg rounded-[28px] shadow justify-center flex items-start gap-6`}>
                 {links.map(link => {
                     const isActive = pathname === link.url;
 
@@ -76,6 +74,7 @@ export default function Header() {
                     );
                 })}
             </motion.div>
+            <ThemeToggle className="lg:relative lg:ml-auto absolute lg:right-auto -right-4"/>
             <button
                 className="text-caramel hidden ml-3 lg:block text-2xl "
                 onClick={() => setIsMenuOpen(!isMenuOpen)}

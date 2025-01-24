@@ -24,13 +24,13 @@ const features = [
 
 export default function FeaturesSection() {
     return (
-        <section className="bg-white py-16">
+        <section className="dark:bg-darkBg py-16">
             <div className="max-w-6xl mx-auto px-6">
                 <motion.div
                     className="
                         m-auto
                         text-5xl md:text-xl font-bold mb-6 justify-center
-                        bg-clip-text text-black/80"
+                        bg-clip-text dark:text-white text-black/80"
                 >
                     Features provided by Caramel
                 </motion.div>
@@ -59,7 +59,7 @@ export default function FeaturesSection() {
                                 <div
                                     className="
                     absolute w-full h-full
-                    bg-white rounded-lg shadow-md p-6
+                    bg-white dark:bg-darkerBg rounded-lg shadow-md p-6
                     flex flex-col justify-center items-start
                   "
                                     style={{ backfaceVisibility: "hidden" }}
@@ -67,7 +67,7 @@ export default function FeaturesSection() {
                                     <h3 className="text-xl font-semibold text-caramel mb-2">
                                         {feat.title}
                                     </h3>
-                                    <p className="text-gray-700 text-sm">{feat.desc}</p>
+                                    <p className="text-gray-700 dark:text-white text-sm">{feat.desc}</p>
                                 </div>
                                 <div
                                     className="
