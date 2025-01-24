@@ -9,6 +9,12 @@
       "domain":"ebay.com",
       "couponInput": "input[name='redemptionCode']",
       "couponSubmit": "button[data-test-id='INCENTIVES_ADD_BUTTON']"
+    },
+    {
+      "domain":"codecademy.com",
+      "showInput": "button[id='promo-button']",
+      "couponInput": "input[name='redemptionCode']",
+      "couponSubmit": "button[data-test-id='INCENTIVES_ADD_BUTTON']"
     }
   ]
 }

@@ -18,7 +18,8 @@
   ],
   "host_permissions": [
     "https://www.amazon.com/*",
-    "https://*.ebay.com/*"
+    "https://*.ebay.com/*",
+    "https://*.codecademy.com/*"
   ],
   "web_accessible_resources": [
     {
@@ -30,7 +31,8 @@
     {
       "matches": [
         "https://www.amazon.com/*",
-        "https://*.ebay.com/*"
+        "https://*.ebay.com/*",
+        "https://*.codecademy.com/*"
       ],
       "js": ["shared-utils.js", "inject.js", "amazon.js"]
     }

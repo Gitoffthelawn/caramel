@@ -114,6 +114,10 @@ async function startApplyingCoupons(domainRecord) {
 
     await showTestingModal();
 
+    if(domainRecord.showInput) {
+    const showInputButton = await document.querySelector(`${domainRecord.showInput}`);
+    showInputButton.click();
+    }
     // 1. Gather keywords from the cart
     let keywords = "";
     if(domainRecord.domain === "amazon.com") {
@@ -184,7 +188,7 @@ async function startApplyingCoupons(domainRecord) {
 }
 
 async function fetchCoupons(site,keywords) {
-    const url = `https://dev.grabcaramel.com/coupons?&site=${site}&key_words=${encodeURIComponent(keywords)}`;
+    const url = `https://dev.grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(keywords)}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
