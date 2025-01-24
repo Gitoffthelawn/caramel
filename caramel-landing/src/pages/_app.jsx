@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {Loader} from "@react-three/drei";
 import { ThemeContext } from '@/lib/contexts'
 
-const Layout = dynamic(() => import('../layouts/Layout/Layout'), {
+const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
     loading: () => (
         <div className="flex h-full w-full flex-col items-center justify-center gap-4">
