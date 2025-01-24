@@ -18,7 +18,7 @@ const supportedSites = [
     {
         name: "CodeAcademy",
         desc: "Interactive platform to learn coding",
-        image: "/CodeAcademy.png"
+        image: "/codeAcademy.png"
     },
     {
         name: "Amazon.com",
@@ -33,7 +33,7 @@ const supportedSites = [
     {
         name: "CodeAcademy",
         desc: "Interactive platform to learn coding",
-        image: "/CodeAcademy.png"
+        image: "/codeAcademy.png"
     },
     {
         name: "Amazon.com",
@@ -48,7 +48,7 @@ const supportedSites = [
     {
         name: "CodeAcademy",
         desc: "Interactive platform to learn coding",
-        image: "/CodeAcademy.png"
+        image: "/codeAcademy.png"
     },
 ];
 
