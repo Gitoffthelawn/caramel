@@ -112,7 +112,7 @@ const AppHeader = ({
                 <meta name="twitter:title" content="Caramel"/>
                 <meta
                     name="twitter:description"
-                    content="Develop with innovation"
+                    content="Best coupon extension"
                 />
                 <meta name="twitter:image" content="/og.svg"/>
                 <meta name="twitter:creator" content="@devino_solutions"/>
@@ -123,14 +123,13 @@ const AppHeader = ({
                 />
                 <meta
                     property="og:description"
-                    content="Develop with innovation"
+                    content="Best coupon extension"
                 />
                 <meta property="og:site_name" content="Caramel"/>
                 <meta
                     property="og:url"
                     content={ogUrl ? ogUrl : 'https://dev.grabcaramel.com/'}
                 />
-                <meta property="og:image" content="/logo.png"/>
             </Head>
         </>
     )
