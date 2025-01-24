@@ -4,7 +4,6 @@ import React, {useEffect, useState} from "react";
 import dynamic from "next/dynamic";
 import {Loader} from "@react-three/drei";
 import { ThemeContext } from '@/lib/contexts'
-import Header from "@/layouts/Header/Header";
 
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
