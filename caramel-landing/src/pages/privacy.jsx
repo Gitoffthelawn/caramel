@@ -1,13 +1,12 @@
 
-import Image from 'next/image'
-import { Fragment, useState } from 'react'
 import PrivacyPolicy from "@/components/PrivacyPolicy";
+import AppHeader from "@/AppHeader";
 
 const Privacy = () => {
-    const [activeIndex, setActiveIndex] = useState(0)
 
     return (
         <div className="flex justify-center bg-gray-50 h-fit overflow-y-auto">
+            <AppHeader description={"Caramel Privacy Policy"} ogTitle={"Privacy page"}/>
             <div className="max-w-6xl mt-[5rem]">
                 <div className="flex items-center justify-between p-8">
                     <div>

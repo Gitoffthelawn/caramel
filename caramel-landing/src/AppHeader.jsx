@@ -9,7 +9,7 @@ const AppHeader = ({
 }) => {
     const title = `Caramel | ${capitalizeFirst(description || "Best coupon web extension")}`
     const fullOgUrl = ogUrl ? ogUrl : 'https://dev.grabcaramel.com/'
-    const fullOgImage = `${fullOgUrl}/full-logo.png`
+    const fullOgImage = `${fullOgUrl}/logo.png`
     return (
         <>
             <Head>

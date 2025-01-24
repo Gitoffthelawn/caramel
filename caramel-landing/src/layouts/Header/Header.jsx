@@ -8,7 +8,6 @@ import {RiCloseFill, RiMenu3Fill} from "react-icons/ri";
 import Image from "next/image";
 import {usePathname} from "next/navigation";
 import {useWindowSize} from "@/hooks/useWindowSize";
-import AppHeader from "@/AppHeader";
 
 const links = [
     {name: "Home", url: "/"},
