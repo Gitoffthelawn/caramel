@@ -10,7 +10,6 @@ import AppHeader from "@/AppHeader";
 export default function Index() {
     return (
         <main className={"w-[100%] relative overflow-x-clip -mt-[6.7rem]"}>
-
             <AppHeader/>
             <Doodles />
             <HeroSection/>

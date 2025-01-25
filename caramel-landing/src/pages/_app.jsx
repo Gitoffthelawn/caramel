@@ -4,6 +4,8 @@ import React, {useEffect, useState} from "react";
 import dynamic from "next/dynamic";
 import {Loader} from "@react-three/drei";
 import { ThemeContext } from '@/lib/contexts'
+import Header from "@/AppHeader";
+import AppHeader from "@/AppHeader";
 
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
@@ -39,6 +41,11 @@ function MyApp({ Component, pageProps }) {
     }, [])
     return (
         <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
+                <AppHeader
+                    description="Best coupons extension for Chrome and Safari"
+                    ogTitle="Caramel"
+                    ogUrl="https://dev.grabcaramel.com/"
+                />
                 <Layout>
                     <Component {...pageProps} />
                 </Layout>
