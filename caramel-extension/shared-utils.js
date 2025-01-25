@@ -80,44 +80,133 @@ async function insertCaramelPrompt(domainRecord) {
     document.body.appendChild(container);
 }
 
+function getPrice(selector, options = {}) {
+    const priceEl = document.querySelector(selector);
+    if (!priceEl) {
+        return NaN;
+    }
 
-function applyCoupon(code, domainRecord) {
-    return new Promise((resolve) => {
-        // Example selectors - these may be incorrect for the real Amazon flow
-        const promoInput = document.querySelector(`${domainRecord.couponInput}`);
-        const applyButton = document.querySelector(`${domainRecord.couponSubmit}`);
-        console.log(promoInput, applyButton);
-        if (!promoInput || !applyButton) {
-            // If the user’s in a checkout stage without a promo code field
-            return resolve({ success: false, newTotal: NaN });
-        }
+    const text = priceEl.innerText;
 
-        // Insert the code
-        promoInput.value = code;
-        // Trigger an input event
-        promoInput.dispatchEvent(new Event("input", { bubbles: true }));
+    const currencyRegex = /\b(?:[A-Z]{1,3}\s?\$|\$|£|€)\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?\b/gi;
 
-        // Click “Apply”
-        applyButton.click();
-
-        // Let Amazon process the code for a few seconds
-        setTimeout(() => {
-            // Check if the total changed
-            const updatedTotal = getAmazonOrderTotal();
-            resolve({ success: true, newTotal: updatedTotal });
-        }, 3000);
+    const matches = text.match(currencyRegex);
+    if (!matches || matches.length === 0) {
+        return NaN;
+    }
+    const prices = matches.map(m => {
+        const clean = m.replace(/[^0-9.,]/g, "") // remove everything but digits, commas, dots
+            .replace(/,/g, "");       // remove commas
+        return parseFloat(clean);
     });
+    if (options.returnLargest) {
+        return Math.max(...prices);
+    } else {
+        return prices[0];
+    }
 }
 
+
+
+async function applyCoupon(code, domainRecord, best = false) {
+    try {
+        // 1) Get the original price
+        const originalPrice = getPrice(domainRecord.priceContainer);
+        console.log("Caramel: Original price is:", originalPrice);
+
+        // 2) Identify relevant elements
+        let promoInput = document.querySelector(domainRecord.couponInput);
+        const showInput = document.querySelector(domainRecord.showInput);
+
+        // 3) If there's a "show input" button and we don't have our coupon input yet, click to reveal it
+        if (showInput && !promoInput) {
+            console.log("Caramel: Clicking 'show input' to reveal coupon field");
+            await showInput.click();
+
+            // After click, check if coupon input now exists
+            promoInput = document.querySelector(domainRecord.couponInput);
+            // If still not found, wait up to 5 seconds for DOM update
+            if (!promoInput) {
+                try {
+                    await waitForDomUpdate(domainRecord.couponInput, { timeout: 5000 });
+                    promoInput = document.querySelector(domainRecord.couponInput);
+                    console.log("Caramel: Coupon input found after waiting");
+                } catch (err) {
+                    console.warn(
+                        "Caramel: Timed out or error while waiting for coupon input to appear:",
+                        err
+                    );
+                }
+            }
+        }
+        const applyButton = document.querySelector(domainRecord.couponSubmit);
+        if (!promoInput || !applyButton) {
+            console.warn("Caramel: Missing promo input or apply button.");
+            return { success: false, newTotal: NaN };
+        }
+
+        // 5) Insert the code and dispatch an 'input' event
+        promoInput.value = code;
+        promoInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // 6) Click the "Apply" button
+        await applyButton.click();
+
+        // 7) Wait for the price container to update (in case it’s missing or hasn't changed yet)
+        const priceContainer = document.querySelector(domainRecord.priceContainer);
+        if (!priceContainer) {
+            // If the price container doesn't exist yet, wait for it.
+            try {
+                await waitForDomUpdate(domainRecord.priceContainer, { timeout: 5000 });
+            } catch (err) {
+                console.warn(
+                    "Caramel: Timed out or error while waiting for price container to appear:",
+                    err
+                );
+            }
+        } else {
+            // If it does exist, we can still watch for changes inside it
+            try {
+                await waitForDomUpdate(domainRecord.priceContainer, { timeout: 5000 });
+            } catch (err) {
+                console.warn(
+                    "Caramel: Timed out or error while waiting for price container to update:",
+                    err
+                );
+            }
+        }
+
+        // 8) Grab the newly updated price
+        const newPrice = getPrice(domainRecord.priceContainer);
+        console.log("Caramel: New price is:", newPrice);
+
+        // 9) Compare old vs new
+        if (isNaN(newPrice) || newPrice >= originalPrice) {
+            // If the new price is not a number or not lower, the coupon didn't help
+            return { success: false, newTotal: NaN };
+        }
+
+        // 10) Optionally dismiss the coupon if we aren't in "best" mode
+        if (domainRecord.dismissButton && !best) {
+            console.log("Caramel: Dismissing coupon pop-up or modal");
+            const dismissButton = document.querySelector(domainRecord.dismissButton);
+            if (dismissButton) {
+                await dismissButton.click();
+            }
+        }
+
+        // 11) Success: return the new total
+        return { success: true, newTotal: newPrice };
+
+    } catch (err) {
+        console.error("Caramel: Unexpected error in applyCoupon:", err);
+        return { success: false, newTotal: NaN };
+    }
+}
 
 async function startApplyingCoupons(domainRecord) {
 
     await showTestingModal();
-
-    if(domainRecord.showInput) {
-    const showInputButton = await document.querySelector(`${domainRecord.showInput}`);
-    showInputButton.click();
-    }
     // 1. Gather keywords from the cart
     let keywords = "";
     if(domainRecord.domain === "amazon.com") {
@@ -137,16 +226,11 @@ async function startApplyingCoupons(domainRecord) {
         return;
     }
 
-    let bestCode = null;
     let bestDifference = 0;
-    let couponType = null;
+    let bestCoupon = null;
 
     // Store the original total to compare against
-    let originalTotal = null;
-    if(domainRecord.domain === "amazon.com") {
-        originalTotal = parseFloat(getAmazonOrderTotal());
-    }
-    console.log("Caramel: Original total is:", originalTotal);
+    let originalTotal = getPrice(domainRecord.priceContainer);
 
     // 4. Apply each coupon in turn
     for (let i = 0; i < coupons.length; i++) {
@@ -158,33 +242,52 @@ async function startApplyingCoupons(domainRecord) {
         const result = await applyCoupon(code, domainRecord);
         success = result.success;
         newTotal = result.newTotal
-        document.querySelector(`${domainRecord.couponInput}`).value = "";
+        const input = document.querySelector(`${domainRecord.couponInput}`);
+        if(input)
+            input.value = "";
         if (!success) {
             console.log(`Caramel: Coupon ${code} not successfully applied (or no discount field)`);
-            continue;
-        }
+        } else {
+            if(coupons.length === 1) {
+                bestCoupon = coupons[i];
+                bestDifference = originalTotal - newTotal;
+                continue;
 
-        const numericNewTotal = parseFloat(newTotal);
-        const difference = originalTotal - numericNewTotal;
-        console.log(`Caramel: Applied ${code}, new total = ${numericNewTotal}, difference = ${difference}`);
-
-        if (difference > bestDifference) {
-            bestDifference = difference;
-            bestCode = code;
-            couponType = coupons[i].discount_type;
+            }
+            const numericNewTotal = parseFloat(newTotal);
+            const difference = originalTotal - numericNewTotal;
+            console.log(`Caramel: Applied ${code}, new total = ${numericNewTotal}, difference = ${difference}`);
+            if(bestCoupon === null) {
+                bestCoupon = coupons[i];
+                bestDifference = difference;
+            } else {
+                if(difference > bestDifference) {
+                    bestDifference = difference;
+                    bestCoupon = coupons[i];
+                }
+            }
         }
     }
-
-    // 5. Hide testing modal
-    hideTestingModal();
-
-    // 6. Show final results
-    if (bestDifference > 0) {
-        showFinalModal(bestDifference, couponType, "We found a coupon that saves you money!");
-        console.log("Caramel: Best coupon code:", bestCode, "Saved:", bestDifference);
+    if(bestCoupon) {
+        console.log("Caramel: Best coupon code:", bestCoupon.code, "Saved:", bestDifference);
+        console.log("Applying best coupon...")
+        const result = await applyCoupon(bestCoupon.code, domainRecord, true);
+        console.log("FINAL RESULT");
+        console.log(result);
+        console.log("FINAL RESULT");
+        if(result.success) {
+            console.log("Caramel: Best coupon code:", bestCoupon.code, "Saved:", bestDifference);
+            showFinalModal(bestDifference, bestCoupon.code, "We found a coupon that saves you money!");
+            if (bestDifference > 0 && bestCoupon) {
+            } else {
+            }
+        }else {
+            showFinalModal(0, null,"No better price found. This is already the best you can get!");
+        }
     } else {
-        showFinalModal(0, couponType,"No better price found. This is already the best you can get!");
+        showFinalModal(0, null,"No better price found. This is already the best you can get!");
     }
+
 }
 
 async function fetchCoupons(site,keywords) {
@@ -314,7 +417,9 @@ function hideTestingModal() {
 }
 
 
-async function showFinalModal(savingsAmount, discountType,message) {
+async function showFinalModal(savingsAmount, code, message) {
+
+    hideTestingModal();
     // Create overlay
     const overlay = document.createElement("div");
     overlay.id = "caramel-final-overlay";
@@ -342,10 +447,10 @@ async function showFinalModal(savingsAmount, discountType,message) {
 
     // Determine if user saved money
     const isSuccess = savingsAmount > 0;
-    const savingAmountLabel = discountType === "PERCENTAGE" ? "%" : "$";
+
     // If no savings found, encourage the user that it's already the best price
     const defaultMessage = isSuccess
-        ? `We found a coupon that saves you ${savingAmountLabel}${savingsAmount.toFixed(2)}!`
+        ? `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
         : "Looks like you're already getting the best deal. Go ahead and buy!";
 
     // You can decide whether to use `message` or `defaultMessage` or combine them
@@ -373,16 +478,20 @@ async function showFinalModal(savingsAmount, discountType,message) {
       font-size: 24px; 
       font-weight: bold;
     ">
-      ${isSuccess ? "🎉 Savings Found!" : "Great News!"}
+      ${isSuccess ? "🎉 Savings Found! 🎉" : "Great News!"}
     </h2>
-    <p style="font-size: 16px; color: #333; margin: 0 0 10px 0;">
+    <p style="font-size: 13px; color: #333; margin: 0 0 10px 0;">
       ${finalMessage}
     </p>
     
     <!-- If user saved money, show how much -->
     ${
         isSuccess
-            ? `<p style="font-size: 18px; color: ${brandColor}; font-weight: bold;">
+            ? `
+            <p style="font-size: 24px;">
+            Coupon: <span style="color: ${brandColor}; text-decoration: underline;font-weight: bold;">${code}</span>
+          </p>
+            <p style="font-size: 18px; color: ${brandColor}; font-weight: bold;">
             You saved $${savingsAmount.toFixed(2)}!
           </p>`
             : ""
@@ -452,4 +561,37 @@ async function filterKeywords(keywords) {
             !lineBreaks.test(keyword) && // No line breaks
             keyword.trim() !== "" // Not empty or whitespace
         );
+}
+
+
+function waitForDomUpdate(selector, { timeout = 5000 } = {}) {
+    return new Promise((resolve, reject) => {
+        let target = document.querySelector(selector);
+
+        // If not found, observe the entire document for the element to appear
+        const root = target ? target : document.documentElement;
+
+        const observer = new MutationObserver(() => {
+            target = document.querySelector(selector);
+            if (target) {
+                // Once we have the target element (or a change in its subtree if it existed),
+                // we can stop observing and resolve
+                observer.disconnect();
+                resolve();
+            }
+        });
+
+        // Start observing
+        observer.observe(root, {
+            childList: true,
+            characterData: true,
+            subtree: true,
+        });
+
+        // Fallback: stop waiting after `timeout` ms
+        setTimeout(() => {
+            observer.disconnect();
+            reject(`waitForDomUpdate: timed out after ${timeout}ms, no relevant changes.`);
+        }, timeout);
+    });
 }
