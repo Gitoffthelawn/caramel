@@ -1,5 +1,6 @@
-import { capitalizeFirst } from '@/lib/capitalizeFirst'
+
 import Head from 'next/head'
+import {capitalizeFirst} from "@/lib/capitalizeFirst";
 
 const AppHeader = ({
                                description,

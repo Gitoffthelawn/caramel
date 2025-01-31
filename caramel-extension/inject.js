@@ -3,10 +3,13 @@ const currentBrowser = (() => {
     if (typeof browser !== "undefined") return browser;
     throw new Error("Browser is not supported!");
 })();
-
+console.log("Caramel: Injected script");
 window.addEventListener("load", async () => {
+    console.log("Caramel: DOM loaded");
     const domain = window.location.hostname;
+    console.log("Caramel: Current domain", domain);
     const domainRecord = await getDomainRecord(domain);
+    console.log("Caramel: Domain record", domainRecord)
     if (domainRecord) {
         const fullUrl = window.location.href;
         if (fullUrl) {
