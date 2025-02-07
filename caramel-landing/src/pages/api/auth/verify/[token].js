@@ -8,16 +8,22 @@ export default async function handler(
     if (!token) {
         return res.status(400).json({ error: "Token is required" });
     }
-    console.log("_________________________")
-    console.log(`'${token}'`)
-    console.log("user")
     const user = await prisma.user.findUnique({
         where: {
             token: token,
         },
     })
-    console.log("user")
-    console.log(user)
-    console.log("user")
+    if (user) {
+        await prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                token: null,
+                tokenExpiry: null,
+                status: 'ACTIVE_USER',
+            },
+        })
+    }
     res.redirect('/login')
 }

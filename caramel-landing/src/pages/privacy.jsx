@@ -1,11 +1,14 @@
 
 import PrivacyPolicy from "@/components/PrivacyPolicy";
-import AppHeader from "@/AppHeader";
+import AppHeader from "@/components/AppHeader";
+import Doodles from "@/components/Doodles";
+import React from "react";
 
 const Privacy = () => {
 
     return (
         <div className="flex justify-center dark:bg-darkBg h-fit overflow-y-auto">
+            <Doodles />
             <AppHeader description={"Caramel Privacy Policy"} ogTitle={"Privacy page"}/>
             <div className="max-w-6xl mt-[5rem]">
                 <div className="flex items-center justify-between p-8">

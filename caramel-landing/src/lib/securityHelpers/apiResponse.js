@@ -1,4 +1,3 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
 import { encryptJsonServer } from './cryptoHelpers'
 
 /**
@@ -7,12 +6,12 @@ import { encryptJsonServer } from './cryptoHelpers'
  * - If API_ENCRYPTION_ENABLED === "true", returns { response: "<encrypted string>" }.
  */
 export function apiResponse(
-    req: NextApiRequest,
-    res: NextApiResponse,
-    statusCode: number,
-    message: string,
-    data: any = null,
-    error: string | null = null,
+    req,
+    res,
+    statusCode,
+    message,
+    data = null,
+    error = null,
 ) {
     // Build the payload
     const payload = {

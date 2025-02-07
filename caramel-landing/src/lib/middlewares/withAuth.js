@@ -1,5 +1,4 @@
-import { authOptions } from '@/pages/api/auth/[...nextauth]'
-import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next'
+
 import { getServerSession } from 'next-auth/next'
 
 /**
@@ -8,8 +7,8 @@ import { getServerSession } from 'next-auth/next'
  * Usage:
  * export default withAuth(async function handler(req, res) { ... })
  */
-export function withAuth(handler: NextApiHandler) {
-    return async function (req: NextApiRequest, res: NextApiResponse) {
+export function withAuth(handler) {
+    return async function (req, res) {
         try {
             // @ts-ignore
             const session = await getServerSession(req, res, authOptions)
@@ -19,14 +18,12 @@ export function withAuth(handler: NextApiHandler) {
                     .status(401)
                     .json({ status: 'error', message: 'Unauthorized' })
             }
-
-            // Attach session & user to req for downstream usage
-            ;(req as any).session = session
-            ;(req as any).user = session.user
+            ;req.session = session
+            ;req.user = session.user
 
             // Proceed to the actual request handler
             return handler(req, res)
-        } catch (error: any) {
+        } catch (error) {
             // In case something goes wrong during session retrieval
             return res.status(500).json({
                 status: 'error',

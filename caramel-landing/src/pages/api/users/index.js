@@ -7,7 +7,7 @@ import prisma from "../../../lib/prisma";
 import {sendEmail} from "../../../lib/email";
 import VerificationRequestTemplate from "../../../../emails/VerificationRequestTemplate";
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req, res) {
     try {
         switch (req.method) {
             case 'POST':
@@ -15,12 +15,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             default:
                 return onNoMatchMiddleware(req, res)
         }
-    } catch (error: any) {
+    } catch (error) {
         return onErrorMiddleware(error, req, res)
     }
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+async function handlePost(req, res) {
     const { username, email, password } = req.body
 
     if (!email || !password || !username) {
@@ -99,7 +99,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         })
 
         return apiResponse(req, res, 200, 'User created successfully')
-    } catch (error: any) {
+    } catch (error) {
         return apiResponse(
             req,
             res,

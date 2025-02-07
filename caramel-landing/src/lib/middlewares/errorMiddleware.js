@@ -1,9 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next'
-
 export const onErrorMiddleware = (
-    error: any,
-    req: NextApiRequest,
-    res: NextApiResponse,
+    error,
+    req,
+    res,
 ) => {
     res.status(500).json({
         status: 'error',
@@ -12,8 +10,8 @@ export const onErrorMiddleware = (
 }
 
 export const onNoMatchMiddleware = (
-    req: NextApiRequest,
-    res: NextApiResponse,
+    req,
+    res,
 ) => {
     res.status(405).json({
         status: 'error',

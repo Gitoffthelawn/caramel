@@ -15,7 +15,7 @@ export default function StoreButtons() {
                 transition={{duration: 0.6}}
                 className=" m-auto text-3xl text-start w-full md:text-lg font-bold dark:text-white text-black drop-shadow-2xl"
             >
-                Grab caramel now
+                Where to get Caramel?
             </motion.div>
             <div className="
             grid grid-cols-2
@@ -24,28 +24,31 @@ export default function StoreButtons() {
                 <motion.a
                     href="https://chrome.google.com/webstore"
                     target="_blank"
-                    className="px-3 py-1.5 hover:scale-105 dark:text-white dark:border-white hover:bg-caramel hover:text-white transition-transform duration-200 ease-in-out flex gap-2 items-center rounded-xl border-[1.5px] hover:border-caramel border-black text-black/70">
+                    className="px-3 pointer-events-none opacity-60 py-1.5 hover:scale-105 dark:text-white dark:border-white hover:bg-caramel hover:text-white transition-transform duration-200 ease-in-out flex gap-2 items-center rounded-xl border-[1.5px] hover:border-caramel border-black text-black/70">
                     <div className="w-10">
                         <Image src={isDarkMode ? "/apple-white.png" : "/apple.png"} alt="Chrome" width={40} height={40}/>
                     </div>
-                    <div className="">
+                    <div className="w-full">
                         <div className="text-sm md:text-xs font-extrabold">Download on</div>
-                        <div className="text-2xl md:text-sm">
-                            Play Store
+                        <div className="text-2xl md:text-sm w-full flex justify-between">
+                            <span>Play Store</span>
+                            <span className="text-xs my-auto">Coming soon</span>
                         </div>
+
                     </div>
                 </motion.a>
                 <motion.a
                     target="_blank"
                     href="https://chrome.google.com/webstore"
-                    className="px-3 py-1.5 hover:scale-105 dark:text-white dark:border-white hover:bg-caramel hover:text-white transition-transform duration-200 ease-in-out flex gap-2 items-center rounded-xl border-[1.5px] hover:border-caramel border-black text-black/70">
+                    className="px-3 py-1.5 hover:scale-105 pointer-events-none opacity-65 dark:text-white dark:border-white hover:bg-caramel hover:text-white transition-transform duration-200 ease-in-out flex gap-2 items-center rounded-xl border-[1.5px] hover:border-caramel border-black text-black/70">
                 <div className="w-10">
                         <Image src="/chrome.png" alt="Chrome" width={40} height={40}/>
                     </div>
-                    <div className="">
+                    <div className="w-full">
                         <div className="text-sm md:text-xs font-extrabold">Download on the</div>
-                        <div className="text-2xl md:text-sm">
-                            Chrome extension store
+                        <div className="text-2xl md:text-sm flex justify-between">
+                            <span>Chrome extension store</span>
+                            <span className="text-xs my-auto">Coming soon</span>
                         </div>
                     </div>
                 </motion.a>

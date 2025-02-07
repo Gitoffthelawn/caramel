@@ -1,22 +1,10 @@
-import { PasswordItem } from '@/components'
-
-interface PasswordCheckerProps {
-    password: string
-    confirmPassword: string
-}
-
-export interface ItemChecker {
-    id: number
-    term: boolean
-    success_message: string
-    failure_message: string
-}
+import PasswordItem from "@/components/PasswordStrength/PasswordItem";
 
 const PasswordChecker = ({
     password,
     confirmPassword,
-}: PasswordCheckerProps) => {
-    const checkList: ItemChecker[] = [
+}) => {
+    const checkList = [
         {
             id: 1,
             term: password.length >= 5,
@@ -51,8 +39,8 @@ const PasswordChecker = ({
 
     return (
         <div className="flex w-full justify-start">
-            <ul className="grid w-full grid-cols-2 gap-2 xl:grid-cols-2 lg:grid-cols-2 sm:grid-cols-1">
-                {checkList.map((itemChecker: ItemChecker) => (
+            <ul className="grid w-full mt-5 grid-cols-1 gap-2 xl:grid-cols-2 lg:grid-cols-2 sm:grid-cols-1">
+                {checkList.map((itemChecker) => (
                     <li
                         className="flex items-center py-1 pl-3"
                         key={itemChecker.id}

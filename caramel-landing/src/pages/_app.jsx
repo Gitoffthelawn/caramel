@@ -4,8 +4,9 @@ import React, {useEffect, useState} from "react";
 import dynamic from "next/dynamic";
 import {Loader} from "@react-three/drei";
 import { ThemeContext } from '@/lib/contexts'
-import Header from "@/AppHeader";
-import AppHeader from "@/AppHeader";
+import AppHeader from "@/components/AppHeader";
+import {useRouter} from "next/router";
+import {SessionProvider} from "next-auth/react";
 
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
@@ -22,9 +23,13 @@ const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
         </div>
     ),
 })
-
-function MyApp({ Component, pageProps }) {
+const pagesLayoutless = [
+    '/login',
+    '/signup',
+]
+function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     const [isDarkMode, setDarkMode] = useState(false)
+    const { pathname } = useRouter()
     const switchTheme = () => {
         setDarkMode(prevState => {
             localStorage.setItem('theme', prevState ? 'light' : 'dark')
@@ -41,14 +46,23 @@ function MyApp({ Component, pageProps }) {
     }, [])
     return (
         <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
+            <SessionProvider session={session}>
                 <AppHeader
                     description="Best coupons extension for Chrome and Safari"
                     ogTitle="Caramel"
                     ogUrl="https://dev.grabcaramel.com/"
                 />
-                <Layout>
+                {pagesLayoutless &&
+                pagesLayoutless.some(page =>
+                    pathname.includes(page),
+                ) ? (
                     <Component {...pageProps} />
-                </Layout>
+                ) : (
+                    <Layout>
+                        <Component {...pageProps} />
+                    </Layout>
+                )}
+            </SessionProvider>
         </ThemeContext.Provider>
     );
 }

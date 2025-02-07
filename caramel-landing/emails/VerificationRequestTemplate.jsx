@@ -1,15 +1,10 @@
-
-interface VerificationEmailProps {
-    token: string
-}
-
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
 
 export default function VerificationRequestTemplate({
     token,
-}: VerificationEmailProps) {
+}) {
     return (
-        <div style={{ background: '#69B3FC', padding: '20px' }}>
+        <div style={{ background: '#ea6925', padding: '20px' }}>
             <div
                 style={{
                     background: '#ffffff',
@@ -27,7 +22,7 @@ export default function VerificationRequestTemplate({
                         textAlign: 'center',
                     }}
                 >
-                    Welcome to uNotes!
+                    Welcome to Caramel!
                 </h1>
                 <p
                     style={{

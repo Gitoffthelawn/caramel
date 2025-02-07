@@ -5,7 +5,7 @@ import OpenSourceSection from "@/components/OpenSourceSection";
 import React from "react";
 import Doodles from "@/components/Doodles";
 import SupportedSection from "@/components/SupportedSection";
-import AppHeader from "@/AppHeader";
+import AppHeader from "@/components/AppHeader";
 
 export default function Index() {
     return (

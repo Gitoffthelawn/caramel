@@ -1,11 +1,4 @@
-import { ItemChecker } from './PasswordChecker'
-
-interface PasswordItemProps {
-    itemChecker: ItemChecker
-    key?: number
-}
-
-const PasswordItem = ({ itemChecker }: PasswordItemProps) => {
+const PasswordItem = ({ itemChecker }) => {
     return (
         <>
             <div

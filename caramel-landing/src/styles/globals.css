@@ -110,3 +110,8 @@
         transition-delay: 0.25s;
     }
 }
+
+.status-active{
+    background-color: #55ff00;
+    border-radius: 360px;
+}

@@ -4,7 +4,7 @@ import {motion} from "framer-motion";
 const Doodles = ({  }) => {
 
     return (
-        <>
+        <div className={"fixed w-full"}>
         <motion.svg
             className="pointer-events-none absolute z-[99] -right-96 lg:-right-32 top-0 lg:top-10
                      -translate-y-1/2 w-[50vw] h-[50vw]"
@@ -39,7 +39,7 @@ const Doodles = ({  }) => {
     </motion.svg>
 
 
-        </>
+        </div>
 )
     ;
 };

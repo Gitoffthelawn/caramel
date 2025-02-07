@@ -1,7 +1,4 @@
-import { track403Error } from '@/lib/ip-ban/checker'
-import { getIpFromRequest } from '@/lib/ip-ban/getIpFromRequest'
-import prisma from '@/lib/prisma'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import prisma from "@prisma/client";
 
 /**
  * withRoles(allowedRoles):
@@ -9,17 +6,14 @@ import type { NextApiRequest, NextApiResponse } from 'next'
  *   - If user’s role is not in allowedRoles, returns 403
  *   - Otherwise, calls the `handler` function
  */
-export function withRoles(allowedRoles: string[]) {
+export function withRoles(allowedRoles) {
     return function (
-        handler: (
-            req: NextApiRequest,
-            res: NextApiResponse,
-        ) => Promise<void> | void,
+        handler,
     ) {
-        return async function (req: NextApiRequest, res: NextApiResponse) {
+        return async function (req, res) {
             try {
                 // Ensure we have user from a previous auth middleware
-                const user = (req as any).user
+                const user = req.user
                 if (!user || !user.id) {
                     return res
                         .status(401)
@@ -34,16 +28,14 @@ export function withRoles(allowedRoles: string[]) {
 
                 // If no user found in DB or role not in allowedRoles, forbid
                 if (!dbUser || !allowedRoles.includes(dbUser.role ?? '')) {
-                    await track403Error(getIpFromRequest(req))
                     return res.status(403).json({ error: 'Forbidden' })
                 }
 
                 // Attach updated role to req.user, if you like
-                ;(req as any).user = { ...user, role: dbUser.role }
+                req.user = { ...user, role: dbUser.role }
 
-                // Proceed to your original handler
                 return await handler(req, res)
-            } catch (error: any) {
+            } catch (error) {
                 // You can customize how you handle errors
                 return res.status(500).json({
                     error: 'Internal Server Error',

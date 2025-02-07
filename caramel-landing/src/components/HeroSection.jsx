@@ -1,16 +1,15 @@
-"use client"; // If you're using Next 13+ App Router and need client-side code
+"use client";
 
-import React, { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import React from "react";
+import { motion } from "framer-motion";
 import Image from "next/image";
-import StoreButtons from "@/components/StoreButtons";
 
 export default function HeroSection() {
 
 
     return (
         <section
-            className="relative mt-[5rem] min-h-screen dark:bg-darkBg dark:text-white flex flex-col justify-center overflow-hidden px-6 py-16 text-gray-800"
+            className="relative mt-[5rem] min-h-screen dark:text-white flex flex-col justify-center overflow-hidden px-6 py-16 text-gray-800"
         >
             <div className="relative z-10 max-w-6xl mx-auto text-center">
                 <motion.h1
