@@ -2,7 +2,7 @@
 
 import {onErrorMiddleware, onNoMatchMiddleware} from "@/lib/middlewares/errorMiddleware";
 import {apiResponse} from "@/lib/securityHelpers/apiResponse";
-import prisma from "../../../lib/prisma";
+import prisma from "@/lib/prisma";
 
 async function handler(req, res) {
     try {

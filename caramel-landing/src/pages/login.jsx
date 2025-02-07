@@ -45,7 +45,7 @@ export default function Login() {
                     username: session?.user?.username || {},
                     image: session?.user?.image || {},
                 },
-                "*" // In production, replace "*" with your trusted origin
+                "*"
             );
             toast.success("Login successful! You can now close this window.");
             setTimeout(() => {

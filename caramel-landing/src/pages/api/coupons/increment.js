@@ -1,4 +1,5 @@
-import prisma from "@prisma/client";
+
+import prisma from "@/lib/prisma";
 import {cors} from "@/lib/cors";
 
 async function handler(req, res) {

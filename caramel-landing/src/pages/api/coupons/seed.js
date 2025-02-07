@@ -1,4 +1,4 @@
-import prisma from "@prisma/client";
+import prisma from "@/lib/prisma";
 import seederMiddleware from '@/pages/api/middlewares/seederMiddleware';
 
 async function handler(req, res) {
