@@ -9,7 +9,6 @@ async function insertCaramelPrompt(domainRecord) {
     if (document.getElementById("caramel-small-prompt")) {
         return;
     }
-
     const container = document.createElement("div");
     container.id = "caramel-small-prompt";
 
@@ -207,7 +206,22 @@ async function applyCoupon(code, domainRecord, best = false) {
 async function startApplyingCoupons(domainRecord) {
 
     await showTestingModal();
-    // 1. Gather keywords from the cart
+    const token = await new Promise((resolve) => {
+        currentBrowser.storage.sync.get(["token"], (result) => {
+            resolve(result.token || "");
+        });
+    });
+    console.log("Caramel: Token from storage:", token);
+    if (!token) {
+        hideTestingModal();
+        await showFinalModal(
+            0,
+            null,
+            "Please sign in to Caramel to use coupons!",
+            true
+        );
+        return;
+    }
     let keywords = "";
     if(domainRecord.domain === "amazon.com") {
         const response = await new Promise((resolve) => {
@@ -293,7 +307,17 @@ async function startApplyingCoupons(domainRecord) {
 async function fetchCoupons(site,keywords) {
     const url = `https://dev.grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(keywords)}`;
     try {
-        const response = await fetch(url);
+        const token = await new Promise((resolve) => {
+            currentBrowser.storage.sync.get(["token"], (result) => {
+                resolve(result.token || "");
+            });
+        });
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
         if (!response.ok) {
             console.error("Caramel: Error fetching coupons:", response.status, response.statusText);
             return [];
@@ -417,7 +441,7 @@ function hideTestingModal() {
 }
 
 
-async function showFinalModal(savingsAmount, code, message) {
+async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
 
     hideTestingModal();
     // Create overlay
@@ -478,7 +502,7 @@ async function showFinalModal(savingsAmount, code, message) {
       font-size: 24px; 
       font-weight: bold;
     ">
-      ${isSuccess ? "🎉 Savings Found! 🎉" : "Great News!"}
+      ${isSuccess ? "🎉 Savings Found! 🎉" : isSignIn ? "Oups.." : "Great News!"}
     </h2>
     <p style="font-size: 13px; color: #333; margin: 0 0 10px 0;">
       ${finalMessage}
@@ -496,8 +520,7 @@ async function showFinalModal(savingsAmount, code, message) {
           </p>`
             : ""
     }
-
-    <!-- Action Button -->
+    
     <button 
       id="caramel-final-ok-btn" 
       style="
@@ -514,7 +537,7 @@ async function showFinalModal(savingsAmount, code, message) {
         transition: background 0.3s;
       "
     >
-      Proceed to Checkout
+      ${isSignIn ? "sing In" : "Proceed to Checkout"}
     </button>
   `;
 
@@ -533,6 +556,13 @@ async function showFinalModal(savingsAmount, code, message) {
     // Close the modal on button click
     modal.querySelector("#caramel-final-ok-btn").addEventListener("click", () => {
         document.body.removeChild(overlay);
+        if(isSignIn) {
+            window.open(
+                "https://dev.grabcaramel.com/login?extension=true",
+                "loginWindow",
+                "width=500,height=600"
+            );
+        }
     });
 }
 
@@ -595,3 +625,19 @@ function waitForDomUpdate(selector, { timeout = 5000 } = {}) {
         }, timeout);
     });
 }
+
+window.addEventListener("message", (event) => {
+    if (event.origin !== "https://dev.grabcaramel.com") return;
+    console.log("Caramel: Received message from", event.origin);
+    if (event.data && event.data.token) {
+        const user = {
+            username: event.data.username || "CaramelUser",
+            image: event.data.image,
+        };
+        console.log("Caramel: Received token and user info", event.data.token, user);
+        currentBrowser.storage.sync.set({ token: event.data.token, user }, () => {
+            const domainRecord = getDomainRecord(window.location.hostname);
+            startApplyingCoupons(domainRecord);
+        });
+    }
+});

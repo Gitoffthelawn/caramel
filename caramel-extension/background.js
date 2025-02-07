@@ -15,11 +15,11 @@ function keepAlive() {
 keepAlive();
 
 currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "keepAlive") {
+   if (message.action === "keepAlive") {
         console.log("Received keep-alive message from content script");
         sendResponse({ status: "alive" }); // Respond to the message
     }
-    if (message.action === "scrapeAmazonCartKeywords") {
+    else if (message.action === "scrapeAmazonCartKeywords") {
         const originalTab = sender.tab;
         currentBrowser.tabs.create({ url: "https://www.amazon.com/gp/cart/view.html?ref_=nav_cart" })
             .then(async (amazonCartPage) => {
