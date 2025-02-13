@@ -109,7 +109,15 @@ function getPrice(selector, options = {}) {
 
 async function applyCoupon(code, domainRecord, best = false) {
     try {
-        // 1) Get the original price
+
+        if (domainRecord.dismissButton) {
+            console.log("Caramel: Dismissing coupon pop-up or modal");
+            const dismissButton = document.querySelector(domainRecord.dismissButton);
+            if (dismissButton) {
+                await dismissButton.click();
+            }
+        }
+
         const originalPrice = getPrice(domainRecord.priceContainer);
         console.log("Caramel: Original price is:", originalPrice);
 
@@ -117,7 +125,9 @@ async function applyCoupon(code, domainRecord, best = false) {
         let promoInput = document.querySelector(domainRecord.couponInput);
         const showInput = document.querySelector(domainRecord.showInput);
 
-        // 3) If there's a "show input" button and we don't have our coupon input yet, click to reveal it
+        console.log("Caramel: Promo input:", promoInput);
+        console.log("Caramel: Show input button:", showInput);
+
         if (showInput && !promoInput) {
             console.log("Caramel: Clicking 'show input' to reveal coupon field");
             await showInput.click();
@@ -184,16 +194,6 @@ async function applyCoupon(code, domainRecord, best = false) {
             // If the new price is not a number or not lower, the coupon didn't help
             return { success: false, newTotal: NaN };
         }
-
-        // 10) Optionally dismiss the coupon if we aren't in "best" mode
-        if (domainRecord.dismissButton && !best) {
-            console.log("Caramel: Dismissing coupon pop-up or modal");
-            const dismissButton = document.querySelector(domainRecord.dismissButton);
-            if (dismissButton) {
-                await dismissButton.click();
-            }
-        }
-
         // 11) Success: return the new total
         return { success: true, newTotal: newPrice };
 
@@ -634,9 +634,9 @@ window.addEventListener("message", (event) => {
             username: event.data.username || "CaramelUser",
             image: event.data.image,
         };
-        console.log("Caramel: Received token and user info", event.data.token, user);
-        currentBrowser.storage.sync.set({ token: event.data.token, user }, () => {
-            const domainRecord = getDomainRecord(window.location.hostname);
+        currentBrowser.storage.sync.set({ token: event.data.token, user }, async () => {
+            const domainRecord = await getDomainRecord(window.location.hostname);
+            console.log("Caramel: Domain record", domainRecord)
             startApplyingCoupons(domainRecord);
         });
     }
