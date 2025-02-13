@@ -188,9 +188,9 @@ export default function Signup() {
                         )}
                     </div>
                     <button
-                        disabled={loading || error || Object.keys(errors).length > 0}
+                        disabled={loading || Object.keys(errors).length > 0}
                         type="submit"
-                        className={`w-full ${loading || error || Object.keys(errors).length > 0 ? "pointer-events-none bg-opacity-75" : "hover:scale-105"}  bg-caramel text-white font-semibold py-2 rounded-md transition`}
+                        className={`w-full ${loading || Object.keys(errors).length > 0 ? "pointer-events-none bg-opacity-75" : "hover:scale-105"}  bg-caramel text-white font-semibold py-2 rounded-md transition`}
                     >
                         {loading ? 'Loading...' : 'Sign Up'}
                     </button>
