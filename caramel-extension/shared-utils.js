@@ -109,94 +109,77 @@ function getPrice(selector, options = {}) {
 
 async function applyCoupon(code, domainRecord, best = false) {
     try {
-
+        // 1) Dismiss any active coupon pop-up/modal if present
         if (domainRecord.dismissButton) {
             console.log("Caramel: Dismissing coupon pop-up or modal");
             const dismissButton = document.querySelector(domainRecord.dismissButton);
             if (dismissButton) {
-                await dismissButton.click();
+                dismissButton.click();
+                // Allow time for the dismissal to take effect
+                await new Promise((resolve) => setTimeout(resolve, 500));
+            } else {
+                console.warn("Caramel: Dismiss button not found.");
             }
         }
+
+        // Allow UI to settle after a possible dismiss
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         const originalPrice = getPrice(domainRecord.priceContainer);
         console.log("Caramel: Original price is:", originalPrice);
 
-        // 2) Identify relevant elements
+        // 2) Identify coupon input and the button to show it if needed
         let promoInput = document.querySelector(domainRecord.couponInput);
-        const showInput = document.querySelector(domainRecord.showInput);
+        let showInput = document.querySelector(domainRecord.showInput);
 
         console.log("Caramel: Promo input:", promoInput);
         console.log("Caramel: Show input button:", showInput);
 
-        if (showInput && !promoInput) {
+        // 3) If promo input isn't visible but a "show input" button exists, click it.
+        if (!promoInput && showInput) {
             console.log("Caramel: Clicking 'show input' to reveal coupon field");
-            await showInput.click();
+            showInput.click();
 
-            // After click, check if coupon input now exists
-            promoInput = document.querySelector(domainRecord.couponInput);
-            // If still not found, wait up to 5 seconds for DOM update
-            if (!promoInput) {
-                try {
-                    await waitForDomUpdate(domainRecord.couponInput, { timeout: 5000 });
-                    promoInput = document.querySelector(domainRecord.couponInput);
-                    console.log("Caramel: Coupon input found after waiting");
-                } catch (err) {
-                    console.warn(
-                        "Caramel: Timed out or error while waiting for coupon input to appear:",
-                        err
-                    );
-                }
+            // Wait for the coupon input to appear (up to 5 seconds)
+            try {
+                await waitForDomUpdate(domainRecord.couponInput, { timeout: 5000 });
+            } catch (err) {
+                console.warn("Caramel: Timed out waiting for coupon input to appear:", err);
             }
+            promoInput = document.querySelector(domainRecord.couponInput);
         }
+
+        // 4) Ensure we have both the coupon input and apply button
         const applyButton = document.querySelector(domainRecord.couponSubmit);
         if (!promoInput || !applyButton) {
             console.warn("Caramel: Missing promo input or apply button.");
             return { success: false, newTotal: NaN };
         }
 
-        // 5) Insert the code and dispatch an 'input' event
+        // 5) Insert the coupon code and dispatch an 'input' event
         promoInput.value = code;
         promoInput.dispatchEvent(new Event("input", { bubbles: true }));
 
-        // 6) Click the "Apply" button
-        await applyButton.click();
+        // 6) Click the apply button
+        applyButton.click();
 
-        // 7) Wait for the price container to update (in case it’s missing or hasn't changed yet)
-        const priceContainer = document.querySelector(domainRecord.priceContainer);
-        if (!priceContainer) {
-            // If the price container doesn't exist yet, wait for it.
-            try {
-                await waitForDomUpdate(domainRecord.priceContainer, { timeout: 5000 });
-            } catch (err) {
-                console.warn(
-                    "Caramel: Timed out or error while waiting for price container to appear:",
-                    err
-                );
-            }
-        } else {
-            // If it does exist, we can still watch for changes inside it
-            try {
-                await waitForDomUpdate(domainRecord.priceContainer, { timeout: 5000 });
-            } catch (err) {
-                console.warn(
-                    "Caramel: Timed out or error while waiting for price container to update:",
-                    err
-                );
-            }
+        // 7) Wait for the price container to update (up to 5 seconds)
+        try {
+            await waitForDomUpdate(domainRecord.priceContainer, { timeout: 5000 });
+        } catch (err) {
+            console.warn("Caramel: Timed out waiting for price update:", err);
         }
 
-        // 8) Grab the newly updated price
+        // 8) Grab the new price
         const newPrice = getPrice(domainRecord.priceContainer);
         console.log("Caramel: New price is:", newPrice);
 
-        // 9) Compare old vs new
+        // 9) Compare prices. If the new price isn’t lower, the coupon failed.
         if (isNaN(newPrice) || newPrice >= originalPrice) {
-            // If the new price is not a number or not lower, the coupon didn't help
             return { success: false, newTotal: NaN };
         }
-        // 11) Success: return the new total
-        return { success: true, newTotal: newPrice };
 
+        return { success: true, newTotal: newPrice };
     } catch (err) {
         console.error("Caramel: Unexpected error in applyCoupon:", err);
         return { success: false, newTotal: NaN };
@@ -204,8 +187,8 @@ async function applyCoupon(code, domainRecord, best = false) {
 }
 
 async function startApplyingCoupons(domainRecord) {
-
     await showTestingModal();
+
     const token = await new Promise((resolve) => {
         currentBrowser.storage.sync.get(["token"], (result) => {
             resolve(result.token || "");
@@ -214,16 +197,12 @@ async function startApplyingCoupons(domainRecord) {
     console.log("Caramel: Token from storage:", token);
     if (!token) {
         hideTestingModal();
-        await showFinalModal(
-            0,
-            null,
-            "Please sign in to Caramel to use coupons!",
-            true
-        );
+        await showFinalModal(0, null, "Please sign in to Caramel to use coupons!", true);
         return;
     }
+
     let keywords = "";
-    if(domainRecord.domain === "amazon.com") {
+    if (domainRecord.domain === "amazon.com") {
         const response = await new Promise((resolve) => {
             currentBrowser.runtime.sendMessage({ action: "scrapeAmazonCartKeywords" }, (response) => {
                 resolve(response);
@@ -233,75 +212,62 @@ async function startApplyingCoupons(domainRecord) {
         console.log("Caramel: Keywords from Amazon cart:", keywords);
     }
 
-    // 2. Fetch coupons from your backend
+    // 2) Fetch coupons from your backend
     const coupons = await fetchCoupons(domainRecord.domain, keywords);
     if (!coupons || coupons.length === 0) {
-        showFinalModal(0, null,"No better price found. This is already the best you can get!");
+        showFinalModal(0, null, "No better price found. This is already the best you can get!");
         return;
     }
 
     let bestDifference = 0;
     let bestCoupon = null;
-
     // Store the original total to compare against
-    let originalTotal = getPrice(domainRecord.priceContainer);
+    const originalTotal = getPrice(domainRecord.priceContainer);
 
-    // 4. Apply each coupon in turn
+    // 4) Apply each coupon in turn
     for (let i = 0; i < coupons.length; i++) {
         const code = coupons[i].code;
         await updateTestingModal(i + 1, coupons.length, code);
 
-        let  success = false;
-        let newTotal = null;
         const result = await applyCoupon(code, domainRecord);
-        success = result.success;
-        newTotal = result.newTotal
-        const input = document.querySelector(`${domainRecord.couponInput}`);
-        if(input)
+
+        // Clear coupon input if it exists so the next coupon starts with a fresh state.
+        const input = document.querySelector(domainRecord.couponInput);
+        if (input) {
             input.value = "";
-        if (!success) {
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        // Give a short pause between coupon attempts.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        if (!result.success) {
             console.log(`Caramel: Coupon ${code} not successfully applied (or no discount field)`);
         } else {
-            if(coupons.length === 1) {
-                bestCoupon = coupons[i];
-                bestDifference = originalTotal - newTotal;
-                continue;
-
-            }
-            const numericNewTotal = parseFloat(newTotal);
+            const numericNewTotal = parseFloat(result.newTotal);
             const difference = originalTotal - numericNewTotal;
             console.log(`Caramel: Applied ${code}, new total = ${numericNewTotal}, difference = ${difference}`);
-            if(bestCoupon === null) {
-                bestCoupon = coupons[i];
+            if (bestCoupon === null || difference > bestDifference) {
                 bestDifference = difference;
-            } else {
-                if(difference > bestDifference) {
-                    bestDifference = difference;
-                    bestCoupon = coupons[i];
-                }
+                bestCoupon = coupons[i];
             }
         }
-    }
-    if(bestCoupon) {
-        console.log("Caramel: Best coupon code:", bestCoupon.code, "Saved:", bestDifference);
-        console.log("Applying best coupon...")
-        const result = await applyCoupon(bestCoupon.code, domainRecord, true);
-        console.log("FINAL RESULT");
-        console.log(result);
-        console.log("FINAL RESULT");
-        if(result.success) {
-            console.log("Caramel: Best coupon code:", bestCoupon.code, "Saved:", bestDifference);
-            showFinalModal(bestDifference, bestCoupon.code, "We found a coupon that saves you money!");
-            if (bestDifference > 0 && bestCoupon) {
-            } else {
-            }
-        }else {
-            showFinalModal(0, null,"No better price found. This is already the best you can get!");
-        }
-    } else {
-        showFinalModal(0, null,"No better price found. This is already the best you can get!");
     }
 
+    // 5) If we found a best coupon, reapply it
+    if (bestCoupon) {
+        console.log("Caramel: Best coupon code:", bestCoupon.code, "Saved:", bestDifference);
+        console.log("Applying best coupon...");
+        const result = await applyCoupon(bestCoupon.code, domainRecord, true);
+        if (result.success) {
+            console.log("Caramel: Best coupon code applied:", bestCoupon.code, "Saved:", bestDifference);
+            showFinalModal(bestDifference, bestCoupon.code, "We found a coupon that saves you money!");
+        } else {
+            showFinalModal(0, null, "No better price found. This is already the best you can get!");
+        }
+    } else {
+        showFinalModal(0, null, "No better price found. This is already the best you can get!");
+    }
 }
 
 async function fetchCoupons(site,keywords) {

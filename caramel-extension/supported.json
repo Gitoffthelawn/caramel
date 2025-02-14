@@ -18,7 +18,7 @@
       "couponInput": "input[data-testid='promo-input']",
       "couponSubmit": "button[data-testid='promo-code-submit']",
       "priceContainer": "div[data-testid='total-after-trial']",
-      "dismissButton": "button[class='e1y09um01 e116l7sm0 gamut-1p7zq5p-ResetElement-createButtonComponent-DismissButton e1bhhzie1']"
+      "dismissButton": "button[type='button'][aria-label^='Dismiss']"
     }
   ]
 }
