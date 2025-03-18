@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Listen for messages from the login window (sent via postMessage)
     window.addEventListener("message", (event) => {
         console.log(event);
-        if (event.origin !== "https://dev.grabcaramel.com") return;
+        if (event.origin !== "https://grabcaramel.com") return;
         if (event.data && event.data.token) {
             // Keep only the essential data for the user
             const user = {
@@ -59,7 +59,7 @@ function renderSignInPrompt() {
   `;
     document.getElementById("loginButton").addEventListener("click", () => {
         window.open(
-            "https://dev.grabcaramel.com/login?extension=true",
+            "https://grabcaramel.com/login?extension=true",
             "loginWindow",
             "width=500,height=600"
         );
@@ -90,13 +90,13 @@ function renderProfileCard(user) {
     const settingsIcon = document.getElementById("settingsIcon");
     settingsIcon.style.display = "block";
     settingsIcon.onclick = () => {
-        window.open("https://dev.grabcaramel.com/profile", "_blank");
+        window.open("https://grabcaramel.com/profile", "_blank");
     };
 
     document
         .getElementById("settingsButton")
         .addEventListener("click", () => {
-            window.open("https://dev.grabcaramel.com/profile", "_blank");
+            window.open("https://grabcaramel.com/profile", "_blank");
         });
 
     document.getElementById("logoutButton").addEventListener("click", () => {

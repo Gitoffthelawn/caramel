@@ -271,7 +271,7 @@ async function startApplyingCoupons(domainRecord) {
 }
 
 async function fetchCoupons(site,keywords) {
-    const url = `https://dev.grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(keywords)}`;
+    const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(keywords)}&limit=20`;
     try {
         const token = await new Promise((resolve) => {
             currentBrowser.storage.sync.get(["token"], (result) => {
@@ -524,7 +524,7 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
         document.body.removeChild(overlay);
         if(isSignIn) {
             window.open(
-                "https://dev.grabcaramel.com/login?extension=true",
+                "https://grabcaramel.com/login?extension=true",
                 "loginWindow",
                 "width=500,height=600"
             );
@@ -593,7 +593,7 @@ function waitForDomUpdate(selector, { timeout = 5000 } = {}) {
 }
 
 window.addEventListener("message", (event) => {
-    if (event.origin !== "https://dev.grabcaramel.com") return;
+    if (event.origin !== "https://grabcaramel.com") return;
     console.log("Caramel: Received message from", event.origin);
     if (event.data && event.data.token) {
         const user = {
