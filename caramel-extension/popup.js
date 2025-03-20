@@ -36,16 +36,22 @@ function renderSignInPrompt() {
     const authContainer = document.getElementById("auth-container");
     authContainer.innerHTML = `
       <div class="login-prompt fade-in-up">
-        <h2>Sign In to Caramel</h2>
         <p>In order to start using our coupons, please sign in!</p>
         <form id="loginForm" class="login-form">
           <div id="loginErrorMessage" class="error-message" style="display: none;"></div>
-          <label>Email</label>
-          <input type="email" id="email" required />
-          <label>Password</label>
-          <input type="password" id="password" required />
+          <div>
+            <label>Email</label>
+            <input type="email" id="email" required />    
+          </div>
+          <div>
+            <label>Password</label>
+            <input type="password" id="password" required />    
+          </div>
           <button type="submit" class="login-button">Login</button>
         </form>
+        <p>Don't have an account?
+          <a href="https://grabcaramel.com/signup" target="_blank" rel="noopener noreferrer">Sign Up</a>
+        </p>
       </div>
     `;
 
