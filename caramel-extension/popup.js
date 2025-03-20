@@ -36,15 +36,22 @@ function renderSignInPrompt() {
     const authContainer = document.getElementById("auth-container");
     authContainer.innerHTML = `
       <div class="login-prompt fade-in-up">
-        <h2>Sign In to Caramel</h2>
         <p>In order to start using our coupons, please sign in!</p>
         <form id="loginForm" class="login-form">
-          <label>Email</label>
-          <input type="email" id="email" required />
-          <label>Password</label>
-          <input type="password" id="password" required />
+          <div id="loginErrorMessage" class="error-message" style="display: none;"></div>
+          <div>
+            <label>Email</label>
+            <input type="email" id="email" required />    
+          </div>
+          <div>
+            <label>Password</label>
+            <input type="password" id="password" required />    
+          </div>
           <button type="submit" class="login-button">Login</button>
         </form>
+        <p class="mt-6">Don't have an account?
+          <a href="https://grabcaramel.com/signup" target="_blank" rel="noopener noreferrer">Sign Up</a>
+        </p>
       </div>
     `;
 
@@ -57,6 +64,12 @@ function renderSignInPrompt() {
     const loginForm = document.getElementById("loginForm");
     loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
+
+        // Grab the error message element
+        const errorMessageElem = document.getElementById("loginErrorMessage");
+        // Reset visibility each time user attempts login
+        errorMessageElem.style.display = "none";
+        errorMessageElem.textContent = "";
 
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
@@ -85,7 +98,9 @@ function renderSignInPrompt() {
             });
         } catch (err) {
             console.error("Login error:", err);
-            alert(`Login failed: ${err.message}`);
+            // Show the error message in the box above the form
+            errorMessageElem.textContent = `Login failed: ${err.message}`;
+            errorMessageElem.style.display = "block";
         }
     });
 }
@@ -108,6 +123,7 @@ function renderProfileCard(user) {
       </div>
     </div>
   `;
+
     // Show the settings icon in the header
     const settingsIcon = document.getElementById("settingsIcon");
     settingsIcon.style.display = "block";

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import prisma from "@prisma/client";
 import {cors} from "@/lib/cors";
+import prisma from '@/lib/prisma'
 
 export default async function handler(req, res) {
     await cors(req, res);
