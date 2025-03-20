@@ -30,42 +30,64 @@ document.addEventListener("DOMContentLoaded", async () => {
             renderSignInPrompt();
         }
     });
-
-    // Listen for messages from the login window (sent via postMessage)
-    window.addEventListener("message", (event) => {
-        console.log(event);
-        if (event.origin !== "https://grabcaramel.com") return;
-        if (event.data && event.data.token) {
-            // Keep only the essential data for the user
-            const user = {
-                username: event.data.username || "CaramelUser",
-                image: event.data.image,
-            };
-            currentBrowser.storage.sync.set({ token: event.data.token, user }, () => {
-                renderProfileCard(user);
-            });
-        }
-    });
 });
 
 function renderSignInPrompt() {
     const authContainer = document.getElementById("auth-container");
     authContainer.innerHTML = `
-    <div class="login-prompt fade-in-up">
-      <h2>Sign In to Caramel</h2>
-      <p>In order to start using our coupons, please sign in!</p>
-      <button id="loginButton" class="login-button">Sign In</button>
-    </div>
-  `;
-    document.getElementById("loginButton").addEventListener("click", () => {
-        window.open(
-            "https://grabcaramel.com/login?extension=true",
-            "loginWindow",
-            "width=500,height=600"
-        );
-    });
+      <div class="login-prompt fade-in-up">
+        <h2>Sign In to Caramel</h2>
+        <p>In order to start using our coupons, please sign in!</p>
+        <form id="loginForm" class="login-form">
+          <label>Email</label>
+          <input type="email" id="email" required />
+          <label>Password</label>
+          <input type="password" id="password" required />
+          <button type="submit" class="login-button">Login</button>
+        </form>
+      </div>
+    `;
+
     // Hide the settings icon when not logged in
-    document.getElementById("settingsIcon").style.display = "none";
+    const settingsIcon = document.getElementById("settingsIcon");
+    if (settingsIcon) {
+        settingsIcon.style.display = "none";
+    }
+
+    const loginForm = document.getElementById("loginForm");
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        try {
+            // Call your Next.js endpoint at /extension/login (adjust as needed)
+            const response = await fetch("https://grabcaramel.com/api/extension/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "Login failed");
+            }
+
+            // Parse the result: { token, username, image }
+            const { token, username, image } = await response.json();
+            const user = { username, image };
+
+            // Store token/user in extension storage
+            currentBrowser.storage.sync.set({ token, user }, () => {
+                // Now render the "logged in" UI
+                renderProfileCard(user);
+            });
+        } catch (err) {
+            console.error("Login error:", err);
+            alert(`Login failed: ${err.message}`);
+        }
+    });
 }
 
 function renderProfileCard(user) {
