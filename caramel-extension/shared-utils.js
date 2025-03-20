@@ -1,3 +1,20 @@
+async function tryInitialize() {
+    const domain = window.location.hostname;
+    console.log("Caramel: Current domain", domain);
+    const domainRecord = await getDomainRecord(domain);
+    console.log("Caramel: Domain record", domainRecord)
+    if (domainRecord) {
+        const input = await document.querySelector(`${domainRecord.couponInput}`);
+        console.log("Caramel: Input", input);
+        const showInputButton = await document.querySelector(`${domainRecord.showInput}`);
+        console.log("Caramel: Show input button", showInputButton);
+        if (input || showInputButton) {
+            console.log("Caramel: Detected checkout page");
+            initCouponFlow(domainRecord);
+        }
+    }
+}
+
 function initCouponFlow(domainRecord) {
     // Insert a small button/prompt for the user to click
     console.log("Caramel: Inserting prompt for coupons...");
@@ -601,10 +618,7 @@ window.addEventListener("message", (event) => {
             image: event.data.image,
         };
         currentBrowser.storage.sync.set({ token: event.data.token, user }, async () => {
-            const domainRecord = await getDomainRecord(window.location.hostname);
-            if(domainRecord) {
-                initCouponFlow(domainRecord);
-            }
+            tryInitialize()
         });
     }
 });
