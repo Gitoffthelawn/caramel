@@ -38,6 +38,8 @@ export default function Login() {
         console.log("session", session);
         console.log("extension", extension);
         console.log("window.opener", window.opener);
+        console.log("window.parent", window.parent);
+        window.parent.opener.callBackIntegrationCompleted("testing");
         if (extension && window.opener) {
             window.opener.postMessage(
                 {
