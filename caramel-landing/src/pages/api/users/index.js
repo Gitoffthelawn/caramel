@@ -1,6 +1,5 @@
 import { render } from '@react-email/render'
 import bcrypt from 'bcryptjs'
-import { NextApiRequest, NextApiResponse } from 'next'
 import {onErrorMiddleware, onNoMatchMiddleware} from "@/lib/middlewares/errorMiddleware";
 import {apiResponse} from "@/lib/securityHelpers/apiResponse";
 import prisma from "@/lib/prisma";
