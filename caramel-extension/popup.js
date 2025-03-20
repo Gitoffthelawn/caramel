@@ -49,7 +49,7 @@ function renderSignInPrompt() {
           </div>
           <button type="submit" class="login-button">Login</button>
         </form>
-        <p>Don't have an account?
+        <p class="mt-6">Don't have an account?
           <a href="https://grabcaramel.com/signup" target="_blank" rel="noopener noreferrer">Sign Up</a>
         </p>
       </div>
