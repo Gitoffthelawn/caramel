@@ -8,7 +8,7 @@ export const cors = initMiddleware(
             const allowedOrigins = ['https://www.amazon.com', 'https://www.ebay.com', 'https://www.codecademy.com'];
             const extensionPatterns = [
                 /^chrome-extension:\/\/[a-z]{32}$/, // Chrome extension IDs (32 chars)
-                /^safari-extension:\/\/[a-z0-9-]+$/, // Safari extension IDs
+                /^safari-web-extension:\/\/[a-z0-9-]+$/, // Safari extension IDs
             ];
 
             if (!origin ||
