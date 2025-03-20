@@ -31,29 +31,8 @@ export default function Login() {
             setLoading(false);
             return;
         }
-
-        // On successful sign-in, fetch the session to get user/token details.
-        const session = await getSession();
-
-        console.log("session", session);
-        console.log("extension", extension);
-        if (extension) {
-            window.postMessage(
-                {
-                    token: session?.accessToken || "",
-                    username: session?.user?.username || {},
-                    image: session?.user?.image || {},
-                },
-                "*"
-            );
-            toast.success("Login successful! You can now close this window.");
-            setTimeout(() => {
-                window.close();
-            }, 1500);
-        } else {
-            toast.success("Login successful!");
-            router.push("/");
-        }
+        toast.success("Login successful!");
+        router.push("/");
         setLoading(false);
     };
 
