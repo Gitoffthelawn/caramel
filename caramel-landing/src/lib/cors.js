@@ -5,7 +5,8 @@ import { initMiddleware } from './initMiddleware';
 export const cors = initMiddleware(
     Cors({
         origin: (origin, callback) => {
-            const allowedOrigins = ['https://www.amazon.com', 'https://www.ebay.com', 'https://www.codecademy.com'];
+            // const allowedOrigins = ['https://www.amazon.com', 'https://www.ebay.com', 'https://www.codecademy.com'];
+            const allowedOrigins = ['*'];
             if (!origin || allowedOrigins.includes(origin)) {
                 callback(null, true);
             } else {

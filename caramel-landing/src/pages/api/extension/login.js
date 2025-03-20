@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "@prisma/client";
+import {cors} from "@/lib/cors";
 
 export default async function handler(req, res) {
+    await cors(req, res);
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
     }
