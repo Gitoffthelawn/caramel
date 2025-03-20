@@ -602,8 +602,9 @@ window.addEventListener("message", (event) => {
         };
         currentBrowser.storage.sync.set({ token: event.data.token, user }, async () => {
             const domainRecord = await getDomainRecord(window.location.hostname);
-            console.log("Caramel: Domain record", domainRecord)
-            startApplyingCoupons(domainRecord);
+            if(domainRecord) {
+                initCouponFlow(domainRecord);
+            }
         });
     }
 });
