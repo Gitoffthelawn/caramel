@@ -1,24 +1,30 @@
 async function tryInitialize() {
     const domain = window.location.hostname;
     console.log("Caramel: Current domain", domain);
+
     const domainRecord = await getDomainRecord(domain);
-    console.log("Caramel: Domain record", domainRecord)
-    if (domainRecord) {
-        const input = await document.querySelector(`${domainRecord.couponInput}`);
-        console.log("Caramel: Input", input);
-        const showInputButton = await document.querySelector(`${domainRecord.showInput}`);
-        console.log("Caramel: Show input button", showInputButton);
-        if (input || showInputButton) {
-            console.log("Caramel: Detected checkout page");
-            initCouponFlow(domainRecord);
-        }
+    console.log("Caramel: Domain record", domainRecord);
+    if (!domainRecord) return;
+    try {
+        await Promise.race([
+            waitForDomUpdate(domainRecord.couponInput),
+            waitForDomUpdate(domainRecord.showInput)
+        ]);
+    } catch (err) {
+        console.error("Caramel: Timed out or error:", err);
+    }
+    const input = document.querySelector(domainRecord.couponInput);
+    const showInputButton = document.querySelector(domainRecord.showInput);
+    if (input || showInputButton) {
+        console.log("Caramel: Detected checkout page");
+        await initCouponFlow(domainRecord);
     }
 }
 
-function initCouponFlow(domainRecord) {
+async function initCouponFlow(domainRecord) {
     // Insert a small button/prompt for the user to click
     console.log("Caramel: Inserting prompt for coupons...");
-    insertCaramelPrompt(domainRecord);
+   await insertCaramelPrompt(domainRecord);
 }
 
 async function insertCaramelPrompt(domainRecord) {
@@ -580,15 +586,11 @@ async function filterKeywords(keywords) {
 function waitForDomUpdate(selector, { timeout = 5000 } = {}) {
     return new Promise((resolve, reject) => {
         let target = document.querySelector(selector);
-
-        // If not found, observe the entire document for the element to appear
         const root = target ? target : document.documentElement;
 
         const observer = new MutationObserver(() => {
             target = document.querySelector(selector);
             if (target) {
-                // Once we have the target element (or a change in its subtree if it existed),
-                // we can stop observing and resolve
                 observer.disconnect();
                 resolve();
             }
