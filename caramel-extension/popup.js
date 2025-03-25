@@ -120,7 +120,7 @@ function renderProfileCard(user) {
       <div class="welcome-message">Welcome back, ${user.username}!</div>
       <div class="username">@${user.username}</div>
       <div class="profile-actions">
-        <button id="settingsButton" class="settings-button">Profile</button>
+<!--        <button id="settingsButton" class="settings-button">Start applying Coupons!</button>-->
         <button id="logoutButton" class="logout-button">Logout</button>
       </div>
     </div>
@@ -133,11 +133,11 @@ function renderProfileCard(user) {
         window.open("https://grabcaramel.com/profile", "_blank");
     };
 
-    document
-        .getElementById("settingsButton")
-        .addEventListener("click", () => {
-            window.open("https://grabcaramel.com/profile", "_blank");
-        });
+    // document
+    //     .getElementById("settingsButton")
+    //     .addEventListener("click", () => {
+    //         window.open("https://grabcaramel.com/profile", "_blank");
+    //     });
 
     document.getElementById("logoutButton").addEventListener("click", () => {
         currentBrowser.storage.sync.remove(["token", "user"], () => {
