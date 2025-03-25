@@ -1,9 +1,4 @@
 // popup.js
-const currentBrowser = (() => {
-    if (typeof chrome !== "undefined") return chrome;
-    if (typeof browser !== "undefined") return browser;
-    throw new Error("Browser is not supported!");
-})();
 
 document.addEventListener("DOMContentLoaded", async () => {
     // Remove the loading overlay after a short delay
@@ -93,8 +88,15 @@ function renderSignInPrompt() {
 
             // Store token/user in extension storage
             currentBrowser.storage.sync.set({ token, user }, () => {
-                // Now render the "logged in" UI
                 renderProfileCard(user);
+                const urlParams = new URLSearchParams(window.location.search);
+                const isPopup = urlParams.get("isPopup") === "true";
+                console.log("Is popup?", isPopup);
+                if (isPopup) {
+                    const callerId = urlParams.get("callerId");
+                    currentBrowser.runtime.sendMessage({ action: `userLoggedInFromPopup_${callerId}` });
+                    window.close();
+                }
             });
         } catch (err) {
             console.error("Login error:", err);

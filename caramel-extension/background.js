@@ -15,7 +15,19 @@ function keepAlive() {
 keepAlive();
 
 currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-   if (message.action === "keepAlive") {
+    if (message.action === "openPopup") {
+        currentBrowser.windows.create({
+            url: currentBrowser.runtime.getURL("index.html?isPopup=true&callerId=" + sender.tab.id),
+            type: "popup",
+            width: 400,
+            height: 450
+        });
+        sendResponse({ success: true });
+    } else if (message.action.startsWith("userLoggedInFromPopup_")) {
+        const callerId = message.action.split("_")[1];
+        currentBrowser.tabs.sendMessage(parseInt(callerId), { action: "userLoggedIn" });
+        sendResponse({ success: true });
+    } else if (message.action === "keepAlive") {
         console.log("Received keep-alive message from content script");
         sendResponse({ status: "alive" }); // Respond to the message
     }

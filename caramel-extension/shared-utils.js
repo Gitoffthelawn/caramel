@@ -1,3 +1,9 @@
+const currentBrowser = (() => {
+    if (typeof chrome !== "undefined") return chrome;
+    if (typeof browser !== "undefined") return browser;
+    throw new Error("Browser is not supported!");
+})();
+
 async function tryInitialize() {
     const domain = window.location.hostname;
     console.log("Caramel: Current domain", domain);
@@ -546,11 +552,8 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
     modal.querySelector("#caramel-final-ok-btn").addEventListener("click", () => {
         document.body.removeChild(overlay);
         if(isSignIn) {
-            window.open(
-                "https://grabcaramel.com/login?extension=true",
-                "loginWindow",
-                "width=500,height=600"
-            );
+            //show popup.html
+            currentBrowser.runtime.sendMessage({ action: "openPopup" });
         }
     });
 }
@@ -622,5 +625,14 @@ window.addEventListener("message", (event) => {
         currentBrowser.storage.sync.set({ token: event.data.token, user }, async () => {
             tryInitialize()
         });
+    }
+});
+
+currentBrowser.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+    if (request.action === "userLoggedIn") {
+        const domain = window.location.hostname;
+        const domainRecord = await getDomainRecord(domain);
+        await startApplyingCoupons(domainRecord);
+        sendResponse({ success: true });
     }
 });
