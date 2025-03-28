@@ -194,7 +194,6 @@ async function renderCheckoutCoupons(domainRecord, user) {
         headerRightButtonHtml = `<button id="loginButton" class="coupons-logout-button">Login</button>`;
     }
 
-    // 3) Inject the main HTML structure
     authContainer.innerHTML = `
         <div class="coupons-profile-card fade-in-up">
             <!-- Minimal "profile" row on top (like a header) -->
@@ -258,7 +257,7 @@ async function renderCheckoutCoupons(domainRecord, user) {
     const copyButtons = authContainer.querySelectorAll(".coupon-item");
     copyButtons.forEach((btn) => {
         btn.addEventListener("click", (e) => {
-            const code = e.target.getAttribute("data-code");
+            const code = e.currentTarget.getAttribute("data-code");
             navigator.clipboard
                 .writeText(code)
                 .then(() => {
