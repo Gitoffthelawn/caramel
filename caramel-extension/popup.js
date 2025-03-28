@@ -180,67 +180,71 @@ async function renderCheckoutCoupons(domainRecord, user) {
             : "assets/default-profile.png";
 
         headerLeftHtml = `
-      <img src="${imageUrl}" alt="Profile" class="coupons-profile-image" />
-      <span class="user-label">@${user.username}</span>
-    `;
+            <img src="${imageUrl}" alt="Profile" class="coupons-profile-image" />
+            <span class="coupons-user-label">@${user.username}</span>
+        `;
         // Logged-in user sees a "Logout" button
         headerRightButtonHtml = `<button id="logoutButton" class="coupons-logout-button">Logout</button>`;
     } else {
-        // Guest scenario: show default image + "Guest"
+        // Guest scenario
         headerLeftHtml = `
-      <img src="assets/default-profile.png" alt="Profile" class="coupons-profile-image" />
-      <span class="user-label">Guest</span>
-    `;
-        headerRightButtonHtml = `<button id="loginButton" class="logout-button">Login</button>`;
+            <img src="assets/default-profile.png" alt="Profile" class="coupons-profile-image" />
+            <span class="coupons-user-label">Guest</span>
+        `;
+        headerRightButtonHtml = `<button id="loginButton" class="coupons-logout-button">Login</button>`;
     }
 
     // 3) Inject the main HTML structure
     authContainer.innerHTML = `
-    <div class="coupons-profile-card fade-in-up">
-      <!-- Minimal "profile" row on top (like a header) -->
-      <div class="coupons-profile-row">
-        <div class="coupons-profile-info">
-          ${headerLeftHtml}
-        </div>
-        ${headerRightButtonHtml}
-      </div>
+        <div class="coupons-profile-card fade-in-up">
+            <!-- Minimal "profile" row on top (like a header) -->
+            <div class="coupons-profile-row">
+                <div class="coupons-profile-info">
+                    ${headerLeftHtml}
+                </div>
+                ${headerRightButtonHtml}
+            </div>
 
-      <h3 class="coupon-header">Coupons for ${domainRecord.domain}:</h3>
-      <div id="couponList" class="coupon-list">
-        ${
+            <h3 class="coupon-header">Coupons for ${domainRecord.domain}</h3>
+            <div id="couponList" class="coupon-list">
+                ${
         coupons.length === 0
             ? `<p>No coupons found for this site</p>`
             : coupons
                 .map(
                     (c) => `
-                    <div class="coupon-item">
-                      <div class="coupon-title">${c.title || "Untitled Coupon"}</div>
-                      <div class="coupon-desc">${c.description || ""}</div>
-                      <div class="coupon-action">
-                        <button 
-                          class="copyBtn" 
-                          data-code="${c.code}"
-                        >
-                          Copy "${c.code}"
-                        </button>
-                      </div>
-                    </div>
-                  `
+                                <div data-code="${c.code}" class="coupon-item">
+                                    <div class="coupon-title">${c.title || "Untitled Coupon"}</div>
+                                    <div class="coupon-desc">${c.description || ""}</div>
+                                    <div class="coupon-action">
+                                        <button 
+                                            class="copyBtn" 
+                                        >
+                                            Copy "${c.code}"
+                                        </button>
+                                    </div>
+                                </div>
+                            `
                 )
                 .join("")
     }
-      </div>
-    </div>
-  `;
+            </div>
+        </div>
+        <!-- Toast container (for showing copy notifications) -->
+        <div id="toastContainer" class="copy-toast-container"></div>
+    `;
 
     // 4) Wire up the "Logout" or "Login" button
     if (user) {
-        document.getElementById("logoutButton").addEventListener("click", () => {
-            currentBrowser.storage.sync.remove(["token", "user"], () => {
-                // Now user is logged out -> show sign-in prompt for checkout
-                renderSignInPrompt();
+        const logoutButton = document.getElementById("logoutButton");
+        if (logoutButton) {
+            logoutButton.addEventListener("click", () => {
+                currentBrowser.storage.sync.remove(["token", "user"], () => {
+                    // Now user is logged out -> show sign-in prompt for checkout
+                    renderSignInPrompt();
+                });
             });
-        });
+        }
     } else {
         const loginBtn = document.getElementById("loginButton");
         if (loginBtn) {
@@ -250,8 +254,8 @@ async function renderCheckoutCoupons(domainRecord, user) {
         }
     }
 
-    // 5) Copy button logic
-    const copyButtons = authContainer.querySelectorAll(".copyBtn");
+    // 5) Copy button logic + show a toast when successful
+    const copyButtons = authContainer.querySelectorAll(".coupon-item");
     copyButtons.forEach((btn) => {
         btn.addEventListener("click", (e) => {
             const code = e.target.getAttribute("data-code");
@@ -259,9 +263,35 @@ async function renderCheckoutCoupons(domainRecord, user) {
                 .writeText(code)
                 .then(() => {
                     console.log(`Copied coupon code: ${code}`);
+                    showCopyToast(`Copied "${code}" to clipboard!`);
                 })
                 .catch((err) => console.error("Failed to copy code", err));
         });
     });
 }
+
+/**
+ * Creates and displays a brief toast message indicating a successful copy.
+ */
+function showCopyToast(message) {
+    const toastContainer = document.getElementById("toastContainer");
+    if (!toastContainer) return;
+
+    // Create the toast element
+    const toast = document.createElement("div");
+    toast.className = "copy-toast";
+    toast.innerText = message;
+
+    // Add it to the container
+    toastContainer.appendChild(toast);
+
+    // Remove it after animation completes (or set a timer)
+    setTimeout(() => {
+        toast.classList.add("fade-out");
+        toast.addEventListener("animationend", () => {
+            toast.remove();
+        });
+    }, 2000);
+}
+
 

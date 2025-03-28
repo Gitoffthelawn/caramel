@@ -6,7 +6,7 @@ html, body {
     overflow: hidden; /* Keep extension popup from scrolling */
 }
 body {
-    width: 400px;
+    width: 420px;
     height: 470px;
     display: flex;
     justify-content: center;
@@ -19,7 +19,7 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 400px; /* Match body width */
+    width: 420px; /* Match body width */
     height: 600px; /* Match body height */
     overflow: hidden;
     z-index: 1;
@@ -30,7 +30,7 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 400px;
+    width: 420px;
     height: 220px;
     z-index: 2;
 }
@@ -38,7 +38,7 @@ body {
 /* Doodles */
 .doodle {
     position: absolute;
-    width: 250px;
+    width: 420px;
     opacity: 0.15;
     z-index: 1;
 }
@@ -49,12 +49,13 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 400px;
+    width: 420px;
     height: 600px;
     background: rgba(0, 0, 0, 0.35);
     display: flex;
     justify-content: center;
     align-items: center;
+    border-radius: 20px;
     z-index: 999;
 }
 .loading-container img {
@@ -67,11 +68,11 @@ body {
 .popup-container {
     position: relative;
     z-index: 10;
-    width: 360px;
+    width: 380px;
+    border-radius: 20px;
     margin: auto; /* space from wave */
     background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(8px); /* Glassmorphic effect */
-    border-radius: 16px;
+    backdrop-filter: blur(8px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     animation: fadeIn 0.8s ease forwards;
 }
@@ -305,25 +306,40 @@ body {
 }
 
 
-/* -------------- Profile / Header Row -------------- */
-
-/* The card container – you already have .profile-card from older code */
+/* -------------- Overall Card -------------- */
 .coupons-profile-card {
+    /* Subtle gradient with your brand color (#ea6925) in mind */
+    background: linear-gradient(135deg, #fff 50%, #fff3ec 100%);
     padding: 16px;
-    border-radius: 8px;
-    background-color: #fff;
-    /* ... or whatever background/box shadow you like */
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    animation: fadeInUp 0.3s ease forwards;
+    max-width: 420px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Row for the user info on the left and button on the right */
+/* Optional fade-in keyframe for the card */
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* -------------- Header / Profile Row -------------- */
 .coupons-profile-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
 }
 
-/* The left portion with image + user name/guest label */
 .coupons-profile-info {
     display: flex;
     align-items: center;
@@ -335,47 +351,79 @@ body {
     height: 40px;
     border-radius: 50%;
     object-fit: cover;
+    margin-right: 10px;
+    border: 2px solid #ea6925;
 }
 
 /* The user label (e.g., "@username" or "Guest") */
 .coupons-user-label {
-    margin-left: 10px;
     font-size: 14px;
     font-weight: bold;
     color: #333;
 }
 
-/* The coupon header (h3 text) */
+/* -------------- Header text for the coupon list -------------- */
 .coupon-header {
     font-size: 16px;
     color: #ea6925;
     margin: 0 0 8px 0;
+    font-weight: bold;
+    text-align: center;
 }
 
 /* -------------- Coupon List + Items -------------- */
-
-/* The container for all coupons */
 .coupon-list {
-    max-height: 180px;
+    max-height: 220px;
     overflow-y: auto;
+    overflow-x: hidden;
     margin: 8px 0;
     padding-right: 4px; /* helps avoid overlap with scrollbar */
 }
 
-/* Individual coupon item container */
+/*
+   "Coupon" item style:
+   - dashed border to evoke real coupons
+   - slight background tint
+*/
 .coupon-item {
-    border: 1px solid #ccc;
+    cursor: url("data:image/svg+xml;base64,PHN2Zw0KICAgICAgICB3aWR0aD0iNjAiDQogICAgICAgIGhlaWdodD0iMTYiDQogICAgICAgIHZpZXdCb3g9IjAgMCA2MCAxNiINCiAgICAgICAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIg0KPg0KICAgIDwhLS0gT3ZlcmxhcHBpbmcgc3F1YXJlcyAocmVwcmVzZW50IHRoZSAiY29weSIgaWNvbikgLS0+DQogICAgPHJlY3QNCiAgICAgICAgICAgIHg9IjAiDQogICAgICAgICAgICB5PSIzIg0KICAgICAgICAgICAgd2lkdGg9IjgiDQogICAgICAgICAgICBoZWlnaHQ9IjEwIg0KICAgICAgICAgICAgZmlsbD0ibm9uZSINCiAgICAgICAgICAgIHN0cm9rZT0iI2VhNjkyNSINCiAgICAgICAgICAgIHN0cm9rZS13aWR0aD0iMSINCiAgICAgICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCINCiAgICAgICAgICAgIHN0cm9rZS1saW5lam9pbj0icm91bmQiDQogICAgLz4NCiAgICA8cmVjdA0KICAgICAgICAgICAgeD0iMiINCiAgICAgICAgICAgIHk9IjEiDQogICAgICAgICAgICB3aWR0aD0iOCINCiAgICAgICAgICAgIGhlaWdodD0iMTAiDQogICAgICAgICAgICBmaWxsPSJub25lIg0KICAgICAgICAgICAgc3Ryb2tlPSIjZWE2OTI1Ig0KICAgICAgICAgICAgc3Ryb2tlLXdpZHRoPSIxIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCINCiAgICAvPg0KDQogICAgPCEtLSBUaGUgd29yZCAiQ29weSIgdG8gdGhlIHJpZ2h0IC0tPg0KICAgIDx0ZXh0DQogICAgICAgICAgICB4PSIxOCINCiAgICAgICAgICAgIHk9IjEyIg0KICAgICAgICAgICAgZmlsbD0iI2VhNjkyNSINCiAgICAgICAgICAgIGZvbnQtc2l6ZT0iMTAiDQogICAgICAgICAgICBmb250LWZhbWlseT0ic2Fucy1zZXJpZiINCiAgICA+DQogICAgICAgIENvcHkNCiAgICA8L3RleHQ+DQo8L3N2Zz4NCg==") 8 8, copy;
+    border: 2px dashed #ea6925;
     border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 8px;
-    transition: background-color 0.2s;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    transition: background-color 0.2s, box-shadow 0.2s;
+    background-color: #fff;
+    position: relative;
 }
 
+/* Subtle hover effect */
 .coupon-item:hover {
-    background-color: #fdf9f7; /* subtle hover highlight */
+    background-color: #fff8f5;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.07);
 }
 
-/* The coupon's title, typically bold or bigger text */
+/* Optional "ticket notch" effect (using :before/:after) */
+.coupon-item:before,
+.coupon-item:after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border: 2px solid #ea6925;
+    border-radius: 50%;
+}
+
+.coupon-item:before {
+    top: -9px;
+    left: -9px;
+}
+.coupon-item:after {
+    bottom: -9px;
+    right: -9px;
+}
+
+/* The coupon's title */
 .coupon-title {
     font-weight: bold;
     font-size: 14px;
@@ -385,48 +433,130 @@ body {
 
 /* The coupon's description text */
 .coupon-desc {
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
     margin-bottom: 6px;
 }
 
-/* A little container or row for the button(s) */
+/* A container for the copy button */
 .coupon-action {
     display: flex;
     align-items: center;
     margin-top: 5px;
+    justify-content: flex-end;
 }
 
-/* The copy button */
+/* -------------- The big, obvious Copy button -------------- */
 .copyBtn {
     background: #ea6925;
-    color: white;
+    color: #fff;
     border: none;
     border-radius: 4px;
-    padding: 4px 8px;
+    padding: 10px 16px;
     cursor: pointer;
-    font-size: 12px;
-    transition: background 0.3s ease;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background 0.3s ease, transform 0.1s;
 }
 
 .copyBtn:hover {
-    background: #da7f52;
+    background: #cf581f;
 }
 
-/* -------------- Buttons, e.g. logout-button -------------- */
+.copyBtn:active {
+    transform: scale(0.97);
+}
 
+/* -------------- Logout / Login Button -------------- */
 .coupons-logout-button {
     background: #fff;
     color: #ea6925;
-    border: 1px solid #ea6925;
-    border-radius: 8px;
-    padding: 4px 12px;
+    border: 2px solid #ea6925;
+    border-radius: 6px;
+    padding: 6px 16px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: bold;
     transition: all 0.3s ease;
 }
 
 .coupons-logout-button:hover {
     background: #ea6925;
     color: #fff;
+}
+
+/* -------------- Toast / Confirmation -------------- */
+.copy-toast-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+}
+
+.copy-toast {
+    background-color: #333;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    opacity: 0.95;
+    animation: fadeIn 0.3s ease forwards;
+    font-size: 14px;
+}
+
+/* Fade out after the setTimeout triggers 'fade-out' class */
+.copy-toast.fade-out {
+    animation: fadeOut 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+}
+
+/* -------------- Media Queries (for small screens) -------------- */
+@media (max-width: 480px) {
+    .coupons-profile-card {
+        width: 90%;
+        padding: 12px;
+    }
+
+    .coupon-item {
+        padding: 8px;
+        margin-bottom: 8px;
+    }
+
+    .coupon-title {
+        font-size: 15px;
+    }
+
+    .copyBtn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+        font-size: 15px;
+    }
+
+    .coupons-logout-button {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
 }
