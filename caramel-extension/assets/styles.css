@@ -7,7 +7,7 @@ html, body {
 }
 body {
     width: 400px;
-    height: 400px;
+    height: 470px;
     display: flex;
     justify-content: center;
     position: relative;
@@ -302,4 +302,131 @@ body {
 
 .mt-6 {
     margin-top: 6px;
+}
+
+
+/* -------------- Profile / Header Row -------------- */
+
+/* The card container – you already have .profile-card from older code */
+.coupons-profile-card {
+    padding: 16px;
+    border-radius: 8px;
+    background-color: #fff;
+    /* ... or whatever background/box shadow you like */
+}
+
+/* Row for the user info on the left and button on the right */
+.coupons-profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+/* The left portion with image + user name/guest label */
+.coupons-profile-info {
+    display: flex;
+    align-items: center;
+}
+
+/* The user profile image */
+.coupons-profile-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* The user label (e.g., "@username" or "Guest") */
+.coupons-user-label {
+    margin-left: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* The coupon header (h3 text) */
+.coupon-header {
+    font-size: 16px;
+    color: #ea6925;
+    margin: 0 0 8px 0;
+}
+
+/* -------------- Coupon List + Items -------------- */
+
+/* The container for all coupons */
+.coupon-list {
+    max-height: 180px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding-right: 4px; /* helps avoid overlap with scrollbar */
+}
+
+/* Individual coupon item container */
+.coupon-item {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    transition: background-color 0.2s;
+}
+
+.coupon-item:hover {
+    background-color: #fdf9f7; /* subtle hover highlight */
+}
+
+/* The coupon's title, typically bold or bigger text */
+.coupon-title {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: #333;
+}
+
+/* The coupon's description text */
+.coupon-desc {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+/* A little container or row for the button(s) */
+.coupon-action {
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
+}
+
+/* The copy button */
+.copyBtn {
+    background: #ea6925;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.3s ease;
+}
+
+.copyBtn:hover {
+    background: #da7f52;
+}
+
+/* -------------- Buttons, e.g. logout-button -------------- */
+
+.coupons-logout-button {
+    background: #fff;
+    color: #ea6925;
+    border: 1px solid #ea6925;
+    border-radius: 8px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.coupons-logout-button:hover {
+    background: #ea6925;
+    color: #fff;
 }

@@ -9,24 +9,49 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 400);
     }
 
-    const mainContent = document.getElementById("mainContent");
-    let authContainer = document.getElementById("auth-container");
-    if (!authContainer) {
-        authContainer = document.createElement("div");
-        authContainer.id = "auth-container";
-        mainContent.appendChild(authContainer);
-    }
-
-    // Check for an existing token and user info in chrome storage.
-    currentBrowser.storage.sync.get(["token", "user"], (result) => {
-        if (result.token) {
-            renderProfileCard(result.user);
-        } else {
-            renderSignInPrompt();
-        }
-    });
+    // 1) Main init
+    await initPopup();
 });
 
+// ========================================================
+//  Main logic entry — checks the current domain via background
+// ========================================================
+async function initPopup() {
+    const domainRecord = await getActiveTabDomainRecord();
+
+    // Grab the user’s auth info from storage
+    currentBrowser.storage.sync.get(["token", "user"], (result) => {
+        const token = result.token;
+        const user = result.user;
+        if(domainRecord) {
+            renderCheckoutCoupons(domainRecord, user);
+        } else {
+            if (token) {
+                renderProfileCard(user);
+            } else {
+                renderSignInPrompt();
+            }
+        }
+    });
+}
+
+// ========================================================
+//  Ask background for the domain record of the active tab
+// ========================================================
+function getActiveTabDomainRecord() {
+    return new Promise((resolve) => {
+        currentBrowser.runtime.sendMessage(
+            { action: "getActiveTabDomainRecord" },
+            (response) => {
+                resolve(response?.domainRecord || null);
+            }
+        );
+    });
+}
+
+// ========================================================
+//  Old logic unchanged below...
+// ========================================================
 function renderSignInPrompt() {
     const authContainer = document.getElementById("auth-container");
     authContainer.innerHTML = `
@@ -36,11 +61,11 @@ function renderSignInPrompt() {
           <div id="loginErrorMessage" class="error-message" style="display: none;"></div>
           <div>
             <label>Email</label>
-            <input type="email" id="email" required />    
+            <input type="email" id="email" required />
           </div>
           <div>
             <label>Password</label>
-            <input type="password" id="password" required />    
+            <input type="password" id="password" required />
           </div>
           <button type="submit" class="login-button">Login</button>
         </form>
@@ -60,9 +85,7 @@ function renderSignInPrompt() {
     loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        // Grab the error message element
         const errorMessageElem = document.getElementById("loginErrorMessage");
-        // Reset visibility each time user attempts login
         errorMessageElem.style.display = "none";
         errorMessageElem.textContent = "";
 
@@ -70,7 +93,7 @@ function renderSignInPrompt() {
         const password = document.getElementById("password").value;
 
         try {
-            // Call your Next.js endpoint at /extension/login (adjust as needed)
+            // Call your Next.js endpoint at /extension/login
             const response = await fetch("https://grabcaramel.com/api/extension/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -82,25 +105,16 @@ function renderSignInPrompt() {
                 throw new Error(errData.error || "Login failed");
             }
 
-            // Parse the result: { token, username, image }
             const { token, username, image } = await response.json();
             const user = { username, image };
 
-            // Store token/user in extension storage
+            // Store token/user
             currentBrowser.storage.sync.set({ token, user }, () => {
-                renderProfileCard(user);
-                const urlParams = new URLSearchParams(window.location.search);
-                const isPopup = urlParams.get("isPopup") === "true";
-                console.log("Is popup?", isPopup);
-                if (isPopup) {
-                    const callerId = urlParams.get("callerId");
-                    currentBrowser.runtime.sendMessage({ action: `userLoggedInFromPopup_${callerId}` });
-                    window.close();
-                }
+                // Re-init the popup so it can show the "profile card" or "checkout UI"
+                initPopup();
             });
         } catch (err) {
             console.error("Login error:", err);
-            // Show the error message in the box above the form
             errorMessageElem.textContent = `Login failed: ${err.message}`;
             errorMessageElem.style.display = "block";
         }
@@ -109,7 +123,6 @@ function renderSignInPrompt() {
 
 function renderProfileCard(user) {
     const authContainer = document.getElementById("auth-container");
-    // Use the user's image if provided; otherwise, use a default image.
     const imageUrl = user.image && user.image.length
         ? user.image
         : "assets/default-profile.png";
@@ -120,7 +133,6 @@ function renderProfileCard(user) {
       <div class="welcome-message">Welcome back, ${user.username}!</div>
       <div class="username">@${user.username}</div>
       <div class="profile-actions">
-<!--        <button id="settingsButton" class="settings-button">Start applying Coupons!</button>-->
         <button id="logoutButton" class="logout-button">Logout</button>
       </div>
     </div>
@@ -128,20 +140,128 @@ function renderProfileCard(user) {
 
     // Show the settings icon in the header
     const settingsIcon = document.getElementById("settingsIcon");
-    settingsIcon.style.display = "block";
-    settingsIcon.onclick = () => {
-        window.open("https://grabcaramel.com/profile", "_blank");
-    };
-
-    // document
-    //     .getElementById("settingsButton")
-    //     .addEventListener("click", () => {
-    //         window.open("https://grabcaramel.com/profile", "_blank");
-    //     });
+    if (settingsIcon) {
+        settingsIcon.style.display = "block";
+        settingsIcon.onclick = () => {
+            window.open("https://grabcaramel.com/profile", "_blank");
+        };
+    }
 
     document.getElementById("logoutButton").addEventListener("click", () => {
         currentBrowser.storage.sync.remove(["token", "user"], () => {
-            window.location.reload();
+            // Re-init so it shows the sign-in prompt again
+            initPopup();
         });
     });
 }
+
+// ========================================================
+//  NEW 1: Render login prompt specifically for "checkout" flows
+//         (Same as normal login, but includes a "Back" button.)
+// ========================================================
+
+// ========================================================
+//  NEW 2: Show the actual coupon list for the recognized domain
+// ========================================================
+async function renderCheckoutCoupons(domainRecord, user) {
+    const authContainer = document.getElementById("auth-container");
+
+    // 1) Fetch coupons for this domain
+    const coupons = await getCoupons(domainRecord, true);
+
+    // 2) Determine what to display in the top "header" area
+    let headerLeftHtml = "";
+    let headerRightButtonHtml = "";
+
+    if (user) {
+        // Logged-in scenario: show user profile image + username
+        const imageUrl = user.image && user.image.length
+            ? user.image
+            : "assets/default-profile.png";
+
+        headerLeftHtml = `
+      <img src="${imageUrl}" alt="Profile" class="coupons-profile-image" />
+      <span class="user-label">@${user.username}</span>
+    `;
+        // Logged-in user sees a "Logout" button
+        headerRightButtonHtml = `<button id="logoutButton" class="coupons-logout-button">Logout</button>`;
+    } else {
+        // Guest scenario: show default image + "Guest"
+        headerLeftHtml = `
+      <img src="assets/default-profile.png" alt="Profile" class="coupons-profile-image" />
+      <span class="user-label">Guest</span>
+    `;
+        headerRightButtonHtml = `<button id="loginButton" class="logout-button">Login</button>`;
+    }
+
+    // 3) Inject the main HTML structure
+    authContainer.innerHTML = `
+    <div class="coupons-profile-card fade-in-up">
+      <!-- Minimal "profile" row on top (like a header) -->
+      <div class="coupons-profile-row">
+        <div class="coupons-profile-info">
+          ${headerLeftHtml}
+        </div>
+        ${headerRightButtonHtml}
+      </div>
+
+      <h3 class="coupon-header">Coupons for ${domainRecord.domain}:</h3>
+      <div id="couponList" class="coupon-list">
+        ${
+        coupons.length === 0
+            ? `<p>No coupons found for this site</p>`
+            : coupons
+                .map(
+                    (c) => `
+                    <div class="coupon-item">
+                      <div class="coupon-title">${c.title || "Untitled Coupon"}</div>
+                      <div class="coupon-desc">${c.description || ""}</div>
+                      <div class="coupon-action">
+                        <button 
+                          class="copyBtn" 
+                          data-code="${c.code}"
+                        >
+                          Copy "${c.code}"
+                        </button>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")
+    }
+      </div>
+    </div>
+  `;
+
+    // 4) Wire up the "Logout" or "Login" button
+    if (user) {
+        document.getElementById("logoutButton").addEventListener("click", () => {
+            currentBrowser.storage.sync.remove(["token", "user"], () => {
+                // Now user is logged out -> show sign-in prompt for checkout
+                renderSignInPrompt();
+            });
+        });
+    } else {
+        const loginBtn = document.getElementById("loginButton");
+        if (loginBtn) {
+            loginBtn.addEventListener("click", () => {
+                renderSignInPrompt();
+            });
+        }
+    }
+
+    // 5) Copy button logic
+    const copyButtons = authContainer.querySelectorAll(".copyBtn");
+    copyButtons.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            const code = e.target.getAttribute("data-code");
+            navigator.clipboard
+                .writeText(code)
+                .then(() => {
+                    console.log(`Copied coupon code: ${code}`);
+                })
+                .catch((err) => console.error("Failed to copy code", err));
+        });
+    });
+}
+

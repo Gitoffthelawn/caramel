@@ -3,8 +3,7 @@ const currentBrowser = (() => {
     if (typeof browser !== "undefined") return browser;
     throw new Error("Browser is not supported!");
 })();
-
-async function tryInitialize() {
+async function isCheckout() {
     const domain = window.location.hostname;
     console.log("Caramel: Current domain", domain);
 
@@ -21,8 +20,12 @@ async function tryInitialize() {
     }
     const input = document.querySelector(domainRecord.couponInput);
     const showInputButton = document.querySelector(domainRecord.showInput);
-    if (input || showInputButton) {
-        console.log("Caramel: Detected checkout page");
+    return input || showInputButton;
+}
+async function tryInitialize() {
+        if(await isCheckout()) {
+        const domain = window.location.hostname;
+        const domainRecord = await getDomainRecord(domain);
         await initCouponFlow(domainRecord);
     }
 }
@@ -215,23 +218,10 @@ async function applyCoupon(code, domainRecord, best = false) {
     }
 }
 
-async function startApplyingCoupons(domainRecord) {
-    await showTestingModal();
-
-    const token = await new Promise((resolve) => {
-        currentBrowser.storage.sync.get(["token"], (result) => {
-            resolve(result.token || "");
-        });
-    });
-    console.log("Caramel: Token from storage:", token);
-    if (!token) {
-        hideTestingModal();
-        await showFinalModal(0, null, "Please sign in to Caramel to use coupons!", true);
-        return;
-    }
-
+async function getCoupons(domainRecord, noKeyWords=false) {
+    console.log("Caramel: Fetching coupons for", domainRecord.domain);
     let keywords = "";
-    if (domainRecord.domain === "amazon.com") {
+    if (domainRecord.domain === "amazon.com" && !noKeyWords) {
         const response = await new Promise((resolve) => {
             currentBrowser.runtime.sendMessage({ action: "scrapeAmazonCartKeywords" }, (response) => {
                 resolve(response);
@@ -240,9 +230,26 @@ async function startApplyingCoupons(domainRecord) {
         keywords = response.keywords.join(",");
         console.log("Caramel: Keywords from Amazon cart:", keywords);
     }
+    console.log("Caramel: Fetching coupons for", domainRecord.domain, "with keywords:", keywords);
+    return  await fetchCoupons(domainRecord.domain, keywords);
+}
 
-    // 2) Fetch coupons from your backend
-    const coupons = await fetchCoupons(domainRecord.domain, keywords);
+async function startApplyingCoupons(domainRecord) {
+    await showTestingModal();
+
+    // const token = await new Promise((resolve) => {
+    //     currentBrowser.storage.sync.get(["token"], (result) => {
+    //         resolve(result.token || "");
+    //     });
+    // });
+    // console.log("Caramel: Token from storage:", token);
+    // if (!token) {
+    //     hideTestingModal();
+    //     await showFinalModal(0, null, "Please sign in to Caramel to use coupons!", true);
+    //     return;
+    // }
+
+    const coupons = await getCoupons(domainRecord);
     if (!coupons || coupons.length === 0) {
         showFinalModal(0, null, "No better price found. This is already the best you can get!");
         return;
@@ -302,15 +309,15 @@ async function startApplyingCoupons(domainRecord) {
 async function fetchCoupons(site,keywords) {
     const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(keywords)}&limit=20`;
     try {
-        const token = await new Promise((resolve) => {
-            currentBrowser.storage.sync.get(["token"], (result) => {
-                resolve(result.token || "");
-            });
-        });
+        // const token = await new Promise((resolve) => {
+        //     currentBrowser.storage.sync.get(["token"], (result) => {
+        //         resolve(result.token || "");
+        //     });
+        // });
         const response = await fetch(url, {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${token}`,
+                // Authorization: `Bearer ${token}`,
             },
         });
         if (!response.ok) {

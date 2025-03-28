@@ -69,6 +69,41 @@ currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => 
                 sendResponse({ error: "Failed to scrape Amazon cart" });
             });
         return true;
+    } else if (message.action === "getActiveTabDomainRecord") {
+        currentBrowser.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
+            if (!tabs || !tabs.length) {
+                sendResponse({ domainRecord: null });
+                return;
+            }
+
+            const tabId = tabs[0].id;
+
+            try {
+                await currentBrowser.scripting.executeScript({
+                    target: { tabId },
+                    files: ["shared-utils.js"]
+                });
+                const [result] = await currentBrowser.scripting.executeScript({
+                    target: { tabId },
+                    func: async () => {
+                        try {
+                            const hostname = window.location.hostname;
+                            const domainRecord = await window.getDomainRecord(hostname);
+                            return domainRecord;
+                        } catch (err) {
+                            console.error("Error while getting domain record:", err);
+                            return null;
+                        }
+                    }
+                });
+                const domainRecord = result?.result || null;
+                sendResponse({ domainRecord });
+            } catch (err) {
+                console.error("Error injecting or executing domain-record script:", err);
+                sendResponse({ domainRecord: null });
+            }
+        });
+        return true;
     }
 });
 
