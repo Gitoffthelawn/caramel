@@ -534,6 +534,16 @@ body {
 
 /* -------------- Media Queries (for small screens) -------------- */
 @media (max-width: 480px) {
+    body, .popup-bg, .popup-wave {
+        width: 100%;
+        max-width: none;
+    }
+
+    .popup-container {
+        width: 90%;
+        max-width: none;
+    }
+
     .coupons-profile-card {
         width: 90%;
         padding: 12px;
