@@ -1,11 +1,13 @@
 import AppHeader from '@/components/AppHeader'
 import { ThemeContext } from '@/lib/contexts'
+import * as gtag from '@/lib/gtag'
 import '@/styles/globals.css'
 import Hotjar from '@hotjar/browser'
 import { Loader } from '@react-three/drei'
 import { SessionProvider } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
+import Script from 'next/script'
 import { useEffect, useState } from 'react'
 
 const siteId = 6369129
