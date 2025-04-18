@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ========================================================
 async function initPopup() {
     const {domainRecord, url} = await getActiveTabDomainRecord();
-    console.log("URL:", url);
     // Grab the user’s auth info from storage
     currentBrowser.storage.sync.get(["token", "user"], async (result) => {
         const token = result.token;
@@ -28,7 +27,6 @@ async function initPopup() {
             return
         } else if (url) {
             const domainString = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, "");
-            console.log("Domain string:", domainString);
           const coupons =  await fetchCoupons(domainString, []);
           if(coupons?.length) {
              await proceedPopulateCoupons(coupons, user, domainString);
