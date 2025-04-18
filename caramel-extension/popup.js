@@ -17,20 +17,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 //  Main logic entry — checks the current domain via background
 // ========================================================
 async function initPopup() {
-    const domainRecord = await getActiveTabDomainRecord();
-
+    const {domainRecord, url} = await getActiveTabDomainRecord();
+    console.log("URL:", url);
     // Grab the user’s auth info from storage
-    currentBrowser.storage.sync.get(["token", "user"], (result) => {
+    currentBrowser.storage.sync.get(["token", "user"], async (result) => {
         const token = result.token;
         const user = result.user;
         if(domainRecord) {
-            renderCheckoutCoupons(domainRecord, user);
+            await renderCheckoutCoupons(domainRecord, user);
+            return
+        } else if (url) {
+            const domainString = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, "");
+            console.log("Domain string:", domainString);
+          const coupons =  await fetchCoupons(domainString, []);
+          if(coupons?.length) {
+             await proceedPopulateCoupons(coupons, user, domainString);
+             return;
+          }
+        }
+        if (token) {
+            renderProfileCard(user);
         } else {
-            if (token) {
-                renderProfileCard(user);
-            } else {
-                renderSignInPrompt();
-            }
+            renderSignInPrompt();
         }
     });
 }
@@ -43,7 +51,7 @@ function getActiveTabDomainRecord() {
         currentBrowser.runtime.sendMessage(
             { action: "getActiveTabDomainRecord" },
             (response) => {
-                resolve(response?.domainRecord || null);
+                resolve(response);
             }
         );
     });
@@ -164,11 +172,15 @@ function renderProfileCard(user) {
 //  NEW 2: Show the actual coupon list for the recognized domain
 // ========================================================
 async function renderCheckoutCoupons(domainRecord, user) {
-    const authContainer = document.getElementById("auth-container");
 
     // 1) Fetch coupons for this domain
     const coupons = await getCoupons(domainRecord, true);
 
+    await proceedPopulateCoupons(coupons, user, domainRecord.domain);
+    }
+
+async function proceedPopulateCoupons(coupons, user, url) {
+    const authContainer = document.getElementById("auth-container");
     // 2) Determine what to display in the top "header" area
     let headerLeftHtml = "";
     let headerRightButtonHtml = "";
@@ -204,7 +216,7 @@ async function renderCheckoutCoupons(domainRecord, user) {
                 ${headerRightButtonHtml}
             </div>
 
-            <h3 class="coupon-header">Coupons for ${domainRecord.domain}</h3>
+            <h3 class="coupon-header">Coupons for ${url}</h3>
             <div id="couponList" class="coupon-list">
                 ${
         coupons.length === 0
@@ -251,7 +263,7 @@ async function renderCheckoutCoupons(domainRecord, user) {
                 renderSignInPrompt();
             });
         }
-    }
+}
 
     // 5) Copy button logic + show a toast when successful
     const copyButtons = authContainer.querySelectorAll(".coupon-item");

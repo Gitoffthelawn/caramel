@@ -72,7 +72,7 @@ currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => 
     } else if (message.action === "getActiveTabDomainRecord") {
         currentBrowser.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
             if (!tabs || !tabs.length) {
-                sendResponse({ domainRecord: null });
+                sendResponse({ domainRecord: null, url: null });
                 return;
             }
 
@@ -89,18 +89,18 @@ currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => 
                         try {
                             const hostname = window.location.hostname;
                             const domainRecord = await window.getDomainRecord(hostname);
-                            return domainRecord;
+                            return {domainRecord, url: hostname};
                         } catch (err) {
                             console.error("Error while getting domain record:", err);
                             return null;
                         }
                     }
                 });
-                const domainRecord = result?.result || null;
-                sendResponse({ domainRecord });
+                const {domainRecord, url} = result?.result || null;
+                sendResponse({ domainRecord, url });
             } catch (err) {
                 console.error("Error injecting or executing domain-record script:", err);
-                sendResponse({ domainRecord: null });
+                sendResponse({ domainRecord: null, url: null });
             }
         });
         return true;
