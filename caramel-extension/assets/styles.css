@@ -533,8 +533,11 @@ body {
 }
 
 /* -------------- Media Queries (for small screens) -------------- */
-@media (max-width: 480px) {
-    body, .popup-bg, .popup-wave {
+/* only apply when viewport ≤480px AND on a touch device (no hover) */
+@media only screen and (max-width: 480px) and (hover: none) and (pointer: coarse) {
+    body,
+    .popup-bg,
+    .popup-wave {
         width: 100%;
         max-width: none;
     }
@@ -543,7 +546,9 @@ body {
         width: 90%;
         max-width: none;
     }
+}
 
+@media (max-width: 480px) {
     .coupons-profile-card {
         width: 90%;
         padding: 12px;
