@@ -32,3 +32,6 @@ next-env.d.ts
 
 # IDE
 /.idea
+
+#xcode local
+/Caramel

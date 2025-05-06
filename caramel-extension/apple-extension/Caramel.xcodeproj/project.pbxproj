@@ -1,0 +1,1003 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		12CAD1402DCAA01A0043F9BD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD13F2DCAA01A0043F9BD /* AppDelegate.swift */; };
+		12CAD1422DCAA01A0043F9BD /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1412DCAA01A0043F9BD /* SceneDelegate.swift */; };
+		12CAD1452DCAA01A0043F9BD /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1432DCAA01A0043F9BD /* LaunchScreen.storyboard */; };
+		12CAD1482DCAA01A0043F9BD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1462DCAA01A0043F9BD /* Main.storyboard */; };
+		12CAD1512DCAA01A0043F9BD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1502DCAA01A0043F9BD /* AppDelegate.swift */; };
+		12CAD1542DCAA01A0043F9BD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1522DCAA01A0043F9BD /* Main.storyboard */; };
+		12CAD15C2DCAA01A0043F9BD /* Caramel Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 12CAD15B2DCAA01A0043F9BD /* Caramel Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		12CAD1662DCAA01A0043F9BD /* Caramel Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 12CAD1652DCAA01A0043F9BD /* Caramel Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		12CAD16C2DCAA01A0043F9BD /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD12F2DCAA0190043F9BD /* Main.html */; };
+		12CAD16D2DCAA01A0043F9BD /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD12F2DCAA0190043F9BD /* Main.html */; };
+		12CAD16E2DCAA01A0043F9BD /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1312DCAA0190043F9BD /* Icon.png */; };
+		12CAD16F2DCAA01A0043F9BD /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1312DCAA0190043F9BD /* Icon.png */; };
+		12CAD1702DCAA01A0043F9BD /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1322DCAA0190043F9BD /* Style.css */; };
+		12CAD1712DCAA01A0043F9BD /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1322DCAA0190043F9BD /* Style.css */; };
+		12CAD1722DCAA01A0043F9BD /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1332DCAA0190043F9BD /* Script.js */; };
+		12CAD1732DCAA01A0043F9BD /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1332DCAA0190043F9BD /* Script.js */; };
+		12CAD1742DCAA01A0043F9BD /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1342DCAA0190043F9BD /* ViewController.swift */; };
+		12CAD1752DCAA01A0043F9BD /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1342DCAA0190043F9BD /* ViewController.swift */; };
+		12CAD1762DCAA01A0043F9BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1352DCAA01A0043F9BD /* Assets.xcassets */; };
+		12CAD1772DCAA01A0043F9BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1352DCAA01A0043F9BD /* Assets.xcassets */; };
+		12CAD1782DCAA01A0043F9BD /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1372DCAA01A0043F9BD /* SafariWebExtensionHandler.swift */; };
+		12CAD1792DCAA01A0043F9BD /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CAD1372DCAA01A0043F9BD /* SafariWebExtensionHandler.swift */; };
+		12CAD1982DCAA01A0043F9BD /* shared-utils.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18B2DCAA01A0043F9BD /* shared-utils.js */; };
+		12CAD1992DCAA01A0043F9BD /* supported.json in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18C2DCAA01A0043F9BD /* supported.json */; };
+		12CAD19A2DCAA01A0043F9BD /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18D2DCAA01A0043F9BD /* popup.js */; };
+		12CAD19B2DCAA01A0043F9BD /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18E2DCAA01A0043F9BD /* index.html */; };
+		12CAD19C2DCAA01A0043F9BD /* Caramel in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18F2DCAA01A0043F9BD /* Caramel */; };
+		12CAD19D2DCAA01A0043F9BD /* sparkle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1902DCAA01A0043F9BD /* sparkle.svg */; };
+		12CAD19E2DCAA01A0043F9BD /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1912DCAA01A0043F9BD /* background.js */; };
+		12CAD19F2DCAA01A0043F9BD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1922DCAA01A0043F9BD /* README.md */; };
+		12CAD1A02DCAA01A0043F9BD /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1932DCAA01A0043F9BD /* icons */; };
+		12CAD1A12DCAA01A0043F9BD /* amazon.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1942DCAA01A0043F9BD /* amazon.js */; };
+		12CAD1A22DCAA01A0043F9BD /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1952DCAA01A0043F9BD /* manifest.json */; };
+		12CAD1A32DCAA01A0043F9BD /* inject.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1962DCAA01A0043F9BD /* inject.js */; };
+		12CAD1A42DCAA01A0043F9BD /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1972DCAA01A0043F9BD /* assets */; };
+		12CAD1A52DCAA01A0043F9BD /* shared-utils.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18B2DCAA01A0043F9BD /* shared-utils.js */; };
+		12CAD1A62DCAA01A0043F9BD /* supported.json in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18C2DCAA01A0043F9BD /* supported.json */; };
+		12CAD1A72DCAA01A0043F9BD /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18D2DCAA01A0043F9BD /* popup.js */; };
+		12CAD1A82DCAA01A0043F9BD /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18E2DCAA01A0043F9BD /* index.html */; };
+		12CAD1A92DCAA01A0043F9BD /* Caramel in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD18F2DCAA01A0043F9BD /* Caramel */; };
+		12CAD1AA2DCAA01A0043F9BD /* sparkle.svg in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1902DCAA01A0043F9BD /* sparkle.svg */; };
+		12CAD1AB2DCAA01A0043F9BD /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1912DCAA01A0043F9BD /* background.js */; };
+		12CAD1AC2DCAA01A0043F9BD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1922DCAA01A0043F9BD /* README.md */; };
+		12CAD1AD2DCAA01A0043F9BD /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1932DCAA01A0043F9BD /* icons */; };
+		12CAD1AE2DCAA01A0043F9BD /* amazon.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1942DCAA01A0043F9BD /* amazon.js */; };
+		12CAD1AF2DCAA01A0043F9BD /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1952DCAA01A0043F9BD /* manifest.json */; };
+		12CAD1B02DCAA01A0043F9BD /* inject.js in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1962DCAA01A0043F9BD /* inject.js */; };
+		12CAD1B12DCAA01A0043F9BD /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 12CAD1972DCAA01A0043F9BD /* assets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		12CAD15D2DCAA01A0043F9BD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 12CAD1292DCAA0190043F9BD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 12CAD15A2DCAA01A0043F9BD;
+			remoteInfo = "Caramel Extension (iOS)";
+		};
+		12CAD1672DCAA01A0043F9BD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 12CAD1292DCAA0190043F9BD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 12CAD1642DCAA01A0043F9BD;
+			remoteInfo = "Caramel Extension (macOS)";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		12CAD17F2DCAA01A0043F9BD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				12CAD15C2DCAA01A0043F9BD /* Caramel Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1862DCAA01A0043F9BD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				12CAD1662DCAA01A0043F9BD /* Caramel Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		12CAD1302DCAA0190043F9BD /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		12CAD1312DCAA0190043F9BD /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		12CAD1322DCAA0190043F9BD /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		12CAD1332DCAA0190043F9BD /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		12CAD1342DCAA0190043F9BD /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		12CAD1352DCAA01A0043F9BD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		12CAD1372DCAA01A0043F9BD /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		12CAD13C2DCAA01A0043F9BD /* Caramel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Caramel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CAD13F2DCAA01A0043F9BD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		12CAD1412DCAA01A0043F9BD /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		12CAD1442DCAA01A0043F9BD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		12CAD1472DCAA01A0043F9BD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		12CAD1492DCAA01A0043F9BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		12CAD14E2DCAA01A0043F9BD /* Caramel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Caramel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CAD1502DCAA01A0043F9BD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		12CAD1532DCAA01A0043F9BD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		12CAD1552DCAA01A0043F9BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		12CAD1562DCAA01A0043F9BD /* Caramel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Caramel.entitlements; sourceTree = "<group>"; };
+		12CAD15B2DCAA01A0043F9BD /* Caramel Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Caramel Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CAD1602DCAA01A0043F9BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		12CAD1652DCAA01A0043F9BD /* Caramel Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Caramel Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CAD16A2DCAA01A0043F9BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		12CAD16B2DCAA01A0043F9BD /* Caramel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Caramel.entitlements; sourceTree = "<group>"; };
+		12CAD18B2DCAA01A0043F9BD /* shared-utils.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "shared-utils.js"; path = "../../shared-utils.js"; sourceTree = "<group>"; };
+		12CAD18C2DCAA01A0043F9BD /* supported.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = supported.json; path = ../../supported.json; sourceTree = "<group>"; };
+		12CAD18D2DCAA01A0043F9BD /* popup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = popup.js; path = ../../popup.js; sourceTree = "<group>"; };
+		12CAD18E2DCAA01A0043F9BD /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = index.html; path = ../../index.html; sourceTree = "<group>"; };
+		12CAD18F2DCAA01A0043F9BD /* Caramel */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Caramel; sourceTree = SOURCE_ROOT; };
+		12CAD1902DCAA01A0043F9BD /* sparkle.svg */ = {isa = PBXFileReference; lastKnownFileType = text; name = sparkle.svg; path = ../../sparkle.svg; sourceTree = "<group>"; };
+		12CAD1912DCAA01A0043F9BD /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = ../../background.js; sourceTree = "<group>"; };
+		12CAD1922DCAA01A0043F9BD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../../README.md; sourceTree = "<group>"; };
+		12CAD1932DCAA01A0043F9BD /* icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = icons; path = ../../icons; sourceTree = "<group>"; };
+		12CAD1942DCAA01A0043F9BD /* amazon.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = amazon.js; path = ../../amazon.js; sourceTree = "<group>"; };
+		12CAD1952DCAA01A0043F9BD /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../manifest.json; sourceTree = "<group>"; };
+		12CAD1962DCAA01A0043F9BD /* inject.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = inject.js; path = ../../inject.js; sourceTree = "<group>"; };
+		12CAD1972DCAA01A0043F9BD /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../assets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		12CAD1392DCAA01A0043F9BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD14B2DCAA01A0043F9BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1582DCAA01A0043F9BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1622DCAA01A0043F9BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		12CAD1282DCAA0190043F9BD = {
+			isa = PBXGroup;
+			children = (
+				12CAD12D2DCAA0190043F9BD /* Shared (App) */,
+				12CAD1362DCAA01A0043F9BD /* Shared (Extension) */,
+				12CAD13E2DCAA01A0043F9BD /* iOS (App) */,
+				12CAD14F2DCAA01A0043F9BD /* macOS (App) */,
+				12CAD15F2DCAA01A0043F9BD /* iOS (Extension) */,
+				12CAD1692DCAA01A0043F9BD /* macOS (Extension) */,
+				12CAD13D2DCAA01A0043F9BD /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		12CAD12D2DCAA0190043F9BD /* Shared (App) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD1342DCAA0190043F9BD /* ViewController.swift */,
+				12CAD1352DCAA01A0043F9BD /* Assets.xcassets */,
+				12CAD12E2DCAA0190043F9BD /* Resources */,
+			);
+			path = "Shared (App)";
+			sourceTree = "<group>";
+		};
+		12CAD12E2DCAA0190043F9BD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD12F2DCAA0190043F9BD /* Main.html */,
+				12CAD1312DCAA0190043F9BD /* Icon.png */,
+				12CAD1322DCAA0190043F9BD /* Style.css */,
+				12CAD1332DCAA0190043F9BD /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		12CAD1362DCAA01A0043F9BD /* Shared (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD18A2DCAA01A0043F9BD /* Resources */,
+				12CAD1372DCAA01A0043F9BD /* SafariWebExtensionHandler.swift */,
+			);
+			path = "Shared (Extension)";
+			sourceTree = "<group>";
+		};
+		12CAD13D2DCAA01A0043F9BD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD13C2DCAA01A0043F9BD /* Caramel.app */,
+				12CAD14E2DCAA01A0043F9BD /* Caramel.app */,
+				12CAD15B2DCAA01A0043F9BD /* Caramel Extension.appex */,
+				12CAD1652DCAA01A0043F9BD /* Caramel Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		12CAD13E2DCAA01A0043F9BD /* iOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD13F2DCAA01A0043F9BD /* AppDelegate.swift */,
+				12CAD1412DCAA01A0043F9BD /* SceneDelegate.swift */,
+				12CAD1432DCAA01A0043F9BD /* LaunchScreen.storyboard */,
+				12CAD1462DCAA01A0043F9BD /* Main.storyboard */,
+				12CAD1492DCAA01A0043F9BD /* Info.plist */,
+			);
+			path = "iOS (App)";
+			sourceTree = "<group>";
+		};
+		12CAD14F2DCAA01A0043F9BD /* macOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD1502DCAA01A0043F9BD /* AppDelegate.swift */,
+				12CAD1522DCAA01A0043F9BD /* Main.storyboard */,
+				12CAD1552DCAA01A0043F9BD /* Info.plist */,
+				12CAD1562DCAA01A0043F9BD /* Caramel.entitlements */,
+			);
+			path = "macOS (App)";
+			sourceTree = "<group>";
+		};
+		12CAD15F2DCAA01A0043F9BD /* iOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD1602DCAA01A0043F9BD /* Info.plist */,
+			);
+			path = "iOS (Extension)";
+			sourceTree = "<group>";
+		};
+		12CAD1692DCAA01A0043F9BD /* macOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD16A2DCAA01A0043F9BD /* Info.plist */,
+				12CAD16B2DCAA01A0043F9BD /* Caramel.entitlements */,
+			);
+			path = "macOS (Extension)";
+			sourceTree = "<group>";
+		};
+		12CAD18A2DCAA01A0043F9BD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				12CAD18B2DCAA01A0043F9BD /* shared-utils.js */,
+				12CAD18C2DCAA01A0043F9BD /* supported.json */,
+				12CAD18D2DCAA01A0043F9BD /* popup.js */,
+				12CAD18E2DCAA01A0043F9BD /* index.html */,
+				12CAD18F2DCAA01A0043F9BD /* Caramel */,
+				12CAD1902DCAA01A0043F9BD /* sparkle.svg */,
+				12CAD1912DCAA01A0043F9BD /* background.js */,
+				12CAD1922DCAA01A0043F9BD /* README.md */,
+				12CAD1932DCAA01A0043F9BD /* icons */,
+				12CAD1942DCAA01A0043F9BD /* amazon.js */,
+				12CAD1952DCAA01A0043F9BD /* manifest.json */,
+				12CAD1962DCAA01A0043F9BD /* inject.js */,
+				12CAD1972DCAA01A0043F9BD /* assets */,
+			);
+			name = Resources;
+			path = "Shared (Extension)";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		12CAD13B2DCAA01A0043F9BD /* Caramel (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 12CAD1802DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel (iOS)" */;
+			buildPhases = (
+				12CAD1382DCAA01A0043F9BD /* Sources */,
+				12CAD1392DCAA01A0043F9BD /* Frameworks */,
+				12CAD13A2DCAA01A0043F9BD /* Resources */,
+				12CAD17F2DCAA01A0043F9BD /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				12CAD15E2DCAA01A0043F9BD /* PBXTargetDependency */,
+			);
+			name = "Caramel (iOS)";
+			packageProductDependencies = (
+			);
+			productName = "Caramel (iOS)";
+			productReference = 12CAD13C2DCAA01A0043F9BD /* Caramel.app */;
+			productType = "com.apple.product-type.application";
+		};
+		12CAD14D2DCAA01A0043F9BD /* Caramel (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 12CAD1872DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel (macOS)" */;
+			buildPhases = (
+				12CAD14A2DCAA01A0043F9BD /* Sources */,
+				12CAD14B2DCAA01A0043F9BD /* Frameworks */,
+				12CAD14C2DCAA01A0043F9BD /* Resources */,
+				12CAD1862DCAA01A0043F9BD /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				12CAD1682DCAA01A0043F9BD /* PBXTargetDependency */,
+			);
+			name = "Caramel (macOS)";
+			packageProductDependencies = (
+			);
+			productName = "Caramel (macOS)";
+			productReference = 12CAD14E2DCAA01A0043F9BD /* Caramel.app */;
+			productType = "com.apple.product-type.application";
+		};
+		12CAD15A2DCAA01A0043F9BD /* Caramel Extension (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 12CAD17C2DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel Extension (iOS)" */;
+			buildPhases = (
+				12CAD1572DCAA01A0043F9BD /* Sources */,
+				12CAD1582DCAA01A0043F9BD /* Frameworks */,
+				12CAD1592DCAA01A0043F9BD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Caramel Extension (iOS)";
+			packageProductDependencies = (
+			);
+			productName = "Caramel Extension (iOS)";
+			productReference = 12CAD15B2DCAA01A0043F9BD /* Caramel Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		12CAD1642DCAA01A0043F9BD /* Caramel Extension (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 12CAD1832DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel Extension (macOS)" */;
+			buildPhases = (
+				12CAD1612DCAA01A0043F9BD /* Sources */,
+				12CAD1622DCAA01A0043F9BD /* Frameworks */,
+				12CAD1632DCAA01A0043F9BD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Caramel Extension (macOS)";
+			packageProductDependencies = (
+			);
+			productName = "Caramel Extension (macOS)";
+			productReference = 12CAD1652DCAA01A0043F9BD /* Caramel Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		12CAD1292DCAA0190043F9BD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					12CAD13B2DCAA01A0043F9BD = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					12CAD14D2DCAA01A0043F9BD = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					12CAD15A2DCAA01A0043F9BD = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					12CAD1642DCAA01A0043F9BD = {
+						CreatedOnToolsVersion = 16.2;
+					};
+				};
+			};
+			buildConfigurationList = 12CAD12C2DCAA0190043F9BD /* Build configuration list for PBXProject "Caramel" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 12CAD1282DCAA0190043F9BD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 12CAD13D2DCAA01A0043F9BD /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				12CAD13B2DCAA01A0043F9BD /* Caramel (iOS) */,
+				12CAD14D2DCAA01A0043F9BD /* Caramel (macOS) */,
+				12CAD15A2DCAA01A0043F9BD /* Caramel Extension (iOS) */,
+				12CAD1642DCAA01A0043F9BD /* Caramel Extension (macOS) */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		12CAD13A2DCAA01A0043F9BD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD16E2DCAA01A0043F9BD /* Icon.png in Resources */,
+				12CAD1452DCAA01A0043F9BD /* LaunchScreen.storyboard in Resources */,
+				12CAD16C2DCAA01A0043F9BD /* Main.html in Resources */,
+				12CAD1722DCAA01A0043F9BD /* Script.js in Resources */,
+				12CAD1762DCAA01A0043F9BD /* Assets.xcassets in Resources */,
+				12CAD1482DCAA01A0043F9BD /* Main.storyboard in Resources */,
+				12CAD1702DCAA01A0043F9BD /* Style.css in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD14C2DCAA01A0043F9BD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD16F2DCAA01A0043F9BD /* Icon.png in Resources */,
+				12CAD1712DCAA01A0043F9BD /* Style.css in Resources */,
+				12CAD1542DCAA01A0043F9BD /* Main.storyboard in Resources */,
+				12CAD1732DCAA01A0043F9BD /* Script.js in Resources */,
+				12CAD1772DCAA01A0043F9BD /* Assets.xcassets in Resources */,
+				12CAD16D2DCAA01A0043F9BD /* Main.html in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1592DCAA01A0043F9BD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1B12DCAA01A0043F9BD /* assets in Resources */,
+				12CAD1A62DCAA01A0043F9BD /* supported.json in Resources */,
+				12CAD1AA2DCAA01A0043F9BD /* sparkle.svg in Resources */,
+				12CAD1AB2DCAA01A0043F9BD /* background.js in Resources */,
+				12CAD1AD2DCAA01A0043F9BD /* icons in Resources */,
+				12CAD1A82DCAA01A0043F9BD /* index.html in Resources */,
+				12CAD1B02DCAA01A0043F9BD /* inject.js in Resources */,
+				12CAD1AF2DCAA01A0043F9BD /* manifest.json in Resources */,
+				12CAD1A92DCAA01A0043F9BD /* Caramel in Resources */,
+				12CAD1AE2DCAA01A0043F9BD /* amazon.js in Resources */,
+				12CAD1A72DCAA01A0043F9BD /* popup.js in Resources */,
+				12CAD1AC2DCAA01A0043F9BD /* README.md in Resources */,
+				12CAD1A52DCAA01A0043F9BD /* shared-utils.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1632DCAA01A0043F9BD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1A42DCAA01A0043F9BD /* assets in Resources */,
+				12CAD1992DCAA01A0043F9BD /* supported.json in Resources */,
+				12CAD19D2DCAA01A0043F9BD /* sparkle.svg in Resources */,
+				12CAD19E2DCAA01A0043F9BD /* background.js in Resources */,
+				12CAD1A02DCAA01A0043F9BD /* icons in Resources */,
+				12CAD19B2DCAA01A0043F9BD /* index.html in Resources */,
+				12CAD1A32DCAA01A0043F9BD /* inject.js in Resources */,
+				12CAD1A22DCAA01A0043F9BD /* manifest.json in Resources */,
+				12CAD19C2DCAA01A0043F9BD /* Caramel in Resources */,
+				12CAD1A12DCAA01A0043F9BD /* amazon.js in Resources */,
+				12CAD19A2DCAA01A0043F9BD /* popup.js in Resources */,
+				12CAD19F2DCAA01A0043F9BD /* README.md in Resources */,
+				12CAD1982DCAA01A0043F9BD /* shared-utils.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		12CAD1382DCAA01A0043F9BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1742DCAA01A0043F9BD /* ViewController.swift in Sources */,
+				12CAD1402DCAA01A0043F9BD /* AppDelegate.swift in Sources */,
+				12CAD1422DCAA01A0043F9BD /* SceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD14A2DCAA01A0043F9BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1752DCAA01A0043F9BD /* ViewController.swift in Sources */,
+				12CAD1512DCAA01A0043F9BD /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1572DCAA01A0043F9BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1782DCAA01A0043F9BD /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12CAD1612DCAA01A0043F9BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12CAD1792DCAA01A0043F9BD /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		12CAD15E2DCAA01A0043F9BD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 12CAD15A2DCAA01A0043F9BD /* Caramel Extension (iOS) */;
+			targetProxy = 12CAD15D2DCAA01A0043F9BD /* PBXContainerItemProxy */;
+		};
+		12CAD1682DCAA01A0043F9BD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 12CAD1642DCAA01A0043F9BD /* Caramel Extension (macOS) */;
+			targetProxy = 12CAD1672DCAA01A0043F9BD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		12CAD12F2DCAA0190043F9BD /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				12CAD1302DCAA0190043F9BD /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		12CAD1432DCAA01A0043F9BD /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				12CAD1442DCAA01A0043F9BD /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		12CAD1462DCAA01A0043F9BD /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				12CAD1472DCAA01A0043F9BD /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		12CAD1522DCAA01A0043F9BD /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				12CAD1532DCAA01A0043F9BD /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		12CAD17A2DCAA01A0043F9BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		12CAD17B2DCAA01A0043F9BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		12CAD17D2DCAA01A0043F9BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Caramel Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel.Extension;
+				PRODUCT_NAME = "Caramel Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		12CAD17E2DCAA01A0043F9BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Caramel Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel.Extension;
+				PRODUCT_NAME = "Caramel Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		12CAD1812DCAA01A0043F9BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Caramel;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel;
+				PRODUCT_NAME = Caramel;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		12CAD1822DCAA01A0043F9BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Caramel;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel;
+				PRODUCT_NAME = Caramel;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		12CAD1842DCAA01A0043F9BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "macOS (Extension)/Caramel.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Caramel Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel.Extension;
+				PRODUCT_NAME = "Caramel Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		12CAD1852DCAA01A0043F9BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "macOS (Extension)/Caramel.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Caramel Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel.Extension;
+				PRODUCT_NAME = "Caramel Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		12CAD1882DCAA01A0043F9BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "macOS (App)/Caramel.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Caramel;
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel;
+				PRODUCT_NAME = Caramel;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		12CAD1892DCAA01A0043F9BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "macOS (App)/Caramel.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Caramel;
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourCompany.Caramel;
+				PRODUCT_NAME = Caramel;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		12CAD12C2DCAA0190043F9BD /* Build configuration list for PBXProject "Caramel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12CAD17A2DCAA01A0043F9BD /* Debug */,
+				12CAD17B2DCAA01A0043F9BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		12CAD17C2DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel Extension (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12CAD17D2DCAA01A0043F9BD /* Debug */,
+				12CAD17E2DCAA01A0043F9BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		12CAD1802DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12CAD1812DCAA01A0043F9BD /* Debug */,
+				12CAD1822DCAA01A0043F9BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		12CAD1832DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel Extension (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12CAD1842DCAA01A0043F9BD /* Debug */,
+				12CAD1852DCAA01A0043F9BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		12CAD1872DCAA01A0043F9BD /* Build configuration list for PBXNativeTarget "Caramel (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12CAD1882DCAA01A0043F9BD /* Debug */,
+				12CAD1892DCAA01A0043F9BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 12CAD1292DCAA0190043F9BD /* Project object */;
+}
