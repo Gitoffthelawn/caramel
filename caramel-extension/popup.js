@@ -17,17 +17,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 //  Main logic entry — checks the current domain via background
 // ========================================================
 async function initPopup() {
-    const {domainRecord, url} = await getActiveTabDomainRecord();
+    const {url} = await getActiveTabDomainRecord();
     // Grab the user’s auth info from storage
     currentBrowser.storage.sync.get(["token", "user"], async (result) => {
         const token = result.token;
         const user = result.user;
-        if(domainRecord) {
-            await renderCheckoutCoupons(domainRecord, user);
-            return
-        } else if (url) {
+        if (url) {
             const domainString = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, "");
-          const coupons =  await fetchCoupons(domainString, []);
+            console.log("Domain string:", domainString);
+            const coupons =  await fetchCoupons(domainString, []);
+            console.log("Coupons:", coupons);
           if(coupons?.length) {
              await proceedPopulateCoupons(coupons, user, domainString);
              return;
@@ -170,7 +169,6 @@ function renderProfileCard(user) {
 //  NEW 2: Show the actual coupon list for the recognized domain
 // ========================================================
 async function renderCheckoutCoupons(domainRecord, user) {
-
     // 1) Fetch coupons for this domain
     const coupons = await getCoupons(domainRecord, true);
 

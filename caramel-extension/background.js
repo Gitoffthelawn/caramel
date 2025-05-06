@@ -88,8 +88,7 @@ currentBrowser.runtime.onMessage.addListener((message, sender, sendResponse) => 
                     func: async () => {
                         try {
                             const hostname = window.location.hostname;
-                            const domainRecord = await window.getDomainRecord(hostname);
-                            return {domainRecord, url: hostname};
+                            return {url: hostname};
                         } catch (err) {
                             console.error("Error while getting domain record:", err);
                             return null;
