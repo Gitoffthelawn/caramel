@@ -1,6 +1,22 @@
 import {cors} from "@/lib/cors";
 import prisma from "@/lib/prisma";
 
+function getBaseDomain(raw) {
+    let hostname = raw;
+    try {
+        const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+        hostname = u.hostname;
+    } catch {
+        throw new Error("Could not find base domain");
+    }
+    const parts = hostname.split(".");
+    // for foo.bar.baz.com → baz.com
+    return parts.length > 2
+        ? parts.slice(-2).join(".")
+        : hostname;
+}
+
+
 async function handler(req, res) {
     await cors(req, res);
     if (req.method === 'GET') {
@@ -9,7 +25,15 @@ async function handler(req, res) {
 
             const filters = { expired: false };
 
-            if (site) filters.site = site;
+            if (site) {
+                const base = getBaseDomain(site);
+                filters.AND = [{
+                      OR: [
+                        { site: base },
+                        { site: { endsWith: `.${base}` } }
+                      ]
+                }];
+            }
             if (key_words) {
                 const keywordsArray = key_words.split(',').map(keyword => keyword.trim());
                 filters.OR = keywordsArray.map(keyword => ({
@@ -19,7 +43,6 @@ async function handler(req, res) {
                     },
                 }));
             }
-
             const coupons = await prisma.coupon.findMany({
                 where: filters,
                 skip: parseInt(skip, 10),
