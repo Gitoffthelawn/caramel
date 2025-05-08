@@ -1,0 +1,39 @@
+name: Build & Package Extension
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+
+jobs:
+  build:
+    name: 🛠️ Build & 📦 Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Package extension
+        run: pnpm run package
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: extension-package
+          path: extension.zip
