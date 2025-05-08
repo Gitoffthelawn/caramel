@@ -9,6 +9,9 @@ jobs:
   lint:
     name: 🔍 ESLint & 🎨 Prettier
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: caramel-extension
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,7 +28,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run ESLint
         run: pnpm run lint
