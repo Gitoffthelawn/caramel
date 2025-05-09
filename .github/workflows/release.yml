@@ -1,0 +1,126 @@
+# .github/workflows/release.yml
+name: Release – Caramel Extension
+
+on:
+  push:
+    branches: [ dev ]      # publish whenever code lands in dev
+
+jobs:
+  package:
+    name: 📦 Package Extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: caramel-extension
+
+    outputs:
+      artifact-name: extension-package
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: caramel-extension/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Package extension
+        run: pnpm run package
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.package_id.outputs.artifact-name }}
+          path: extension.zip
+
+  publish_chrome:
+    name: 🚀 Publish to Chrome Web Store
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: extension-package
+          path: .
+
+      - name: Publish to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: extension.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id:     ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+  publish_safari:
+    name: 🚀 Publish to Apple App Store (Safari)
+    needs: package
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: caramel-extension
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: extension-package
+          path: extension.zip
+
+      - name: Unzip extension
+        run: unzip -q extension.zip -d safari_src
+
+      - name: Install signing certs & profile
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64:            ${{ secrets.APPLE_CERT_P12 }}
+          p12-password:               ${{ secrets.APPLE_CERT_PASSWORD }}
+          provisioning-profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
+          keychain-password:          ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Convert to Safari app
+        run: |
+          xcrun safari-web-extension-converter safari_src \
+            --project-location SafariExtProject \
+            --app-name "Caramel" \
+            --bundle-identifier "com.yourcompany.caramel" \
+            --macos-only --no-open --no-prompt --force --copy-resources
+
+      - name: Build & archive
+        run: |
+          xcodebuild -project SafariExtProject/Caramel.xcodeproj \
+            -scheme Caramel -configuration Release \
+            -archivePath SafariExtProject/Caramel.xcarchive \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" archive
+
+      - name: Export for App Store
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath SafariExtProject/Caramel.xcarchive \
+            -exportOptionsPlist SafariExtProject/Caramel/Info.plist \
+            -exportPath SafariExtProject/Exported
+
+      - name: Upload to App Store Connect
+        env:
+          ALTOOL_USER:     ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun altool --upload-app \
+            -f SafariExtProject/Exported/Caramel.pkg \
+            -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
