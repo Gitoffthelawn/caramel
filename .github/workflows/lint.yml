@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    name: "🔍 ESLint & 🎨 Prettier"
+    name: "Lint & Format Checks"
     runs-on: ubuntu-latest
 
     # All `run:` commands execute inside caramel-extension/

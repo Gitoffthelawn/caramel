@@ -1,18 +1,29 @@
+# .github/workflows/build-extension.yml
 name: Build & Package Extension
 
 on:
-  push:
-    branches: [ "main", "dev" ]
+  workflow_run:
+    workflows: ["Lint & Format Checks"]   # exact name of the lint workflow
+    branches:   [main, dev]
+    types:      [completed]
 
 jobs:
   build:
-    name: 🛠️ Build & 📦 Package
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # only run if lint passed
+    name: "🛠️ Build & 📦 Package"
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: caramel-extension
+
     steps:
-      - name: Checkout code
+      - name: Download linted code from previous run
+        uses: actions/download-artifact@v3
+        with:
+          name: source   # or simply re-checkout below if you prefer
+
+      - name: Checkout code   # (re-checkout is fine too)
         uses: actions/checkout@v4
 
       - name: Setup pnpm
@@ -25,6 +36,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: caramel-extension/pnpm-lock.yaml   # <- same fix as before
 
       - name: Install dependencies
         run: pnpm install
