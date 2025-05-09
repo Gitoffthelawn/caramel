@@ -10,17 +10,15 @@ jobs:
     name: "🔍 ESLint & 🎨 Prettier"
     runs-on: ubuntu-latest
 
-    # All shell commands still run from the extension folder
+    # All `run:` commands execute inside caramel-extension/
     defaults:
       run:
         working-directory: caramel-extension
 
     steps:
-      # 1️⃣  Checkout the repo into ./caramel-extension
+      # 1️⃣  Checkout repo into the workspace root
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: caramel-extension
 
       # 2️⃣  Install pnpm
       - name: Setup pnpm
@@ -28,8 +26,7 @@ jobs:
         with:
           version: 9
 
-      # 3️⃣  Install Node + turn on the pnpm cache
-      #     👉 Tell the action where the lock-file really lives
+      # 3️⃣  Install Node and enable the pnpm cache
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
