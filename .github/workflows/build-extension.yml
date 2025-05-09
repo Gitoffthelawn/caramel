@@ -1,54 +1,35 @@
-# .github/workflows/build-extension.yml
 name: Build & Package Extension
 
 on:
   workflow_run:
-    workflows: ["Lint & Format Checks"]   # exact name of the lint workflow
-    branches:   [main, dev]
-    types:      [completed]
+    workflows: ["Lint & Format Checks"]
+    types: [completed]
 
 jobs:
   build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # only run if lint passed
-    name: "🛠️ Build & 📦 Package"
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: caramel-extension
 
     steps:
-      - name: Download linted code from previous run
-        uses: actions/download-artifact@v3
-        with:
-          name: source   # or simply re-checkout below if you prefer
+      - uses: actions/checkout@v4
 
-      - name: Checkout code   # (re-checkout is fine too)
-        uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with: { version: 9 }
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: caramel-extension/pnpm-lock.yaml   # <- same fix as before
+          cache-dependency-path: caramel-extension/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install
+      - run: pnpm install
+      - run: pnpm run build
+      - run: pnpm run package
 
-      - name: Build extension
-        run: pnpm run build
-
-      - name: Package extension
-        run: pnpm run package
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v3
         with:
           name: extension-package
           path: extension.zip
