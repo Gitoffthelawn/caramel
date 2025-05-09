@@ -45,7 +45,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.package_id.outputs.artifact-name }}
-          path: extension.zip
+          path: caramel-extension/extension.zip
+
 
   publish_chrome:
     name: 🚀 Publish to Chrome Web Store
