@@ -64,6 +64,7 @@ jobs:
           client-id:     ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          publish: false       # ← upload only, don’t push live for now
 
   publish_safari:
     name: 🚀 Publish to Apple App Store (Safari)
