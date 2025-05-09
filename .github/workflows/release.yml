@@ -5,6 +5,9 @@ on:
   push:
     branches: [ dev ]
 
+env:
+  SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
+
 jobs:
   package:
     name: 📦 Package Extension
@@ -98,7 +101,7 @@ jobs:
           xcrun safari-web-extension-converter safari_src \
             --project-location SafariExtProject \
             --app-name "Caramel" \
-            --bundle-identifier "com.yourcompany.caramel" \
+            --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
 
       - name: Build & archive (macOS)
