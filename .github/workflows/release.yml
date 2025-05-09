@@ -84,7 +84,7 @@ jobs:
           path: caramel-extension
 
       - name: Unzip extension
-        run: unzip -q extension.zip -d safari_src
+        run: unzip -q extension.zip
 
       - name: Install signing certs & profile
         uses: apple-actions/import-codesign-certs@v1
@@ -96,7 +96,7 @@ jobs:
 
       - name: Convert to Safari app (macOS & iOS)
         run: |
-          xcrun safari-web-extension-converter safari_src \
+          xcrun safari-web-extension-converter dist \
             --project-location SafariExtProject \
             --app-name "Caramel" \
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
