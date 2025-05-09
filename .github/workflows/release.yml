@@ -3,7 +3,7 @@ name: Release – Caramel Extension
 
 on:
   push:
-    branches: [ dev ]      # publish whenever code lands in dev
+    branches: [ dev ]
 
 jobs:
   package:
@@ -12,9 +12,6 @@ jobs:
     defaults:
       run:
         working-directory: caramel-extension
-
-    outputs:
-      artifact-name: extension-package
 
     steps:
       - name: Checkout code
@@ -44,14 +41,14 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.package_id.outputs.artifact-name }}
+          name: extension-package
           path: caramel-extension/extension.zip
-
 
   publish_chrome:
     name: 🚀 Publish to Chrome Web Store
     needs: package
     runs-on: ubuntu-latest
+
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -73,6 +70,7 @@ jobs:
     needs: package
     runs-on: macos-latest
     timeout-minutes: 30
+
     defaults:
       run:
         working-directory: caramel-extension
@@ -90,10 +88,10 @@ jobs:
       - name: Install signing certs & profile
         uses: apple-actions/import-codesign-certs@v1
         with:
-          p12-file-base64:            ${{ secrets.APPLE_CERT_P12 }}
-          p12-password:               ${{ secrets.APPLE_CERT_PASSWORD }}
+          p12-file-base64:             ${{ secrets.APPLE_CERT_P12 }}
+          p12-password:                ${{ secrets.APPLE_CERT_PASSWORD }}
           provisioning-profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
-          keychain-password:          ${{ secrets.KEYCHAIN_PASSWORD }}
+          keychain-password:           ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Convert to Safari app
         run: |
