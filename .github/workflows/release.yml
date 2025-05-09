@@ -1,4 +1,3 @@
-# .github/workflows/release.yml
 name: Release – Caramel Extension
 
 on:
@@ -6,16 +5,16 @@ on:
     branches: [ dev ]
 
 env:
+  # Repo variable set in Settings → Secrets & variables → Actions → Variables
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
 
 jobs:
   package:
-    name: 📦 Package Extension
+    name: "📦 Package Extension"
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: caramel-extension
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,10 +47,9 @@ jobs:
           path: caramel-extension/extension.zip
 
   publish_chrome:
-    name: 🚀 Publish to Chrome Web Store
+    name: "🚀 Publish to Chrome Web Store"
     needs: package
     runs-on: ubuntu-latest
-
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -59,25 +57,24 @@ jobs:
           name: extension-package
           path: .
 
-      # Uncomment to publish to Chrome Web Store
-      # - name: Publish to Chrome Web Store
-      #   uses: mnao305/chrome-extension-upload@v5.0.0
-      #   with:
-      #     file-path: extension.zip
-      #     extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-      #     client-id:     ${{ secrets.CHROME_CLIENT_ID }}
-      #     client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
-      #     refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      - name: Upload to Chrome Web Store (upload‑only)
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: extension.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          publish: false   # upload but don’t push live
 
   publish_safari:
-    name: 🚀 Publish to Apple App Store (Safari)
+    name: "🚀 Publish to Apple App Store (Safari & iOS)"
     needs: package
     runs-on: macos-latest
     timeout-minutes: 30
     defaults:
       run:
         working-directory: caramel-extension
-
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -91,10 +88,10 @@ jobs:
       - name: Install signing certs & profile
         uses: apple-actions/import-codesign-certs@v1
         with:
-          p12-file-base64:             ${{ secrets.APPLE_CERT_P12 }}
-          p12-password:                ${{ secrets.APPLE_CERT_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
+          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
           provisioning-profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
-          keychain-password:           ${{ secrets.KEYCHAIN_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Convert to Safari app (macOS & iOS)
         run: |
@@ -134,22 +131,20 @@ jobs:
             -exportOptionsPlist SafariExtProject/Caramel-ios/Info.plist \
             -exportPath SafariExtProject/Exported-ios
 
-      # Uncomment to publish macOS package
-      # - name: Upload to App Store Connect (macOS)
-      #   env:
-      #     ALTOOL_USER:     ${{ secrets.APPLE_ID }}
-      #     ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-      #   run: |
-      #     xcrun altool --upload-app \
-      #       -f SafariExtProject/Exported-macos/Caramel.pkg \
-      #       -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
+      - name: Upload macOS pkg to App Store Connect
+        env:
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun altool --upload-app \
+            -f SafariExtProject/Exported-macos/Caramel.pkg \
+            -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
 
-      # Uncomment to publish iOS package
-      # - name: Upload to App Store Connect (iOS)
-      #   env:
-      #     ALTOOL_USER:     ${{ secrets.APPLE_ID }}
-      #     ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-      #   run: |
-      #     xcrun altool --upload-app \
-      #       -f SafariExtProject/Exported-ios/Caramel.ipa \
-      #       -t ios -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
+      - name: Upload iOS ipa to App Store Connect
+        env:
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun altool --upload-app \
+            -f SafariExtProject/Exported-ios/Caramel.ipa \
+            -t ios -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
