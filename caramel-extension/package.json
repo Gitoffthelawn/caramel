@@ -7,7 +7,7 @@
         "lint": "eslint . --ext .js --ext .html",
         "prettier-check": "prettier --check '**/*.{js,html,css,json,md}'",
         "format": "prettier --write '**/*.{js,html,css,json,md}'",
-        "build": "rm -rf dist && cp -R src dist",
+        "build": "rm -rf dist && mkdir -p dist && rsync -a --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='*.lock' --exclude='apple-extension' ./ dist/",
         "package": "zip -r extension.zip ./dist"
     },
     "devDependencies": {
