@@ -104,7 +104,7 @@ jobs:
 
       - name: Build & archive (macOS)
         run: |
-          xcodebuild -project SafariExtProject/Caramel.xcodeproj \
+          xcodebuild -project SafariExtProject/Caramel/Caramel.xcodeproj \
             -scheme "Caramel (macOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
@@ -112,7 +112,7 @@ jobs:
 
       - name: Build & archive (iOS)
         run: |
-          xcodebuild -project SafariExtProject/Caramel.xcodeproj \
+          xcodebuild -project SafariExtProject/Caramel/Caramel.xcodeproj \
             -scheme "Caramel (iOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
