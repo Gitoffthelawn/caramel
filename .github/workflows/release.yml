@@ -105,7 +105,7 @@ jobs:
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
-          create-keychain: false   # keychain already exists
+          create-keychain: false
           keychain: signing_temp
           p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
           p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
@@ -128,7 +128,7 @@ jobs:
             -scheme "Caramel (macOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
-            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_STYLE=Automatic \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
@@ -155,12 +155,41 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
 
+      # ---------- write exportOptions plists ----------
+      - name: Write exportOptions (macOS)
+        run: |
+          cat > /tmp/exportOptionsMac.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Write exportOptions (iOS)
+        run: |
+          cat > /tmp/exportOptionsIOS.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+          </dict>
+          </plist>
+          EOF
+
       # ---------- macOS export ----------
       - name: Export (macOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
-            -exportOptionsPlist SafariExtProject/Caramel-macos/Info.plist \
+            -exportOptionsPlist /tmp/exportOptionsMac.plist \
             -exportPath SafariExtProject/Exported-macos \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
@@ -172,7 +201,7 @@ jobs:
         run: |
           xcodebuild -exportArchive \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
-            -exportOptionsPlist SafariExtProject/Caramel-ios/Info.plist \
+            -exportOptionsPlist /tmp/exportOptionsIOS.plist \
             -exportPath SafariExtProject/Exported-ios \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
