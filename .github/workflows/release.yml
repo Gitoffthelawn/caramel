@@ -92,17 +92,21 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      # ------- Certificates (Distribution + Development) -------
+      # ------- Certificates: distribution first -------
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
           p12-password:    ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain: signing_temp
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      # ------- Certificates: development next (reuse same keychain) -------
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
+          create-keychain: false   # keychain already exists
+          keychain: signing_temp
           p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
           p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
