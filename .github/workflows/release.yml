@@ -91,12 +91,12 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      - name: Install signing certs & profile
-        uses: apple-actions/import-codesign-certs@v1
+      - name: Install signing certs & profiles
+        uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: |
-            ${{ secrets.APPLE_CERT_P12 }}
-            ${{ secrets.APPLE_DEV_CERT_P12 }}
+            ${{ secrets.APPLE_CERT_P12 }}      # distribution
+            ${{ secrets.APPLE_DEV_CERT_P12 }}  # development
           p12-password: |
             ${{ secrets.APPLE_CERT_PASSWORD }}
             ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
