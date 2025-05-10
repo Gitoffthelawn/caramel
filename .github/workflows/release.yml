@@ -125,26 +125,17 @@ jobs:
       # ---------- CI patches (category + entitlements) ----------
       - name: Patch macOS Info.plist & entitlements
         run: |
-          # add LSApplicationCategoryType (handle both folder casings)
-          for PLIST in \
-            SafariExtProject/Caramel/Caramel-macOS/Info.plist \
-            SafariExtProject/Caramel/Caramel-macos/Info.plist
-          do
-            [ -f "$PLIST" ] || continue
-            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" \
-              || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST"
+          # add LSApplicationCategoryType to every Info.plist
+          find SafariExtProject -name Info.plist -print0 | while IFS= read -r -d '' PLIST; do
+            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || true
           done
 
-          # create sandbox entitlements
-          cat > /tmp/AppSandbox.entitlements <<'EOT'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>com.apple.security.app-sandbox</key><true/>
-          </dict>
-          </plist>
-          EOT
+          # ensure sandbox entitlement in every *.entitlements file
+          find SafariExtProject -name "*.entitlements" -print0 | while IFS= read -r -d '' ENT; do
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENT" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null || true
+          done
 
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
