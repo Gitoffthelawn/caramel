@@ -136,6 +136,7 @@ jobs:
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            ARCHS="arm64 x86_64"
 
       # ---------- iOS archive ----------
       - name: Build & archive (iOS)
@@ -154,6 +155,7 @@ jobs:
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            ARCHS="arm64 x86_64"
 
       # ---------- write exportOptions plists ----------
       - name: Write exportOptions (macOS)
