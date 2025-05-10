@@ -147,7 +147,7 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
