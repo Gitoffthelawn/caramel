@@ -102,35 +102,49 @@ jobs:
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
 
+      # ---------- macOS archive ----------
       - name: Build & archive (macOS)
         run: |
-          xcodebuild -project SafariExtProject/Caramel/Caramel.xcodeproj \
+          xcodebuild archive \
+            -project SafariExtProject/Caramel/Caramel.xcodeproj \
             -scheme "Caramel (macOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" archive
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            -allowProvisioningUpdates
 
+      # ---------- iOS archive ----------
       - name: Build & archive (iOS)
         run: |
-          xcodebuild -project SafariExtProject/Caramel/Caramel.xcodeproj \
+          xcodebuild archive \
+            -project SafariExtProject/Caramel/Caramel.xcodeproj \
             -scheme "Caramel (iOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" archive
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            -allowProvisioningUpdates
 
+      # ---------- macOS export ----------
       - name: Export (macOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             -exportOptionsPlist SafariExtProject/Caramel-macos/Info.plist \
-            -exportPath SafariExtProject/Exported-macos
+            -exportPath SafariExtProject/Exported-macos \
+            -allowProvisioningUpdates
 
+      # ---------- iOS export ----------
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             -exportOptionsPlist SafariExtProject/Caramel-ios/Info.plist \
-            -exportPath SafariExtProject/Exported-ios
+            -exportPath SafariExtProject/Exported-ios \
+            -allowProvisioningUpdates
 
       - name: Upload macOS pkg to App Store Connect
         env:
