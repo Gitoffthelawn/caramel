@@ -106,10 +106,10 @@ jobs:
       # ②  provisioning profile (if you really need one;
       #     optional when using automatic signing + API key)
       - name: Install provisioning profile
-        uses: apple-actions/import-provisioning-profile@v1
+        uses: apple-actions/import-provisioning-profiles@v1
         with:
           profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
-          
+
 
       - name: Convert to Safari app (macOS & iOS)
         run: |
