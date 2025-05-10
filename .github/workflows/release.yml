@@ -5,6 +5,7 @@ on:
     branches: [ dev ]
 
 env:
+  # Repo variable set in Settings → Secrets & variables → Actions → Variables
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
 
 jobs:
@@ -64,7 +65,7 @@ jobs:
           client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          publish: false
+          publish: false   # upload but don’t push live
 
   publish_safari:
     name: "🚀 Publish to Apple App Store (Safari & iOS)"
@@ -76,7 +77,6 @@ jobs:
         working-directory: caramel-extension
     steps:
       - uses: actions/checkout@v4
-
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -87,7 +87,8 @@ jobs:
         run: unzip -q extension.zip
 
       - name: Install App Store Connect API key
-        run: echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
+        run: |
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
@@ -116,7 +117,6 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
