@@ -8,6 +8,7 @@ env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
   VERSION_NAME: 1.0.${{ github.run_number }}
   BUILD_NUM: ${{ github.run_number }}
+  MAC_CATEGORY: public.app-category.productivity         # <-- pick any valid UTI
 
 jobs:
   package:
@@ -121,6 +122,26 @@ jobs:
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
 
+      # ---------- CI patches (category + entitlements) ----------
+      - name: Patch macOS Info.plist & entitlements
+        run: |
+          # 1️⃣  add LSApplicationCategoryType
+          MAC_PLIST="SafariExtProject/Caramel/Caramel-macos/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$MAC_PLIST" \
+            || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$MAC_PLIST"
+
+          # 2️⃣  create sandbox entitlements file
+          cat > /tmp/AppSandbox.entitlements <<'EOT'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+               "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.security.app-sandbox</key><true/>
+          </dict>
+          </plist>
+          EOT
+
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
         run: |
@@ -131,6 +152,8 @@ jobs:
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=/tmp/AppSandbox.entitlements \
+            EXCLUDED_ARCHS="" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
@@ -176,7 +199,6 @@ jobs:
           </dict>
           </plist>
           EOF
-
       - name: Write exportOptions (iOS)
         run: |
           cat > /tmp/exportOptionsIOS.plist <<'EOF'
@@ -184,14 +206,15 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-            <key>method</key><string>app-store-connect</string>
+            <key>method</key><string>app-store</string>
             <key>signingStyle</key><string>automatic</string>
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>destination</key><string>app-store-connect</string>
           </dict>
           </plist>
           EOF
 
-      # ---------- macOS export ----------
+      # ---------- exports (unchanged) ----------
       - name: Export (macOS)
         run: |
           xcodebuild -exportArchive \
@@ -202,8 +225,6 @@ jobs:
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-
-      # ---------- iOS export ----------
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
@@ -215,7 +236,7 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
 
-      # ---------- Uploads ----------
+      # ---------- uploads (unchanged) ----------
       - name: Upload macOS pkg to App Store Connect
         env:
           ALTOOL_USER: ${{ secrets.APPLE_ID }}
@@ -224,7 +245,6 @@ jobs:
           xcrun altool --upload-app \
             -f SafariExtProject/Exported-macos/Caramel.pkg \
             -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
-
       - name: Upload iOS ipa to App Store Connect
         env:
           ALTOOL_USER: ${{ secrets.APPLE_ID }}
