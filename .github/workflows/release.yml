@@ -94,8 +94,12 @@ jobs:
       - name: Install signing certs & profile
         uses: apple-actions/import-codesign-certs@v1
         with:
-          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
-          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          p12-file-base64: |
+            ${{ secrets.APPLE_CERT_P12 }}       # distribution
+            ${{ secrets.APPLE_DEV_CERT_P12 }}   # development
+          p12-password: |
+            ${{ secrets.APPLE_CERT_PASSWORD }}
+            ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           provisioning-profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
@@ -116,7 +120,6 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
@@ -133,7 +136,6 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
