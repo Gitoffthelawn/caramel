@@ -6,6 +6,8 @@ on:
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
+  VERSION_NAME: 1.0.${{ github.run_number }}
+  BUILD_NUM: ${{ github.run_number }}
 
 jobs:
   package:
@@ -92,7 +94,7 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      # ------- Certificates: distribution first -------
+      # ------- Certificates -------
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
         with:
@@ -101,7 +103,6 @@ jobs:
           keychain: signing_temp
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      # ------- Certificates: development next (reuse same keychain) -------
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
@@ -111,7 +112,7 @@ jobs:
           p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      # ------- Convert web-extension to Safari container project -------
+      # ------- Convert web-extension -------
       - name: Convert to Safari app (macOS & iOS)
         run: |
           xcrun safari-web-extension-converter dist \
@@ -132,11 +133,13 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
+            MARKETING_VERSION="${{ env.VERSION_NAME }}" \
+            CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
+            ARCHS="arm64 x86_64" \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-            ARCHS="arm64 x86_64"
 
       # ---------- iOS archive ----------
       - name: Build & archive (iOS)
@@ -151,11 +154,13 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
+            MARKETING_VERSION="${{ env.VERSION_NAME }}" \
+            CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
+            ARCHS="arm64" \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-            ARCHS="arm64 x86_64"
 
       # ---------- write exportOptions plists ----------
       - name: Write exportOptions (macOS)
@@ -168,6 +173,7 @@ jobs:
             <key>method</key><string>app-store</string>
             <key>signingStyle</key><string>automatic</string>
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>destination</key><string>app-store-connect</string>
           </dict>
           </plist>
           EOF
@@ -182,6 +188,7 @@ jobs:
             <key>method</key><string>app-store</string>
             <key>signingStyle</key><string>automatic</string>
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>destination</key><string>app-store-connect</string>
           </dict>
           </plist>
           EOF
