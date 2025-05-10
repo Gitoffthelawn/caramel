@@ -122,20 +122,52 @@ jobs:
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
 
+      # ------- Create AppSandbox.entitlements -------
+      - name: Create AppSandbox.entitlements
+        run: |
+          cat > /tmp/AppSandbox.entitlements <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.security.app-sandbox</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
       # ---------- CI patches (category + entitlements) ----------
       - name: Patch macOS Info.plist & entitlements
         run: |
-          # add LSApplicationCategoryType to every Info.plist
+          # Add LSApplicationCategoryType to every Info.plist
           find SafariExtProject -name Info.plist -print0 | while IFS= read -r -d '' PLIST; do
+            echo "Patching Info.plist: $PLIST"
             /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || true
           done
 
-          # ensure sandbox entitlement in every *.entitlements file
+          # Ensure sandbox entitlement in every *.entitlements file
           find SafariExtProject -name "*.entitlements" -print0 | while IFS= read -r -d '' ENT; do
+            echo "Patching entitlements: $ENT"
             /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENT" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null || true
+            # Verify the entitlement was added
+            /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" "$ENT" || echo "Failed to add sandbox entitlement to $ENT"
           done
+
+      # ---------- Ensure extension entitlements ----------
+      - name: Ensure extension entitlements
+        run: |
+          EXT_ENTITLEMENTS="SafariExtProject/Caramel/Caramel Extension/Resources/Caramel Extension.entitlements"
+          if [ -f "$EXT_ENTITLEMENTS" ]; then
+            echo "Patching extension entitlements: $EXT_ENTITLEMENTS"
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$EXT_ENTITLEMENTS" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$EXT_ENTITLEMENTS" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" "$EXT_ENTITLEMENTS" || echo "Failed to add sandbox entitlement to $EXT_ENTITLEMENTS"
+          else
+            echo "Extension entitlements file not found: $EXT_ENTITLEMENTS"
+            exit 1
+          fi
 
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
@@ -147,6 +179,7 @@ jobs:
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=/tmp/AppSandbox.entitlements \
             EXCLUDED_ARCHS="" \
             VALID_ARCHS="arm64 x86_64" \
             ONLY_ACTIVE_ARCH=NO \
@@ -230,6 +263,16 @@ jobs:
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+
+      # ---------- validate macOS pkg ----------
+      - name: Validate macOS pkg
+        env:
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun altool --validate-app \
+            -f SafariExtProject/Exported-macos/Caramel.pkg \
+            -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
 
       # ---------- uploads ----------
       - name: Upload macOS pkg to App Store Connect
