@@ -86,12 +86,13 @@ jobs:
       - name: Unzip extension
         run: unzip -q extension.zip
 
+      # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      # ①  certificates (dist + dev)
+      # ------- Certificates (Distribution + Development) -------
       - name: Install signing certs
         uses: apple-actions/import-codesign-certs@v2
         with:
@@ -99,18 +100,11 @@ jobs:
             ${{ secrets.APPLE_CERT_P12 }}      # distribution
             ${{ secrets.APPLE_DEV_CERT_P12 }}  # development
           p12-password: |
-            ${{ secrets.APPLE_CERT_PASSWORD }}     # password for line 1
-            ${{ secrets.APPLE_DEV_CERT_PASSWORD }} # password for line 2
+            ${{ secrets.APPLE_CERT_PASSWORD }}
+            ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      # ②  provisioning profile (if you really need one;
-      #     optional when using automatic signing + API key)
-      - name: Install provisioning profile
-        uses: apple-actions/import-provisioning-profiles@v1
-        with:
-          profile-base64: ${{ secrets.APPLE_PROVISION_PROFILE }}
-
-
+      # ------- Convert web-extension to Safari container project -------
       - name: Convert to Safari app (macOS & iOS)
         run: |
           xcrun safari-web-extension-converter dist \
@@ -145,7 +139,6 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
@@ -177,6 +170,7 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
 
+      # ---------- Uploads ----------
       - name: Upload macOS pkg to App Store Connect
         env:
           ALTOOL_USER: ${{ secrets.APPLE_ID }}
