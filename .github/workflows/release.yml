@@ -128,7 +128,8 @@ jobs:
             -scheme "Caramel (macOS)" \
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -allowProvisioningUpdates \
