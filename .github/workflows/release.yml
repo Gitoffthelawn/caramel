@@ -122,8 +122,16 @@ jobs:
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
 
+      # ---------- macOS Info.plist Category patch ----------
+      - name: Patch macOS Info.plist LSApplicationCategoryType
+        run: |
+          # add or update LSApplicationCategoryType in every Info.plist under the macOS target
+          find SafariExtProject/Caramel -name Info.plist -print0 | while IFS= read -r -d '' plist; do
+            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
+          done
 
-      # ---------- macOS archive ----------
+      # ---------- macOS archive (universal) ----------
       - name: Build & archive (macOS)
         run: |
           xcodebuild archive \
@@ -135,6 +143,8 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
+            ARCHS="arm64 x86_64" \
+            VALID_ARCHS="arm64 x86_64" \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
@@ -174,6 +184,7 @@ jobs:
           </dict>
           </plist>
           EOF
+
       - name: Write exportOptions (iOS)
         run: |
           cat > /tmp/exportOptionsIOS.plist <<'EOF'
@@ -199,6 +210,7 @@ jobs:
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
