@@ -80,6 +80,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode 16
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
