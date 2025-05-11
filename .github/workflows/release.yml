@@ -135,7 +135,6 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            ENABLE_APP_SANDBOX=YES \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
@@ -155,7 +154,6 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            ENABLE_APP_SANDBOX=YES \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
