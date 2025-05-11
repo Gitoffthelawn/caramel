@@ -113,9 +113,9 @@ jobs:
           p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      # ------- Debug codesigning identities -------
       - name: Debug list codesigning identities
         run: |
-          # if you used a custom keychain name (e.g. signing_temp), point to that
           security find-identity -p codesigning -v ~/Library/Keychains/signing_temp-db
 
       # ------- Convert web-extension -------
@@ -130,24 +130,34 @@ jobs:
       # ---------- CI patches (category + entitlements) ----------
       - name: Patch macOS Info.plist & entitlements
         run: |
-          # add LSApplicationCategoryType to every Info.plist
-          find SafariExtProject -name Info.plist -print0 | while IFS= read -r -d '' PLIST; do
-            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null || true
-          done
+          # add LSApplicationCategoryType and sandbox only to macOS targets
+          find SafariExtProject -name Info.plist -print0 \
+            | while IFS= read -r -d '' PLIST; do
+                /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
+                 || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
+                 || true
+              done
 
-          # ensure sandbox entitlement in every *.entitlements file
-          find SafariExtProject -name "*.entitlements" -print0 | while IFS= read -r -d '' ENT; do
-            /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENT" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null || true
-          done
+          find SafariExtProject -name "*.entitlements" -print0 \
+            | while IFS= read -r -d '' ENT; do
+                # only patch entitlements if it's in the macOS target directory
+                case "$ENT" in
+                  *macos*) 
+                    /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENT" 2>/dev/null \
+                     || /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null \
+                     || true
+                    ;;
+                esac
+              done
 
       - name: Copy sandbox entitlement to /tmp
         run: |
-          find SafariExtProject -name '*.entitlements' -print0 | while IFS= read -r -d '' ENT; do
-            cp "$ENT" /tmp/AppSandbox.entitlements
-            break
-          done
+          find SafariExtProject -name '*.entitlements' -print0 \
+            | while IFS= read -r -d '' ENT; do
+                case "$ENT" in
+                  *macos*) cp "$ENT" /tmp/AppSandbox.entitlements && break;;
+                esac
+              done
 
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
@@ -180,13 +190,9 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_ENTITLEMENTS=/tmp/AppSandbox.entitlements \
-            OTHER_CODE_SIGN_FLAGS="--entitlements /tmp/AppSandbox.entitlements" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            ENABLE_APP_SANDBOX=YES \
-            ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
