@@ -143,7 +143,9 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            MACOSX_DEPLOYMENT_TARGET=10.14 \
+            ARCHS="arm64 x86_64" \
+            VALID_ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
