@@ -118,30 +118,46 @@ jobs:
         run: |
           security find-identity -p codesigning -v ~/Library/Keychains/signing_temp-db
 
-      # ---------- CI patches (Info.plist only) ----------
-      - name: Patch macOS Info.plist
+      # ------- Convert web-extension -------
+      - name: Convert to Safari app (macOS & iOS)
         run: |
+          xcrun safari-web-extension-converter dist \
+            --project-location SafariExtProject \
+            --app-name "Caramel" \
+            --bundle-identifier "${SAFARI_BUNDLE_ID}" \
+            --no-open --no-prompt --force --copy-resources
+
+      # ---------- CI patches (category + entitlements) ----------
+      - name: Patch macOS Info.plist & entitlements
+        run: |
+          # add LSApplicationCategoryType and sandbox only to macOS targets
           find SafariExtProject -name Info.plist -print0 \
             | while IFS= read -r -d '' PLIST; do
-                /usr/libexec/PlistBuddy \
-                  -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
-                 || /usr/libexec/PlistBuddy \
-                  -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
+                /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
+                 || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$PLIST" 2>/dev/null \
                  || true
               done
 
-      - name: Generate sandbox entitlements
+          find SafariExtProject -name "*.entitlements" -print0 \
+            | while IFS= read -r -d '' ENT; do
+                # only patch entitlements if it's in the macOS target directory
+                case "$ENT" in
+                  *macos*) 
+                    /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENT" 2>/dev/null \
+                     || /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null \
+                     || true
+                    ;;
+                esac
+              done
+
+      - name: Copy sandbox entitlement to /tmp
         run: |
-          cat > /tmp/AppSandbox.entitlements << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>com.apple.security.app-sandbox</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
+          find SafariExtProject -name '*.entitlements' -print0 \
+            | while IFS= read -r -d '' ENT; do
+                case "$ENT" in
+                  *macos*) cp "$ENT" /tmp/AppSandbox.entitlements && break;;
+                esac
+              done
 
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
@@ -200,7 +216,7 @@ jobs:
         run: |
           cat > /tmp/exportOptionsIOS.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store-connect</string>
