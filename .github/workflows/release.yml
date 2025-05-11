@@ -144,7 +144,8 @@ jobs:
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
             ARCHS="arm64 x86_64" \
-            VALID_ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            EXCLUDED_ARCHS="" \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
