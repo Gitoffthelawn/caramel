@@ -113,6 +113,11 @@ jobs:
           p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: Debug list codesigning identities
+        run: |
+          # if you used a custom keychain name (e.g. signing_temp), point to that
+          security find-identity -p codesigning -v ~/Library/Keychains/signing_temp-db
+
       # ------- Convert web-extension -------
       - name: Convert to Safari app (macOS & iOS)
         run: |
