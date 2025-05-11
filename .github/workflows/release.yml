@@ -125,11 +125,28 @@ jobs:
       # ---------- macOS Info.plist Category patch ----------
       - name: Patch macOS Info.plist LSApplicationCategoryType
         run: |
-          # add or update LSApplicationCategoryType in every Info.plist under the macOS target
-          find SafariExtProject/Caramel -name Info.plist -print0 | while IFS= read -r -d '' plist; do
-            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" 2>/dev/null \
-              || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
-          done
+          find SafariExtProject/Caramel -name Info.plist -print0 \
+            | while IFS= read -r -d '' plist; do
+                /usr/libexec/PlistBuddy \
+                  -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" 2>/dev/null \
+                 || /usr/libexec/PlistBuddy \
+                  -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
+              done
+
+      # ---------- write macOS exportOptions.plist ----------
+      - name: Write exportOptions (macOS)
+        run: |
+          cat > /tmp/exportOptionsMac.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+          </dict>
+          </plist>
+          EOF
 
       # ---------- macOS archive (universal) ----------
       - name: Build & archive (macOS)
@@ -152,6 +169,30 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
 
+      # ---------- export macOS ----------
+      - name: Export (macOS)
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath SafariExtProject/Caramel-macos.xcarchive \
+            -exportOptionsPlist /tmp/exportOptionsMac.plist \
+            -exportPath SafariExtProject/Exported-macos \
+            -allowProvisioningUpdates
+
+      # ---------- write exportOptions.plist for iOS ----------
+      - name: Write exportOptions (iOS)
+        run: |
+          cat > /tmp/exportOptionsIOS.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+          </dict>
+          </plist>
+          EOF
+
       # ---------- iOS archive ----------
       - name: Build & archive (iOS)
         run: |
@@ -171,57 +212,14 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
 
-      # ---------- write exportOptions plists ----------
-      - name: Write exportOptions (macOS)
-        run: |
-          cat > /tmp/exportOptionsMac.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Write exportOptions (iOS)
-        run: |
-          cat > /tmp/exportOptionsIOS.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
-          </dict>
-          </plist>
-          EOF
-
-      # ---------- exports ----------
-      - name: Export (macOS)
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath SafariExtProject/Caramel-macos.xcarchive \
-            -exportOptionsPlist /tmp/exportOptionsMac.plist \
-            -exportPath SafariExtProject/Exported-macos \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-
+      # ---------- export iOS ----------
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             -exportOptionsPlist /tmp/exportOptionsIOS.plist \
             -exportPath SafariExtProject/Exported-ios \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -allowProvisioningUpdates
 
       # ---------- uploads ----------
       - name: Upload macOS pkg to App Store Connect
