@@ -2,7 +2,7 @@ name: Release – Caramel Extension
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ main ]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
