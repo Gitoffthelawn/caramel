@@ -137,6 +137,13 @@ jobs:
             /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox true" "$ENT" 2>/dev/null || true
           done
 
+      - name: Copy sandbox entitlement to /tmp
+        run: |
+          find SafariExtProject -name '*.entitlements' -print0 | while IFS= read -r -d '' ENT; do
+            cp "$ENT" /tmp/AppSandbox.entitlements
+            break
+          done
+
       # ---------- macOS archive ----------
       - name: Build & archive (macOS)
         run: |
@@ -146,15 +153,13 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="" \
-            EXCLUDED_ARCHS="" \
-            VALID_ARCHS="arm64 x86_64" \
-            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_ENTITLEMENTS=/tmp/AppSandbox.entitlements \
+            OTHER_CODE_SIGN_FLAGS="--entitlements /tmp/AppSandbox.entitlements" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            ARCHS="arm64 x86_64" \
+            ENABLE_APP_SANDBOX=YES \
+            ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
@@ -170,12 +175,13 @@ jobs:
             -configuration Release \
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=/tmp/AppSandbox.entitlements \
+            OTHER_CODE_SIGN_FLAGS="--entitlements /tmp/AppSandbox.entitlements" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
             MARKETING_VERSION="${{ env.VERSION_NAME }}" \
             CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
-            ARCHS="arm64" \
+            ENABLE_APP_SANDBOX=YES \
+            ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
