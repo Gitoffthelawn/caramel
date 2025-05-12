@@ -2,7 +2,7 @@ name: Release – Caramel Extension
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
@@ -94,6 +94,16 @@ jobs:
       - name: Unzip extension
         run: unzip -q extension.zip
 
+      # ------- Install dependencies for icon generation -------
+      - name: Install ImageMagick and jq
+        run: brew install imagemagick jq
+
+      # ------- Generate Safari icons -------
+      - name: Generate Safari icons
+        run: |
+          chmod +x scripts/generate-safari-icons.sh
+          ./scripts/generate-safari-icons.sh icons/512.png
+
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
@@ -126,6 +136,12 @@ jobs:
             --app-name "Caramel" \
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
+
+      # ------- Update Safari icons -------
+      - name: Update Safari icons
+        run: |
+          chmod +x scripts/update-safari-icons.sh
+          ./scripts/update-safari-icons.sh
 
       # ---------- macOS Info.plist Category patch ----------
       - name: Patch macOS Info.plist LSApplicationCategoryType
