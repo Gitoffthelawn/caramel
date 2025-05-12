@@ -62,7 +62,7 @@ jobs:
         with:
           file-path: extension.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-id:   ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: false
@@ -101,7 +101,7 @@ jobs:
         run: |
           mkdir -p /tmp/safari-icon-scripts
           cp scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
-          cp scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
+          cp scripts/update-safari-icons.sh  /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
 
       # ------- Generate Safari icons -------
@@ -115,13 +115,11 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      # ------- Install App Store Connect API Tool -------
-      - name: Install App Store Connect API Tool
+      # ------- Install App Store Connect CLI (“asc”) -------
+      - name: Install App Store Connect CLI (“asc”)
         run: |
-          # Install Swift command-line tool for App Store Connect API
-          brew install blender/homebrew-tap/app-store-connect
-          
-          # Verify installation
+          brew tap ittybittyapps/appstoreconnect-cli
+          brew install --HEAD appstoreconnect-cli
           asc --version
 
       # ------- Get latest versions from App Store Connect -------
@@ -215,19 +213,19 @@ jobs:
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
         with:
-          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
-          p12-password:    ${{ secrets.APPLE_CERT_PASSWORD }}
-          keychain: signing_temp
-          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+          p12-file-base64:    ${{ secrets.APPLE_CERT_P12 }}
+          p12-password:       ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain:           signing_temp
+          keychain-password:  ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
-          create-keychain: false
-          keychain: signing_temp
-          p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
-          p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+          create-keychain:    false
+          keychain:           signing_temp
+          p12-file-base64:    ${{ secrets.APPLE_DEV_CERT_P12 }}
+          p12-password:       ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          keychain-password:  ${{ secrets.KEYCHAIN_PASSWORD }}
 
       # ------- Convert web-extension -------
       - name: Convert to Safari app (macOS & iOS)
