@@ -115,12 +115,11 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
-      # ------- Install App Store Connect CLI (“asc”) -------
-      - name: Install App Store Connect CLI (“asc”)
+      # ------- Install App Store Connect CLI -------
+      - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
           brew install --HEAD appstoreconnect-cli
-          asc --version
 
       # ------- Get latest versions from App Store Connect -------
       - name: Get latest versions from App Store Connect
