@@ -6,8 +6,6 @@ on:
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
-  VERSION_NAME: 1.0.${{ github.run_number }}
-  BUILD_NUM: ${{ github.run_id }}                    # always > any previous build number
   MAC_CATEGORY: public.app-category.productivity     # valid Mac-App-Store UTI
 
 jobs:
@@ -117,6 +115,69 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
+      # ------- Get latest versions from App Store Connect -------
+      - name: Get latest versions from App Store Connect
+        id: get_versions
+        run: |
+          # Install app-store-connect-cli
+          npm install -g app-store-connect-cli
+          
+          # Authenticate with App Store Connect
+          export ASC_KEY_ID="${{ secrets.ASC_KEY_ID }}"
+          export ASC_ISSUER_ID="${{ secrets.ASC_ISSUER_ID }}"
+          export ASC_KEY_FILEPATH="/tmp/AuthKey.p8"
+          
+          # Function to get and increment version
+          get_and_increment_version() {
+            local platform=$1
+            local latest_version=$(asc app-version list --app-id "${{ secrets.APPLE_APP_ID }}" --platform "$platform" --json | jq -r 'sort_by(.version) | last | .version')
+            
+            if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
+              # If no version found, start with 1.0.0
+              echo "1.0.0"
+            else
+              # Split version into components
+              local major=$(echo $latest_version | cut -d. -f1)
+              local minor=$(echo $latest_version | cut -d. -f2)
+              local patch=$(echo $latest_version | cut -d. -f3)
+              
+              # Increment patch version
+              patch=$((patch + 1))
+              echo "${major}.${minor}.${patch}"
+            fi
+          }
+          
+          # Function to get and increment build number
+          get_and_increment_build() {
+            local platform=$1
+            local latest_build=$(asc app-version list --app-id "${{ secrets.APPLE_APP_ID }}" --platform "$platform" --json | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
+            
+            if [ -z "$latest_build" ] || [ "$latest_build" = "null" ]; then
+              # If no build number found, start with 1
+              echo "1"
+            else
+              # Increment build number
+              echo $((latest_build + 1))
+            fi
+          }
+          
+          # Get versions for iOS
+          IOS_VERSION=$(get_and_increment_version "IOS")
+          IOS_BUILD=$(get_and_increment_build "IOS")
+          
+          # Get versions for macOS
+          MACOS_VERSION=$(get_and_increment_version "MAC_OS")
+          MACOS_BUILD=$(get_and_increment_build "MAC_OS")
+          
+          echo "iOS: Latest version -> $IOS_VERSION, build -> $IOS_BUILD"
+          echo "macOS: Latest version -> $MACOS_VERSION, build -> $MACOS_BUILD"
+          
+          # Set environment variables for later use
+          echo "IOS_VERSION_NAME=$IOS_VERSION" >> $GITHUB_ENV
+          echo "IOS_BUILD_NUM=$IOS_BUILD" >> $GITHUB_ENV
+          echo "MACOS_VERSION_NAME=$MACOS_VERSION" >> $GITHUB_ENV
+          echo "MACOS_BUILD_NUM=$MACOS_BUILD" >> $GITHUB_ENV
+
       # ------- Certificates -------
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
@@ -174,8 +235,8 @@ jobs:
             -archivePath SafariExtProject/Caramel-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            MARKETING_VERSION="${{ env.VERSION_NAME }}" \
-            CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
+            MARKETING_VERSION="${{ env.MACOS_VERSION_NAME }}" \
+            CURRENT_PROJECT_VERSION="${{ env.MACOS_BUILD_NUM }}" \
             ARCHS="arm64 x86_64" \
             VALID_ARCHS="arm64 x86_64" \
             ONLY_ACTIVE_ARCH=NO \
@@ -196,8 +257,8 @@ jobs:
             -archivePath SafariExtProject/Caramel-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            MARKETING_VERSION="${{ env.VERSION_NAME }}" \
-            CURRENT_PROJECT_VERSION="${{ env.BUILD_NUM }}" \
+            MARKETING_VERSION="${{ env.IOS_VERSION_NAME }}" \
+            CURRENT_PROJECT_VERSION="${{ env.IOS_BUILD_NUM }}" \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/AuthKey.p8 \
