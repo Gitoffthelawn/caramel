@@ -118,59 +118,81 @@ jobs:
       # ------- Get latest versions from App Store Connect -------
       - name: Get latest versions from App Store Connect
         id: get_versions
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
         run: |
-          # Install app-store-connect-cli
-          npm install -g app-store-connect-cli
+          # Create a temporary directory for version info
+          mkdir -p /tmp/version_info
           
-          # Authenticate with App Store Connect
-          export ASC_KEY_ID="${{ secrets.ASC_KEY_ID }}"
-          export ASC_ISSUER_ID="${{ secrets.ASC_ISSUER_ID }}"
-          export ASC_KEY_FILEPATH="/tmp/AuthKey.p8"
-          
-          # Function to get and increment version
-          get_and_increment_version() {
+          # Function to extract version and build from app info
+          get_app_info() {
             local platform=$1
-            local latest_version=$(asc app-version list --app-id "${{ secrets.APPLE_APP_ID }}" --platform "$platform" --json | jq -r 'sort_by(.version) | last | .version')
+            local output_file="/tmp/version_info/${platform}_info.json"
             
-            if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
-              # If no version found, start with 1.0.0
-              echo "1.0.0"
+            # Use xcrun altool to get app info
+            if [ "$platform" = "ios" ]; then
+              xcrun altool --list-apps --type ios --output-format json -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" > "$output_file"
             else
-              # Split version into components
-              local major=$(echo $latest_version | cut -d. -f1)
-              local minor=$(echo $latest_version | cut -d. -f2)
-              local patch=$(echo $latest_version | cut -d. -f3)
+              xcrun altool --list-apps --type osx --output-format json -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" > "$output_file"
+            fi
+            
+            # Parse the JSON output to find our app
+            if [ -f "$output_file" ]; then
+              # Find our app in the list
+              local app_info=$(cat "$output_file" | jq -r '.apps[] | select(.adamId == env.APPLE_APP_ID)')
               
-              # Increment patch version
-              patch=$((patch + 1))
-              echo "${major}.${minor}.${patch}"
-            fi
-          }
-          
-          # Function to get and increment build number
-          get_and_increment_build() {
-            local platform=$1
-            local latest_build=$(asc app-version list --app-id "${{ secrets.APPLE_APP_ID }}" --platform "$platform" --json | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
-            
-            if [ -z "$latest_build" ] || [ "$latest_build" = "null" ]; then
-              # If no build number found, start with 1
-              echo "1"
+              if [ -n "$app_info" ]; then
+                # Extract version and build
+                local version=$(echo "$app_info" | jq -r '.version')
+                local build=$(echo "$app_info" | jq -r '.build')
+                
+                echo "$version $build"
+              else
+                echo "1.0.0 1"  # Default if app not found
+              fi
             else
-              # Increment build number
-              echo $((latest_build + 1))
+              echo "1.0.0 1"  # Default if file not found
             fi
           }
           
-          # Get versions for iOS
-          IOS_VERSION=$(get_and_increment_version "IOS")
-          IOS_BUILD=$(get_and_increment_build "IOS")
+          # Function to increment version
+          increment_version() {
+            local version=$1
+            
+            # Split version into components
+            local major=$(echo $version | cut -d. -f1)
+            local minor=$(echo $version | cut -d. -f2)
+            local patch=$(echo $version | cut -d. -f3)
+            
+            # Increment patch version
+            patch=$((patch + 1))
+            echo "${major}.${minor}.${patch}"
+          }
           
-          # Get versions for macOS
-          MACOS_VERSION=$(get_and_increment_version "MAC_OS")
-          MACOS_BUILD=$(get_and_increment_build "MAC_OS")
+          # Get iOS info
+          IOS_INFO=$(get_app_info "ios")
+          IOS_CURRENT_VERSION=$(echo $IOS_INFO | cut -d' ' -f1)
+          IOS_CURRENT_BUILD=$(echo $IOS_INFO | cut -d' ' -f2)
           
-          echo "iOS: Latest version -> $IOS_VERSION, build -> $IOS_BUILD"
-          echo "macOS: Latest version -> $MACOS_VERSION, build -> $MACOS_BUILD"
+          # Get macOS info
+          MACOS_INFO=$(get_app_info "macos")
+          MACOS_CURRENT_VERSION=$(echo $MACOS_INFO | cut -d' ' -f1)
+          MACOS_CURRENT_BUILD=$(echo $MACOS_INFO | cut -d' ' -f2)
+          
+          # Increment versions
+          IOS_VERSION=$(increment_version "$IOS_CURRENT_VERSION")
+          IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
+          
+          MACOS_VERSION=$(increment_version "$MACOS_CURRENT_VERSION")
+          MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
+          
+          echo "iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
+          echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
+          
+          echo "macOS: Current version: $MACOS_CURRENT_VERSION, build: $MACOS_CURRENT_BUILD"
+          echo "macOS: New version: $MACOS_VERSION, build: $MACOS_BUILD"
           
           # Set environment variables for later use
           echo "IOS_VERSION_NAME=$IOS_VERSION" >> $GITHUB_ENV
