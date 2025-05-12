@@ -115,48 +115,24 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
+      # ------- Install App Store Connect API Tool -------
+      - name: Install App Store Connect API Tool
+        run: |
+          # Install Swift command-line tool for App Store Connect API
+          brew install blender/homebrew-tap/app-store-connect
+          
+          # Verify installation
+          asc --version
+
       # ------- Get latest versions from App Store Connect -------
       - name: Get latest versions from App Store Connect
         id: get_versions
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: /tmp/AuthKey.p8
           APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
         run: |
-          # Create a temporary directory for version info
-          mkdir -p /tmp/version_info
-          
-          # Function to extract version and build from app info
-          get_app_info() {
-            local platform=$1
-            local output_file="/tmp/version_info/${platform}_info.json"
-            
-            # Use xcrun altool to get app info
-            if [ "$platform" = "ios" ]; then
-              xcrun altool --list-apps --type ios --output-format json -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" > "$output_file"
-            else
-              xcrun altool --list-apps --type osx --output-format json -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" > "$output_file"
-            fi
-            
-            # Parse the JSON output to find our app
-            if [ -f "$output_file" ]; then
-              # Find our app in the list
-              local app_info=$(cat "$output_file" | jq -r '.apps[] | select(.adamId == env.APPLE_APP_ID)')
-              
-              if [ -n "$app_info" ]; then
-                # Extract version and build
-                local version=$(echo "$app_info" | jq -r '.version')
-                local build=$(echo "$app_info" | jq -r '.build')
-                
-                echo "$version $build"
-              else
-                echo "1.0.0 1"  # Default if app not found
-              fi
-            else
-              echo "1.0.0 1"  # Default if file not found
-            fi
-          }
-          
           # Function to increment version
           increment_version() {
             local version=$1
@@ -171,15 +147,50 @@ jobs:
             echo "${major}.${minor}.${patch}"
           }
           
-          # Get iOS info
-          IOS_INFO=$(get_app_info "ios")
-          IOS_CURRENT_VERSION=$(echo $IOS_INFO | cut -d' ' -f1)
-          IOS_CURRENT_BUILD=$(echo $IOS_INFO | cut -d' ' -f2)
+          # Get iOS versions
+          echo "Fetching iOS app versions..."
+          IOS_VERSIONS=$(asc app versions list --app-id $APPLE_APP_ID --platform IOS --json)
+          if [ $? -ne 0 ]; then
+            echo "Error fetching iOS versions"
+            exit 1
+          fi
           
-          # Get macOS info
-          MACOS_INFO=$(get_app_info "macos")
-          MACOS_CURRENT_VERSION=$(echo $MACOS_INFO | cut -d' ' -f1)
-          MACOS_CURRENT_BUILD=$(echo $MACOS_INFO | cut -d' ' -f2)
+          # Get macOS versions
+          echo "Fetching macOS app versions..."
+          MACOS_VERSIONS=$(asc app versions list --app-id $APPLE_APP_ID --platform MACOS --json)
+          if [ $? -ne 0 ]; then
+            echo "Error fetching macOS versions"
+            exit 1
+          fi
+          
+          # Extract latest iOS version and build
+          IOS_CURRENT_VERSION=$(echo "$IOS_VERSIONS" | jq -r 'sort_by(.version) | last | .version')
+          IOS_CURRENT_BUILD=$(echo "$IOS_VERSIONS" | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
+          
+          # Extract latest macOS version and build
+          MACOS_CURRENT_VERSION=$(echo "$MACOS_VERSIONS" | jq -r 'sort_by(.version) | last | .version')
+          MACOS_CURRENT_BUILD=$(echo "$MACOS_VERSIONS" | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
+          
+          # Validate and set defaults only if truly needed
+          if [ -z "$IOS_CURRENT_VERSION" ] || [ "$IOS_CURRENT_VERSION" = "null" ]; then
+            echo "Warning: Could not retrieve iOS version, using 1.0.0"
+            IOS_CURRENT_VERSION="1.0.0"
+          fi
+          
+          if [ -z "$IOS_CURRENT_BUILD" ] || [ "$IOS_CURRENT_BUILD" = "null" ]; then
+            echo "Warning: Could not retrieve iOS build number, using 1"
+            IOS_CURRENT_BUILD="1"
+          fi
+          
+          if [ -z "$MACOS_CURRENT_VERSION" ] || [ "$MACOS_CURRENT_VERSION" = "null" ]; then
+            echo "Warning: Could not retrieve macOS version, using 1.0.0"
+            MACOS_CURRENT_VERSION="1.0.0"
+          fi
+          
+          if [ -z "$MACOS_CURRENT_BUILD" ] || [ "$MACOS_CURRENT_BUILD" = "null" ]; then
+            echo "Warning: Could not retrieve macOS build number, using 1"
+            MACOS_CURRENT_BUILD="1"
+          fi
           
           # Increment versions
           IOS_VERSION=$(increment_version "$IOS_CURRENT_VERSION")
