@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Source icon path
-SOURCE_ICON="${1:-"$PROJECT_ROOT/icons/512.png"}"
+SOURCE_ICON="${1:-"$PROJECT_ROOT/icons/original.png"}"
 
 if [ ! -f "$SOURCE_ICON" ]; then
     echo "Error: Source icon not found at $SOURCE_ICON"

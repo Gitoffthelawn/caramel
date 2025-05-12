@@ -2,7 +2,7 @@ name: Release – Caramel Extension
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
@@ -98,11 +98,18 @@ jobs:
       - name: Install ImageMagick and jq
         run: brew install imagemagick jq
 
+      # ------- Create temporary directory for scripts -------
+      - name: Setup temporary scripts directory
+        run: |
+          mkdir -p /tmp/safari-icon-scripts
+          cp scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
+          cp scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
+          chmod +x /tmp/safari-icon-scripts/*.sh
+
       # ------- Generate Safari icons -------
       - name: Generate Safari icons
         run: |
-          chmod +x scripts/generate-safari-icons.sh
-          ./scripts/generate-safari-icons.sh icons/512.png
+          /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
 
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
@@ -140,8 +147,13 @@ jobs:
       # ------- Update Safari icons -------
       - name: Update Safari icons
         run: |
-          chmod +x scripts/update-safari-icons.sh
-          ./scripts/update-safari-icons.sh
+          /tmp/safari-icon-scripts/update-safari-icons.sh
+
+      # ------- Clean up scripts from project -------
+      - name: Clean up script files from project
+        run: |
+          # Remove any script files that might have been copied into the project
+          find SafariExtProject -name "*.sh" -delete
 
       # ---------- macOS Info.plist Category patch ----------
       - name: Patch macOS Info.plist LSApplicationCategoryType

@@ -17,7 +17,7 @@ Usage:
 ./generate-safari-icons.sh [source-icon-path]
 ```
 
-- `source-icon-path`: Path to the source icon (default: `caramel-extension/icons/512.png`)
+- `source-icon-path`: Path to the source icon (default: `caramel-extension/icons/original.png`)
 
 The script will generate icons in various sizes required by Apple App Store in the `caramel-extension/safari-icons` directory.
 
