@@ -1,9 +1,11 @@
-# .github/workflows/ci.yml
-name: CI – Caramel Extension
+name: CI – Extension
 
 on:
   pull_request:
     branches: [ dev ]
+
+env:
+  WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
 
 jobs:
   lint_and_build:
@@ -11,32 +13,25 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: caramel-extension
-
+        working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
-
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: caramel-extension/pnpm-lock.yaml
-
+          cache-dependency-path: ${{ env.WORKING_DIRECTORY }}/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install
-
       - name: Run ESLint
         run: pnpm run lint
-
       - name: Run Prettier check
         run: pnpm run prettier-check
-
       - name: Build extension
         run: pnpm run build

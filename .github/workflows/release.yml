@@ -1,4 +1,4 @@
-name: Release – Caramel Extension
+name: Release – Extension
 
 on:
   push:
@@ -6,7 +6,9 @@ on:
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
-  MAC_CATEGORY: public.app-category.productivity     # valid Mac-App-Store UTI
+  WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
+  APP_NAME: ${{ vars.APP_NAME }}
+  MAC_CATEGORY: ${{ vars.MAC_CATEGORY }}
 
 jobs:
   package:
@@ -14,37 +16,31 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: caramel-extension
+        working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: caramel-extension/pnpm-lock.yaml
-
+          cache-dependency-path: ${{ env.WORKING_DIRECTORY }}/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install
-
       - name: Build extension
         run: pnpm run build
-
       - name: Package extension
         run: pnpm run package
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: extension-package
-          path: caramel-extension/extension.zip
+          path: ${{ env.WORKING_DIRECTORY }}/extension.zip
 
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
@@ -56,13 +52,12 @@ jobs:
         with:
           name: extension-package
           path: .
-
       - name: Upload to Chrome Web Store (upload-only)
         uses: mnao305/chrome-extension-upload@v5.0.0
         with:
           file-path: extension.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id:   ${{ secrets.CHROME_CLIENT_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: false
@@ -74,25 +69,20 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: caramel-extension
+        working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Select Xcode 16
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: extension-package
-          path: caramel-extension
-
+          path: ${{ env.WORKING_DIRECTORY }}
       - name: Unzip extension
         run: unzip -q extension.zip
-
-      # ------- Install dependencies for icon generation -------
       - name: Install ImageMagick and jq
         run: |
           if ! command -v convert >/dev/null 2>&1; then
@@ -107,21 +97,15 @@ jobs:
           else
             echo "jq already installed"
           fi
-
-      # ------- Create temporary directory for scripts -------
       - name: Setup temporary scripts directory
         run: |
           mkdir -p /tmp/safari-icon-scripts
-          cp scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
-          cp scripts/update-safari-icons.sh  /tmp/safari-icon-scripts/
+          cp ../.github/workflows/scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
+          cp ../.github/workflows/scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
-
-      # ------- Generate Safari icons -------
       - name: Generate Safari icons
         run: |
           /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
-
-      # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: |
           echo "${ASC_API_KEY_BASE64}" | base64 --decode > "/tmp/AuthKey_${ASC_KEY_ID}.p8"
@@ -129,49 +113,23 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-
-      # ------- Install App Store Connect CLI -------
       - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
           brew install --HEAD appstoreconnect-cli
-
-      # ------- Debug ASC CLI -------
-      - name: Debug ASC CLI help
-        run: asc testflight builds list --help || true
-
-      # ------- Debug authentication -------
-      - name: Debug authentication variables
-        run: |
-          echo "ASC_KEY_ID is set: ${ASC_KEY_ID:+true}"
-          echo "ASC_ISSUER_ID is set: ${ASC_ISSUER_ID:+true}"
-          echo "ASC_KEY_PATH exists: $(test -f "/tmp/AuthKey_${ASC_KEY_ID}.p8" && echo true || echo false)"
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-
-      # ------- Get latest versions from App Store Connect -------
       - name: Get latest versions for macOS and iOS
         id: get_versions
         env:
-          ASC_KEY_ID:         ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID:      ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
         run: |
           echo "Fetching latest builds from TestFlight..."
-
-          # Write the .p8 key into the standard lookup dir
           mkdir -p private_keys
-          echo "${ASC_API_KEY_BASE64}" \
-            | base64 --decode \
-            > private_keys/AuthKey_${ASC_KEY_ID}.p8
-
-          # Export the vars the CLI actually reads
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode > private_keys/AuthKey_${ASC_KEY_ID}.p8
           export APPSTORE_CONNECT_API_KEY_ID="${ASC_KEY_ID}"
           export APPSTORE_CONNECT_ISSUER_ID="${ASC_ISSUER_ID}"
           export APPSTORE_CONNECT_API_KEY="$(cat private_keys/AuthKey_${ASC_KEY_ID}.p8)"
-
-          # List all recent builds as JSON
           asc testflight builds list \
             --filter-bundle-ids "${SAFARI_BUNDLE_ID}" \
             --include-expired \
@@ -179,33 +137,18 @@ jobs:
             --api-key-id "${ASC_KEY_ID}" \
             --api-issuer "${ASC_ISSUER_ID}" \
             --json > builds.json || true
-
-          echo "Raw builds JSON:"
-          cat builds.json || true
-
-          # ── macOS ────────────────────────────────────────────────────────
-          echo "Filtering latest macOS build..."
           jq '[.[] | select(.platform == "MAC_OS")] | sort_by(.uploadedDate) | .[-1]' \
             builds.json > latest_macos_build.json || true
-          echo "macOS build JSON:"
-          cat latest_macos_build.json || true
-
           if [ ! -s latest_macos_build.json ]; then
             echo "Warning: Could not retrieve macOS build, using defaults"
             MACOS_CURRENT_VERSION="1.0.0"
             MACOS_CURRENT_BUILD="1"
           else
-            MACOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"'   < latest_macos_build.json)
+            MACOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_macos_build.json)
             MACOS_CURRENT_VERSION=$(jq -r '.version     // "1.0.0"' < latest_macos_build.json)
           fi
-
-          # ── iOS ──────────────────────────────────────────────────────────
-          echo "Filtering latest iOS build..."
           jq '[.[] | select(.platform == "IOS")] | sort_by(.uploadedDate) | .[-1]' \
             builds.json > latest_ios_build.json || true
-          echo "iOS build JSON:"
-          cat latest_ios_build.json || true
-
           if [ ! -s latest_ios_build.json ]; then
             echo "Warning: Could not retrieve iOS build, using defaults"
             IOS_CURRENT_VERSION="1.0.0"
@@ -214,90 +157,66 @@ jobs:
             IOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_ios_build.json)
             IOS_CURRENT_VERSION=$(jq -r '.version      // "1.0.0"' < latest_ios_build.json)
           fi
-
-          # ── Bump versions/build numbers ──────────────────────────────────
-          # macOS
           IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
           patch=$((patch + 1))
           MACOS_VERSION="${major}.${minor}.${patch}"
           MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-          # iOS
           IFS='.' read -r major minor patch <<< "$IOS_CURRENT_VERSION"
           patch=$((patch + 1))
           IOS_VERSION="${major}.${minor}.${patch}"
           IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
-
-          # ── Summary & export ─────────────────────────────────────────────
           echo "macOS: Current $MACOS_CURRENT_VERSION (#$MACOS_CURRENT_BUILD) → New $MACOS_VERSION (#$MACOS_BUILD)"
           echo "iOS:   Current $IOS_CURRENT_VERSION (#$IOS_CURRENT_BUILD) → New $IOS_VERSION (#$IOS_BUILD)"
-
           echo "IOS_VERSION_NAME=$IOS_VERSION"     >> $GITHUB_ENV
           echo "IOS_BUILD_NUM=$IOS_BUILD"         >> $GITHUB_ENV
           echo "MACOS_VERSION_NAME=$MACOS_VERSION" >> $GITHUB_ENV
           echo "MACOS_BUILD_NUM=$MACOS_BUILD"     >> $GITHUB_ENV
-
-
-      # ------- Certificates -------
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
         with:
-          p12-file-base64:    ${{ secrets.APPLE_CERT_P12 }}
-          p12-password:       ${{ secrets.APPLE_CERT_PASSWORD }}
-          keychain:           signing_temp
-          keychain-password:  ${{ secrets.KEYCHAIN_PASSWORD }}
-
+          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
+          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain: signing_temp
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
-          create-keychain:    false
-          keychain:           signing_temp
-          p12-file-base64:    ${{ secrets.APPLE_DEV_CERT_P12 }}
-          p12-password:       ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-          keychain-password:  ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      # ------- Convert web-extension -------
+          create-keychain: false
+          keychain: signing_temp
+          p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
+          p12-password: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
       - name: Convert to Safari app (macOS & iOS)
         run: |
           xcrun safari-web-extension-converter dist \
             --project-location SafariExtProject \
-            --app-name "Caramel" \
+            --app-name "${{ env.APP_NAME }}" \
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
-
-      # ------- Update Safari icons -------
       - name: Update Safari icons
         run: |
           /tmp/safari-icon-scripts/update-safari-icons.sh
-
       - name: Upload full Safari Xcode project
         uses: actions/upload-artifact@v4
         with:
           name: safari-xcode-project
-          path: caramel-extension/SafariExtProject
-
-      # ------- Clean up scripts from project -------
+          path: ${{ env.WORKING_DIRECTORY }}/SafariExtProject
       - name: Clean up script files from project
         run: |
-          # Remove any script files that might have been copied into the project
           find SafariExtProject -name "*.sh" -delete
-
-      # ---------- macOS Info.plist Category patch ----------
       - name: Patch macOS Info.plist LSApplicationCategoryType
         run: |
-          # add or update LSApplicationCategoryType in every Info.plist under the macOS target
-          find SafariExtProject/Caramel -name Info.plist -print0 | while IFS= read -r -d '' plist; do
+          find SafariExtProject/${{ env.APP_NAME }} -name Info.plist -print0 | while IFS= read -r -d '' plist; do
             /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" 2>/dev/null \
               || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
           done
-
-      # ---------- macOS archive (universal) ----------
       - name: Build & archive (macOS)
         run: |
           xcodebuild archive \
-            -project SafariExtProject/Caramel/Caramel.xcodeproj \
-            -scheme "Caramel (macOS)" \
+            -project SafariExtProject/${{ env.APP_NAME }}/${{ env.APP_NAME }}.xcodeproj \
+            -scheme "${{ env.APP_NAME }} (macOS)" \
             -configuration Release \
-            -archivePath SafariExtProject/Caramel-macos.xcarchive \
+            -archivePath SafariExtProject/${{ env.APP_NAME }}-macos.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.MACOS_VERSION_NAME }}" \
@@ -312,16 +231,14 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-
-      # ---------- iOS archive ----------
       - name: Build & archive (iOS)
         run: |
           xcodebuild archive \
-            -project SafariExtProject/Caramel/Caramel.xcodeproj \
-            -scheme "Caramel (iOS)" \
+            -project SafariExtProject/${{ env.APP_NAME }}/${{ env.APP_NAME }}.xcodeproj \
+            -scheme "${{ env.APP_NAME }} (iOS)" \
             -destination "generic/platform=iOS" \
             -configuration Release \
-            -archivePath SafariExtProject/Caramel-ios.xcarchive \
+            -archivePath SafariExtProject/${{ env.APP_NAME }}-ios.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${{ env.IOS_VERSION_NAME }}" \
@@ -333,8 +250,6 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-
-      # ---------- write exportOptions plists ----------
       - name: Write exportOptions (macOS)
         run: |
           cat > /tmp/exportOptionsMac.plist <<'EOF'
@@ -348,7 +263,6 @@ jobs:
           </dict>
           </plist>
           EOF
-
       - name: Write exportOptions (iOS)
         run: |
           cat > /tmp/exportOptionsIOS.plist <<'EOF'
@@ -362,12 +276,10 @@ jobs:
           </dict>
           </plist>
           EOF
-
-      # ---------- exports ----------
       - name: Export (macOS)
         run: |
           xcodebuild -exportArchive \
-            -archivePath SafariExtProject/Caramel-macos.xcarchive \
+            -archivePath SafariExtProject/${{ env.APP_NAME }}-macos.xcarchive \
             -exportOptionsPlist /tmp/exportOptionsMac.plist \
             -exportPath SafariExtProject/Exported-macos \
             -allowProvisioningUpdates \
@@ -376,11 +288,10 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
-            -archivePath SafariExtProject/Caramel-ios.xcarchive \
+            -archivePath SafariExtProject/${{ env.APP_NAME }}-ios.xcarchive \
             -exportOptionsPlist /tmp/exportOptionsIOS.plist \
             -exportPath SafariExtProject/Exported-ios \
             -allowProvisioningUpdates \
@@ -389,22 +300,19 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-
-      # ---------- uploads ----------
       - name: Upload macOS pkg to App Store Connect
         env:
           ALTOOL_USER: ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
-            -f SafariExtProject/Exported-macos/Caramel.pkg \
+            -f SafariExtProject/Exported-macos/${{ env.APP_NAME }}.pkg \
             -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
-
       - name: Upload iOS ipa to App Store Connect
         env:
           ALTOOL_USER: ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
-            -f SafariExtProject/Exported-ios/Caramel.ipa \
+            -f SafariExtProject/Exported-ios/${{ env.APP_NAME }}.ipa \
             -t ios -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose

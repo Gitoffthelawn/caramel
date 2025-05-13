@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# This script generates properly formatted icons for Safari from a single source icon
-# It requires ImageMagick to be installed (brew install imagemagick)
+# Generating properly formatted icons for Safari from a single source icon
+# Requires ImageMagick to be installed
 
 # Check if ImageMagick is installed
 if ! command -v convert &> /dev/null; then
@@ -11,10 +11,10 @@ if ! command -v convert &> /dev/null; then
 fi
 
 # Source icon path (should be at least 1024x1024)
-SOURCE_ICON=${1:-"caramel-extension/icons/original.png"}
+SOURCE_ICON=${1:-"icons/original.png"}
 
 # Output directory
-OUTPUT_DIR="caramel-extension/safari-icons"
+OUTPUT_DIR="safari-icons"
 mkdir -p "$OUTPUT_DIR"
 
 # Generate icons with proper rounding for macOS/iOS
@@ -25,11 +25,11 @@ echo "Generating Safari icons from $SOURCE_ICON"
 
 for size in "${ICON_SIZES[@]}"; do
   echo "Creating $size×$size icon..."
-  
+
   # Create a rounded square icon with proper corner radius (following Apple's guidelines)
   # The corner radius is approximately 23% of the icon size for iOS/macOS app icons
   radius=$(echo "$size * 0.23" | bc)
-  
+
   convert "$SOURCE_ICON" \
     -resize ${size}x${size} \
     \( +clone -alpha extract \
@@ -39,4 +39,4 @@ for size in "${ICON_SIZES[@]}"; do
     "$OUTPUT_DIR/icon_${size}x${size}.png"
 done
 
-echo "Safari icons generated in $OUTPUT_DIR" 
+echo "Safari icons generated in $OUTPUT_DIR"
