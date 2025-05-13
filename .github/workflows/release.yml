@@ -154,24 +154,24 @@ jobs:
       - name: Get latest versions for macOS and iOS
         id: get_versions
         env:
-          ASC_KEY_ID:        ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID:     ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID:         ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:      ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
         run: |
           echo "Fetching latest builds from TestFlight..."
 
-          # write the .p8 key into the standard lookup dir
+          # Write the .p8 key into the standard lookup dir
           mkdir -p private_keys
           echo "${ASC_API_KEY_BASE64}" \
             | base64 --decode \
             > private_keys/AuthKey_${ASC_KEY_ID}.p8
 
-          # export the vars the CLI actually reads:
+          # Export the vars the CLI actually reads
           export APPSTORE_CONNECT_API_KEY_ID="${ASC_KEY_ID}"
           export APPSTORE_CONNECT_ISSUER_ID="${ASC_ISSUER_ID}"
           export APPSTORE_CONNECT_API_KEY="$(cat private_keys/AuthKey_${ASC_KEY_ID}.p8)"
 
-          # now call asc (no --api-key-path)
+          # List all recent builds as JSON
           asc testflight builds list \
             --filter-bundle-ids "${SAFARI_BUNDLE_ID}" \
             --include-expired \
@@ -182,78 +182,60 @@ jobs:
 
           echo "Raw builds JSON:"
           cat builds.json || true
-          
-          # Filter and sort macOS build
+
+          # ── macOS ────────────────────────────────────────────────────────
           echo "Filtering latest macOS build..."
-          jq '[.data[] | select(.attributes.platform == "MACOS")] | sort_by(.attributes.uploadedDate) | .[-1]' builds.json > latest_macos_build.json || true
+          jq '[.[] | select(.platform == "MAC_OS")] | sort_by(.uploadedDate) | .[-1]' \
+            builds.json > latest_macos_build.json || true
           echo "macOS build JSON:"
           cat latest_macos_build.json || true
+
           if [ ! -s latest_macos_build.json ]; then
             echo "Warning: Could not retrieve macOS build, using defaults"
             MACOS_CURRENT_VERSION="1.0.0"
             MACOS_CURRENT_BUILD="1"
           else
-            MACOS_CURRENT_BUILD=$(jq -r '.attributes.version // "1"' < latest_macos_build.json)
-            MACOS_CURRENT_VERSION=$(jq -r '.relationships.preReleaseVersion.data.attributes.version // "1.0.0"' < latest_macos_build.json)
-            if [ -z "$MACOS_CURRENT_VERSION" ] || [ "$MACOS_CURRENT_VERSION" = "null" ]; then
-              echo "Warning: Could not retrieve macOS version, using 1.0.0"
-              MACOS_CURRENT_VERSION="1.0.0"
-            fi
-            if [ -z "$MACOS_CURRENT_BUILD" ] || [ "$MACOS_CURRENT_BUILD" = "null" ]; then
-              echo "Warning: Could not retrieve macOS build number, using 1"
-              MACOS_CURRENT_BUILD="1"
-            fi
+            MACOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"'   < latest_macos_build.json)
+            MACOS_CURRENT_VERSION=$(jq -r '.version     // "1.0.0"' < latest_macos_build.json)
           fi
 
-          # Filter and sort iOS build
+          # ── iOS ──────────────────────────────────────────────────────────
           echo "Filtering latest iOS build..."
-          jq '[.data[] | select(.attributes.platform == "IOS")] | sort_by(.attributes.uploadedDate) | .[-1]' builds.json > latest_ios_build.json || true
+          jq '[.[] | select(.platform == "IOS")] | sort_by(.uploadedDate) | .[-1]' \
+            builds.json > latest_ios_build.json || true
           echo "iOS build JSON:"
           cat latest_ios_build.json || true
+
           if [ ! -s latest_ios_build.json ]; then
             echo "Warning: Could not retrieve iOS build, using defaults"
             IOS_CURRENT_VERSION="1.0.0"
             IOS_CURRENT_BUILD="1"
           else
-            IOS_CURRENT_BUILD=$(jq -r '.attributes.version // "1"' < latest_ios_build.json)
-            IOS_CURRENT_VERSION=$(jq -r '.relationships.preReleaseVersion.data.attributes.version // "1.0.0"' < latest_ios_build.json)
-            if [ -z "$IOS_CURRENT_VERSION" ] || [ "$IOS_CURRENT_VERSION" = "null" ]; then
-              echo "Warning: Could not retrieve iOS version, using 1.0.0"
-              IOS_CURRENT_VERSION="1.0.0"
-            fi
-            if [ -z "$IOS_CURRENT_BUILD" ] || [ "$IOS_CURRENT_BUILD" = "null" ]; then
-              echo "Warning: Could not retrieve iOS build number, using 1"
-              IOS_CURRENT_BUILD="1"
-            fi
+            IOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_ios_build.json)
+            IOS_CURRENT_VERSION=$(jq -r '.version      // "1.0.0"' < latest_ios_build.json)
           fi
 
-          # Increment macOS version and build
-          major=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f1)
-          minor=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f2)
-          patch=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f3)
+          # ── Bump versions/build numbers ──────────────────────────────────
+          # macOS
+          IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
           patch=$((patch + 1))
           MACOS_VERSION="${major}.${minor}.${patch}"
           MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-
-          # Increment iOS version and build
-          major=$(echo "$IOS_CURRENT_VERSION" | cut -d. -f1)
-          minor=$(echo "$IOS_CURRENT_VERSION" | cut -d. -f2)
-          patch=$(echo "$IOS_CURRENT_VERSION" | cut -d. -f3)
+          # iOS
+          IFS='.' read -r major minor patch <<< "$IOS_CURRENT_VERSION"
           patch=$((patch + 1))
           IOS_VERSION="${major}.${minor}.${patch}"
           IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
 
-          echo "macOS: Current version: $MACOS_CURRENT_VERSION, build: $MACOS_CURRENT_BUILD"
-          echo "macOS: New version: $MACOS_VERSION, build: $MACOS_BUILD"
-          echo "iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
-          echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
+          # ── Summary & export ─────────────────────────────────────────────
+          echo "macOS: Current $MACOS_CURRENT_VERSION (#$MACOS_CURRENT_BUILD) → New $MACOS_VERSION (#$MACOS_BUILD)"
+          echo "iOS:   Current $IOS_CURRENT_VERSION (#$IOS_CURRENT_BUILD) → New $IOS_VERSION (#$IOS_BUILD)"
 
-
-          # Set environment variables
-          echo "IOS_VERSION_NAME=$IOS_VERSION" >> $GITHUB_ENV
-          echo "IOS_BUILD_NUM=$IOS_BUILD" >> $GITHUB_ENV
+          echo "IOS_VERSION_NAME=$IOS_VERSION"     >> $GITHUB_ENV
+          echo "IOS_BUILD_NUM=$IOS_BUILD"         >> $GITHUB_ENV
           echo "MACOS_VERSION_NAME=$MACOS_VERSION" >> $GITHUB_ENV
-          echo "MACOS_BUILD_NUM=$MACOS_BUILD" >> $GITHUB_ENV
+          echo "MACOS_BUILD_NUM=$MACOS_BUILD"     >> $GITHUB_ENV
+
 
       # ------- Certificates -------
       - name: Import distribution cert
