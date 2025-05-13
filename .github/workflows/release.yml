@@ -119,6 +119,11 @@ jobs:
     name: "🚀 Publish to Apple App Store (Safari & iOS)"
     needs: package
     runs-on: macos-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     timeout-minutes: 30
     defaults:
       run:
@@ -246,12 +251,6 @@ jobs:
       - name: Update Safari icons
         run: /tmp/safari-icon-scripts/update-safari-icons.sh
 
-      - name: Upload full Safari Xcode project
-        uses: actions/upload-artifact@v4
-        with:
-          name: safari-xcode-project
-          path: ${{ env.WORKING_DIRECTORY }}/SafariExtProject
-
       - name: Clean up script files from project
         run: find SafariExtProject -name "*.sh" -delete
 
@@ -281,8 +280,8 @@ jobs:
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
 
       - name: Build & archive (iOS)
         run: |
@@ -299,8 +298,8 @@ jobs:
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
 
       - name: Write exportOptions (macOS)
         run: |
@@ -338,8 +337,8 @@ jobs:
             -exportPath SafariExtProject/Exported-macos \
             -allowProvisioningUpdates \
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
 
       - name: Export (iOS)
         run: |
@@ -349,8 +348,8 @@ jobs:
             -exportPath SafariExtProject/Exported-ios \
             -allowProvisioningUpdates \
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
 
       - name: Upload macOS pkg to App Store Connect
         env:
