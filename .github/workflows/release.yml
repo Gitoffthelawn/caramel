@@ -120,14 +120,14 @@ jobs:
       - name: Generate Safari icons
         run: |
           /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
-          
+
       # ------- Upload generated Xcode asset catalogs -------
       - name: Upload generated Xcode asset catalogs
         uses: actions/upload-artifact@v4
         with:
           name: safari-xcassets
           path: |
-            SafariExtProject/Caramel/**/*.xcassets
+            caramel-extension/SafariExtProject/**/*.xcassets
 
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
