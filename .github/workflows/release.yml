@@ -48,8 +48,8 @@ jobs:
 
       - name: Create secrets file
         run: |
-          mkdir -p tmp
-          cd tmp
+          mkdir -p $GITHUB_WORKSPACE/tmp
+          cd $GITHUB_WORKSPACE/tmp
           echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}"    > secrets.txt
           echo "ASC_KEY_ID=${ASC_KEY_ID}"                  >> secrets.txt
           echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}"            >> secrets.txt
@@ -65,28 +65,35 @@ jobs:
           echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> secrets.txt
           echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"    >> secrets.txt
           echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"            >> secrets.txt
+        shell: /usr/bin/bash -e {0}
         env:
-          ASC_API_KEY_BASE64:   ${{ secrets.ASC_API_KEY_BASE64 }}
-          ASC_KEY_ID:           ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID:        ${{ secrets.ASC_ISSUER_ID }}
-          CHROME_EXTENSION_ID:  ${{ secrets.CHROME_EXTENSION_ID }}
-          CHROME_CLIENT_ID:     ${{ secrets.CHROME_CLIENT_ID }}
+          SAFARI_BUNDLE_ID: com.devino.Caramel
+          WORKING_DIRECTORY: caramel-extension
+          APP_NAME: Caramel
+          MAC_CATEGORY: public.app-category.utilities
+          CUSTOM_VERSION: dev
+          PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          ALTOOL_USER:          ${{ secrets.APPLE_ID }}
-          ALTOOL_PASSWORD:      ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_CERT_P12:       ${{ secrets.APPLE_CERT_P12 }}
-          APPLE_CERT_PASSWORD:  ${{ secrets.APPLE_CERT_PASSWORD }}
-          APPLE_DEV_CERT_P12:   ${{ secrets.APPLE_DEV_CERT_P12 }}
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_DEV_CERT_P12: ${{ secrets.APPLE_DEV_CERT_P12 }}
           APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-          KEYCHAIN_PASSWORD:    ${{ secrets.KEYCHAIN_PASSWORD }}
-          APPLE_TEAM_ID:        ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
       - name: Upload secrets file as artifact
         uses: actions/upload-artifact@v4
         with:
           name: secrets-file
           path: tmp/secrets.txt
-
 
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
