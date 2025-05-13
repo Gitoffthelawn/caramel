@@ -145,18 +145,24 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_PATH: /tmp/AuthKey.p8
         run: |
-          # Get latest macOS build from TestFlight
-          echo "Fetching latest macOS build from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --filter-platform MACOS --limit 1 --sort -uploadedDate > latest_macos_build.json || true
+          # Get latest builds for the Bundle ID
+          echo "Fetching latest builds from TestFlight..."
+          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --limit 10 --sort -uploadedDate > builds.json || true
+          echo "Raw builds JSON:"
+          cat builds.json || true
+
+          # Filter macOS build
+          echo "Filtering latest macOS build..."
+          jq '[.data[] | select(.attributes.platform == "MACOS")] | sort_by(.attributes.uploadedDate) | last' builds.json > latest_macos_build.json || true
           echo "macOS build JSON:"
           cat latest_macos_build.json || true
-          if [ $? -ne 0 ] || [ ! -s latest_macos_build.json ]; then
+          if [ ! -s latest_macos_build.json ]; then
             echo "Warning: Could not retrieve macOS build, using defaults"
             MACOS_CURRENT_VERSION="1.0.0"
             MACOS_CURRENT_BUILD="1"
           else
-            MACOS_CURRENT_BUILD=$(jq -r '.data[0].attributes.version // "1"' < latest_macos_build.json)
-            MACOS_CURRENT_VERSION=$(jq -r '.data[0].relationships."preReleaseVersion".data.attributes.version // "1.0.0"' < latest_macos_build.json)
+            MACOS_CURRENT_BUILD=$(jq -r '.attributes.version // "1"' < latest_macos_build.json)
+            MACOS_CURRENT_VERSION=$(jq -r '.relationships.preReleaseVersion.data.attributes.version // "1.0.0"' < latest_macos_build.json)
             if [ -z "$MACOS_CURRENT_VERSION" ] || [ "$MACOS_CURRENT_VERSION" = "null" ]; then
               echo "Warning: Could not retrieve macOS version, using 1.0.0"
               MACOS_CURRENT_VERSION="1.0.0"
@@ -167,18 +173,18 @@ jobs:
             fi
           fi
 
-          # Get latest iOS build from TestFlight
-          echo "Fetching latest iOS build from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --filter-platform IOS --limit 1 --sort -uploadedDate > latest_ios_build.json || true
+          # Filter iOS build
+          echo "Filtering latest iOS build..."
+          jq '[.data[] | select(.attributes.platform == "IOS")] | sort_by(.attributes.uploadedDate) | last' builds.json > latest_ios_build.json || true
           echo "iOS build JSON:"
           cat latest_ios_build.json || true
-          if [ $? -ne 0 ] || [ ! -s latest_ios_build.json ]; then
+          if [ ! -s latest_ios_build.json ]; then
             echo "Warning: Could not retrieve iOS build, using defaults"
             IOS_CURRENT_VERSION="1.0.0"
             IOS_CURRENT_BUILD="1"
           else
-            IOS_CURRENT_BUILD=$(jq -r '.data[0].attributes.version // "1"' < latest_ios_build.json)
-            IOS_CURRENT_VERSION=$(jq -r '.data[0].relationships."preReleaseVersion".data.attributes.version // "1.0.0"' < latest_ios_build.json)
+            IOS_CURRENT_BUILD=$(jq -r '.attributes.version // "1"' < latest_ios_build.json)
+            IOS_CURRENT_VERSION=$(jq -r '.relationships.preReleaseVersion.data.attributes.version // "1.0.0"' < latest_ios_build.json)
             if [ -z "$IOS_CURRENT_VERSION" ] || [ "$IOS_CURRENT_VERSION" = "null" ]; then
               echo "Warning: Could not retrieve iOS version, using 1.0.0"
               IOS_CURRENT_VERSION="1.0.0"
