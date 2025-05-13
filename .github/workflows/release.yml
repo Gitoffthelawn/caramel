@@ -158,15 +158,17 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           echo "Fetching latest builds from TestFlight..."
+          
+          # make sure your .p8 lives in ./private_keys/AuthKey_<KEY_ID>.p8 (or set APPSTORE_CONNECT_API_KEY)
+          mkdir -p private_keys
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode > private_keys/AuthKey_${ASC_KEY_ID}.p8
+  
           asc testflight builds list \
             --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" \
             --include-expired \
             --limit 10 \
             --api-key-id "${{ secrets.ASC_KEY_ID }}" \
-            --api-issuer-id "${{ secrets.ASC_ISSUER_ID }}" \
-            --api-key-path "/tmp/AuthKey_${ASC_KEY_ID}.p8" > builds.json || true
-          echo "Raw builds JSON:"
-          cat builds.json || true
+            --api-issuer "${{ secrets.ASC_ISSUER_ID }}" > builds.json || true
 
           # Filter and sort macOS build
           echo "Filtering latest macOS build..."
