@@ -3,7 +3,7 @@ name: Release – Extension
 on:
   pull_request:
     types: [closed]
-    branches: [dev]
+    branches: [main]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
@@ -18,15 +18,8 @@ jobs:
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
-    if: >
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.head.ref == 'dev' &&
-      (
-        contains(toLower(github.event.pull_request.title), 'fix') ||
-        contains(toLower(github.event.pull_request.title), 'feature') ||
-        contains(toLower(github.event.pull_request.title), 'major')
-      )
+    # only run when a PR into main is merged
+    if: github.event.pull_request.merged == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -60,17 +53,20 @@ jobs:
 
       - name: Create secrets file
         run: |
+          mkdir -p "${{ env.WORKING_DIRECTORY }}"
+          cd "${{ env.WORKING_DIRECTORY }}"
+
           echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}"    > secrets.txt
           echo "ASC_KEY_ID=${ASC_KEY_ID}"                  >> secrets.txt
           echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}"            >> secrets.txt
-          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}">> secrets.txt
+          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}" >> secrets.txt
           echo "CHROME_CLIENT_ID=${CHROME_CLIENT_ID}"      >> secrets.txt
           echo "CHROME_CLIENT_SECRET=${CHROME_CLIENT_SECRET}" >> secrets.txt
           echo "CHROME_REFRESH_TOKEN=${CHROME_REFRESH_TOKEN}" >> secrets.txt
           echo "APPLE_ID=${ALTOOL_USER}"                   >> secrets.txt
           echo "APPLE_APP_PASSWORD=${ALTOOL_PASSWORD}"     >> secrets.txt
           echo "APPLE_CERT_P12=${APPLE_CERT_P12}"          >> secrets.txt
-          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}">> secrets.txt
+          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}" >> secrets.txt
           echo "APPLE_DEV_CERT_P12=${APPLE_DEV_CERT_P12}"  >> secrets.txt
           echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> secrets.txt
           echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"    >> secrets.txt
@@ -129,36 +125,29 @@ jobs:
         working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Select Xcode 16
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: extension-package
           path: ${{ env.WORKING_DIRECTORY }}
-
       - name: Unzip extension
         run: unzip -q extension.zip
-
       - name: Install ImageMagick and jq
         run: |
           if ! command -v convert >/dev/null 2>&1; then brew install imagemagick; fi
           if ! command -v jq      >/dev/null 2>&1; then brew install jq; fi
-
       - name: Setup temporary scripts directory
         run: |
           mkdir -p /tmp/safari-icon-scripts
           cp ${{ github.workspace }}/.github/workflows/scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
           cp ${{ github.workspace }}/.github/workflows/scripts/update-safari-icons.sh   /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
-
       - name: Generate Safari icons
         run: /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
-
       - name: Install App Store Connect API key
         run: |
           echo "${ASC_API_KEY_BASE64}" | base64 --decode > "/tmp/AuthKey_${ASC_KEY_ID}.p8"
@@ -166,12 +155,10 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
           ASC_KEY_ID:        ${{ secrets.ASC_KEY_ID }}
-
       - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
           brew install --HEAD appstoreconnect-cli
-
       - name: Get latest versions for macOS and iOS and bump
         id: get_versions
         env:
@@ -204,9 +191,9 @@ jobs:
           ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.uploadedDate) | .[-1]' builds.json)
 
           MACOS_CURRENT_VERSION=$( echo "$mac_entry" | jq -r '.version      // "1.0.0"' )
-          MACOS_CURRENT_BUILD  $( echo "$mac_entry" | jq -r '.buildNumber // "1"' )
+          MACOS_CURRENT_BUILD=$( echo "$mac_entry" | jq -r '.buildNumber // "1"' )
           IOS_CURRENT_VERSION=$( echo "$ios_entry" | jq -r '.version      // "1.0.0"' )
-          IOS_CURRENT_BUILD   $( echo "$ios_entry" | jq -r '.buildNumber // "1"' )
+          IOS_CURRENT_BUILD=$( echo "$ios_entry" | jq -r '.buildNumber // "1"' )
 
           IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
           case "$bump" in
