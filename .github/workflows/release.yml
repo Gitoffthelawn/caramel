@@ -157,9 +157,14 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          # Get latest builds for the Bundle ID
           echo "Fetching latest builds from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 --api-issuer "${{ secrets.ASC_ISSUER_ID }}" --api-key-id "${{ secrets.ASC_KEY_ID }}" > builds.json || true
+          asc testflight builds list \
+            --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" \
+            --include-expired \
+            --limit 10 \
+            --api-key-id "${{ secrets.ASC_KEY_ID }}" \
+            --api-issuer-id "${{ secrets.ASC_ISSUER_ID }}" \
+            --api-key-path "/tmp/AuthKey_${ASC_KEY_ID}.p8" > builds.json || true
           echo "Raw builds JSON:"
           cat builds.json || true
 
@@ -225,8 +230,9 @@ jobs:
 
           echo "macOS: Current version: $MACOS_CURRENT_VERSION, build: $MACOS_CURRENT_BUILD"
           echo "macOS: New version: $MACOS_VERSION, build: $MACOS_BUILD"
-          iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
+          echo "iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
           echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
+
 
           # Set environment variables
           echo "IOS_VERSION_NAME=$IOS_VERSION" >> $GITHUB_ENV
