@@ -122,7 +122,7 @@ jobs:
           brew install --HEAD appstoreconnect-cli
 
       # ------- Get latest versions from App Store Connect -------
-      - name: Get latest versions from App Store Connect
+      - name: Get latest versions for macOS and set iOS versions
         id: get_versions
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -130,79 +130,44 @@ jobs:
           ASC_KEY_PATH: /tmp/AuthKey.p8
           APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
         run: |
-          # Function to increment version
-          increment_version() {
-            local version=$1
-            
-            # Split version into components
-            local major=$(echo $version | cut -d. -f1)
-            local minor=$(echo $version | cut -d. -f2)
-            local patch=$(echo $version | cut -d. -f3)
-            
-            # Increment patch version
-            patch=$((patch + 1))
-            echo "${major}.${minor}.${patch}"
-          }
-          
-          # Get iOS versions
-          echo "Fetching iOS app versions..."
-          IOS_VERSIONS=$(asc app versions list --app-id $APPLE_APP_ID --platform IOS --json)
-          if [ $? -ne 0 ]; then
-            echo "Error fetching iOS versions"
-            exit 1
-          fi
-          
-          # Get macOS versions
-          echo "Fetching macOS app versions..."
-          MACOS_VERSIONS=$(asc app versions list --app-id $APPLE_APP_ID --platform MACOS --json)
-          if [ $? -ne 0 ]; then
-            echo "Error fetching macOS versions"
-            exit 1
-          fi
-          
-          # Extract latest iOS version and build
-          IOS_CURRENT_VERSION=$(echo "$IOS_VERSIONS" | jq -r 'sort_by(.version) | last | .version')
-          IOS_CURRENT_BUILD=$(echo "$IOS_VERSIONS" | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
-          
-          # Extract latest macOS version and build
-          MACOS_CURRENT_VERSION=$(echo "$MACOS_VERSIONS" | jq -r 'sort_by(.version) | last | .version')
-          MACOS_CURRENT_BUILD=$(echo "$MACOS_VERSIONS" | jq -r 'sort_by(.buildNumber | tonumber) | last | .buildNumber')
-          
-          # Validate and set defaults only if truly needed
-          if [ -z "$IOS_CURRENT_VERSION" ] || [ "$IOS_CURRENT_VERSION" = "null" ]; then
-            echo "Warning: Could not retrieve iOS version, using 1.0.0"
-            IOS_CURRENT_VERSION="1.0.0"
-          fi
-          
-          if [ -z "$IOS_CURRENT_BUILD" ] || [ "$IOS_CURRENT_BUILD" = "null" ]; then
-            echo "Warning: Could not retrieve iOS build number, using 1"
-            IOS_CURRENT_BUILD="1"
-          fi
-          
-          if [ -z "$MACOS_CURRENT_VERSION" ] || [ "$MACOS_CURRENT_VERSION" = "null" ]; then
-            echo "Warning: Could not retrieve macOS version, using 1.0.0"
+          # Get latest macOS build from TestFlight
+          echo "Fetching latest macOS build from TestFlight..."
+          asc testflight builds list --filter-app-id "$APPLE_APP_ID" --filter-platform MACOS --limit 1 --sort -uploadedDate > latest_build.json
+          if [ $? -ne 0 ] || [ ! -s latest_build.json ]; then
+            echo "Warning: Could not retrieve macOS build, using defaults"
             MACOS_CURRENT_VERSION="1.0.0"
-          fi
-          
-          if [ -z "$MACOS_CURRENT_BUILD" ] || [ "$MACOS_CURRENT_BUILD" = "null" ]; then
-            echo "Warning: Could not retrieve macOS build number, using 1"
             MACOS_CURRENT_BUILD="1"
+          else
+            MACOS_CURRENT_BUILD=$(jq -r '.data[0].attributes.version' < latest_build.json)
+            MACOS_CURRENT_VERSION=$(jq -r '.data[0].relationships."preReleaseVersion".data.attributes.version' < latest_build.json)
+            if [ -z "$MACOS_CURRENT_VERSION" ] || [ "$MACOS_CURRENT_VERSION" = "null" ]; then
+              echo "Warning: Could not retrieve macOS version, using 1.0.0"
+              MACOS_CURRENT_VERSION="1.0.0"
+            fi
+            if [ -z "$MACOS_CURRENT_BUILD" ] || [ "$MACOS_CURRENT_BUILD" = "null" ]; then
+              echo "Warning: Could not retrieve macOS build number, using 1"
+              MACOS_CURRENT_BUILD="1"
+            fi
           fi
-          
-          # Increment versions
-          IOS_VERSION=$(increment_version "$IOS_CURRENT_VERSION")
-          IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
-          
-          MACOS_VERSION=$(increment_version "$MACOS_CURRENT_VERSION")
+
+          # Increment macOS version and build
+          # Split version into components (e.g., 1.2.3)
+          major=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f1)
+          minor=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f2)
+          patch=$(echo "$MACOS_CURRENT_VERSION" | cut -d. -f3)
+          patch=$((patch + 1))
+          MACOS_VERSION="${major}.${minor}.${patch}"
           MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-          
-          echo "iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
-          echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
-          
+
+          # Set iOS version and build (simplified using run number)
+          IOS_VERSION="1.0.0"  # Static or derive from Git tag if needed
+          IOS_BUILD="${{ github.run_number }}"
+
           echo "macOS: Current version: $MACOS_CURRENT_VERSION, build: $MACOS_CURRENT_BUILD"
           echo "macOS: New version: $MACOS_VERSION, build: $MACOS_BUILD"
-          
-          # Set environment variables for later use
+          echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
+
+          # Set environment variables
           echo "IOS_VERSION_NAME=$IOS_VERSION" >> $GITHUB_ENV
           echo "IOS_BUILD_NUM=$IOS_BUILD" >> $GITHUB_ENV
           echo "MACOS_VERSION_NAME=$MACOS_VERSION" >> $GITHUB_ENV
