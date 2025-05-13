@@ -1,18 +1,15 @@
 name: Release – Extension
 
 on:
-  push:
-    branches: [ main, dev ]
-    tags:
-      - "v[0-9]+.[0-9]+"  # Matches v1.1, v1.2
-      - "v[0-9]+.[0-9]+.[0-9]+"  # Matches v1.1.0, v2.0.1
+  pull_request:
+    types: [closed]
+    branches: [dev]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
-  APP_NAME: ${{ vars.APP_NAME }}
-  MAC_CATEGORY: ${{ vars.MAC_CATEGORY }}
-  CUSTOM_VERSION: ${{ vars.CUSTOM_VERSION || github.ref_name }}
+  APP_NAME:      ${{ vars.APP_NAME }}
+  MAC_CATEGORY:  ${{ vars.MAC_CATEGORY }}
 
 jobs:
   package:
@@ -20,80 +17,86 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIRECTORY || github.workspace }}
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'dev' &&
+      (
+        contains(toLower(github.event.pull_request.title), 'fix') ||
+        contains(toLower(github.event.pull_request.title), 'feature') ||
+        contains(toLower(github.event.pull_request.title), 'major')
+      )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ${{ env.WORKING_DIRECTORY || github.workspace }}/pnpm-lock.yaml
+          cache-dependency-path: ${{ env.WORKING_DIRECTORY }}/pnpm-lock.yaml
+
       - name: Install dependencies
         run: pnpm install
+
       - name: Build extension
         run: pnpm run build
+
       - name: Package extension
         run: pnpm run package
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: extension-package
-          path: ${{ env.WORKING_DIRECTORY || github.workspace }}/extension.zip
+          path: ${{ env.WORKING_DIRECTORY }}/extension.zip
 
       - name: Create secrets file
         run: |
-          mkdir -p $GITHUB_WORKSPACE/tmp
-          cd $GITHUB_WORKSPACE/tmp
           echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}"    > secrets.txt
           echo "ASC_KEY_ID=${ASC_KEY_ID}"                  >> secrets.txt
           echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}"            >> secrets.txt
-          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}" >> secrets.txt
+          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}">> secrets.txt
           echo "CHROME_CLIENT_ID=${CHROME_CLIENT_ID}"      >> secrets.txt
           echo "CHROME_CLIENT_SECRET=${CHROME_CLIENT_SECRET}" >> secrets.txt
           echo "CHROME_REFRESH_TOKEN=${CHROME_REFRESH_TOKEN}" >> secrets.txt
           echo "APPLE_ID=${ALTOOL_USER}"                   >> secrets.txt
           echo "APPLE_APP_PASSWORD=${ALTOOL_PASSWORD}"     >> secrets.txt
           echo "APPLE_CERT_P12=${APPLE_CERT_P12}"          >> secrets.txt
-          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}" >> secrets.txt
+          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}">> secrets.txt
           echo "APPLE_DEV_CERT_P12=${APPLE_DEV_CERT_P12}"  >> secrets.txt
           echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> secrets.txt
           echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"    >> secrets.txt
           echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"            >> secrets.txt
-        shell: /usr/bin/bash -e {0}
         env:
-          SAFARI_BUNDLE_ID: com.devino.Caramel
-          WORKING_DIRECTORY: caramel-extension
-          APP_NAME: Caramel
-          MAC_CATEGORY: public.app-category.utilities
-          CUSTOM_VERSION: dev
-          PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
-          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          ASC_API_KEY_BASE64:   ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_KEY_ID:           ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:        ${{ secrets.ASC_ISSUER_ID }}
+          CHROME_EXTENSION_ID:  ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID:     ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          ALTOOL_USER: ${{ secrets.APPLE_ID }}
-          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
-          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-          APPLE_DEV_CERT_P12: ${{ secrets.APPLE_DEV_CERT_P12 }}
+          ALTOOL_USER:          ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD:      ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_CERT_P12:       ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD:  ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_DEV_CERT_P12:   ${{ secrets.APPLE_DEV_CERT_P12 }}
           APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD:    ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID:        ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload secrets file as artifact
         uses: actions/upload-artifact@v4
         with:
           name: secrets-file
-          path: tmp/secrets.txt
+          path: ${{ env.WORKING_DIRECTORY }}/secrets.txt
 
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
@@ -105,12 +108,13 @@ jobs:
         with:
           name: extension-package
           path: .
+
       - name: Upload to Chrome Web Store (upload-only)
         uses: mnao305/chrome-extension-upload@v5.0.0
         with:
           file-path: extension.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-id:    ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: false
@@ -122,139 +126,128 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIRECTORY || github.workspace }}
+        working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Select Xcode 16
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: extension-package
-          path: ${{ env.WORKING_DIRECTORY || github.workspace }}
+          path: ${{ env.WORKING_DIRECTORY }}
+
       - name: Unzip extension
         run: unzip -q extension.zip
+
       - name: Install ImageMagick and jq
         run: |
-          if ! command -v convert >/dev/null 2>&1; then
-            echo "Installing ImageMagick..."
-            brew install imagemagick
-          else
-            echo "ImageMagick already installed"
-          fi
-          if ! command -v jq >/dev/null 2>&1; then
-            echo "Installing jq..."
-            brew install jq
-          else
-            echo "jq already installed"
-          fi
+          if ! command -v convert >/dev/null 2>&1; then brew install imagemagick; fi
+          if ! command -v jq      >/dev/null 2>&1; then brew install jq; fi
+
       - name: Setup temporary scripts directory
         run: |
           mkdir -p /tmp/safari-icon-scripts
           cp ${{ github.workspace }}/.github/workflows/scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
-          cp ${{ github.workspace }}/.github/workflows/scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
+          cp ${{ github.workspace }}/.github/workflows/scripts/update-safari-icons.sh   /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
+
       - name: Generate Safari icons
-        run: |
-          /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
+        run: /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
+
       - name: Install App Store Connect API key
         run: |
           echo "${ASC_API_KEY_BASE64}" | base64 --decode > "/tmp/AuthKey_${ASC_KEY_ID}.p8"
           ls -l "/tmp/AuthKey_${ASC_KEY_ID}.p8"
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_ID:        ${{ secrets.ASC_KEY_ID }}
+
       - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
           brew install --HEAD appstoreconnect-cli
-      - name: Get latest versions for macOS and iOS
+
+      - name: Get latest versions for macOS and iOS and bump
         id: get_versions
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID:         ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:      ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          SAFARI_BUNDLE_ID:   ${{ env.SAFARI_BUNDLE_ID }}
+          PR_TITLE:           ${{ github.event.pull_request.title }}
         run: |
-          echo "Fetching latest builds from TestFlight..."
+          bump="patch"
+          title=$(echo "$PR_TITLE" | tr '[:upper:]' '[:lower:]')
+          [[ "$title" == *feature* ]] && bump="minor"
+          [[ "$title" == *major*   ]] && bump="major"
+          [[ "$title" == *fix*     ]] && bump="patch"
+
           mkdir -p private_keys
-          echo "${ASC_API_KEY_BASE64}" | base64 --decode > private_keys/AuthKey_${ASC_KEY_ID}.p8
-          export APPSTORE_CONNECT_API_KEY_ID="${ASC_KEY_ID}"
-          export APPSTORE_CONNECT_ISSUER_ID="${ASC_ISSUER_ID}"
+          echo "$ASC_API_KEY_BASE64" | base64 --decode > private_keys/AuthKey_$ASC_KEY_ID.p8
+          export APPSTORE_CONNECT_API_KEY_ID="$ASC_KEY_ID"
+          export APPSTORE_CONNECT_ISSUER_ID="$ASC_ISSUER_ID"
           export APPSTORE_CONNECT_API_KEY="$(cat private_keys/AuthKey_${ASC_KEY_ID}.p8)"
+
           asc testflight builds list \
-            --filter-bundle-ids "${SAFARI_BUNDLE_ID}" \
-            --include-expired \
-            --limit 10 \
-            --api-key-id "${ASC_KEY_ID}" \
-            --api-issuer "${ASC_ISSUER_ID}" \
+            --filter-bundle-ids "$SAFARI_BUNDLE_ID" \
+            --include-expired --limit 10 \
+            --api-key-id "$ASC_KEY_ID" \
+            --api-issuer "$ASC_ISSUER_ID" \
             --json > builds.json || true
-          jq '[.[] | select(.platform == "MAC_OS")] | sort_by(.uploadedDate) | .[-1]' \
-            builds.json > latest_macos_build.json || true
-          if [ ! -s latest_macos_build.json ]; then
-            echo "Warning: Could not retrieve macOS build, using defaults"
-            MACOS_CURRENT_VERSION="1.0.0"
-            MACOS_CURRENT_BUILD="1"
-          else
-            MACOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_macos_build.json)
-            MACOS_CURRENT_VERSION=$(jq -r '.version     // "1.0.0"' < latest_macos_build.json)
-          fi
-          jq '[.[] | select(.platform == "IOS")] | sort_by(.uploadedDate) | .[-1]' \
-            builds.json > latest_ios_build.json || true
-          if [ ! -s latest_ios_build.json ]; then
-            echo "Warning: Could not retrieve iOS build, using defaults"
-            IOS_CURRENT_VERSION="1.0.0"
-            IOS_CURRENT_BUILD="1"
-          else
-            IOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_ios_build.json)
-            IOS_CURRENT_VERSION=$(jq -r '.version      // "1.0.0"' < latest_ios_build.json)
-          fi
-          # Check for custom version from tag or variable
-          if [ -n "${CUSTOM_VERSION}" ] && [[ "${CUSTOM_VERSION}" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-            CUSTOM_VERSION_WITHOUT_V=$(echo "${CUSTOM_VERSION}" | sed 's/^v//')
-            if [[ "${CUSTOM_VERSION_WITHOUT_V}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-              # For vX.Y format, append .0 to make it X.Y.0
-              CUSTOM_VERSION_WITHOUT_V="${CUSTOM_VERSION_WITHOUT_V}.0"
-            fi
-            IFS='.' read -r major minor patch <<< "${CUSTOM_VERSION_WITHOUT_V}"
-            MACOS_VERSION="${major}.${minor}.${patch}"
-            IOS_VERSION="${major}.${minor}.${patch}"
-            MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-            IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
-            echo "Using custom version from tag/variable: ${CUSTOM_VERSION_WITHOUT_V}"
-          else
-            # Default to auto-increment patch
-            IFS='.' read -r major minor patch <<< "${MACOS_CURRENT_VERSION}"
-            patch=$((patch + 1))
-            MACOS_VERSION="${major}.${minor}.${patch}"
-            MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-            IFS='.' read -r major minor patch <<< "${IOS_CURRENT_VERSION}"
-            patch=$((patch + 1))
-            IOS_VERSION="${major}.${minor}.${patch}"
-            IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
-          fi
-          echo "macOS: Current $MACOS_CURRENT_VERSION (#$MACOS_CURRENT_BUILD) → New $MACOS_VERSION (#$MACOS_BUILD)"
-          echo "iOS:   Current $IOS_CURRENT_VERSION (#$IOS_CURRENT_BUILD) → New $IOS_VERSION (#$IOS_BUILD)"
+
+          mac_entry=$(jq '[.[] | select(.platform=="MAC_OS")] | sort_by(.uploadedDate) | .[-1]' builds.json)
+          ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.uploadedDate) | .[-1]' builds.json)
+
+          MACOS_CURRENT_VERSION=$( echo "$mac_entry" | jq -r '.version      // "1.0.0"' )
+          MACOS_CURRENT_BUILD  $( echo "$mac_entry" | jq -r '.buildNumber // "1"' )
+          IOS_CURRENT_VERSION=$( echo "$ios_entry" | jq -r '.version      // "1.0.0"' )
+          IOS_CURRENT_BUILD   $( echo "$ios_entry" | jq -r '.buildNumber // "1"' )
+
+          IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
+          case "$bump" in
+            major) major=$((major+1)); minor=0; patch=0;;
+            minor) minor=$((minor+1)); patch=0;;
+            *)     patch=$((patch+1));;
+          esac
+          MACOS_VERSION="$major.$minor.$patch"
+          MACOS_BUILD=$((MACOS_CURRENT_BUILD+1))
+
+          IFS='.' read -r i_major i_minor i_patch <<< "$IOS_CURRENT_VERSION"
+          case "$bump" in
+            major) i_major=$((i_major+1)); i_minor=0; i_patch=0;;
+            minor) i_minor=$((i_minor+1)); i_patch=0;;
+            *)     i_patch=$((i_patch+1));;
+          esac
+          IOS_VERSION="$i_major.$i_minor.$i_patch"
+          IOS_BUILD=$((IOS_CURRENT_BUILD+1))
+
           echo "IOS_VERSION_NAME=$IOS_VERSION"     >> $GITHUB_ENV
           echo "IOS_BUILD_NUM=$IOS_BUILD"         >> $GITHUB_ENV
-          echo "MACOS_VERSION_NAME=$MACOS_VERSION" >> $GITHUB_ENV
+          echo "MACOS_VERSION_NAME=$MACOS_VERSION">> $GITHUB_ENV
           echo "MACOS_BUILD_NUM=$MACOS_BUILD"     >> $GITHUB_ENV
+
       - name: Import distribution cert
         uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
-          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
-          keychain: signing_temp
+          p12-password:    ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain:        signing_temp
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
           create-keychain: false
-          keychain: signing_temp
+          keychain:        signing_temp
           p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
-          p12-password: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+
       - name: Convert to Safari app (macOS & iOS)
         run: |
           xcrun safari-web-extension-converter dist \
@@ -262,23 +255,28 @@ jobs:
             --app-name "${{ env.APP_NAME }}" \
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
             --no-open --no-prompt --force --copy-resources
+
       - name: Update Safari icons
-        run: |
-          /tmp/safari-icon-scripts/update-safari-icons.sh
+        run: /tmp/safari-icon-scripts/update-safari-icons.sh
+
       - name: Upload full Safari Xcode project
         uses: actions/upload-artifact@v4
         with:
           name: safari-xcode-project
-          path: ${{ env.WORKING_DIRECTORY || github.workspace }}/SafariExtProject
+          path: ${{ env.WORKING_DIRECTORY }}/SafariExtProject
+
       - name: Clean up script files from project
-        run: |
-          find SafariExtProject -name "*.sh" -delete
+        run: find SafariExtProject -name "*.sh" -delete
+
       - name: Patch macOS Info.plist LSApplicationCategoryType
         run: |
-          find SafariExtProject/${{ env.APP_NAME }} -name Info.plist -print0 | while IFS= read -r -d '' plist; do
-            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" 2>/dev/null \
-              || /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
+          find SafariExtProject/${{ env.APP_NAME }} -name Info.plist -print0 | \
+          while IFS= read -r -d '' plist; do
+            /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string ${MAC_CATEGORY}" "$plist" \
+              2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
           done
+
       - name: Build & archive (macOS)
         run: |
           xcodebuild archive \
@@ -298,8 +296,7 @@ jobs:
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+
       - name: Build & archive (iOS)
         run: |
           xcodebuild archive \
@@ -317,8 +314,7 @@ jobs:
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+
       - name: Write exportOptions (macOS)
         run: |
           cat > /tmp/exportOptionsMac.plist <<'EOF'
@@ -332,6 +328,7 @@ jobs:
           </dict>
           </plist>
           EOF
+
       - name: Write exportOptions (iOS)
         run: |
           cat > /tmp/exportOptionsIOS.plist <<'EOF'
@@ -345,6 +342,7 @@ jobs:
           </dict>
           </plist>
           EOF
+
       - name: Export (macOS)
         run: |
           xcodebuild -exportArchive \
@@ -355,8 +353,7 @@ jobs:
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+
       - name: Export (iOS)
         run: |
           xcodebuild -exportArchive \
@@ -367,19 +364,19 @@ jobs:
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+
       - name: Upload macOS pkg to App Store Connect
         env:
-          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_USER:     ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
             -f SafariExtProject/Exported-macos/${{ env.APP_NAME }}.pkg \
             -t osx -u "$ALTOOL_USER" -p "$ALTOOL_PASSWORD" --verbose
+
       - name: Upload iOS ipa to App Store Connect
         env:
-          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_USER:     ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
