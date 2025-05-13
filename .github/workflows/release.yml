@@ -124,10 +124,11 @@ jobs:
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: |
-          echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
-          ls -l /tmp/AuthKey.p8
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode > "/tmp/AuthKey_${ASC_KEY_ID}.p8"
+          ls -l "/tmp/AuthKey_${ASC_KEY_ID}.p8"
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
 
       # ------- Install App Store Connect CLI -------
       - name: Install App Store Connect CLI
@@ -144,7 +145,7 @@ jobs:
         run: |
           echo "ASC_KEY_ID is set: ${ASC_KEY_ID:+true}"
           echo "ASC_ISSUER_ID is set: ${ASC_ISSUER_ID:+true}"
-          echo "ASC_KEY_PATH exists: $(test -f /tmp/AuthKey.p8 && echo true || echo false)"
+          echo "ASC_KEY_PATH exists: $(test -f "/tmp/AuthKey_${ASC_KEY_ID}.p8" && echo true || echo false)"
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -155,11 +156,10 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_PATH: /tmp/AuthKey.p8
         run: |
           # Get latest builds for the Bundle ID
           echo "Fetching latest builds from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 --api-issuer "${{ secrets.ASC_ISSUER_ID }}" --api-key-id "${{ secrets.ASC_KEY_ID }}" --private-key "@file:/tmp/AuthKey.p8" > builds.json || true
+          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 --api-issuer "${{ secrets.ASC_ISSUER_ID }}" --api-key-id "${{ secrets.ASC_KEY_ID }}" > builds.json || true
           echo "Raw builds JSON:"
           cat builds.json || true
 
@@ -225,7 +225,7 @@ jobs:
 
           echo "macOS: Current version: $MACOS_CURRENT_VERSION, build: $MACOS_CURRENT_BUILD"
           echo "macOS: New version: $MACOS_VERSION, build: $MACOS_BUILD"
-          echo "iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
+          iOS: Current version: $IOS_CURRENT_VERSION, build: $IOS_CURRENT_BUILD"
           echo "iOS: New version: $IOS_VERSION, build: $IOS_BUILD"
 
           # Set environment variables
@@ -298,9 +298,11 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
+            -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
 
       # ---------- iOS archive ----------
       - name: Build & archive (iOS)
@@ -317,9 +319,11 @@ jobs:
             CURRENT_PROJECT_VERSION="${{ env.IOS_BUILD_NUM }}" \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
+            -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
 
       # ---------- write exportOptions plists ----------
       - name: Write exportOptions (macOS)
@@ -358,9 +362,11 @@ jobs:
             -exportOptionsPlist /tmp/exportOptionsMac.plist \
             -exportPath SafariExtProject/Exported-macos \
             -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
+            -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
 
       - name: Export (iOS)
         run: |
@@ -369,9 +375,11 @@ jobs:
             -exportOptionsPlist /tmp/exportOptionsIOS.plist \
             -exportPath SafariExtProject/Exported-ios \
             -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/AuthKey.p8 \
+            -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
 
       # ---------- uploads ----------
       - name: Upload macOS pkg to App Store Connect
