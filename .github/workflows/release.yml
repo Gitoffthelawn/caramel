@@ -123,7 +123,9 @@ jobs:
 
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
-        run: echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
+        run: |
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode > /tmp/AuthKey.p8
+          ls -l /tmp/AuthKey.p8
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
 
@@ -137,6 +139,16 @@ jobs:
       - name: Debug ASC CLI help
         run: asc testflight builds list --help || true
 
+      # ------- Debug authentication -------
+      - name: Debug authentication variables
+        run: |
+          echo "ASC_KEY_ID is set: ${ASC_KEY_ID:+true}"
+          echo "ASC_ISSUER_ID is set: ${ASC_ISSUER_ID:+true}"
+          echo "ASC_KEY_PATH exists: $(test -f /tmp/AuthKey.p8 && echo true || echo false)"
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+
       # ------- Get latest versions from App Store Connect -------
       - name: Get latest versions for macOS and iOS
         id: get_versions
@@ -147,7 +159,7 @@ jobs:
         run: |
           # Get latest builds for the Bundle ID
           echo "Fetching latest builds from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 > builds.json || true
+          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 --api-issuer "${{ secrets.ASC_ISSUER_ID }}" --api-key-id "${{ secrets.ASC_KEY_ID }}" --private-key "@file:/tmp/AuthKey.p8" > builds.json || true
           echo "Raw builds JSON:"
           cat builds.json || true
 
