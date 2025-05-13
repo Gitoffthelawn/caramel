@@ -121,12 +121,6 @@ jobs:
         run: |
           /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
 
-      - name: Upload Safari icons for inspection
-        uses: actions/upload-artifact@v4
-        with:
-          name: safari-icons
-          path: caramel-extension/safari-icons
-
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: |
