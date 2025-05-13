@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIRECTORY }}
+        working-directory: ${{ env.WORKING_DIRECTORY || github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ${{ env.WORKING_DIRECTORY }}/pnpm-lock.yaml
+          cache-dependency-path: ${{ env.WORKING_DIRECTORY || github.workspace }}/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install
       - name: Build extension
@@ -40,7 +40,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: extension-package
-          path: ${{ env.WORKING_DIRECTORY }}/extension.zip
+          path: ${{ env.WORKING_DIRECTORY || github.workspace }}/extension.zip
 
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
@@ -69,7 +69,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIRECTORY }}
+        working-directory: ${{ env.WORKING_DIRECTORY || github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 16
@@ -80,7 +80,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: extension-package
-          path: ${{ env.WORKING_DIRECTORY }}
+          path: ${{ env.WORKING_DIRECTORY || github.workspace }}
       - name: Unzip extension
         run: unzip -q extension.zip
       - name: Install ImageMagick and jq
@@ -100,8 +100,8 @@ jobs:
       - name: Setup temporary scripts directory
         run: |
           mkdir -p /tmp/safari-icon-scripts
-          cp ../.github/workflows/scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
-          cp ../.github/workflows/scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
+          cp ${{ github.workspace }}/.github/workflows/scripts/generate-safari-icons.sh /tmp/safari-icon-scripts/
+          cp ${{ github.workspace }}/.github/workflows/scripts/update-safari-icons.sh /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
       - name: Generate Safari icons
         run: |
@@ -200,7 +200,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: safari-xcode-project
-          path: ${{ env.WORKING_DIRECTORY }}/SafariExtProject
+          path: ${{ env.WORKING_DIRECTORY || github.workspace }}/SafariExtProject
       - name: Clean up script files from project
         run: |
           find SafariExtProject -name "*.sh" -delete
