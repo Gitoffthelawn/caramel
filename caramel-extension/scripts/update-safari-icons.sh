@@ -4,69 +4,58 @@ set -e
 # This script updates the Xcode project with custom icons
 # It should be run after safari-web-extension-converter has generated the project
 
-# Arguments
+# Arguments:
+#   $1 = path to the generated Safari Xcode project (default: SafariExtProject/Caramel)
+#   $2 = path to the folder containing your generated icons (default: safari-icons)
 PROJECT_DIR=${1:-"SafariExtProject/Caramel"}
-ICONS_DIR=${2:-"caramel-extension/safari-icons"}
+ICONS_DIR=${2:-"safari-icons"}
 
-echo "Updating Safari app icons in $PROJECT_DIR with icons from $ICONS_DIR"
+echo "Updating Safari app icons in $PROJECT_DIR using icons from $ICONS_DIR"
 
-# Find all .xcassets directories that might contain AppIcon.appiconset
+# Iterate over all .xcassets asset catalogs
 find "$PROJECT_DIR" -name "*.xcassets" -type d | while read -r assets_dir; do
   APPICONSET_DIR="$assets_dir/AppIcon.appiconset"
-  
   if [ -d "$APPICONSET_DIR" ]; then
-    echo "Found app icon set at $APPICONSET_DIR"
-    
-    # Read the Contents.json to find all icon files and their sizes
+    echo "Found AppIcon set at $APPICONSET_DIR"
+
     CONTENTS_FILE="$APPICONSET_DIR/Contents.json"
-    
-    if [ -f "$CONTENTS_FILE" ]; then
-      # For each icon entry in Contents.json
-      jq -c '.images[]' "$CONTENTS_FILE" | while read -r icon_entry; do
-        # Extract filename and size
-        FILENAME=$(echo "$icon_entry" | jq -r '.filename // empty')
-        SIZE=$(echo "$icon_entry" | jq -r '.size // empty')
-        SCALE=$(echo "$icon_entry" | jq -r '.scale // "1x"')
-        
-        if [ -n "$FILENAME" ] && [ -n "$SIZE" ]; then
-          # Parse size like "29x29" to get dimension
-          WIDTH=$(echo "$SIZE" | cut -d'x' -f1)
-          
-          # Extract scale multiplier (2x -> 2, 3x -> 3)
-          SCALE_FACTOR=$(echo "$SCALE" | sed 's/x$//')
-          
-          # Calculate actual size
-          ACTUAL_SIZE=$((WIDTH * SCALE_FACTOR))
-          
-          # Find matching icon from our generated set
-          SOURCE_ICON="$ICONS_DIR/icon_${ACTUAL_SIZE}x${ACTUAL_SIZE}.png"
-          
-          if [ -f "$SOURCE_ICON" ]; then
-            echo "Replacing $FILENAME with custom icon ($ACTUAL_SIZE×$ACTUAL_SIZE)"
-            cp "$SOURCE_ICON" "$APPICONSET_DIR/$FILENAME"
-          else
-            # If we don't have an exact match, find the closest larger size and resize
-            LARGER_ICON=$(find "$ICONS_DIR" -name "icon_*x*.png" | sort -V | while read -r icon; do
-              ICON_SIZE=$(basename "$icon" | sed -E 's/icon_([0-9]+)x.*/\1/')
-              if [ "$ICON_SIZE" -ge "$ACTUAL_SIZE" ]; then
-                echo "$icon"
-                break
-              fi
-            done)
-            
-            if [ -n "$LARGER_ICON" ]; then
-              echo "Resizing from larger icon to $ACTUAL_SIZE×$ACTUAL_SIZE for $FILENAME"
-              convert "$LARGER_ICON" -resize "${ACTUAL_SIZE}x${ACTUAL_SIZE}" "$APPICONSET_DIR/$FILENAME"
-            else
-              echo "Warning: No suitable icon found for $FILENAME ($ACTUAL_SIZE×$ACTUAL_SIZE)"
-            fi
-          fi
-        fi
-      done
-    else
-      echo "Warning: No Contents.json found in $APPICONSET_DIR"
+    if [ ! -f "$CONTENTS_FILE" ]; then
+      echo "Warning: Contents.json not found in $APPICONSET_DIR"
+      continue
     fi
+
+    # For each image entry in Contents.json
+    jq -c '.images[]' "$CONTENTS_FILE" | while read -r entry; do
+      FILENAME=$(echo "$entry" | jq -r '.filename // empty')
+      SIZE=$(echo "$entry" | jq -r '.size // empty')
+      SCALE=$(echo "$entry" | jq -r '.scale // "1x"')
+
+      if [ -z "$FILENAME" ] || [ -z "$SIZE" ]; then
+        continue
+      fi
+
+      WIDTH=$(echo "$SIZE" | cut -d'x' -f1)
+      MULTIPLIER=${SCALE%x}
+      ACTUAL_SIZE=$(( WIDTH * MULTIPLIER ))
+      SOURCE_ICON="$ICONS_DIR/icon_${ACTUAL_SIZE}x${ACTUAL_SIZE}.png"
+
+      if [ -f "$SOURCE_ICON" ]; then
+        echo "Replacing $FILENAME with icon ${ACTUAL_SIZE}x${ACTUAL_SIZE}"
+        cp "$SOURCE_ICON" "$APPICONSET_DIR/$FILENAME"
+      else
+        echo "No exact match for ${ACTUAL_SIZE}×${ACTUAL_SIZE}, looking for larger..."
+        find "$ICONS_DIR" -name 'icon_*x*.png' | sort -V | while read -r alt; do
+          ALT_SIZE=$(basename "$alt" | sed -E 's/icon_([0-9]+)x.*/\1/')
+          if [ "$ALT_SIZE" -ge "$ACTUAL_SIZE" ]; then
+            echo "Resizing $alt → ${ACTUAL_SIZE}x${ACTUAL_SIZE} for $FILENAME"
+            convert "$alt" -resize "${ACTUAL_SIZE}x${ACTUAL_SIZE}" "$APPICONSET_DIR/$FILENAME"
+            break
+          fi
+        done
+      fi
+    done
   fi
+
 done
 
-echo "Safari app icons updated successfully" 
+echo "Safari app icons updated successfully"
