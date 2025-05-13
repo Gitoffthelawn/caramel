@@ -208,12 +208,6 @@ jobs:
       - name: Update Safari icons
         run: /tmp/safari-icon-scripts/update-safari-icons.sh SafariExtProject/${{ env.APP_NAME }} safari-icons
 
-      - name: Upload full Safari Xcode project
-        uses: actions/upload-artifact@v4
-        with:
-          name: safari-xcode-project
-          path: caramel-extension/SafariExtProject
-
       - name: Clean up script files from project
         run: find SafariExtProject -name "*.sh" -delete
 
