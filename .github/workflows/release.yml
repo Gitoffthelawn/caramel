@@ -132,7 +132,7 @@ jobs:
         run: |
           # Get latest macOS build from TestFlight
           echo "Fetching latest macOS build from TestFlight..."
-          asc testflight builds list --filter-app-id "$APPLE_APP_ID" --filter-platform MACOS --limit 1 --sort -uploadedDate > latest_build.json
+          asc testflight builds list --app "$APPLE_APP_ID" --filter-platform MACOS --limit 1 --sort -uploadedDate > latest_build.json
           if [ $? -ne 0 ] || [ ! -s latest_build.json ]; then
             echo "Warning: Could not retrieve macOS build, using defaults"
             MACOS_CURRENT_VERSION="1.0.0"
