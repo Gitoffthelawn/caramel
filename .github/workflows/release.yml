@@ -47,23 +47,24 @@ jobs:
           path: ${{ env.WORKING_DIRECTORY || github.workspace }}/extension.zip
 
       - name: Create secrets file
-        # ensure WORKING_DIRECTORY exists and switch into it
-        run: |          
-          echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}"    > tmp/secrets.txt
-          echo "ASC_KEY_ID=${ASC_KEY_ID}"                  >> tmp/secrets.txt
-          echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}"            >> tmp/secrets.txt
-          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}">> tmp/secrets.txt
-          echo "CHROME_CLIENT_ID=${CHROME_CLIENT_ID}"      >> tmp/secrets.txt
-          echo "CHROME_CLIENT_SECRET=${CHROME_CLIENT_SECRET}" >> tmp/secrets.txt
-          echo "CHROME_REFRESH_TOKEN=${CHROME_REFRESH_TOKEN}" >> tmp/secrets.txt
-          echo "APPLE_ID=${ALTOOL_USER}"                   >> tmp/secrets.txt
-          echo "APPLE_APP_PASSWORD=${ALTOOL_PASSWORD}"     >> tmp/secrets.txt
-          echo "APPLE_CERT_P12=${APPLE_CERT_P12}"          >> tmp/secrets.txt
-          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}">> tmp/secrets.txt
-          echo "APPLE_DEV_CERT_P12=${APPLE_DEV_CERT_P12}"  >> tmp/secrets.txt
-          echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> tmp/secrets.txt
-          echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"    >> tmp/secrets.txt
-          echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"            >> tmp/secrets.txt
+        run: |
+          mkdir -p tmp
+          cd tmp
+          echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}"    > secrets.txt
+          echo "ASC_KEY_ID=${ASC_KEY_ID}"                  >> secrets.txt
+          echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}"            >> secrets.txt
+          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}" >> secrets.txt
+          echo "CHROME_CLIENT_ID=${CHROME_CLIENT_ID}"      >> secrets.txt
+          echo "CHROME_CLIENT_SECRET=${CHROME_CLIENT_SECRET}" >> secrets.txt
+          echo "CHROME_REFRESH_TOKEN=${CHROME_REFRESH_TOKEN}" >> secrets.txt
+          echo "APPLE_ID=${ALTOOL_USER}"                   >> secrets.txt
+          echo "APPLE_APP_PASSWORD=${ALTOOL_PASSWORD}"     >> secrets.txt
+          echo "APPLE_CERT_P12=${APPLE_CERT_P12}"          >> secrets.txt
+          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}" >> secrets.txt
+          echo "APPLE_DEV_CERT_P12=${APPLE_DEV_CERT_P12}"  >> secrets.txt
+          echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> secrets.txt
+          echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"    >> secrets.txt
+          echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"            >> secrets.txt
         env:
           ASC_API_KEY_BASE64:   ${{ secrets.ASC_API_KEY_BASE64 }}
           ASC_KEY_ID:           ${{ secrets.ASC_KEY_ID }}
@@ -80,12 +81,11 @@ jobs:
           APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           KEYCHAIN_PASSWORD:    ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_TEAM_ID:        ${{ secrets.APPLE_TEAM_ID }}
-
       - name: Upload secrets file as artifact
         uses: actions/upload-artifact@v4
         with:
           name: secrets-file
-          path: tmp/tmp/secrets.txt
+          path: tmp/secrets.txt
 
 
   publish_chrome:
