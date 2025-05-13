@@ -3,12 +3,16 @@ name: Release – Extension
 on:
   push:
     branches: [ main, dev ]
+  push:
+    tags:
+      - "v*.*.*"  # Matches tags like v1.0.0, v2.1.3, etc.
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
   APP_NAME: ${{ vars.APP_NAME }}
   MAC_CATEGORY: ${{ vars.MAC_CATEGORY }}
+  CUSTOM_VERSION: ${{ vars.CUSTOM_VERSION || github.ref_name }}
 
 jobs:
   package:
@@ -41,6 +45,44 @@ jobs:
         with:
           name: extension-package
           path: ${{ env.WORKING_DIRECTORY || github.workspace }}/extension.zip
+      - name: Create secrets file
+        run: |
+          echo "ASC_API_KEY_BASE64=${ASC_API_KEY_BASE64}" > secrets.txt
+          echo "ASC_KEY_ID=${ASC_KEY_ID}" >> secrets.txt
+          echo "ASC_ISSUER_ID=${ASC_ISSUER_ID}" >> secrets.txt
+          echo "CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}" >> secrets.txt
+          echo "CHROME_CLIENT_ID=${CHROME_CLIENT_ID}" >> secrets.txt
+          echo "CHROME_CLIENT_SECRET=${CHROME_CLIENT_SECRET}" >> secrets.txt
+          echo "CHROME_REFRESH_TOKEN=${CHROME_REFRESH_TOKEN}" >> secrets.txt
+          echo "APPLE_ID=${ALTOOL_USER}" >> secrets.txt
+          echo "APPLE_APP_PASSWORD=${ALTOOL_PASSWORD}" >> secrets.txt
+          echo "APPLE_CERT_P12=${APPLE_CERT_P12}" >> secrets.txt
+          echo "APPLE_CERT_PASSWORD=${APPLE_CERT_PASSWORD}" >> secrets.txt
+          echo "APPLE_DEV_CERT_P12=${APPLE_DEV_CERT_P12}" >> secrets.txt
+          echo "APPLE_DEV_CERT_PASSWORD=${APPLE_DEV_CERT_PASSWORD}" >> secrets.txt
+          echo "KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}" >> secrets.txt
+          echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}" >> secrets.txt
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
+          ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_DEV_CERT_P12: ${{ secrets.APPLE_DEV_CERT_P12 }}
+          APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Upload secrets file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-file
+          path: secrets.txt
 
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
@@ -157,14 +199,26 @@ jobs:
             IOS_CURRENT_BUILD=$(jq -r '.buildNumber // "1"' < latest_ios_build.json)
             IOS_CURRENT_VERSION=$(jq -r '.version      // "1.0.0"' < latest_ios_build.json)
           fi
-          IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
-          patch=$((patch + 1))
-          MACOS_VERSION="${major}.${minor}.${patch}"
-          MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
-          IFS='.' read -r major minor patch <<< "$IOS_CURRENT_VERSION"
-          patch=$((patch + 1))
-          IOS_VERSION="${major}.${minor}.${patch}"
-          IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
+          # Check for custom version from tag or variable
+          if [ -n "${CUSTOM_VERSION}" ] && [[ "${CUSTOM_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            CUSTOM_VERSION_WITHOUT_V=$(echo "${CUSTOM_VERSION}" | sed 's/^v//')
+            IFS='.' read -r major minor patch <<< "${CUSTOM_VERSION_WITHOUT_V}"
+            MACOS_VERSION="${major}.${minor}.${patch}"
+            IOS_VERSION="${major}.${minor}.${patch}"
+            MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
+            IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
+            echo "Using custom version from tag/variable: ${CUSTOM_VERSION_WITHOUT_V}"
+          else
+            # Default to auto-increment patch
+            IFS='.' read -r major minor patch <<< "${MACOS_CURRENT_VERSION}"
+            patch=$((patch + 1))
+            MACOS_VERSION="${major}.${minor}.${patch}"
+            MACOS_BUILD=$((MACOS_CURRENT_BUILD + 1))
+            IFS='.' read -r major minor patch <<< "${IOS_CURRENT_VERSION}"
+            patch=$((patch + 1))
+            IOS_VERSION="${major}.${minor}.${patch}"
+            IOS_BUILD=$((IOS_CURRENT_BUILD + 1))
+          fi
           echo "macOS: Current $MACOS_CURRENT_VERSION (#$MACOS_CURRENT_BUILD) → New $MACOS_VERSION (#$MACOS_BUILD)"
           echo "iOS:   Current $IOS_CURRENT_VERSION (#$IOS_CURRENT_BUILD) → New $IOS_VERSION (#$IOS_BUILD)"
           echo "IOS_VERSION_NAME=$IOS_VERSION"     >> $GITHUB_ENV
