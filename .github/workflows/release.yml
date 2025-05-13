@@ -3,7 +3,7 @@ name: Release – Extension
 on:
   pull_request:
     types: [closed]
-    branches: [main]
+    branches: [dev]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
