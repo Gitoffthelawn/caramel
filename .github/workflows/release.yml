@@ -147,13 +147,13 @@ jobs:
         run: |
           # Get latest builds for the Bundle ID
           echo "Fetching latest builds from TestFlight..."
-          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --limit 10 --sort -uploadedDate > builds.json || true
+          asc testflight builds list --filter-bundle-ids "${{ env.SAFARI_BUNDLE_ID }}" --include-expired --limit 10 > builds.json || true
           echo "Raw builds JSON:"
           cat builds.json || true
 
-          # Filter macOS build
+          # Filter and sort macOS build
           echo "Filtering latest macOS build..."
-          jq '[.data[] | select(.attributes.platform == "MACOS")] | sort_by(.attributes.uploadedDate) | last' builds.json > latest_macos_build.json || true
+          jq '[.data[] | select(.attributes.platform == "MACOS")] | sort_by(.attributes.uploadedDate) | .[-1]' builds.json > latest_macos_build.json || true
           echo "macOS build JSON:"
           cat latest_macos_build.json || true
           if [ ! -s latest_macos_build.json ]; then
@@ -173,9 +173,9 @@ jobs:
             fi
           fi
 
-          # Filter iOS build
+          # Filter and sort iOS build
           echo "Filtering latest iOS build..."
-          jq '[.data[] | select(.attributes.platform == "IOS")] | sort_by(.attributes.uploadedDate) | last' builds.json > latest_ios_build.json || true
+          jq '[.data[] | select(.attributes.platform == "IOS")] | sort_by(.attributes.uploadedDate) | .[-1]' builds.json > latest_ios_build.json || true
           echo "iOS build JSON:"
           cat latest_ios_build.json || true
           if [ ! -s latest_ios_build.json ]; then
