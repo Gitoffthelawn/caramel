@@ -121,14 +121,6 @@ jobs:
         run: |
           /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
 
-      # ------- Upload generated Xcode asset catalogs -------
-      - name: Upload generated Xcode asset catalogs
-        uses: actions/upload-artifact@v4
-        with:
-          name: safari-xcassets
-          path: |
-            caramel-extension/SafariExtProject/**/*.xcassets
-
       # ------- App Store Connect API key -------
       - name: Install App Store Connect API key
         run: |
@@ -276,6 +268,12 @@ jobs:
       - name: Update Safari icons
         run: |
           /tmp/safari-icon-scripts/update-safari-icons.sh
+
+      - name: Upload full Safari Xcode project
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-xcode-project
+          path: caramel-extension/SafariExtProject
 
       # ------- Clean up scripts from project -------
       - name: Clean up script files from project
