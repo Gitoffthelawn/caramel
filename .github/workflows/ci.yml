@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   push:
     branches: [dev]
-    
+
 env:
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
 

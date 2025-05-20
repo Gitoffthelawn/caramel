@@ -22,7 +22,6 @@ jobs:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
     # only run when a PR into main is merged
-    if: github.event.pull_request.merged == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
