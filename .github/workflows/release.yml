@@ -54,6 +54,7 @@ jobs:
   publish_chrome:
     name: "🚀 Publish to Chrome Web Store"
     needs: package
+    if: ${{ !contains(github.event.pull_request.title, 'skip=chrome') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download artifact
@@ -75,6 +76,7 @@ jobs:
   publish_safari:
     name: "🚀 Publish to Apple App Store (Safari & iOS)"
     needs: package
+    if: ${{ !contains(github.event.pull_request.title, 'skip=apple') }}
     runs-on: macos-latest
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
