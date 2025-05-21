@@ -11,6 +11,7 @@ env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
   APP_NAME:      ${{ vars.APP_NAME }}
+  
   MAC_CATEGORY:  ${{ vars.MAC_CATEGORY }}
 
 jobs:
