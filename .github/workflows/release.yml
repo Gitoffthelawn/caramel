@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  push:
+    branches: [dev]
 
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
@@ -19,7 +21,7 @@ jobs:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
     # only run when a PR into main is merged
-    if: github.event.pull_request.merged == true
+    #if: github.event.pull_request.merged == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,6 +64,19 @@ jobs:
         with:
           name: extension-package
           path: .
+
+      - name: Test Chrome Web Store auth
+        shell: bash
+        run: |
+          ACCESS_TOKEN=$(curl -s \
+            -d client_id=${{ secrets.CHROME_CLIENT_ID }} \
+            -d client_secret=${{ secrets.CHROME_CLIENT_SECRET }} \
+            -d grant_type=refresh_token \
+            -d refresh_token=${{ secrets.CHROME_REFRESH_TOKEN }} \
+            https://www.googleapis.com/oauth2/v4/token \
+            | jq -r .access_token)
+          curl -I -H "Authorization: Bearer $ACCESS_TOKEN" \
+            https://www.googleapis.com/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}?projection=DRAFT
 
       - name: Upload to Chrome Web Store (upload-only)
         uses: mnao305/chrome-extension-upload@v5.0.0
