@@ -61,7 +61,7 @@ export default function SupportedSection() {
     const { isDarkMode } = useContext(ThemeContext);
 
     return (
-        <section id="supported" className="py-32 dark:bg-darkBg relative overflow-hidden">
+        <section id="supported" className="py-32 relative overflow-hidden">
             {/* Background Elements */}
             <div className="absolute inset-0">
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-caramel/20 to-transparent"></div>
@@ -74,10 +74,10 @@ export default function SupportedSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
                     className="text-center mb-20"
                 >
-                    <h2 className="text-5xl lg:text-4xl font-extrabold mb-8 bg-gradient-to-r from-caramel to-caramelLight bg-clip-text text-transparent tracking-tight">
+                    <h2 className="text-5xl lg:text-4xl font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
                         5,000+ Supported Stores
                     </h2>
                     <p className="text-xl lg:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
@@ -90,10 +90,10 @@ export default function SupportedSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                    transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
                     className="mb-24"
                 >
-                    <div className="relative w-full overflow-hidden">
+                    <div className="relative w-full overflow-x-hidden">
                         <motion.div
                             className="flex"
                             animate={{ x: ["0%", "-100%"] }}
@@ -101,7 +101,7 @@ export default function SupportedSection() {
                                 x: {
                                     repeat: Infinity,
                                     repeatType: "loop",
-                                    duration: 20,
+                                    duration: 25,
                                     ease: "linear"
                                 }
                             }}
@@ -110,9 +110,14 @@ export default function SupportedSection() {
                             {[...featuredStores, ...featuredStores].map((store, index) => (
                                 <motion.div
                                     key={`${store.name}-${index}`}
-                                    className="relative bg-gradient-to-br from-white via-gray-50 to-white dark:from-darkerBg dark:via-gray-900 dark:to-darkerBg rounded-3xl p-8 sm:p-6 border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0 mx-2"
+                                    className="relative bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 rounded-3xl p-8 sm:p-6 border border-caramel/20 dark:border-caramel/30 overflow-hidden flex-shrink-0 mx-2 group"
                                     style={{ width: `${100 / featuredStores.length}%` }}
-                                    whileHover={{ scale: 1.03, boxShadow: "0 30px 60px rgba(234,105,37,0.2)" }}
+                                    whileHover={{
+                                        scale: 1.03,
+                                        y: -5,
+                                        boxShadow: "0 20px 40px rgba(234,105,37,0.15)",
+                                        transition: { duration: 0.2 }
+                                    }}
                                 >
                                     <div className="absolute inset-0 opacity-5">
                                         <motion.div
@@ -124,8 +129,15 @@ export default function SupportedSection() {
                                                 `,
                                                 backgroundSize: "20px 20px"
                                             }}
-                                            animate={{ backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"] }}
-                                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                            animate={{
+                                                backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"]
+                                            }}
+                                            transition={{
+                                                duration: 8,
+                                                repeat: Infinity,
+                                                ease: "linear",
+                                                repeatType: "loop"
+                                            }}
                                         />
                                     </div>
                                     <div className="relative z-10 text-center">
@@ -156,10 +168,10 @@ export default function SupportedSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+                    transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
                     className="mb-24"
                 >
-                    <h3 className="text-3xl lg:text-2xl font-semibold text-center mb-12 text-gray-800 dark:text-white tracking-tight">
+                    <h3 className="text-3xl lg:text-2xl font-extrabold text-gray-900 dark:text-white mb-12 text-center">
                         Growing Every Day
                     </h3>
                     <div className="grid grid-cols-4 lg:grid-cols-2 sm:grid-cols-1 gap-8 sm:gap-6">
@@ -171,12 +183,23 @@ export default function SupportedSection() {
                         ].map((stat, index) => (
                             <motion.div
                                 key={stat.label}
-                                initial={{ opacity: 0, x: index % 2 === 0 ? -100 : 100 }}
+                                initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
                                 whileInView={{ opacity: 1, x: 0 }}
                                 viewport={{ once: true }}
-                                transition={{ duration: 1, delay: index * 0.2, type: "spring", bounce: 0.4 }}
-                                whileHover={{ scale: 1.02, boxShadow: "0 30px 60px rgba(234,105,37,0.2)" }}
-                                className="relative bg-gradient-to-br from-white via-gray-50 to-white dark:from-darkerBg dark:via-gray-900 dark:to-darkerBg rounded-3xl p-8 sm:p-6 border border-gray-200 dark:border-gray-700 overflow-hidden"
+                                transition={{
+                                    duration: 0.6,
+                                    delay: index * 0.1,
+                                    type: "spring",
+                                    stiffness: 100,
+                                    damping: 15
+                                }}
+                                whileHover={{
+                                    scale: 1.02,
+                                    y: -5,
+                                    boxShadow: "0 20px 40px rgba(234,105,37,0.15)",
+                                    transition: { duration: 0.2 }
+                                }}
+                                className="relative bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 rounded-3xl p-8 sm:p-6 border border-caramel/20 dark:border-caramel/30 overflow-hidden group"
                             >
                                 <div className="absolute inset-0 opacity-5">
                                     <motion.div
@@ -188,8 +211,15 @@ export default function SupportedSection() {
                                             `,
                                             backgroundSize: "20px 20px"
                                         }}
-                                        animate={{ backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"] }}
-                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                        animate={{
+                                            backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"]
+                                        }}
+                                        transition={{
+                                            duration: 8,
+                                            repeat: Infinity,
+                                            ease: "linear",
+                                            repeatType: "loop"
+                                        }}
                                     />
                                 </div>
                                 <div className="relative z-10 text-center">
@@ -210,18 +240,28 @@ export default function SupportedSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-                    className="text-center bg-gradient-to-r from-caramel to-caramelLight rounded-3xl p-12 lg:p-8 text-white shadow-2xl"
+                    transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
+                    className="text-center bg-gradient-to-r from-caramel to-orange-600 rounded-3xl p-12 lg:p-8 text-white shadow-2xl"
                 >
                     <h3 className="text-3xl lg:text-2xl font-semibold mb-6 tracking-tight">
                         Don't See Your Favorite Store?
                     </h3>
                     <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto leading-relaxed">
-                        We're constantly adding new stores to our platform!
+                        We're constantly adding new stores to our platform. Request yours today!
                     </p>
-                    <button className="px-8 py-4 bg-white text-caramel hover:bg-gray-100 font-semibold rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg">
+                    <motion.a
+                        href="https://github.com/DevinoSolutions/caramel/issues/new?assignees=&labels=store-request&projects=&template=store-request.md&title=%5BStore+Request%5D+Add+support+for+"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                        className="inline-flex items-center px-8 py-4 bg-white text-caramel hover:bg-orange-50 font-semibold rounded-full transition-all duration-200 shadow-md hover:shadow-xl"
+                    >
                         Request a Store
-                    </button>
+                    </motion.a>
                 </motion.div>
             </div>
         </section>
