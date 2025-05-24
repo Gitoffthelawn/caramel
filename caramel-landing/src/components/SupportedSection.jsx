@@ -20,7 +20,7 @@ const featuredStores = [
         category: "marketplace"
     },
     {
-        name: "CodeAcademy",
+        name: "Codecademy",
         desc: "Interactive platform to learn coding",
         image: "/codeAcademy.png",
         category: "education"
@@ -93,29 +93,27 @@ export default function SupportedSection() {
                     transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
                     className="mb-24"
                 >
-                    <div className="relative w-full overflow-x-hidden">
+                    <div className="relative w-full overflow-hidden py-4">
                         <motion.div
-                            className="flex"
-                            animate={{ x: ["0%", "-100%"] }}
+                            className="flex gap-4"
+                            animate={{ x: ["0%", "-50%"] }}
                             transition={{
                                 x: {
                                     repeat: Infinity,
                                     repeatType: "loop",
-                                    duration: 25,
+                                    duration: 30,
                                     ease: "linear"
                                 }
                             }}
-                            style={{ width: `${featuredStores.length * 25}%` }}
                         >
                             {[...featuredStores, ...featuredStores].map((store, index) => (
                                 <motion.div
                                     key={`${store.name}-${index}`}
-                                    className="relative bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 rounded-3xl p-8 sm:p-6 border border-caramel/20 dark:border-caramel/30 overflow-hidden flex-shrink-0 mx-2 group"
-                                    style={{ width: `${100 / featuredStores.length}%` }}
+                                    className="relative bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 rounded-3xl p-8 sm:p-6 border border-caramel/20 dark:border-caramel/30 overflow-hidden flex-shrink-0 group min-w-[280px] lg:min-w-[240px] sm:min-w-[200px]"
                                     whileHover={{
-                                        scale: 1.03,
-                                        y: -5,
-                                        boxShadow: "0 20px 40px rgba(234,105,37,0.15)",
+                                        scale: 1.02,
+                                        y: -3,
+                                        boxShadow: "0 15px 30px rgba(234,105,37,0.12)",
                                         transition: { duration: 0.2 }
                                     }}
                                 >
@@ -141,13 +139,13 @@ export default function SupportedSection() {
                                         />
                                     </div>
                                     <div className="relative z-10 text-center">
-                                        <div className="relative mb-6 mx-auto w-20 h-20">
+                                        <div className="relative mb-6 mx-auto w-20 h-20 flex items-center justify-center">
                                             <Image
                                                 src={isDarkMode && store.imageLight ? store.imageLight : store.image}
                                                 alt={store.name}
                                                 width={80}
                                                 height={80}
-                                                className="object-contain"
+                                                className={`object-contain ${isDarkMode ? 'brightness-0 invert' : ''}`}
                                             />
                                         </div>
                                         <h3 className="text-2xl sm:text-xl font-semibold text-gray-800 dark:text-white mb-3">
