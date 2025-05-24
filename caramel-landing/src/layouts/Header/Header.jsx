@@ -10,7 +10,6 @@ import {useScrollDirection} from "@/hooks/useScrollDirection";
 
 const links = [
     {name: "Home", url: "/"},
-    {name: "Sources", url: "/sources"},
     {name: "Privacy", url: "/privacy"},
 ];
 

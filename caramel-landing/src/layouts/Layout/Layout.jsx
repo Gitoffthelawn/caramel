@@ -12,7 +12,7 @@ export default function Layout({ children }) {
   return (
       <div
             ref={ref}
-          className={`overflow-x-hidden h-screen ${
+          className={`overflow-x-hidden h-screen scroll-smooth ${
               isDarkMode ? 'dark bg-darkBg' : 'light bg-gray-50'
           } font-Roboto`}
       >
