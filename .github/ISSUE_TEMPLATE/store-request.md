@@ -10,18 +10,43 @@ assignees: ''
 **Store Name:**
 **Store URL:**
 **Store Category:** (e.g., fashion, electronics, retail, marketplace, education)
+**Country/Region:** (e.g., US, EU, Global)
 
 ## 📊 Store Popularity
-**Why this store?** (Tell us why this store should be prioritized)
-**Estimated user demand:** (High/Medium/Low)
+**Why should we prioritize this store?**
+- [ ] Very popular in my region
+- [ ] Frequently requested by users
+- [ ] Has good coupon/discount programs
+- [ ] Large user base
+- [ ] Personal preference
 
-## 🔗 Additional Context
-- [ ] Store has existing coupon/discount programs
-- [ ] Store is popular in specific regions
-- [ ] Store has API documentation available
+**Estimated demand:**
+- [ ] High (many users would benefit)
+- [ ] Medium (some users would benefit)
+- [ ] Low (niche audience)
 
-**Screenshots or additional info:**
-(Add any context that might help implement support)
+## 🔗 Store Details
+**Does this store have:**
+- [ ] Regular sales/promotions
+- [ ] Coupon codes
+- [ ] Membership discounts
+- [ ] Seasonal sales
+- [ ] Student discounts
+
+**Store size:**
+- [ ] Large retailer (Amazon, Walmart level)
+- [ ] Medium retailer (regional chain)
+- [ ] Small/niche retailer
+
+## 📋 Additional Context
+**Any specific challenges or considerations:**
+- Special checkout processes
+- Regional restrictions
+- Known coupon sources
+- API availability
+
+**Screenshots or links:**
+(Add any helpful context about the store)
 
 ---
 *Thank you for helping make Caramel better! 🎉*
