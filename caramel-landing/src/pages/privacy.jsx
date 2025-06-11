@@ -1,13 +1,13 @@
-
 import PrivacyPolicy from "@/components/PrivacyPolicy";
 import AppHeader from "@/components/AppHeader";
 import Doodles from "@/components/Doodles";
 import React from "react";
+import { motion } from "framer-motion";
 
 const Privacy = () => {
-
     return (
-        <div className="flex justify-center dark:bg-darkBg h-fit overflow-y-auto">
+        <main className="w-full relative overflow-x-clip -mt-[6.7rem] dark:bg-darkBg">
+            <AppHeader description={"Caramel Privacy Policy"} ogTitle={"Privacy page"} />
             <Doodles />
 
             <div className="scroll-smooth">
@@ -21,7 +21,7 @@ const Privacy = () => {
                             transition={{duration: 0.6, ease: "easeOut"}}
                             className="mb-8"
                         >
-                            <h1 className="text-5xl lg:text-4xl md:text-3xl font-extrabold mb-6 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
+                            <h1 className="text-5xl leading-[90px] lg:text-4xl md:text-3xl font-extrabold mb-6 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
                                 Privacy Policy
                             </h1>
                             <p className="text-xl lg:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
@@ -53,8 +53,8 @@ const Privacy = () => {
                     <PrivacyPolicy/>
                 </motion.div>
             </div>
-        </div>
-    )
-}
+        </main>
+    );
+};
 
-export default Privacy
+export default Privacy;

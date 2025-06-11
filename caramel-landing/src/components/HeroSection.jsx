@@ -3,44 +3,97 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { FaGithub } from "react-icons/fa";
 
 export default function HeroSection() {
-
-
     return (
-        <section
-            className="relative mt-[5rem] min-h-screen dark:text-white flex flex-col justify-center overflow-hidden px-6 py-16 text-gray-800"
-        >
+        <section className="relative mt-[5rem] min-h-screen dark:text-white flex flex-col justify-center overflow-hidden px-6 py-16 text-gray-800">
+            {/* Floating elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <motion.div
+                    className="absolute top-1/4 left-1/4 w-32 h-32 bg-caramel/8 rounded-full blur-xl"
+                    animate={{
+                        x: [0, 30, 0],
+                        y: [0, -20, 0],
+                    }}
+                    transition={{
+                        duration: 8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                    }}
+                />
+                <motion.div
+                    className="absolute top-3/4 right-1/4 w-24 h-24 bg-orange-300/8 rounded-full blur-xl"
+                    animate={{
+                        x: [0, -25, 0],
+                        y: [0, 25, 0],
+                    }}
+                    transition={{
+                        duration: 10,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 2
+                    }}
+                />
+                <motion.div
+                    className="absolute top-1/2 right-1/3 w-20 h-20 bg-caramel/6 rounded-full blur-lg"
+                    animate={{
+                        x: [0, 20, 0],
+                        y: [0, -15, 0],
+                    }}
+                    transition={{
+                        duration: 12,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: 4
+                    }}
+                />
+            </div>
+
             <div className="relative z-10 max-w-6xl mx-auto text-center">
                 <motion.h1
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{duration: 0.6}}
-                    className="text-5xl md:text-3xl flex flex-col justify-center font-bold mb-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="text-5xl lg:text-4xl md:text-3xl flex flex-col justify-center font-bold mb-6"
                 >
-                    {/* Animated text */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6 }}
-                        className="
-                        m-auto dark:text-white text-black/70 drop-shadow-2xl"
+                        className="m-auto dark:text-white text-gray-700 mb-4"
                     >
                         Welcome to
                     </motion.div>
-                    <Image
-                        src="/full-logo.png"
-                        alt="logo"
-                        height={2000}
-                        width={2000}
-                        className="m-auto "
-                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{
+                            duration: 0.8,
+                            delay: 0.3,
+                            type: "spring",
+                            stiffness: 100,
+                            damping: 15
+                        }}
+                        className="relative"
+                        whileHover={{ scale: 1.02 }}
+                    >
+                        <Image
+                            src="/full-logo.png"
+                            alt="Caramel Logo"
+                            height={2000}
+                            width={2000}
+                            className="m-auto drop-shadow-lg max-w-lg lg:w-full"
+                            priority
+                        />
+                    </motion.div>
                 </motion.h1>
+
                 <motion.p
-                    initial={{opacity: 0, y: 10}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{duration: 0.8}}
-                    className="text-xl md:text-sm text-gray-600 dark:text-white max-w-2xl mx-auto mb-8"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
+                    className="text-xl lg:text-lg md:text-base text-gray-600 dark:text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed"
                 >
                     The{" "}
                     <motion.a

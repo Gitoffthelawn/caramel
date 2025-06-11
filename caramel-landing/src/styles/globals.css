@@ -4,8 +4,25 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    scroll-behavior: smooth;
+}
+
 ::-webkit-scrollbar {
     width: 20px;
+}
+
+/* Mobile responsive scrollbar */
+@media (max-width: 768px) {
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    ::-webkit-scrollbar {
+        width: 6px;
+    }
 }
 
 ::-webkit-scrollbar-track {
@@ -20,6 +37,20 @@
     transition: background-color 0.3s ease;
 }
 
+/* Adjust border for mobile */
+@media (max-width: 768px) {
+    ::-webkit-scrollbar-thumb {
+        border: 2px solid transparent;
+        border-radius: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    ::-webkit-scrollbar-thumb {
+        border: 1px solid transparent;
+        border-radius: 6px;
+    }
+}
 ::-webkit-scrollbar-thumb:hover {
     @apply bg-caramelLight;
 }
