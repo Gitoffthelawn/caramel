@@ -56,18 +56,73 @@ export default function FeaturesSection() {
                   group-hover:[transform:rotateY(180deg)]
                 "
                             >
-                                <div
-                                    className="
-                    absolute w-full h-full
-                    bg-white dark:bg-darkerBg rounded-lg shadow-md p-6
-                    flex flex-col justify-center items-start
-                  "
-                                    style={{ backfaceVisibility: "hidden" }}
-                                >
-                                    <h3 className="text-xl font-semibold text-caramel mb-2">
-                                        {feat.title}
-                                    </h3>
-                                    <p className="text-gray-700 dark:text-white text-sm">{feat.desc}</p>
+                                {/* Animated Background Pattern */}
+                                <div className="absolute inset-0 opacity-5">
+                                    <motion.div
+                                        className="w-full h-full"
+                                        style={{
+                                            backgroundImage: `
+                                                linear-gradient(90deg, #ea6925 1px, transparent 1px),
+                                                linear-gradient(#ea6925 1px, transparent 1px)
+                                            `,
+                                            backgroundSize: "20px 20px"
+                                        }}
+                                        animate={{
+                                            backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"]
+                                        }}
+                                        transition={{
+                                            duration: 8,
+                                            repeat: Infinity,
+                                            ease: "linear",
+                                            repeatType: "loop"
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="relative z-10 text-center">
+                                    {/* Large icon - hidden on lg and down */}
+                                    <motion.div
+                                        className="text-6xl mx-auto mb-6 text-caramel transition-transform duration-300 xl:block lg:hidden"
+                                        animate={{
+                                            rotate: [0, 2, -2, 0],
+                                            scale: [1, 1.02, 1]
+                                        }}
+                                        transition={{
+                                            duration: 4,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                            repeatType: "loop"
+                                        }}
+                                        whileHover={{ scale: 1.1 }}
+                                    >
+                                        {feat.icon}
+                                    </motion.div>
+
+                                    {/* Mobile layout - icon + title in one row */}
+                                    <div className="hidden lg:block text-left">
+                                        <div className="flex items-center mb-3">
+                                            <span className="text-2xl text-caramel mr-3 flex-shrink-0">{feat.icon}</span>
+                                            <h3 className="text-2xl sm:text-xl font-bold text-gray-800 dark:text-white tracking-tight">
+                                                {feat.title}
+                                            </h3>
+                                        </div>
+                                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-base sm:text-sm ml-11">
+                                            {feat.desc}
+                                        </p>
+                                    </div>
+
+                                    {/* Desktop layout - original centered layout */}
+                                    <div className="xl:block lg:hidden">
+                                        <h3 className="text-3xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 tracking-tight">
+                                            {feat.title}
+                                        </h3>
+                                        <p className="text-gray-600 dark:text-gray-400 mb-4 leading-relaxed text-lg sm:text-base">
+                                            {feat.desc}
+                                        </p>
+                                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm sm:text-xs">
+                                            {feat.detail}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div
                                     className="

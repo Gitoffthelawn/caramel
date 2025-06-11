@@ -45,7 +45,12 @@ export default function OpenSourceSection() {
                         text-5xl md:text-xl font-bold mb-6 justify-center
                         bg-clip-text dark:text-white text-black/80"
                 >
-                    Open Source & Community Driven
+                    <h2 className="text-5xl lg:text-4xl leading-[80px] font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
+                        Open Source & Community Driven
+                    </h2>
+                    <p className="text-xl lg:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                        Transparency is our core. Every line of code is open, auditable, and community-driven. Join thousands of developers building a better alternative to proprietary extensions.
+                    </p>
                 </motion.div>
                 <motion.p
                     initial={{opacity: 0, y: 10}}
