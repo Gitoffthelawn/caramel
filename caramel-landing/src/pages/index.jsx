@@ -7,6 +7,7 @@ import SupportedSection from "@/components/SupportedSection";
 import AppHeader from "@/components/AppHeader";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import WhyNotHoneySection from "@/components/WhyNot";
 
 export default function Index() {
     return (
@@ -16,18 +17,19 @@ export default function Index() {
 
             {/* Add smooth scrolling behavior */}
             <div className="scroll-smooth">
-                <HeroSection />
+                <HeroSection/>
 
                 {/* Enhanced transition sections with particle effects */}
                 <motion.div
                     className="relative h-px"
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 2 }}
+                    initial={{scaleX: 0}}
+                    whileInView={{scaleX: 1}}
+                    viewport={{once: true}}
+                    transition={{duration: 2}}
                 >
                     <div className="h-px bg-gradient-to-r from-transparent via-caramel/40 to-transparent"></div>
-                    <div className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent blur-sm"></div>
+                    <div
+                        className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent blur-sm"></div>
 
                     {/* Floating particles on dividers */}
                     {[...Array(5)].map((_, i) => (
@@ -53,33 +55,47 @@ export default function Index() {
                     ))}
                 </motion.div>
 
-                <FeaturesSection />
+                <FeaturesSection/>
 
                 <motion.div
                     className="relative h-px"
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 2, delay: 0.2 }}
+                    initial={{scaleX: 0}}
+                    whileInView={{scaleX: 1}}
+                    viewport={{once: true}}
+                    transition={{duration: 2, delay: 0.2}}
                 >
                     <div className="h-px bg-gradient-to-r from-transparent via-orange-600/40 to-transparent"></div>
-                    <div className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-caramel/20 to-transparent blur-sm"></div>
+                    <div
+                        className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-caramel/20 to-transparent blur-sm"></div>
                 </motion.div>
 
-                <SupportedSection />
+                <SupportedSection/>
 
                 <motion.div
                     className="relative h-px"
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 2, delay: 0.4 }}
+                    initial={{scaleX: 0}}
+                    whileInView={{scaleX: 1}}
+                    viewport={{once: true}}
+                    transition={{duration: 2, delay: 0.4}}
                 >
                     <div className="h-px bg-gradient-to-r from-transparent via-orange-500/40 to-transparent"></div>
-                    <div className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-300/20 to-transparent blur-sm"></div>
+                    <div
+                        className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-300/20 to-transparent blur-sm"></div>
+                </motion.div>
+                <WhyNotHoneySection />
+                <motion.div
+                    className="relative h-px"
+                    initial={{scaleX: 0}}
+                    whileInView={{scaleX: 1}}
+                    viewport={{once: true}}
+                    transition={{duration: 2, delay: 0.4}}
+                >
+                    <div className="h-px bg-gradient-to-r from-transparent via-orange-500/40 to-transparent"></div>
+                    <div
+                        className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-300/20 to-transparent blur-sm"></div>
                 </motion.div>
 
-                <OpenSourceSection />
+                <OpenSourceSection/>
             </div>
         </main>
     );

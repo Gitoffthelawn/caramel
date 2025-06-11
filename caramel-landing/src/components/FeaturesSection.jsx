@@ -152,8 +152,9 @@ export default function FeaturesSection() {
                                 </div>
 
                                 <div className="relative z-10 text-center">
+                                    {/* Large icon - hidden on lg and down */}
                                     <motion.div
-                                        className="text-6xl mx-auto mb-6 text-caramel transition-transform duration-300"
+                                        className="text-6xl mx-auto mb-6 text-caramel transition-transform duration-300 xl:block lg:hidden"
                                         animate={{
                                             rotate: [0, 2, -2, 0],
                                             scale: [1, 1.02, 1]
@@ -168,15 +169,32 @@ export default function FeaturesSection() {
                                     >
                                         {feat.icon}
                                     </motion.div>
-                                    <h3 className="text-3xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 tracking-tight">
-                                        {feat.title}
-                                    </h3>
-                                    <p className="text-gray-600 dark:text-gray-400 mb-4 leading-relaxed text-lg sm:text-base">
-                                        {feat.desc}
-                                    </p>
-                                    <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm sm:text-xs">
-                                        {feat.detail}
-                                    </p>
+
+                                    {/* Mobile layout - icon + title in one row */}
+                                    <div className="hidden lg:block text-left">
+                                        <div className="flex items-center mb-3">
+                                            <span className="text-2xl text-caramel mr-3 flex-shrink-0">{feat.icon}</span>
+                                            <h3 className="text-2xl sm:text-xl font-bold text-gray-800 dark:text-white tracking-tight">
+                                                {feat.title}
+                                            </h3>
+                                        </div>
+                                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-base sm:text-sm ml-11">
+                                            {feat.desc}
+                                        </p>
+                                    </div>
+
+                                    {/* Desktop layout - original centered layout */}
+                                    <div className="xl:block lg:hidden">
+                                        <h3 className="text-3xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 tracking-tight">
+                                            {feat.title}
+                                        </h3>
+                                        <p className="text-gray-600 dark:text-gray-400 mb-4 leading-relaxed text-lg sm:text-base">
+                                            {feat.desc}
+                                        </p>
+                                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed text-sm sm:text-xs">
+                                            {feat.detail}
+                                        </p>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}

@@ -104,7 +104,7 @@ export default function OpenSourceSection() {
                     transition={{ duration: 0.6, ease: "easeOut" }}
                     className="text-center mb-20"
                 >
-                    <h2 className="text-5xl lg:text-4xl font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
+                    <h2 className="text-5xl lg:text-4xl leading-[80px] font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
                         Open Source & Community Driven
                     </h2>
                     <p className="text-xl lg:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">

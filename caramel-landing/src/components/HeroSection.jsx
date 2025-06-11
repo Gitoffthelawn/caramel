@@ -51,26 +51,6 @@ export default function HeroSection() {
             </div>
 
             <div className="relative z-10 max-w-6xl mx-auto text-center">
-                {/* View Code Button */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="mb-8"
-                >
-                    <motion.a
-                        href="https://github.com/DevinoSolutions/caramel"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-3 px-6 py-3 bg-transparent border-2 border-caramel/40 text-caramel hover:bg-caramel hover:text-white hover:border-caramel transition-all duration-300 rounded-full font-semibold text-sm group backdrop-blur-sm"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        <FaGithub className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
-                        View Source Code
-                    </motion.a>
-                </motion.div>
-
                 <motion.h1
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -115,9 +95,53 @@ export default function HeroSection() {
                     transition={{ duration: 0.6, delay: 0.4 }}
                     className="text-xl lg:text-lg md:text-base text-gray-600 dark:text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed"
                 >
-                    The <span className="text-caramel font-semibold">privacy-first</span> alternative to Honey.
+                    The{" "}
+                    <motion.a
+                        href="https://github.com/DevinoSolutions/caramel"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-caramel font-semibold px-1 rounded hover:bg-orange-500/10 transition-all duration-300 cursor-pointer"
+                        whileHover={{
+                            backgroundColor: "rgba(234, 105, 37, 0.1)",
+                            scale: 1.02
+                        }}
+                    >
+                        open-source
+                    </motion.a>{" "}
+                    and{" "}
+                    <motion.a
+                        href="#why-not"
+                        className="text-caramel font-semibold px-1 rounded hover:bg-orange-500/10 transition-all duration-300 cursor-pointer"
+                        whileHover={{
+                            backgroundColor: "rgba(234, 105, 37, 0.1)",
+                            scale: 1.02
+                        }}
+                    >
+                        privacy-first
+                    </motion.a>{" "}
+                    alternative to Honey.
                     Automatically finds and applies the best coupon codes at checkout—
-                    <span className="text-caramel font-semibold"> without selling your data</span> or hijacking creators' commissions.
+                    <motion.a
+                        href="#why-not"
+                        className="text-caramel font-semibold px-1 rounded hover:bg-orange-500/10 transition-all duration-300 cursor-pointer"
+                        whileHover={{
+                            backgroundColor: "rgba(234, 105, 37, 0.1)",
+                            scale: 1.02
+                        }}
+                    >
+                        {" "}without selling your data
+                    </motion.a>{" "}
+                    or{" "}
+                    <motion.a
+                        href="#why-not"
+                        className="text-caramel font-semibold px-1 rounded hover:bg-orange-500/10 transition-all duration-300 cursor-pointer"
+                        whileHover={{
+                            backgroundColor: "rgba(234, 105, 37, 0.1)",
+                            scale: 1.02
+                        }}
+                    >
+                        hijacking creators' commissions
+                    </motion.a>.
                 </motion.p>
 
                 {/* Stats Section */}
@@ -171,6 +195,17 @@ export default function HeroSection() {
                         whileTap={{ scale: 0.95 }}
                     >
                         Install Extension
+                    </motion.a>
+                    <motion.a
+                        href="https://github.com/DevinoSolutions/caramel"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-3 px-6 py-3 bg-transparent border-2 border-caramel/40 text-caramel hover:bg-caramel hover:text-white hover:border-caramel transition-all duration-300 rounded-full font-semibold text-sm group backdrop-blur-sm"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <FaGithub className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+                        View Source Code
                     </motion.a>
                     <motion.a
                         href="#features"

@@ -77,7 +77,7 @@ export default function SupportedSection() {
                     transition={{ duration: 0.6, ease: "easeOut" }}
                     className="text-center mb-20"
                 >
-                    <h2 className="text-5xl lg:text-4xl font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
+                    <h2 className="text-5xl lg:text-4xl leading-[80px] font-extrabold mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-transparent tracking-tight">
                         5,000+ Supported Stores
                     </h2>
                     <p className="text-xl lg:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
@@ -158,78 +158,6 @@ export default function SupportedSection() {
                                 </motion.div>
                             ))}
                         </motion.div>
-                    </div>
-                </motion.div>
-
-                {/* Stats Section */}
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-                    className="mb-24"
-                >
-                    <h3 className="text-3xl lg:text-2xl font-extrabold text-gray-900 dark:text-white mb-12 text-center">
-                        Growing Every Day
-                    </h3>
-                    <div className="grid grid-cols-4 lg:grid-cols-2 sm:grid-cols-1 gap-8 sm:gap-6">
-                        {[
-                            { value: "5,000+", label: "Supported Stores" },
-                            { value: "1M+", label: "Coupons Found" },
-                            { value: "$50M+", label: "Total Savings" },
-                            { value: "100K+", label: "Happy Users" }
-                        ].map((stat, index) => (
-                            <motion.div
-                                key={stat.label}
-                                initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
-                                transition={{
-                                    duration: 0.6,
-                                    delay: index * 0.1,
-                                    type: "spring",
-                                    stiffness: 100,
-                                    damping: 15
-                                }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    y: -5,
-                                    boxShadow: "0 20px 40px rgba(234,105,37,0.15)",
-                                    transition: { duration: 0.2 }
-                                }}
-                                className="relative bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 rounded-3xl p-8 sm:p-6 border border-caramel/20 dark:border-caramel/30 overflow-hidden group"
-                            >
-                                <div className="absolute inset-0 opacity-5">
-                                    <motion.div
-                                        className="w-full h-full"
-                                        style={{
-                                            backgroundImage: `
-                                                linear-gradient(90deg, #ea6925 1px, transparent 1px),
-                                                linear-gradient(#ea6925 1px, transparent 1px)
-                                            `,
-                                            backgroundSize: "20px 20px"
-                                        }}
-                                        animate={{
-                                            backgroundPosition: ["0px 0px", "20px 20px", "0px 0px"]
-                                        }}
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: "linear",
-                                            repeatType: "loop"
-                                        }}
-                                    />
-                                </div>
-                                <div className="relative z-10 text-center">
-                                    <div className="text-4xl sm:text-3xl font-bold text-caramel mb-3">
-                                        {stat.value}
-                                    </div>
-                                    <div className="text-lg sm:text-base text-gray-600 dark:text-gray-400">
-                                        {stat.label}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
                     </div>
                 </motion.div>
 
