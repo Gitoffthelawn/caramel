@@ -1,5 +1,8 @@
 import { cors } from "@/lib/cors";
 import prisma from "@/lib/prisma";
+import {sendEmail} from "@/lib/email";
+import {render} from "@react-email/render";
+import VerificationRequestTemplate from "@/emails/VerificationRequestTemplate";
 
 export default async function handler(req, res) {
     if (req.method !== "POST") {
@@ -12,11 +15,11 @@ export default async function handler(req, res) {
     if (!cleaned) return res.status(400).json({ error: "Missing url" });
 
     try {
-        await prisma.siteSuggestion.upsert({
-            where: { url: cleaned },
-            create: { url: cleaned },
-            update: {},
-        });
+        await sendEmail({
+            to: "amine@devino.ca",
+            subject: 'Caramel Site Suggestion',
+            text: `A user suggested a new site: ${cleaned}`,
+        })
         return res.status(200).json({ ok: true });
     } catch (err) {
         console.error(err);

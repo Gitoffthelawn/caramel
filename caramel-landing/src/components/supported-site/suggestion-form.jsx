@@ -40,19 +40,15 @@ export default function SuggestionForm({ initialValue, resetValue }) {
             <p className="text-gray-700 dark:text-gray-300 text-center leading-relaxed">
                 We don’t support that store yet. Let us know and we’ll add it!
             </p>
-
-            <input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full rounded-full border border-gray-300 dark:border-gray-700 px-6 py-3 text-base outline-none focus:border-caramel dark:focus:border-orange-400 transition bg-white dark:bg-gray-900 dark:text-white"
-            />
-
             <motion.button
                 whileTap={{ scale: 0.95 }}
                 className="px-8 py-3 rounded-full bg-gradient-to-r from-caramel to-orange-600 text-white font-semibold shadow hover:shadow-lg transition-all"
             >
-                {loading ? "Sending…" : "Request Support"}
+                {loading ? "Sending…" : (
+                    <>
+                        Request Support for <span className="font-bold">{url}</span>
+                    </>
+                    )}
             </motion.button>
         </form>
     );
