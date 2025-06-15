@@ -1,60 +1,64 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Caramel</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Caramel</title>
 
-    <!-- Main stylesheet -->
-    <link rel="stylesheet" href="assets/styles.css" />
-</head>
+        <!-- Main stylesheet -->
+        <link rel="stylesheet" href="assets/styles.css" />
+    </head>
 
-<body>
-<!-- Decorative wave background -->
-<div class="popup-bg">
-    <svg class="popup-wave" viewBox="0 0 1440 320" preserveAspectRatio="none">
-        <path
-                fill="#ea6925"
-                d="
+    <body>
+        <!-- Decorative wave background -->
+        <div class="popup-bg">
+            <svg
+                class="popup-wave"
+                viewBox="0 0 1440 320"
+                preserveAspectRatio="none"
+            >
+                <path
+                    fill="#ea6925"
+                    d="
             M0,192L40,186.7C80,181,160,171,240,160C320,149,400,139,480,138.7C560,139,
             640,149,720,176C800,203,880,245,960,234.7C1040,224,1120,160,1200,133.3C1280,
             107,1360,117,1400,122.7L1440,128V0H0Z
           "
-        />
-    </svg>
-</div>
+                />
+            </svg>
+        </div>
 
-<!-- Loading overlay -->
-<div id="loading-container" class="loading-container">
-    <img src="sparkle.svg" alt="loading" />
-</div>
+        <!-- Loading overlay -->
+        <div id="loading-container" class="loading-container">
+            <img src="sparkle.svg" alt="loading" />
+        </div>
 
-<!-- Popup UI -->
-<div class="popup-container">
-    <header class="popup-header">
-        <a
-                href="https://grabcaramel.com"
-                target="_blank"
-                rel="noopener noreferrer"
-        >
-            <img
-                    src="assets/full-logo-no-bg.png"
-                    alt="Caramel Logo"
-                    class="popup-logo"
-            />
-        </a>
+        <!-- Popup UI -->
+        <div class="popup-container">
+            <header class="popup-header">
+                <a
+                    href="https://grabcaramel.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <img
+                        src="assets/full-logo-no-bg.png"
+                        alt="Caramel Logo"
+                        class="popup-logo"
+                    />
+                </a>
 
-        <!-- Shown only when user is logged in -->
-        <div id="settingsIcon" class="profile-settings"></div>
-    </header>
+                <!-- Shown only when user is logged in -->
+                <div id="settingsIcon" class="profile-settings"></div>
+            </header>
 
-    <main id="mainContent">
-        <div id="auth-container"></div>
-    </main>
-</div>
+            <main id="mainContent">
+                <div id="auth-container"></div>
+            </main>
+        </div>
 
-<!-- Scripts -->
-<script src="shared-utils.js"></script>
-<script src="popup.js"></script>
-</body>
+        <!-- Scripts -->
+        <script src="shared-utils.js"></script>
+        <script src="popup.js"></script>
+    </body>
 </html>

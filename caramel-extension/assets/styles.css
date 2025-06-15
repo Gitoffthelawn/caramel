@@ -592,7 +592,9 @@ body {
     font-size: 14px;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.3s ease, color 0.3s ease;
+    transition:
+        background 0.3s ease,
+        color 0.3s ease;
 }
 
 .supported-sites-btn {
@@ -666,7 +668,9 @@ body {
     font-size: 14px;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.3s ease, color 0.3s ease;
+    transition:
+        background 0.3s ease,
+        color 0.3s ease;
 }
 
 .supported-sites-btn {
@@ -706,7 +710,6 @@ body {
 .github-icon:hover {
     opacity: 1;
 }
-
 
 @media (max-width: 480px) {
     .no-coupons-view {

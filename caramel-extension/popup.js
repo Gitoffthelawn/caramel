@@ -3,62 +3,64 @@
 /* ------------------------------------------------------------ */
 /*  Globals                                                     */
 /* ------------------------------------------------------------ */
-let returnView = null; // callback for the “Back” button, set dynamically
+let returnView = null // callback for the “Back” button, set dynamically
 
 /* ------------------------------------------------------------ */
 /*  Bootstrap                                                   */
 /* ------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', async () => {
-    const loader = document.getElementById('loading-container');
-    if (loader) setTimeout(() => (loader.style.display = 'none'), 400);
+    const loader = document.getElementById('loading-container')
+    if (loader) setTimeout(() => (loader.style.display = 'none'), 400)
 
-    await initPopup();
-});
+    await initPopup()
+})
 
 /* ------------------------------------------------------------ */
 /*  Init                                                        */
 /* ------------------------------------------------------------ */
 async function initPopup() {
-    const { url } = await getActiveTabDomainRecord();
+    const { url } = await getActiveTabDomainRecord()
 
-    currentBrowser.storage.sync.get(['token', 'user'], async (res) => {
-        const token = res.token || null;
-        const user = res.user || null;
+    currentBrowser.storage.sync.get(['token', 'user'], async res => {
+        const token = res.token || null
+        const user = res.user || null
 
         if (url) {
-            const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '');
-            const coupons = await fetchCoupons(domain, []);
+            const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
+            const coupons = await fetchCoupons(domain, [])
 
             if (coupons?.length) {
-                await renderCouponsView(coupons, user, domain);
+                await renderCouponsView(coupons, user, domain)
             } else {
-                renderUnsupportedSite(user);
+                renderUnsupportedSite(user)
             }
-            return;
+            return
         }
 
         // no active tab info
-        if (token) renderProfileCard(user);
-        else renderSignInPrompt(null);
-    });
+        if (token) renderProfileCard(user)
+        else renderSignInPrompt(null)
+    })
 }
 
 /* background helper */
 function getActiveTabDomainRecord() {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         currentBrowser.runtime.sendMessage(
             { action: 'getActiveTabDomainRecord' },
-            (response) => resolve(response || {}),
-        );
-    });
+            response => resolve(response || {}),
+        )
+    })
 }
 
 /* ------------------------------------------------------------ */
 /*  Unsupported-site view                                       */
 /* ------------------------------------------------------------ */
 function renderUnsupportedSite(user) {
-    const container = document.getElementById('auth-container');
-    const avatar = user?.image?.length ? user.image : 'assets/default-profile.png';
+    const container = document.getElementById('auth-container')
+    const avatar = user?.image?.length
+        ? user.image
+        : 'assets/default-profile.png'
 
     container.innerHTML = `
     <div class="no-coupons-view fade-in-up">
@@ -78,10 +80,10 @@ function renderUnsupportedSite(user) {
         </a>
 
         ${
-        user
-            ? '<button id="logoutBtn" class="toggle-login-btn">Logout</button>'
-            : '<button id="loginToggleBtn" class="toggle-login-btn">Login</button>'
-    }
+            user
+                ? '<button id="logoutBtn" class="toggle-login-btn">Logout</button>'
+                : '<button id="loginToggleBtn" class="toggle-login-btn">Login</button>'
+        }
 
         <a
           href="https://github.com/DevinoSolutions/caramel"
@@ -93,35 +95,34 @@ function renderUnsupportedSite(user) {
         </a>
       </div>
     </div>
-  `;
+  `
 
     /* wiring */
-    const loginToggle = document.getElementById('loginToggleBtn');
+    const loginToggle = document.getElementById('loginToggleBtn')
     if (loginToggle)
         loginToggle.addEventListener('click', () =>
             renderSignInPrompt(() => renderUnsupportedSite(user)),
-        );
+        )
 
-    const logout = document.getElementById('logoutBtn');
+    const logout = document.getElementById('logoutBtn')
     if (logout)
         logout.addEventListener('click', () => {
             currentBrowser.storage.sync.remove(['token', 'user'], () =>
                 renderUnsupportedSite(null),
-            );
-        });
+            )
+        })
 }
 
 /* ------------------------------------------------------------ */
 /*  Login prompt                                                */
 /* ------------------------------------------------------------ */
 function renderSignInPrompt(backFn) {
-    returnView = typeof backFn === 'function' ? backFn : null;
+    returnView = typeof backFn === 'function' ? backFn : null
 
-    const container = document.getElementById('auth-container');
+    const container = document.getElementById('auth-container')
 
     container.innerHTML = `
     <div class="login-prompt fade-in-up">
-      <p>In order to start using our coupons, please sign in!</p>
 
       <form id="loginForm" class="login-form">
         <div id="loginErrorMessage" class="error-message" style="display:none;"></div>
@@ -149,59 +150,64 @@ function renderSignInPrompt(backFn) {
       </p>
 
       ${
-        returnView
-            ? '<button id="backBtn" class="back-btn" type="button">← Back</button>'
-            : ''
-    }
+          returnView
+              ? '<button id="backBtn" class="back-btn" type="button">← Back</button>'
+              : ''
+      }
     </div>
-  `;
+  `
 
-    const settingsIcon = document.getElementById('settingsIcon');
-    if (settingsIcon) settingsIcon.style.display = 'none';
+    const settingsIcon = document.getElementById('settingsIcon')
+    if (settingsIcon) settingsIcon.style.display = 'none'
 
-    const backBtn = document.getElementById('backBtn');
-    if (backBtn && returnView) backBtn.addEventListener('click', returnView);
+    const backBtn = document.getElementById('backBtn')
+    if (backBtn && returnView) backBtn.addEventListener('click', returnView)
 
-    const loginForm = document.getElementById('loginForm');
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    const loginForm = document.getElementById('loginForm')
+    loginForm.addEventListener('submit', async e => {
+        e.preventDefault()
 
-        const errorBox = document.getElementById('loginErrorMessage');
-        errorBox.style.display = 'none';
-        errorBox.textContent = '';
+        const errorBox = document.getElementById('loginErrorMessage')
+        errorBox.style.display = 'none'
+        errorBox.textContent = ''
 
         try {
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value.trim()
+            const password = document.getElementById('password').value
 
-            const res = await fetch('https://grabcaramel.com/api/extension/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
+            const res = await fetch(
+                'https://grabcaramel.com/api/extension/login',
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                },
+            )
 
             if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || 'Login failed');
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || 'Login failed')
             }
 
-            const { token, username, image } = await res.json();
-            const user = { username, image };
+            const { token, username, image } = await res.json()
+            const user = { username, image }
 
-            currentBrowser.storage.sync.set({ token, user }, () => initPopup());
+            currentBrowser.storage.sync.set({ token, user }, () => initPopup())
         } catch (err) {
-            errorBox.textContent = `Login failed: ${err.message}`;
-            errorBox.style.display = 'block';
+            errorBox.textContent = `Login failed: ${err.message}`
+            errorBox.style.display = 'block'
         }
-    });
+    })
 }
 
 /* ------------------------------------------------------------ */
 /*  Profile card                                                */
 /* ------------------------------------------------------------ */
 function renderProfileCard(user) {
-    const container = document.getElementById('auth-container');
-    const avatar = user.image?.length ? user.image : 'assets/default-profile.png';
+    const container = document.getElementById('auth-container')
+    const avatar = user.image?.length
+        ? user.image
+        : 'assets/default-profile.png'
 
     container.innerHTML = `
     <div class="profile-card fade-in-up">
@@ -213,25 +219,25 @@ function renderProfileCard(user) {
         <button id="logoutBtn" class="logout-button">Logout</button>
       </div>
     </div>
-  `;
+  `
 
-    const settingsIcon = document.getElementById('settingsIcon');
+    const settingsIcon = document.getElementById('settingsIcon')
     if (settingsIcon) {
-        settingsIcon.style.display = 'block';
+        settingsIcon.style.display = 'block'
         settingsIcon.onclick = () =>
-            window.open('https://grabcaramel.com/profile', '_blank');
+            window.open('https://grabcaramel.com/profile', '_blank')
     }
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
-        currentBrowser.storage.sync.remove(['token', 'user'], initPopup);
-    });
+        currentBrowser.storage.sync.remove(['token', 'user'], initPopup)
+    })
 }
 
 /* ------------------------------------------------------------ */
 /*  Coupons view                                                */
 /* ------------------------------------------------------------ */
 function renderCouponsView(coupons, user, domain) {
-    const container = document.getElementById('auth-container');
+    const container = document.getElementById('auth-container')
 
     const headerLeft = user
         ? `
@@ -245,11 +251,11 @@ function renderCouponsView(coupons, user, domain) {
         : `
         <img src="assets/default-profile.png" class="coupons-profile-image" alt="avatar"/>
         <span class="coupons-user-label">Guest</span>
-      `;
+      `
 
     const headerRight = user
         ? '<button id="logoutBtn" class="coupons-logout-button">Logout</button>'
-        : '<button id="loginToggleBtn" class="coupons-logout-button">Login</button>';
+        : '<button id="loginToggleBtn" class="coupons-logout-button">Login</button>'
 
     container.innerHTML = `
     <div class="coupons-profile-card fade-in-up">
@@ -262,11 +268,11 @@ function renderCouponsView(coupons, user, domain) {
 
       <div id="couponList" class="coupon-list">
         ${
-        coupons.length === 0
-            ? '<p>No coupons found for this site</p>'
-            : coupons
-                .map(
-                    (c) => `
+            coupons.length === 0
+                ? '<p>No coupons found for this site</p>'
+                : coupons
+                      .map(
+                          c => `
             <div data-code="${c.code}" class="coupon-item">
               <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
               <div class="coupon-desc">${c.description || ''}</div>
@@ -274,58 +280,60 @@ function renderCouponsView(coupons, user, domain) {
                 <button class="copyBtn">Copy "${c.code}"</button>
               </div>
             </div>`,
-                )
-                .join('')
-    }
+                      )
+                      .join('')
+        }
       </div>
     </div>
 
     <div id="toastContainer" class="copy-toast-container"></div>
-  `;
+  `
 
     /* save callback for login back-button */
-    const selfCallback = () => renderCouponsView(coupons, user, domain);
+    const selfCallback = () => renderCouponsView(coupons, user, domain)
 
     /* logout */
-    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
             currentBrowser.storage.sync.remove(['token', 'user'], () =>
                 renderSignInPrompt(selfCallback),
-            );
-        });
+            )
+        })
 
     /* login toggle (guest) */
-    const loginToggle = document.getElementById('loginToggleBtn');
+    const loginToggle = document.getElementById('loginToggleBtn')
     if (loginToggle)
-        loginToggle.addEventListener('click', () => renderSignInPrompt(selfCallback));
+        loginToggle.addEventListener('click', () =>
+            renderSignInPrompt(selfCallback),
+        )
 
     /* copy-to-clipboard */
-    container.querySelectorAll('.coupon-item').forEach((item) => {
-        item.addEventListener('click', (e) => {
-            const code = e.currentTarget.getAttribute('data-code');
+    container.querySelectorAll('.coupon-item').forEach(item => {
+        item.addEventListener('click', e => {
+            const code = e.currentTarget.getAttribute('data-code')
             navigator.clipboard
                 .writeText(code)
                 .then(() => showCopyToast(`Copied "${code}" to clipboard!`))
-                .catch(() => {});
-        });
-    });
+                .catch(() => {})
+        })
+    })
 }
 
 /* ------------------------------------------------------------ */
 /*  Toast helper                                                */
 /* ------------------------------------------------------------ */
 function showCopyToast(message) {
-    const host = document.getElementById('toastContainer');
-    if (!host) return;
+    const host = document.getElementById('toastContainer')
+    if (!host) return
 
-    const toast = document.createElement('div');
-    toast.className = 'copy-toast';
-    toast.textContent = message;
-    host.appendChild(toast);
+    const toast = document.createElement('div')
+    toast.className = 'copy-toast'
+    toast.textContent = message
+    host.appendChild(toast)
 
     setTimeout(() => {
-        toast.classList.add('fade-out');
-        toast.addEventListener('animationend', () => toast.remove());
-    }, 2000);
+        toast.classList.add('fade-out')
+        toast.addEventListener('animationend', () => toast.remove())
+    }, 2000)
 }
