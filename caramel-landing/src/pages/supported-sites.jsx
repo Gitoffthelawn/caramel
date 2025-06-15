@@ -1,4 +1,4 @@
-import SearchSection from "./search-section";
+import SearchSection from "@/components/supported-site/search-section";
 
 export const metadata = { title: "Supported Sites | Caramel" };
 
