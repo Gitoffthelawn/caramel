@@ -1,307 +1,331 @@
-// popup.js
+/* global currentBrowser, fetchCoupons */
 
+/* ------------------------------------------------------------ */
+/*  Globals                                                     */
+/* ------------------------------------------------------------ */
+let returnView = null; // callback for the “Back” button, set dynamically
+
+/* ------------------------------------------------------------ */
+/*  Bootstrap                                                   */
+/* ------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', async () => {
-    // Remove the loading overlay after a short delay
-    const loadingContainer = document.getElementById('loading-container')
-    if (loadingContainer) {
-        setTimeout(() => {
-            loadingContainer.style.display = 'none'
-        }, 400)
-    }
+    const loader = document.getElementById('loading-container');
+    if (loader) setTimeout(() => (loader.style.display = 'none'), 400);
 
-    // 1) Main init
-    await initPopup()
-})
+    await initPopup();
+});
 
-// ========================================================
-//  Main logic entry — checks the current domain via background
-// ========================================================
+/* ------------------------------------------------------------ */
+/*  Init                                                        */
+/* ------------------------------------------------------------ */
 async function initPopup() {
-    const { url } = await getActiveTabDomainRecord()
-    // Grab the user’s auth info from storage
-    currentBrowser.storage.sync.get(['token', 'user'], async result => {
-        const token = result.token
-        const user = result.user
+    const { url } = await getActiveTabDomainRecord();
+
+    currentBrowser.storage.sync.get(['token', 'user'], async (res) => {
+        const token = res.token || null;
+        const user = res.user || null;
+
         if (url) {
-            const domainString = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
-            console.log('Domain string:', domainString)
-            const coupons = await fetchCoupons(domainString, [])
-            console.log('Coupons:', coupons)
+            const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '');
+            const coupons = await fetchCoupons(domain, []);
+
             if (coupons?.length) {
-                await proceedPopulateCoupons(coupons, user, domainString)
-                return
+                await renderCouponsView(coupons, user, domain);
+            } else {
+                renderUnsupportedSite(user);
             }
+            return;
         }
-        if (token) {
-            renderProfileCard(user)
-        } else {
-            renderSignInPrompt()
-        }
-    })
+
+        // no active tab info
+        if (token) renderProfileCard(user);
+        else renderSignInPrompt(null);
+    });
 }
 
-// ========================================================
-//  Ask background for the domain record of the active tab
-// ========================================================
+/* background helper */
 function getActiveTabDomainRecord() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         currentBrowser.runtime.sendMessage(
             { action: 'getActiveTabDomainRecord' },
-            response => {
-                resolve(response)
-            },
-        )
-    })
+            (response) => resolve(response || {}),
+        );
+    });
 }
 
-// ========================================================
-//  Old logic unchanged below...
-// ========================================================
-function renderSignInPrompt() {
-    const authContainer = document.getElementById('auth-container')
-    authContainer.innerHTML = `
-      <div class="login-prompt fade-in-up">
-        <p>In order to start using our coupons, please sign in!</p>
-        <form id="loginForm" class="login-form">
-          <div id="loginErrorMessage" class="error-message" style="display: none;"></div>
-          <div>
-            <label>Email</label>
-            <input type="email" id="email" required />
-          </div>
-          <div>
-            <label>Password</label>
-            <input type="password" id="password" required />
-          </div>
-          <button type="submit" class="login-button">Login</button>
-        </form>
-        <p class="mt-6">Don't have an account?
-          <a href="https://grabcaramel.com/signup" target="_blank" rel="noopener noreferrer">Sign Up</a>
-        </p>
-      </div>
-    `
+/* ------------------------------------------------------------ */
+/*  Unsupported-site view                                       */
+/* ------------------------------------------------------------ */
+function renderUnsupportedSite(user) {
+    const container = document.getElementById('auth-container');
+    const avatar = user?.image?.length ? user.image : 'assets/default-profile.png';
 
-    // Hide the settings icon when not logged in
-    const settingsIcon = document.getElementById('settingsIcon')
-    if (settingsIcon) {
-        settingsIcon.style.display = 'none'
+    container.innerHTML = `
+    <div class="no-coupons-view fade-in-up">
+      <img src="${avatar}" class="no-coupons-avatar" alt="User avatar"/>
+
+      <h3>No coupons are available for this site.</h3>
+      <p>Click below to see which sites we support.</p>
+
+      <div class="no-coupons-actions">
+        <a
+          href="https://grabcaramel.com/supported-sites"
+          class="supported-sites-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View Supported Sites
+        </a>
+
+        ${
+        user
+            ? '<button id="logoutBtn" class="toggle-login-btn">Logout</button>'
+            : '<button id="loginToggleBtn" class="toggle-login-btn">Login</button>'
     }
 
-    const loginForm = document.getElementById('loginForm')
-    loginForm.addEventListener('submit', async e => {
-        e.preventDefault()
-
-        const errorMessageElem = document.getElementById('loginErrorMessage')
-        errorMessageElem.style.display = 'none'
-        errorMessageElem.textContent = ''
-
-        const email = document.getElementById('email').value.trim()
-        const password = document.getElementById('password').value
-
-        try {
-            // Call your Next.js endpoint at /extension/login
-            const response = await fetch(
-                'https://grabcaramel.com/api/extension/login',
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password }),
-                },
-            )
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}))
-                throw new Error(errData.error || 'Login failed')
-            }
-
-            const { token, username, image } = await response.json()
-            const user = { username, image }
-
-            // Store token/user
-            currentBrowser.storage.sync.set({ token, user }, () => {
-                // Re-init the popup so it can show the "profile card" or "checkout UI"
-                initPopup()
-            })
-        } catch (err) {
-            console.error('Login error:', err)
-            errorMessageElem.textContent = `Login failed: ${err.message}`
-            errorMessageElem.style.display = 'block'
-        }
-    })
-}
-
-function renderProfileCard(user) {
-    const authContainer = document.getElementById('auth-container')
-    const imageUrl =
-        user.image && user.image.length
-            ? user.image
-            : 'assets/default-profile.png'
-
-    authContainer.innerHTML = `
-    <div class="profile-card fade-in-up">
-      <img src="${imageUrl}" alt="Profile" class="profile-image" />
-      <div class="welcome-message">Welcome back, ${user.username}!</div>
-      <div class="username">@${user.username}</div>
-      <div class="profile-actions">
-        <button id="logoutButton" class="logout-button">Logout</button>
+        <a
+          href="https://github.com/DevinoSolutions/caramel"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="All extension code is 100% open-source."
+        >
+          <img src="assets/github.png" class="github-icon" alt="GitHub"/>
+        </a>
       </div>
     </div>
-  `
+  `;
 
-    // Show the settings icon in the header
-    const settingsIcon = document.getElementById('settingsIcon')
-    if (settingsIcon) {
-        settingsIcon.style.display = 'block'
-        settingsIcon.onclick = () => {
-            window.open('https://grabcaramel.com/profile', '_blank')
-        }
-    }
+    /* wiring */
+    const loginToggle = document.getElementById('loginToggleBtn');
+    if (loginToggle)
+        loginToggle.addEventListener('click', () =>
+            renderSignInPrompt(() => renderUnsupportedSite(user)),
+        );
 
-    document.getElementById('logoutButton').addEventListener('click', () => {
-        currentBrowser.storage.sync.remove(['token', 'user'], () => {
-            // Re-init so it shows the sign-in prompt again
-            initPopup()
-        })
-    })
+    const logout = document.getElementById('logoutBtn');
+    if (logout)
+        logout.addEventListener('click', () => {
+            currentBrowser.storage.sync.remove(['token', 'user'], () =>
+                renderUnsupportedSite(null),
+            );
+        });
 }
 
-// ========================================================
-//  NEW 1: Render login prompt specifically for "checkout" flows
-//         (Same as normal login, but includes a "Back" button.)
-// ========================================================
+/* ------------------------------------------------------------ */
+/*  Login prompt                                                */
+/* ------------------------------------------------------------ */
+function renderSignInPrompt(backFn) {
+    returnView = typeof backFn === 'function' ? backFn : null;
 
-// ========================================================
-//  NEW 2: Show the actual coupon list for the recognized domain
-// ========================================================
-async function renderCheckoutCoupons(domainRecord, user) {
-    // 1) Fetch coupons for this domain
-    const coupons = await getCoupons(domainRecord, true)
+    const container = document.getElementById('auth-container');
 
-    await proceedPopulateCoupons(coupons, user, domainRecord.domain)
-}
+    container.innerHTML = `
+    <div class="login-prompt fade-in-up">
+      <p>In order to start using our coupons, please sign in!</p>
 
-async function proceedPopulateCoupons(coupons, user, url) {
-    const authContainer = document.getElementById('auth-container')
-    // 2) Determine what to display in the top "header" area
-    let headerLeftHtml = ''
-    let headerRightButtonHtml = ''
+      <form id="loginForm" class="login-form">
+        <div id="loginErrorMessage" class="error-message" style="display:none;"></div>
 
-    if (user) {
-        // Logged-in scenario: show user profile image + username
-        const imageUrl =
-            user.image && user.image.length
-                ? user.image
-                : 'assets/default-profile.png'
-
-        headerLeftHtml = `
-            <img src="${imageUrl}" alt="Profile" class="coupons-profile-image" />
-            <span class="coupons-user-label">@${user.username}</span>
-        `
-        // Logged-in user sees a "Logout" button
-        headerRightButtonHtml = `<button id="logoutButton" class="coupons-logout-button">Logout</button>`
-    } else {
-        // Guest scenario
-        headerLeftHtml = `
-            <img src="assets/default-profile.png" alt="Profile" class="coupons-profile-image" />
-            <span class="coupons-user-label">Guest</span>
-        `
-        headerRightButtonHtml = `<button id="loginButton" class="coupons-logout-button">Login</button>`
-    }
-
-    authContainer.innerHTML = `
-        <div class="coupons-profile-card fade-in-up">
-            <!-- Minimal "profile" row on top (like a header) -->
-            <div class="coupons-profile-row">
-                <div class="coupons-profile-info">
-                    ${headerLeftHtml}
-                </div>
-                ${headerRightButtonHtml}
-            </div>
-
-            <h3 class="coupon-header">Coupons for ${url}</h3>
-            <div id="couponList" class="coupon-list">
-                ${
-                    coupons.length === 0
-                        ? `<p>No coupons found for this site</p>`
-                        : coupons
-                              .map(
-                                  c => `
-                                <div data-code="${c.code}" class="coupon-item">
-                                    <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
-                                    <div class="coupon-desc">${c.description || ''}</div>
-                                    <div class="coupon-action">
-                                        <button 
-                                            class="copyBtn" 
-                                        >
-                                            Copy "${c.code}"
-                                        </button>
-                                    </div>
-                                </div>
-                            `,
-                              )
-                              .join('')
-                }
-            </div>
+        <div>
+          <label>Email</label>
+          <input type="email" id="email" required/>
         </div>
-        <!-- Toast container (for showing copy notifications) -->
-        <div id="toastContainer" class="copy-toast-container"></div>
-    `
 
-    // 4) Wire up the "Logout" or "Login" button
-    if (user) {
-        const logoutButton = document.getElementById('logoutButton')
-        if (logoutButton) {
-            logoutButton.addEventListener('click', () => {
-                currentBrowser.storage.sync.remove(['token', 'user'], () => {
-                    // Now user is logged out -> show sign-in prompt for checkout
-                    renderSignInPrompt()
-                })
-            })
+        <div>
+          <label>Password</label>
+          <input type="password" id="password" required/>
+        </div>
+
+        <button type="submit" class="login-button">Login</button>
+      </form>
+
+      <p class="mt-6">
+        Don't have an account?
+        <a
+          href="https://grabcaramel.com/signup"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Sign Up</a>
+      </p>
+
+      ${
+        returnView
+            ? '<button id="backBtn" class="back-btn" type="button">← Back</button>'
+            : ''
+    }
+    </div>
+  `;
+
+    const settingsIcon = document.getElementById('settingsIcon');
+    if (settingsIcon) settingsIcon.style.display = 'none';
+
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn && returnView) backBtn.addEventListener('click', returnView);
+
+    const loginForm = document.getElementById('loginForm');
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const errorBox = document.getElementById('loginErrorMessage');
+        errorBox.style.display = 'none';
+        errorBox.textContent = '';
+
+        try {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            const res = await fetch('https://grabcaramel.com/api/extension/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Login failed');
+            }
+
+            const { token, username, image } = await res.json();
+            const user = { username, image };
+
+            currentBrowser.storage.sync.set({ token, user }, () => initPopup());
+        } catch (err) {
+            errorBox.textContent = `Login failed: ${err.message}`;
+            errorBox.style.display = 'block';
         }
-    } else {
-        const loginBtn = document.getElementById('loginButton')
-        if (loginBtn) {
-            loginBtn.addEventListener('click', () => {
-                renderSignInPrompt()
-            })
-        }
+    });
+}
+
+/* ------------------------------------------------------------ */
+/*  Profile card                                                */
+/* ------------------------------------------------------------ */
+function renderProfileCard(user) {
+    const container = document.getElementById('auth-container');
+    const avatar = user.image?.length ? user.image : 'assets/default-profile.png';
+
+    container.innerHTML = `
+    <div class="profile-card fade-in-up">
+      <img src="${avatar}" class="profile-image" alt="Profile"/>
+      <div class="welcome-message">Welcome back, ${user.username}!</div>
+      <div class="username">@${user.username}</div>
+
+      <div class="profile-actions">
+        <button id="logoutBtn" class="logout-button">Logout</button>
+      </div>
+    </div>
+  `;
+
+    const settingsIcon = document.getElementById('settingsIcon');
+    if (settingsIcon) {
+        settingsIcon.style.display = 'block';
+        settingsIcon.onclick = () =>
+            window.open('https://grabcaramel.com/profile', '_blank');
     }
 
-    // 5) Copy button logic + show a toast when successful
-    const copyButtons = authContainer.querySelectorAll('.coupon-item')
-    copyButtons.forEach(btn => {
-        btn.addEventListener('click', e => {
-            const code = e.currentTarget.getAttribute('data-code')
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        currentBrowser.storage.sync.remove(['token', 'user'], initPopup);
+    });
+}
+
+/* ------------------------------------------------------------ */
+/*  Coupons view                                                */
+/* ------------------------------------------------------------ */
+function renderCouponsView(coupons, user, domain) {
+    const container = document.getElementById('auth-container');
+
+    const headerLeft = user
+        ? `
+        <img
+          src="${user.image?.length ? user.image : 'assets/default-profile.png'}"
+          class="coupons-profile-image"
+          alt="avatar"
+        />
+        <span class="coupons-user-label">@${user.username}</span>
+      `
+        : `
+        <img src="assets/default-profile.png" class="coupons-profile-image" alt="avatar"/>
+        <span class="coupons-user-label">Guest</span>
+      `;
+
+    const headerRight = user
+        ? '<button id="logoutBtn" class="coupons-logout-button">Logout</button>'
+        : '<button id="loginToggleBtn" class="coupons-logout-button">Login</button>';
+
+    container.innerHTML = `
+    <div class="coupons-profile-card fade-in-up">
+      <div class="coupons-profile-row">
+        <div class="coupons-profile-info">${headerLeft}</div>
+        ${headerRight}
+      </div>
+
+      <h3 class="coupon-header">Coupons for ${domain}</h3>
+
+      <div id="couponList" class="coupon-list">
+        ${
+        coupons.length === 0
+            ? '<p>No coupons found for this site</p>'
+            : coupons
+                .map(
+                    (c) => `
+            <div data-code="${c.code}" class="coupon-item">
+              <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
+              <div class="coupon-desc">${c.description || ''}</div>
+              <div class="coupon-action">
+                <button class="copyBtn">Copy "${c.code}"</button>
+              </div>
+            </div>`,
+                )
+                .join('')
+    }
+      </div>
+    </div>
+
+    <div id="toastContainer" class="copy-toast-container"></div>
+  `;
+
+    /* save callback for login back-button */
+    const selfCallback = () => renderCouponsView(coupons, user, domain);
+
+    /* logout */
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn)
+        logoutBtn.addEventListener('click', () => {
+            currentBrowser.storage.sync.remove(['token', 'user'], () =>
+                renderSignInPrompt(selfCallback),
+            );
+        });
+
+    /* login toggle (guest) */
+    const loginToggle = document.getElementById('loginToggleBtn');
+    if (loginToggle)
+        loginToggle.addEventListener('click', () => renderSignInPrompt(selfCallback));
+
+    /* copy-to-clipboard */
+    container.querySelectorAll('.coupon-item').forEach((item) => {
+        item.addEventListener('click', (e) => {
+            const code = e.currentTarget.getAttribute('data-code');
             navigator.clipboard
                 .writeText(code)
-                .then(() => {
-                    console.log(`Copied coupon code: ${code}`)
-                    showCopyToast(`Copied "${code}" to clipboard!`)
-                })
-                .catch(err => console.error('Failed to copy code', err))
-        })
-    })
+                .then(() => showCopyToast(`Copied "${code}" to clipboard!`))
+                .catch(() => {});
+        });
+    });
 }
 
-/**
- * Creates and displays a brief toast message indicating a successful copy.
- */
+/* ------------------------------------------------------------ */
+/*  Toast helper                                                */
+/* ------------------------------------------------------------ */
 function showCopyToast(message) {
-    const toastContainer = document.getElementById('toastContainer')
-    if (!toastContainer) return
+    const host = document.getElementById('toastContainer');
+    if (!host) return;
 
-    // Create the toast element
-    const toast = document.createElement('div')
-    toast.className = 'copy-toast'
-    toast.innerText = message
+    const toast = document.createElement('div');
+    toast.className = 'copy-toast';
+    toast.textContent = message;
+    host.appendChild(toast);
 
-    // Add it to the container
-    toastContainer.appendChild(toast)
-
-    // Remove it after animation completes (or set a timer)
     setTimeout(() => {
-        toast.classList.add('fade-out')
-        toast.addEventListener('animationend', () => {
-            toast.remove()
-        })
-    }, 2000)
+        toast.classList.add('fade-out');
+        toast.addEventListener('animationend', () => toast.remove());
+    }, 2000);
 }
