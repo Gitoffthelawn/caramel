@@ -1,9 +1,4 @@
-import { cors } from "@/lib/cors";
-import prisma from "@/lib/prisma";
 import {sendEmail} from "@/lib/email";
-import {render} from "@react-email/render";
-import VerificationRequestTemplate from "@/emails/VerificationRequestTemplate";
-
 export default async function handler(req, res) {
     if (req.method !== "POST") {
         res.setHeader("Allow", ["POST"]);
@@ -16,7 +11,7 @@ export default async function handler(req, res) {
 
     try {
         await sendEmail({
-            to: "amine@devino.ca",
+            to: "support@unotes.net",
             subject: 'Caramel Site Suggestion',
             text: `A user suggested a new site: ${cleaned}`,
         })
