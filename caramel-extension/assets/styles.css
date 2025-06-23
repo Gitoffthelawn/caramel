@@ -560,7 +560,162 @@ body {
     }
 }
 
+.no-coupons-view {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.no-coupons-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+}
+
+.no-coupons-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.supported-sites-btn,
+.toggle-login-btn {
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+        background 0.3s ease,
+        color 0.3s ease;
+}
+
+.supported-sites-btn {
+    background: #ea6925;
+    color: #fff;
+    border: none;
+}
+.supported-sites-btn:hover {
+    background: #cf581f;
+}
+
+.toggle-login-btn {
+    background: #fff;
+    color: #ea6925;
+    border: 2px solid #ea6925;
+}
+.toggle-login-btn:hover {
+    background: #ea6925;
+    color: #fff;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: #ea6925;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 16px;
+}
+
+.github-icon {
+    width: 28px;
+    height: 28px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+.github-icon:hover {
+    opacity: 1;
+}
+/* --- Unsupported-site section ----------------------------------- */
+
+.no-coupons-view {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.no-coupons-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+}
+
+.no-coupons-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.supported-sites-btn,
+.toggle-login-btn {
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+        background 0.3s ease,
+        color 0.3s ease;
+}
+
+.supported-sites-btn {
+    background: #ea6925;
+    color: #fff;
+    border: none;
+}
+.supported-sites-btn:hover {
+    background: #cf581f;
+}
+
+.toggle-login-btn {
+    background: #fff;
+    color: #ea6925;
+    border: 2px solid #ea6925;
+}
+.toggle-login-btn:hover {
+    background: #ea6925;
+    color: #fff;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: #ea6925;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 12px;
+}
+
+.github-icon {
+    width: 28px;
+    height: 28px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+.github-icon:hover {
+    opacity: 1;
+}
+
 @media (max-width: 480px) {
+    .no-coupons-view {
+        width: 90%;
+        padding: 12px;
+    }
     .coupons-profile-card {
         width: 90%;
         padding: 12px;
