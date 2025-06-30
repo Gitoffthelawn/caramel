@@ -1,8 +1,6 @@
 //UI HELPERS
 
-
 /* -------------------------------------------------- UI prompt   */
-
 
 async function insertCaramelPrompt(domainRecord) {
     // Avoid inserting the prompt more than once
@@ -188,7 +186,6 @@ function hideTestingModal() {
         document.body.removeChild(overlay)
     }
 }
-
 
 async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
     hideTestingModal()
