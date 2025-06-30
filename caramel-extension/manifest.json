@@ -36,7 +36,7 @@
                 "https://*.ebay.com/*",
                 "https://*.codecademy.com/*"
             ],
-            "js": ["shared-utils.js", "inject.js", "amazon.js"]
+            "js": ["shared-utils.js", "UI-helpers.js", "inject.js", "amazon.js"]
         }
     ],
     "background": {
