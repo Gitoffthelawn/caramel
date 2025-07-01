@@ -43,7 +43,7 @@ currentBrowser.runtime.onMessage.addListener(
                 .then(async amazonCartPage => {
                     await currentBrowser.scripting.executeScript({
                         target: { tabId: amazonCartPage.id },
-                        files: ['shared-utils.js'],
+                        files: ['shared-utils.js', 'UI-helpers.js'],
                     })
 
                     const result = await currentBrowser.scripting.executeScript(
@@ -109,7 +109,7 @@ currentBrowser.runtime.onMessage.addListener(
                     try {
                         await currentBrowser.scripting.executeScript({
                             target: { tabId },
-                            files: ['shared-utils.js'],
+                            files: ['shared-utils.js', 'UI-helpers.js'],
                         })
                         const [result] =
                             await currentBrowser.scripting.executeScript({
