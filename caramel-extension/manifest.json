@@ -16,13 +16,7 @@
         "192": "/icons/192.png",
         "512": "/icons/512.png"
     },
-    "permissions": [
-        "tabs",
-        "activeTab",
-        "storage",
-        "scripting",
-        "webNavigation"
-    ],
+    "permissions": ["tabs", "activeTab", "storage", "scripting"],
     "host_permissions": [
         "https://www.amazon.com/*",
         "https://*.ebay.com/*",
