@@ -14,9 +14,9 @@ model Source {
   source    String
   websites  String[]
   status    SourceStatus @default(REQUESTED)
-  coupons   Coupon[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @default(now()) @updatedAt
+  coupons   Coupon[]
 }
 
 model Coupon {
@@ -24,7 +24,7 @@ model Coupon {
   code            String
   site            String
   title           String
-  description     String       @db.Text
+  description     String
   rating          Float
   discount_type   DiscountType @default(PERCENTAGE)
   discount_amount Float?
@@ -34,8 +34,8 @@ model Coupon {
   last_time_used  DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @default(now()) @updatedAt
-  Source          Source?      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   sourceId        String?
+  Source          Source?      @relation(fields: [sourceId], references: [id])
 
   @@unique([code, site])
 }
@@ -89,9 +89,8 @@ model User {
   deletedAt         DateTime?
   role              Role?      @default(USER)
   status            UserStatus @default(NOT_VERIFIED)
-
-  accounts Account[]
-  sessions Session[]
+  accounts          Account[]
+  sessions          Session[]
 
   @@map("users")
 }
