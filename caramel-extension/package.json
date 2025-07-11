@@ -19,5 +19,8 @@
         "eslint-plugin-prettier": "^5.2.6",
         "prettier": "^3.5.3",
         "prettier-plugin-organize-imports": "^4.1.0"
+    },
+    "dependencies": {
+        "web-ext": "^8.8.0"
     }
 }
