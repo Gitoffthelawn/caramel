@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Caramel",
-    "version": "1.0",
+    "version": "1.0.1",
     "description": "Caramel is your trusted, open-source companion for saving on online purchases. No scams, just sweet deals!",
     "browser_specific_settings": {
         "gecko": {
