@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import React, {useContext, useState} from "react";
 import { object, ref, string } from 'yup'
+import AppHeader from "@/components/AppHeader";
 
 import dynamic from 'next/dynamic'
 import {decryptJsonData} from "@/lib/securityHelpers/decryptJsonData";
@@ -91,6 +92,12 @@ export default function Signup() {
     const { handleSubmit, errors, touched, handleChange, handleBlur, values } =
         formik
     return (
+        <>
+            <AppHeader 
+                ogTitle="Caramel | Sign Up" 
+                ogDescription="Join Caramel and start enjoying our services. Sign up now!"
+                ogUrl="https://grabcaramel.com/signup"
+            />
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <ToastContainer theme={isDarkMode ? 'dark' : 'light'}/>
             <motion.div
@@ -203,5 +210,6 @@ export default function Signup() {
                 </p>
             </motion.div>
         </div>
+        </>
     );
 }
