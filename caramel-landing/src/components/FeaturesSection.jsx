@@ -282,28 +282,28 @@ export default function FeaturesSection() {
                     <div className="flex justify-center gap-6 lg:gap-4 sm:flex-col sm:items-center sm:gap-4">
                         {[
                             {
+                                name: "Chrome",
+                                icon: <FaChrome />,
+                                href: "https://chromewebstore.google.com/detail/caramel/gaimofgglbackoimfjopicmbmnlccfoe",
+                                available: true
+                            },
+                            {
                                 name: "Safari",
                                 icon: <FaGlobe />,
                                 href: "https://apps.apple.com/ke/app/caramel/id6741873881",
                                 available: true
                             },
                             {
-                                name: "Chrome",
-                                icon: <FaChrome />,
-                                href: "#",
-                                available: false
-                            },
-                            {
                                 name: "Firefox",
                                 icon: <FaFirefox />,
-                                href: "#",
-                                available: false
+                                href: "https://addons.mozilla.org/en-CA/developers/addon/grabcaramel/",
+                                available: true
                             },
                             {
                                 name: "Edge",
                                 icon: <FaEdge />,
-                                href: "#",
-                                available: false
+                                href: "https://microsoftedge.microsoft.com/addons/detail/caramel/leodahchedhnenmiengkfpmmcdendnof",
+                                available: true
                             }
                         ].map((browser, index) => (
                             <motion.div
