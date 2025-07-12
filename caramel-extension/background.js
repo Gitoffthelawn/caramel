@@ -14,9 +14,10 @@ function isServiceWorkerContext() {
 // Detect if we're in a service worker context or traditional background script
 // This is needed to support Firefox (MV2) and Chromium/Safari browsers (MV3)
 const isServiceWorker = isServiceWorkerContext()
+const hasTabsExecute = !!(currentBrowser.tabs && currentBrowser.tabs.executeScript)
 
 function execScript(details) {
-    if (isServiceWorker) {
+    if (isServiceWorker || !hasTabsExecute) {
         return currentBrowser.scripting.executeScript(details)
     }
     const {
