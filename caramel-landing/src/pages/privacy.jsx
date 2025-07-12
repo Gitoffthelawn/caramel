@@ -4,10 +4,16 @@ import Doodles from "@/components/Doodles";
 import React from "react";
 import { motion } from "framer-motion";
 
+
 const Privacy = () => {
     return (
+        <>
+        <AppHeader 
+            ogTitle="Caramel | Privacy Policy" 
+            ogDescription="Learn how Caramel protects your privacy and handles your data. Our commitment to transparency and security."
+            ogUrl="https://grabcaramel.com/privacy"
+        />
         <main className="w-full relative overflow-x-clip -mt-[6.7rem] dark:bg-darkBg">
-            <AppHeader description={"Caramel Privacy Policy"} ogTitle={"Privacy page"} />
             <Doodles />
 
             <div className="scroll-smooth">
@@ -54,6 +60,7 @@ const Privacy = () => {
                 </motion.div>
             </div>
         </main>
+        </>
     );
 };
 

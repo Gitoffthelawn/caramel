@@ -7,7 +7,6 @@ import SiteCard from "./site-card";
 import SuggestionForm from "./suggestion-form";
 import Loader from "@/components/Loader";
 import {toast} from "react-toastify";
-import {isValidUrl} from "@/lib/urlHelper";
 
 export default function SearchSection() {
     const [query, setQuery] = useState("");
@@ -66,6 +65,7 @@ export default function SearchSection() {
 
     /* ui ------------------------------------------------------ */
     return (
+        <>
         <section className="w-full max-w-3xl mx-auto px-4 sm:px-6">
             <motion.h1
                 initial={{ opacity: 0, y: 20 }}
@@ -162,5 +162,6 @@ export default function SearchSection() {
             )}
 
         </section>
+        </>
     );
 }

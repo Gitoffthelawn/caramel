@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { FaDollarSign, FaLock, FaStar, FaHeart, FaBolt, FaGlobe, FaChrome, FaFirefox, FaEdge } from "react-icons/fa";
+import { FaDollarSign, FaLock, FaStar, FaHeart, FaBolt, FaGlobe, FaChrome, FaFirefox, FaEdge, FaSafari } from "react-icons/fa";
 import { HiCheckCircle, HiXCircle } from "react-icons/hi";
 
 const features = [
@@ -271,13 +271,13 @@ export default function FeaturesSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-                    className="text-center bg-gradient-to-r from-caramel to-orange-600 rounded-3xl p-12 lg:p-8 text-white shadow-lg"
+                    className="text-center bg-gradient-to-r from-caramel to-orange-600 rounded-3xl p-12 lg:p-8 text-black shadow-lg"
                 >
                     <h3 className="text-3xl lg:text-2xl font-extrabold mb-6 tracking-tight">
-                        Available on Safari, More Coming Soon!
+                        Available on Your Favorite Browser!
                     </h3>
                     <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto leading-relaxed">
-                        Start saving with Caramel on Safari today, with Chrome, Firefox, and Edge support coming soon!
+                        Start saving with Caramel on any browser!
                     </p>
                     <div className="flex justify-center gap-6 lg:gap-4 sm:flex-col sm:items-center sm:gap-4">
                         {[
@@ -289,7 +289,7 @@ export default function FeaturesSection() {
                             },
                             {
                                 name: "Safari",
-                                icon: <FaGlobe />,
+                                icon: <FaSafari />,
                                 href: "https://apps.apple.com/ke/app/caramel/id6741873881",
                                 available: true
                             },

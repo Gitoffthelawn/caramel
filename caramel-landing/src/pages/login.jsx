@@ -8,6 +8,7 @@ import { signIn, getSession } from "next-auth/react";
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import {ThemeContext} from "@/lib/contexts";
+import AppHeader from "@/components/AppHeader";
 
 export default function Login() {
     const router = useRouter();
@@ -37,6 +38,12 @@ export default function Login() {
     };
 
     return (
+        <>
+        <AppHeader 
+            ogTitle="Caramel | Login" 
+            ogDescription="Log in to your Caramel account to access exclusive features and start saving with our coupon extension."
+            ogUrl="https://grabcaramel.com/login"
+        />
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <ToastContainer theme={isDarkMode ? 'dark' : 'light'}/>
             <motion.div
@@ -102,5 +109,6 @@ export default function Login() {
                 </p>
             </motion.div>
         </div>
+        </>
     );
 }

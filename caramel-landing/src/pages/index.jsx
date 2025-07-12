@@ -4,15 +4,14 @@ import OpenSourceSection from "@/components/OpenSourceSection";
 import React from "react";
 import Doodles from "@/components/Doodles";
 import SupportedSection from "@/components/SupportedSection";
-import AppHeader from "@/components/AppHeader";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import WhyNotHoneySection from "@/components/WhyNot";
 
 export default function Index() {
     return (
+        <>
         <main className="w-full relative overflow-x-clip -mt-[6.7rem]">
-            <AppHeader />
+
             <Doodles />
 
             {/* Add smooth scrolling behavior */}
@@ -98,5 +97,6 @@ export default function Index() {
                 <OpenSourceSection/>
             </div>
         </main>
+        </>
     );
 }

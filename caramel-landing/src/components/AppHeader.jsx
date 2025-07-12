@@ -1,138 +1,56 @@
-
 import Head from 'next/head'
-import {capitalizeFirst} from "@/lib/capitalizeFirst";
 
 const AppHeader = ({
-                               description,
-                               ogTitle,
-                               ogUrl,
-                               metaDescription,
-                           }) => {
-    const title = `Caramel | ${capitalizeFirst(description || 'Best coupons extension for Chrome and Safari')}`
-    const fullOgUrl = ogUrl ? ogUrl : 'https://dev.grabcaramel.com/'
-    const fullOgImage = `${fullOgUrl}/caramel_banner.png`
-    return (
-        <>
-            <Head>
-                <link rel="icon" href="/favicon.ico"/>
-                <link rel="shortcut icon" href="/caramel.svg"/>
-                <title>{title}</title>
-                <meta
-                    name="description"
-                    content={description || 'YouTube & Spotify AI Summarizer'}
-                />
-                <meta property="og:type" content="website"/>
-                <meta property="og:title" content={ogTitle ? ogTitle : title}/>
-                <meta property="og:description" content={description}/>
-                <meta property="og:image" content={fullOgImage}/>
-                <meta property="og:url" content={fullOgUrl}/>
-                <meta property="og:site_name" content="Caramel"/>
-                <meta property="twitter:card" content="summary_large_image"/>
-                <meta property="twitter:url" content={fullOgUrl}/>
-                <meta property="twitter:title" content={title}/>
-                <meta property="twitter:description" content={description}/>
-                <meta property="twitter:image" content={fullOgImage}/>
-                <meta property="twitter:creator" content="@CaramelOfficial"/>
-                <link rel="canonical" href={fullOgUrl}/>
-                <meta
-                    property="og:title"
-                    name="description"
-                    content={title}
-                    key="title"
-                />
+    ogTitle = 'Caramel | The Trusted Alternative To Honey For Finding Coupons',
+    ogDescription = 'The open-source & privacy-first extension that automatically finds and applies the best coupon codes at checkout without selling your data or hijacking creators’ commissions.',
+    ogUrl = 'https://grabcaramel.com/',
+}) => {
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+  const banner = `${base}/caramel_banner.png`
+  // TODO: square is unused for now but should be used for card that has small image
+  // I couldn't make it work.
+  const square = `${base}/square_caramel_logo.png`
+  const icon = `${base}/caramel.svg`
 
-                <meta
-                    name="description"
-                    content={
-                        metaDescription
-                            ? metaDescription
-                            : 'Caramel | Best coupons extension for Chrome and Safari'
-                    }
-                />
 
-                <meta name="application-name" content="Caramel"/>
-                <meta name="apple-mobile-web-app-capable" content="yes"/>
-                <meta
-                    name="apple-mobile-web-app-status-bar-style"
-                    content="default"
-                />
-                <meta name="apple-mobile-web-app-title" content="Caramel"/>
-                <meta
-                    name="description"
-                    content="Best coupons extension for Chrome and Safari"
-                />
-                <meta name="format-detection" content="telephone=no"/>
-                <meta name="mobile-web-app-capable" content="yes"/>
-                <meta
-                    name="msapplication-config"
-                    content="/icons/browserconfig.xml"
-                />
-                <meta name="msapplication-TileColor" content="#2B5797"/>
-                <meta name="msapplication-tap-highlight" content="no"/>
-                <meta name="theme-color" content="#000000"/>
-                <link
-                    rel="apple-touch-icon"
-                    href="/app/ios/180.png"
-                />
-                <link
-                    rel="apple-touch-icon"
-                    sizes="152x152"
-                    href="/app/ios/152.png"
-                />
-                <link
-                    rel="apple-touch-icon"
-                    sizes="180x180"
-                    href="/app/ios/180.png"
-                />
-                <link
-                    rel="apple-touch-icon"
-                    sizes="167x167"
-                    href="/app/ios/167.png"
-                />
+  return (
+    <Head>
+      {/* Favicons */}
+      <link rel="icon" href="/favicon.ico" />
+      <link rel="shortcut icon" href={icon} />
+      <link rel="apple-touch-icon" sizes="180x180" href="/app/ios/180.png" />
 
-                <link
-                    rel="icon"
-                    type="image/png"
-                    sizes="32x32"
-                    href="/app/ios/32.png"
-                />
-                <link
-                    rel="icon"
-                    type="image/png"
-                    sizes="16x16"
-                    href="/app/ios/16.png"
-                />
-                <link rel="manifest" href="/manifest.json"/>
-                <meta name="twitter:card" content="summary"/>
-                <meta
-                    name="twitter:url"
-                    content={ogUrl ? ogUrl : 'https://dev.grabcaramel.com/'}
-                />
-                <meta name="twitter:title" content="Caramel"/>
-                <meta
-                    name="twitter:description"
-                    content="Best coupons extension for Chrome and Safari"
-                />
-                <meta name="twitter:image" content="/og.svg"/>
-                <meta name="twitter:creator" content="@CaramelOfficial"/>
-                <meta property="og:type" content="website"/>
-                <meta
-                    property="og:title"
-                    content={ogTitle ? ogTitle : 'Caramel'}
-                />
-                <meta
-                    property="og:description"
-                    content="Best coupons extension for Chrome and Safari"
-                />
-                <meta property="og:site_name" content="Caramel"/>
-                <meta
-                    property="og:url"
-                    content={ogUrl ? ogUrl : 'https://dev.grabcaramel.com/'}
-                />
-                <meta property="og:image" content="/caramel.svg"/>
-            </Head>
-        </>
-    )
+      {/* Canonical and basic SEO */}
+      <title>{ogTitle}</title>
+      <meta name="description" content={ogDescription} />
+      <link rel="canonical" href={ogUrl} />
+
+      {/* Open Graph */}
+      <meta property="og:type"        content="website" />
+      <meta property="og:url"         content={ogUrl} />
+      <meta property="og:logo" content={square} />
+      <meta property="og:locale" content="en_US" />
+      <meta property="og:title"       content={ogTitle} />
+      <meta property="og:description" content={ogDescription} />
+      <meta property="og:image"       content={banner} />
+      <meta property="og:image:width"  content="1200" />
+      <meta property="og:image:height" content="630" />
+
+
+      {/* Twitter */}
+      <meta name="twitter:card"        content="summary_large_image" />
+      <meta name="twitter:site"        content="@CaramelOfficial" />
+      <meta name="twitter:url"         content={ogUrl} />
+      <meta name="twitter:title"       content={ogTitle} />
+      <meta name="twitter:description" content={ogDescription} />
+      <meta name="twitter:image"       content={banner} />
+
+      {/* PWA / theme */}
+      <link rel="manifest" href="/manifest.json" />
+      <meta name="application-name"               content="Caramel" />
+      <meta name="apple-mobile-web-app-capable"   content="yes" />
+    </Head>
+  )
 }
 
 export default AppHeader
