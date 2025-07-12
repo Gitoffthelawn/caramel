@@ -296,7 +296,7 @@ export default function FeaturesSection() {
                             {
                                 name: "Firefox",
                                 icon: <FaFirefox />,
-                                href: "https://addons.mozilla.org/en-CA/developers/addon/grabcaramel/",
+                                href: "https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/",
                                 available: true
                             },
                             {
