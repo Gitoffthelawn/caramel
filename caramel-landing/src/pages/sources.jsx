@@ -3,7 +3,6 @@ import React, {useContext, useEffect, useState} from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { decryptJsonData } from "@/lib/securityHelpers/decryptJsonData";
-import AppHeader from "@/components/AppHeader";
 import Doodles from "@/components/Doodles";
 
 // Recharts imports for the graph.
@@ -100,7 +99,6 @@ export default function SourcesPage() {
     }));
     return (
         <main className="min-h-screen relative overflow-x-clip dark:bg-transparent dark:text-gray-50 bg-gray-50 text-gray-800 p-6">
-            <AppHeader description={"Caramel coupon sources page"} />
             <Doodles />
             <motion.h1
                 className="text-4xl font-bold text-caramel mb-4 text-center"

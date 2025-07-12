@@ -1,4 +1,3 @@
-import AppHeader from '@/components/AppHeader'
 import { ThemeContext } from '@/lib/contexts'
 import * as gtag from '@/lib/gtag'
 import '@/styles/globals.css'
@@ -61,13 +60,9 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     }, [])
     return (
         <>
+            <AppHeader />
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
                 <SessionProvider session={session}>
-                    <AppHeader
-                        description="Best coupons extension for Chrome and Safari"
-                        ogTitle="Caramel"
-                        ogUrl="https://dev.grabcaramel.com/"
-                    />
                     {pagesLayoutless &&
                     pagesLayoutless.some(page => pathname.includes(page)) ? (
                         <Component {...pageProps} />

@@ -120,7 +120,7 @@ export default function HeroSection() {
                         privacy-first
                     </motion.a>{" "}
                     alternative to Honey.
-                    Automatically finds and applies the best coupon codes at checkout—
+                    Automatically finds and applies the best coupon codes at checkout —
                     <motion.a
                         href="#why-not"
                         className="text-caramel font-semibold px-1 rounded hover:bg-orange-500/10 transition-all duration-300 cursor-pointer"
@@ -186,13 +186,23 @@ export default function HeroSection() {
                     className="flex justify-center gap-4 md:flex-col md:items-center md:gap-3"
                 >
                     <motion.a
-                        href="#install-extension"
-                        className="px-8 py-4 bg-gradient-to-r from-caramel to-orange-600 hover:from-orange-600 hover:to-caramel text-white font-semibold rounded-full transition-all duration-300 shadow-lg hover:shadow-xl"
-                        whileHover={{
-                            scale: 1.05,
-                            boxShadow: "0 20px 40px rgba(234,105,37,0.3)"
-                        }}
-                        whileTap={{ scale: 0.95 }}
+                    href="#install-extension"
+                    className="px-8 py-4 bg-gradient-to-r from-caramel to-orange-600 hover:from-orange-600 hover:to-caramel text-black font-semibold rounded-full transition-all duration-300 shadow-lg hover:shadow-xl"
+                    initial={{ scale: 1, boxShadow: "0 0 10px rgba(234,105,37,0.6)" }}
+                    animate={{
+                        scale: [1, 1.12, 1],
+                        boxShadow: [
+                        "0 0 10px rgba(234,105,37,0.6)",
+                        "0 0 28px rgba(234,105,37,1)",
+                        "0 0 10px rgba(234,105,37,0.6)"
+                        ]
+                    }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 20px 40px rgba(234,105,37,0.35)"
+                    }}
+                    whileTap={{ scale: 0.95 }}
                     >
                         Install Extension
                     </motion.a>
