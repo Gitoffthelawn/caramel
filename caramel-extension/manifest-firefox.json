@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Caramel",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Caramel is your trusted, open-source companion for saving on online purchases. No scams, just sweet deals!",
     "browser_specific_settings": {
         "gecko": {
@@ -16,7 +16,7 @@
         "192": "/icons/192.png",
         "512": "/icons/512.png"
     },
-    "permissions": ["tabs", "activeTab", "storage", "scripting"],
+    "permissions": ["tabs", "activeTab", "storage", "scripting", "alarms"],
     "host_permissions": [
         "https://www.amazon.com/*",
         "https://*.ebay.com/*",
@@ -40,7 +40,7 @@
         }
     ],
     "background": {
-        "service_worker": "background.js"
+        "scripts": ["background.js"]
     },
     "action": {
         "default_popup": "index.html",

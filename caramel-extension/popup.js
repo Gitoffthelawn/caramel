@@ -39,18 +39,20 @@ async function initPopup() {
 
         // no active tab info
         if (token) renderProfileCard(user)
-        else renderSignInPrompt(null)
+        else renderUnsupportedSite(null)
     })
 }
 
 /* background helper */
-function getActiveTabDomainRecord() {
-    return new Promise(resolve => {
+async function getActiveTabDomainRecord() {
+    const resp = await new Promise(resolve => {
         currentBrowser.runtime.sendMessage(
             { action: 'getActiveTabDomainRecord' },
-            response => resolve(response || {}),
+            reply => resolve(reply), // will be undefined on error
         )
     })
+
+    return resp
 }
 
 /* ------------------------------------------------------------ */

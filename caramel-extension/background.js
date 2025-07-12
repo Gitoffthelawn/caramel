@@ -4,11 +4,62 @@ const currentBrowser = (() => {
     throw new Error('Browser is not supported!')
 })()
 
+function isServiceWorkerContext() {
+    return (
+        typeof ServiceWorkerGlobalScope !== 'undefined' &&
+        self instanceof ServiceWorkerGlobalScope
+    )
+}
+
+// Detect if we're in a service worker context or traditional background script
+// This is needed to support Firefox (MV2) and Chromium/Safari browsers (MV3)
+const isServiceWorker = isServiceWorkerContext()
+const hasTabsExecute = !!(
+    currentBrowser.tabs && currentBrowser.tabs.executeScript
+)
+
+function execScript(details) {
+    if (isServiceWorker || !hasTabsExecute) {
+        return currentBrowser.scripting.executeScript(details)
+    }
+    const {
+        target: { tabId },
+        files,
+        func,
+    } = details // MV2 fallback (For Firefox)
+    if (files && files.length) {
+        return files.reduce(
+            (p, f) =>
+                p.then(() =>
+                    currentBrowser.tabs.executeScript(tabId, { file: f }),
+                ),
+            Promise.resolve(),
+        )
+    }
+    return currentBrowser.tabs.executeScript(tabId, { code: `(${func})();` })
+}
+
 // Keep-Alive Mechanism
 function keepAlive() {
-    setInterval(() => {
-        console.log('Service worker is alive')
-    }, 10000) // Logs every 10 seconds to indicate service worker is active
+    if (isServiceWorker) {
+        // For service workers, use chrome.alarms to keep alive
+        try {
+            currentBrowser.alarms.create('keepAlive', { periodInMinutes: 1 })
+
+            currentBrowser.alarms.onAlarm.addListener(alarm => {
+                if (alarm.name === 'keepAlive') {
+                    // Service worker is alive - periodic check
+                }
+            })
+        } catch (error) {
+            // Fallback if alarms API is not available
+        }
+    } else {
+        // For traditional background scripts, use setInterval
+        setInterval(() => {
+            // Background script is alive - periodic check
+        }, 10000) // Check every 10 seconds
+    }
 }
 
 keepAlive()
@@ -41,50 +92,42 @@ currentBrowser.runtime.onMessage.addListener(
                     url: 'https://www.amazon.com/gp/cart/view.html?ref_=nav_cart',
                 })
                 .then(async amazonCartPage => {
-                    await currentBrowser.scripting.executeScript({
+                    await execScript({
                         target: { tabId: amazonCartPage.id },
                         files: ['shared-utils.js', 'UI-helpers.js'],
                     })
 
-                    const result = await currentBrowser.scripting.executeScript(
-                        {
-                            target: { tabId: amazonCartPage.id },
-                            func: async () => {
-                                window.showTestingModal(
-                                    'Fetching coupon keywords...',
-                                    true,
-                                )
-                                return new Promise(async (resolve, reject) => {
-                                    try {
-                                        const productTitleElements =
-                                            document.querySelectorAll(
-                                                '.sc-product-title',
-                                            )
-                                        const titles = Array.from(
-                                            productTitleElements,
-                                        ).map(element =>
-                                            element.textContent.trim(),
+                    const result = await execScript({
+                        target: { tabId: amazonCartPage.id },
+                        func: async () => {
+                            window.showTestingModal(
+                                'Fetching coupon keywords...',
+                                true,
+                            )
+                            return new Promise(async (resolve, reject) => {
+                                try {
+                                    const productTitleElements =
+                                        document.querySelectorAll(
+                                            '.sc-product-title',
                                         )
-                                        const keywords = titles
-                                            .join(' ')
-                                            .split(' ')
-                                        console.log('Keywords:', keywords)
-                                        const filteredKeywords =
-                                            await window.filterKeywords(
-                                                keywords,
-                                            )
-                                        console.log(
-                                            'Filtered Keywords:',
-                                            filteredKeywords,
-                                        )
-                                        resolve(filteredKeywords)
-                                    } catch (error) {
-                                        reject(error)
-                                    }
-                                })
-                            },
+                                    const titles = Array.from(
+                                        productTitleElements,
+                                    ).map(element => element.textContent.trim())
+                                    const keywords = titles.join(' ').split(' ')
+                                    console.log('Keywords:', keywords)
+                                    const filteredKeywords =
+                                        await window.filterKeywords(keywords)
+                                    console.log(
+                                        'Filtered Keywords:',
+                                        filteredKeywords,
+                                    )
+                                    resolve(filteredKeywords)
+                                } catch (error) {
+                                    reject(error)
+                                }
+                            })
                         },
-                    )
+                    })
                     console.log('Amazon cart keywords:', result[0].result) // result is wrapped in an array
                     sendResponse({ keywords: result[0].result }) // Send filtered keywords as respons
                     currentBrowser.tabs.remove(amazonCartPage.id)
@@ -107,27 +150,25 @@ currentBrowser.runtime.onMessage.addListener(
                     const tabId = tabs[0].id
 
                     try {
-                        await currentBrowser.scripting.executeScript({
+                        await execScript({
                             target: { tabId },
                             files: ['shared-utils.js', 'UI-helpers.js'],
                         })
-                        const [result] =
-                            await currentBrowser.scripting.executeScript({
-                                target: { tabId },
-                                func: async () => {
-                                    try {
-                                        const hostname =
-                                            window.location.hostname
-                                        return { url: hostname }
-                                    } catch (err) {
-                                        console.error(
-                                            'Error while getting domain record:',
-                                            err,
-                                        )
-                                        return null
-                                    }
-                                },
-                            })
+                        const [result] = await execScript({
+                            target: { tabId },
+                            func: async () => {
+                                try {
+                                    const hostname = window.location.hostname
+                                    return { url: hostname }
+                                } catch (err) {
+                                    console.error(
+                                        'Error while getting domain record:',
+                                        err,
+                                    )
+                                    return null
+                                }
+                            },
+                        })
                         const { domainRecord, url } = result?.result || null
                         sendResponse({ domainRecord, url })
                     } catch (err) {
