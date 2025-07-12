@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
+import AppHeader from '@/components/AppHeader'
 
 const siteId = 6369129
 const hotjarVersion = 6
