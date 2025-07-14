@@ -1,5 +1,5 @@
-[![CI](https://github.com/DevinoSolutions/upup/actions/workflows/publish.yml/badge.svg?branch=master)](https://github.com/DevinoSolutions/upup/actions/workflows/CI.yml)
-[![Discord](https://img.shields.io/discord/1326801110274408478?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/buzn7N5c)
+[![CI](https://github.com/DevinoSolutions/upup/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/DevinoSolutions/upup/actions/workflows/CI.yml)
+[![Discord](https://img.shields.io/discord/1326801110274408478?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/2vVVrQ5CEB)
 
 # Caramel
 
