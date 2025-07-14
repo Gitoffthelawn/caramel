@@ -27,7 +27,7 @@ const platforms = [
     },
     {
         name: 'Discord',
-        href: 'https://discord.gg/buzn7N5c',
+        href: 'https://discord.com/invite/2vVVrQ5CEB',
         desc: 'Join our developer community',
         icon: <FaDiscord />,
         color: 'from-indigo-500 to-purple-600',
@@ -450,7 +450,7 @@ export default function OpenSourceSection() {
                             View on GitHub
                         </motion.a>
                         <motion.a
-                            href="https://discord.gg/buzn7N5c"
+                            href="https://discord.com/invite/2vVVrQ5CEB"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-caramel inline-flex items-center rounded-full border-2 border-white bg-transparent px-8 py-4 font-semibold text-white transition-all duration-200 hover:bg-white"
