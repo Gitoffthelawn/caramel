@@ -1,7 +1,7 @@
 [![CI](https://github.com/DevinoSolutions/caramel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DevinoSolutions/caramel/actions/workflows/ci.yml)
 [![Discord](https://img.shields.io/discord/1326801110274408478?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/2vVVrQ5CEB)
 
-# Caramel
+# Caramel - Trusted Coupon Finder
 
 **Caramel is the open‑source, privacy‑first alternative to Honey.**  
 It automatically tests codes at checkout, never sells your data, and never overwrites creators’ affiliate links. Today Caramel already supports more than **5 000 stores**.
