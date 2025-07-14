@@ -1,4 +1,4 @@
-[![CI](https://github.com/DevinoSolutions/upup/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/DevinoSolutions/upup/actions/workflows/CI.yml)
+[![CI](https://github.com/DevinoSolutions/upup/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DevinoSolutions/upup/actions/workflows/CI.yml)
 [![Discord](https://img.shields.io/discord/1326801110274408478?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/2vVVrQ5CEB)
 
 # Caramel
