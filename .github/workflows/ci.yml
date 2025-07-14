@@ -2,7 +2,7 @@ name: CI – Extension
 
 on:
   pull_request:
-    branches: [ main ]
+  push:
 
 env:
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
