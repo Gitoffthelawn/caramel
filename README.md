@@ -1,6 +1,11 @@
+[![CI](https://github.com/DevinoSolutions/upup/actions/workflows/publish.yml/badge.svg?branch=master)](https://github.com/DevinoSolutions/upup/actions/workflows/CI.yml)
+[![Discord](https://img.shields.io/discord/1326801110274408478?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/buzn7N5c)
+
 # Caramel
 
 Caramel is your trusted, open-source companion for saving on online purchases. No scams, just sweet deals!
+
+All info found in the main page: https://grabcaramel.com/
 
 ## Browser Extension
 
