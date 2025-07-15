@@ -7,8 +7,9 @@
         "build": "npx prisma generate && next build",
         "start": "next start",
         "lint": "next lint",
-        "prettier-check": "prettier --check '**/*.{js,html,css,json,md}'",
-        "prettier-write": "prettier --write '**/*.{js,jsx,html,css,json,md}'"
+        "type-check": "tsc --noEmit",
+        "prettier-check": "prettier --check '**/*.{ts,tsx,js,jsx,html,css,json,md}'",
+        "prettier-write": "prettier --write '**/*.{ts,tsx,js,jsx,html,css,json,md}'"
     },
     "dependencies": {
         "@heroicons/react": "^2.1.1",
@@ -46,8 +47,12 @@
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.10",
         "@types/bcryptjs": "^2.4.6",
+        "@types/cors": "^2.8.19",
         "@types/gtag.js": "^0.0.18",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/lodash.debounce": "^4.0.9",
         "@types/node": "^20.11.24",
+        "@types/nodemailer": "^6.4.17",
         "@types/react": "^18.2.63",
         "@types/react-dom": "^18.2.19",
         "@typescript-eslint/parser": "^8.36.0",
@@ -57,6 +62,7 @@
         "prettier": "^3.6.2",
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.11",
-        "tailwindcss": "^3.4.1"
+        "tailwindcss": "^3.4.1",
+        "typescript": "^5.8.3"
     }
 }
