@@ -7,7 +7,7 @@ const Loader = () => {
         height: '120px',
         animation: 'pulse 1.5s ease-in-out infinite',
     }
-    
+
     return (
         <div>
             <Image

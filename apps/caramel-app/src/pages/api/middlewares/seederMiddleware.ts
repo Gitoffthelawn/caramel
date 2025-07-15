@@ -1,6 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 
-type ApiHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void> | void
+type ApiHandler = (
+    req: NextApiRequest,
+    res: NextApiResponse,
+) => Promise<void> | void
 
 export default function seederMiddleware(handler: ApiHandler) {
     return async (req: NextApiRequest, res: NextApiResponse) => {

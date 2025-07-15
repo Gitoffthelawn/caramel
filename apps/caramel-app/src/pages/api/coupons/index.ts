@@ -26,7 +26,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     await cors(req, res)
     if (req.method === 'GET') {
         try {
-            const { site, skip = '0', limit = '10', key_words }: CouponsQuery = req.query
+            const {
+                site,
+                skip = '0',
+                limit = '10',
+                key_words,
+            }: CouponsQuery = req.query
 
             const filters: any = { expired: false }
 

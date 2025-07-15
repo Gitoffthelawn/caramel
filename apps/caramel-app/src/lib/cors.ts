@@ -4,7 +4,10 @@ import { initMiddleware } from './initMiddleware'
 // Configure the CORS middleware
 export const cors = initMiddleware(
     Cors({
-        origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+        origin: (
+            origin: string | undefined,
+            callback: (error: Error | null, allow?: boolean) => void,
+        ) => {
             const allowedOrigins = [
                 'https://www.amazon.com',
                 'https://www.ebay.com',

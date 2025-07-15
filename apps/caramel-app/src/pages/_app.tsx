@@ -32,10 +32,13 @@ const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
 
 const pagesLayoutless = ['/login', '/signup']
 
-function MyApp({ Component, pageProps: { session, ...pageProps } }: AppProps & { pageProps: { session: any } }) {
+function MyApp({
+    Component,
+    pageProps: { session, ...pageProps },
+}: AppProps & { pageProps: { session: any } }) {
     const [isDarkMode, setDarkMode] = useState(false)
     const { pathname, events } = useRouter()
-    
+
     useEffect(() => {
         const handleRouteChange = (url: string) => {
             gtag.pageView(url)
@@ -45,14 +48,14 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppProps & {
             events.off('routeChangeComplete', handleRouteChange)
         }
     }, [events])
-    
+
     const switchTheme = () => {
         setDarkMode(prevState => {
             localStorage.setItem('theme', prevState ? 'light' : 'dark')
             return !prevState
         })
     }
-    
+
     useEffect(() => {
         if (process.env.NODE_ENV === 'production') {
             Hotjar.init(siteId, hotjarVersion)
@@ -65,7 +68,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppProps & {
             ),
         )
     }, [])
-    
+
     return (
         <>
             <AppHeader />

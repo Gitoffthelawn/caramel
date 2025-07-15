@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer'
 import type { SendMailOptions } from 'nodemailer'
+import nodemailer from 'nodemailer'
 
 // Replace with your SMTP credentials
 const smtpOptions = {

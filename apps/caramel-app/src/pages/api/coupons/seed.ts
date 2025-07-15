@@ -29,7 +29,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (
             coupons.some(
-                coupon => !coupon.site || !coupon.description || !coupon.code || !coupon.title || coupon.rating === undefined || !coupon.expiry,
+                coupon =>
+                    !coupon.site ||
+                    !coupon.description ||
+                    !coupon.code ||
+                    !coupon.title ||
+                    coupon.rating === undefined ||
+                    !coupon.expiry,
             )
         ) {
             return res

@@ -20,7 +20,7 @@ interface NavLink {
 const links: NavLink[] = [
     { name: 'Home', url: '/' },
     { name: 'Privacy', url: '/privacy' },
-    { name: 'Supported Sites', url: '/supported-sites' }
+    { name: 'Supported Sites', url: '/supported-sites' },
 ]
 
 const Link = motion.create(L)

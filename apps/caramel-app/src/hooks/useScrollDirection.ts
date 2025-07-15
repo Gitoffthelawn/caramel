@@ -1,42 +1,42 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react'
 
 export function useScrollDirection(scrollRef?: React.RefObject<HTMLElement>) {
-    const [isScrollingUp, setIsScrollingUp] = useState(false);
-    const [isScrollingDown, setIsScrollingDown] = useState(false);
+    const [isScrollingUp, setIsScrollingUp] = useState(false)
+    const [isScrollingDown, setIsScrollingDown] = useState(false)
 
     // We store the previous scroll position in a ref so it persists across renders
-    const prevScrollPosRef = useRef(0);
+    const prevScrollPosRef = useRef(0)
 
     useEffect(() => {
         // Decide whether to observe the window or a custom scrollable element
-        const target = scrollRef?.current || window;
+        const target = scrollRef?.current || window
 
         function handleScroll() {
             // Current scroll position (for a DIV or for the window)
             const currentScrollPos = scrollRef?.current
                 ? scrollRef.current.scrollTop
-                : window.scrollY;
+                : window.scrollY
 
             if (currentScrollPos > prevScrollPosRef.current) {
                 // The user is scrolling down
-                setIsScrollingDown(true);
-                setIsScrollingUp(false);
+                setIsScrollingDown(true)
+                setIsScrollingUp(false)
             } else if (currentScrollPos < prevScrollPosRef.current) {
                 // The user is scrolling up
-                setIsScrollingDown(false);
-                setIsScrollingUp(true);
+                setIsScrollingDown(false)
+                setIsScrollingUp(true)
             }
 
-            prevScrollPosRef.current = currentScrollPos;
+            prevScrollPosRef.current = currentScrollPos
         }
 
         // Attach the event
-        target.addEventListener("scroll", handleScroll, { passive: true });
+        target.addEventListener('scroll', handleScroll, { passive: true })
         // Cleanup
         return () => {
-            target.removeEventListener("scroll", handleScroll);
-        };
-    }, [scrollRef]);
+            target.removeEventListener('scroll', handleScroll)
+        }
+    }, [scrollRef])
 
-    return { isScrollingUp, isScrollingDown };
+    return { isScrollingUp, isScrollingDown }
 }

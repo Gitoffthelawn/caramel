@@ -1,8 +1,11 @@
-import { getServerSession } from 'next-auth/next'
-import { NextApiRequest, NextApiResponse } from 'next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { NextApiRequest, NextApiResponse } from 'next'
+import { getServerSession } from 'next-auth/next'
 
-type ApiHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void> | void
+type ApiHandler = (
+    req: NextApiRequest,
+    res: NextApiResponse,
+) => Promise<void> | void
 
 /**
  * A higher-order function (HOF) that ensures a user is logged in.
@@ -14,13 +17,13 @@ export function withAuth(handler: ApiHandler) {
     return async function (req: NextApiRequest, res: NextApiResponse) {
         try {
             const session = await getServerSession(req, res, authOptions)
-            
+
             if (!session?.user?.id) {
                 return res
                     .status(401)
                     .json({ status: 'error', message: 'Unauthorized' })
             }
-            
+
             // Add session and user to request object
             ;(req as any).session = session
             ;(req as any).user = session.user

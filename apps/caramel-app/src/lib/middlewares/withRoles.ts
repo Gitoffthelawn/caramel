@@ -1,7 +1,10 @@
 import prisma from '@/lib/prisma'
 import { NextApiRequest, NextApiResponse } from 'next'
 
-type ApiHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void> | void
+type ApiHandler = (
+    req: NextApiRequest,
+    res: NextApiResponse,
+) => Promise<void> | void
 
 /**
  * withRoles(allowedRoles):

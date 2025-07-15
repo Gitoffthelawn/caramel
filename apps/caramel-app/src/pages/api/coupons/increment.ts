@@ -12,7 +12,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const { id } = req.query as IncrementCouponQuery
 
         if (!id || Array.isArray(id)) {
-            return res.status(400).json({ error: 'Invalid or missing coupon ID' })
+            return res
+                .status(400)
+                .json({ error: 'Invalid or missing coupon ID' })
         }
 
         try {

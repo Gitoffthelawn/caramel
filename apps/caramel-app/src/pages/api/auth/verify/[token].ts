@@ -5,19 +5,22 @@ interface VerifyTokenQuery {
     token?: string | string[]
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse,
+) {
     const { token } = req.query as VerifyTokenQuery
-    
+
     if (!token || Array.isArray(token)) {
         return res.status(400).json({ error: 'Token is required' })
     }
-    
+
     const user = await prisma.user.findUnique({
         where: {
             token: token,
         },
     })
-    
+
     if (user) {
         await prisma.user.update({
             where: {
@@ -30,6 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             },
         })
     }
-    
+
     res.redirect('/login')
 }

@@ -15,7 +15,10 @@ interface LoginResponse {
     image: string | null
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse,
+) {
     await cors(req, res)
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' })
@@ -38,11 +41,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!isValid) {
             return res.status(401).json({ error: 'Invalid credentials' })
         }
-        
+
         if (!process.env.JWT_SECRET) {
             return res.status(500).json({ error: 'Internal server error' })
         }
-        
+
         const token = jwt.sign(
             {
                 sub: user.id,
