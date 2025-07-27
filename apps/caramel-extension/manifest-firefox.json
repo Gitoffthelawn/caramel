@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Caramel",
+    "name": "Caramel - The Trusted & Ethical Coupon Finder",
     "version": "1.0.2",
-    "description": "Caramel is your trusted, open-source companion for saving on online purchases. No scams, just sweet deals!",
+    "description": "Open‑source coupon extension that auto‑applies deals without selling data or hijacking commissions.",
     "browser_specific_settings": {
         "gecko": {
             "id": "caramel@devino.ca"

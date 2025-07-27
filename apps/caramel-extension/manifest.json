@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Caramel - Trusted Coupon Finder",
-    "version": "1.0.1",
-    "description": "Caramel is an open-source & privacy-first extension that automatically finds and applies the best coupon codes at checkout without selling your data or hijacking creators’ commissions.",
+    "name": "Caramel - The Trusted & Ethical Coupon Finder",
+    "version": "1.0.2",
+    "description": "Open‑source coupon extension that auto‑applies deals without selling data or hijacking commissions.",
     "browser_specific_settings": {
         "gecko": {
             "id": "caramel@devino.ca"
