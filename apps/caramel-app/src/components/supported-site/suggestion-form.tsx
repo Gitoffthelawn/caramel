@@ -5,11 +5,17 @@ import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { toast } from 'react-toastify'
 
-export default function SuggestionForm({ initialValue, resetValue }) {
+export default function SuggestionForm({
+    initialValue,
+    resetValue,
+}: {
+    initialValue: string
+    resetValue: () => void
+}) {
     const [url, setUrl] = useState(initialValue)
     const [loading, setLoading] = useState(false)
 
-    const submit = async e => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!url.trim()) return
         if (!isValidUrl(url)) {

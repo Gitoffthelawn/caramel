@@ -8,7 +8,7 @@ import { useContext } from 'react'
 const featuredStores = [
     {
         name: 'Amazon',
-        desc: "World's largest online retailer",
+        desc: 'Worldʼs largest online retailer',
         image: '/amazon.png',
         imageLight: '/amazon-light.png',
         category: 'marketplace',
@@ -183,10 +183,10 @@ export default function SupportedSection() {
                     className="from-caramel rounded-3xl bg-gradient-to-r to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
-                        Don't See Your Favorite Store?
+                        Donʼt See Your Favorite Store?
                     </h3>
                     <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed opacity-90">
-                        We're constantly adding new stores to our platform.
+                        Weʼre constantly adding new stores to our platform.
                         Request yours today!
                     </p>
                     <motion.a

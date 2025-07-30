@@ -32,16 +32,7 @@ export default function SearchSection() {
     useEffect(() => {
         loadTopSites()
     }, [])
-    useEffect(() => {
-        if (!query.trim()) {
-            setSites([])
-            setSearched(false)
-        } else {
-            debouncedSearch(query)
-        }
-    }, [query])
-
-    const runSearch = async q => {
+    const runSearch = async (q: string) => {
         setLoading(true)
         try {
             setSites([])
@@ -62,6 +53,15 @@ export default function SearchSection() {
 
     const debouncedSearch = useRef(debounce(runSearch, 400)).current
     useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch])
+
+    useEffect(() => {
+        if (!query.trim()) {
+            setSites([])
+            setSearched(false)
+        } else {
+            debouncedSearch(query)
+        }
+    }, [query, debouncedSearch])
 
     /* ui ------------------------------------------------------ */
     return (

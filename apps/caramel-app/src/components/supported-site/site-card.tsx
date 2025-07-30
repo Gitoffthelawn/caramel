@@ -1,8 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 
-export default function SiteCard({ site }) {
+export default function SiteCard({ site }: { site: string }) {
     const icon = `https://www.google.com/s2/favicons?sz=128&domain_url=${encodeURIComponent(
         site,
     )}`
@@ -12,7 +13,7 @@ export default function SiteCard({ site }) {
             whileHover={{ scale: 1.04 }}
             className="from-caramel/5 to-caramel/5 dark:from-caramel/10 dark:to-caramel/10 border-caramel/20 dark:border-caramel/30 flex items-center gap-5 rounded-3xl border bg-gradient-to-br via-orange-50/20 p-6 shadow-md transition-shadow hover:shadow-lg sm:gap-4 sm:p-5 dark:via-orange-900/10"
         >
-            <img
+            <Image
                 src={icon}
                 alt={site}
                 className="h-14 w-14 shrink-0 rounded-md sm:h-12 sm:w-12"
