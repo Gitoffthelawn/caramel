@@ -61,6 +61,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 where: filters,
                 skip: parseInt(skip, 10),
                 take: parseInt(limit, 10),
+                orderBy: [
+                    { createdAt: 'desc' }, // Most recent coupons first
+                ],
             })
 
             res.status(200).json(coupons)
