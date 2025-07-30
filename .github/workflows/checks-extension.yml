@@ -1,9 +1,10 @@
 name: CI – Extension
 
 on:
-  pull_request:
   push:
-
+    branches: [main, dev]
+  pull_request:
+    
 env:
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
 

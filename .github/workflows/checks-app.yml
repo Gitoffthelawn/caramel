@@ -1,4 +1,4 @@
-name: CI Checks
+name: CI Checks – App
 
 on:
   push:
