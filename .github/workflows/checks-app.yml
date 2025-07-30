@@ -41,6 +41,7 @@ jobs:
         run: pnpm --filter caramel-landing exec prisma generate
 
       - name: Run ${{ matrix.task }}
+        working-directory: ./apps/caramel-app
         run: |
           case ${{ matrix.task }} in
             lint)      pnpm lint ;;
