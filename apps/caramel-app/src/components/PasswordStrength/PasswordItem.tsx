@@ -1,4 +1,14 @@
-const PasswordItem = ({ itemChecker }) => {
+interface PasswordItemChecker {
+    term: boolean
+    success_message: string
+    failure_message: string
+}
+
+interface PasswordItemProps {
+    itemChecker: PasswordItemChecker
+}
+
+const PasswordItem = ({ itemChecker }: PasswordItemProps) => {
     return (
         <>
             <div

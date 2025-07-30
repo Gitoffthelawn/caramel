@@ -141,7 +141,7 @@ export default function HeroSection() {
                             scale: 1.02,
                         }}
                     >
-                        hijacking creators' commissions
+                        hijacking creatorsʼ commissions
                     </motion.a>
                     .
                 </motion.p>

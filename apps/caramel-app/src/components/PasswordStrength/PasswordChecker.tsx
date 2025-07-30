@@ -1,6 +1,14 @@
 import PasswordItem from '@/components/PasswordStrength/PasswordItem'
 
-const PasswordChecker = ({ password, confirmPassword }) => {
+interface PasswordCheckerProps {
+    password: string
+    confirmPassword: string
+}
+
+const PasswordChecker = ({
+    password,
+    confirmPassword,
+}: PasswordCheckerProps) => {
     const checkList = [
         {
             id: 1,
