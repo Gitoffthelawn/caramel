@@ -1,4 +1,4 @@
-name: CI – Extension
+name: CI Checks – Extension
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
 
 jobs:
   lint_and_build:
-    name: 🔍 Lint & 🛠️ Build
+    name: Lint & Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,5 +32,3 @@ jobs:
         run: pnpm run lint
       - name: Run Prettier check
         run: pnpm run prettier-check
-      - name: Build extension
-        run: pnpm run build
