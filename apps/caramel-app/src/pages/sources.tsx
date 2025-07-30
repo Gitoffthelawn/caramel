@@ -19,8 +19,22 @@ import {
     YAxis,
 } from 'recharts'
 
+interface Source {
+    id: string
+    source: string
+    websites: string[]
+    numberOfCoupons: string
+    successRate: string
+}
+
+interface ChartData {
+    name: string
+    coupons: number
+    successRate: number
+}
+
 export default function SourcesPage() {
-    const [sources, setSources] = useState([])
+    const [sources, setSources] = useState<Source[]>([])
     const [loading, setLoading] = useState(true)
     const [websitesInput, setWebsitesInput] = useState('')
     const [showModal, setShowModal] = useState(false)
@@ -46,7 +60,7 @@ export default function SourcesPage() {
     }, [])
 
     // URL validation helper.
-    const isValidUrl = url => {
+    const isValidUrl = (url: string): boolean => {
         try {
             new URL(url)
             return true
@@ -56,7 +70,7 @@ export default function SourcesPage() {
     }
 
     // Handle the form submission for new sources.
-    const handleSubmit = async e => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!websitesInput) return
 
@@ -212,7 +226,7 @@ export default function SourcesPage() {
                                 {loading ? (
                                     <tr>
                                         <td
-                                            colSpan="5"
+                                            colSpan={5}
                                             className="py-4 text-center text-gray-500 dark:text-gray-300"
                                         >
                                             Loading...
@@ -247,7 +261,7 @@ export default function SourcesPage() {
                                 ) : (
                                     <tr>
                                         <td
-                                            colSpan="5"
+                                            colSpan={5}
                                             className="py-4 text-center text-gray-500"
                                         >
                                             No sources found.

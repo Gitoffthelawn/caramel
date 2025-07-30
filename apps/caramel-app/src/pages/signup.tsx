@@ -74,8 +74,12 @@ export default function Signup() {
                     toast.error(plainObj.error)
                 }
             } catch (error) {
-                setError(error.message)
-                toast.error(error.message)
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : 'An unexpected error occurred'
+                setError(errorMessage)
+                toast.error(errorMessage)
             } finally {
                 setLoading(false)
             }

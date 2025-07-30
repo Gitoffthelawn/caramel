@@ -1,0 +1,50 @@
+name: CI Checks – App
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ci-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-matrix:
+    name: ${{ matrix.task }}
+    strategy:
+      matrix:
+        task: ["lint", "prettier", "typecheck"]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate dependencies
+        run: pnpm doctor
+
+      # Prisma client only for typecheck
+      - if: matrix.task == 'typecheck'
+        name: Generate Prisma Client
+        run: pnpm --filter caramel-landing exec prisma generate
+
+      - name: Run ${{ matrix.task }}
+        working-directory: ./apps/caramel-app
+        run: |
+          case ${{ matrix.task }} in
+            lint)      pnpm lint ;;
+            prettier)  pnpm prettier-check ;;
+            typecheck) pnpm tsc --noEmit ;;
+          esac
