@@ -10,7 +10,7 @@ env:
 
 jobs:
   lint_and_build:
-    name: Lint & Build
+    name: Checks
     runs-on: ubuntu-latest
     defaults:
       run:
