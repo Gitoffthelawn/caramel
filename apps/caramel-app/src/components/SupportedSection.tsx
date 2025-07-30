@@ -80,10 +80,23 @@ export default function SupportedSection() {
                     <h2 className="from-caramel mb-8 bg-gradient-to-r to-orange-600 bg-clip-text text-5xl font-extrabold leading-[80px] tracking-tight text-transparent lg:text-4xl">
                         5,000+ Supported Stores
                     </h2>
-                    <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 lg:text-lg dark:text-gray-300">
+                    <p className="max-w mx-auto text-xl leading-relaxed text-gray-600 lg:text-lg dark:text-gray-300">
                         From major retailers to niche marketplaces, Caramel
-                        works everywhere you shop online
+                        works everywhere you shop online.
                     </p>
+                    <motion.div className="mt-8">
+                        <motion.a
+                            href="/supported-sites"
+                            whileHover={{
+                                scale: 1.05,
+                                transition: { duration: 0.2 },
+                            }}
+                            whileTap={{ scale: 0.95 }}
+                            className="from-caramel inline-flex items-center rounded-full bg-gradient-to-r to-orange-600 px-6 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:shadow-xl"
+                        >
+                            View All Supported Sites
+                        </motion.a>
+                    </motion.div>
                 </motion.div>
 
                 {/* Carousel View */}
@@ -97,7 +110,7 @@ export default function SupportedSection() {
                     <div className="relative w-full overflow-hidden py-4">
                         <motion.div
                             className="flex gap-4"
-                            animate={{ x: ['0%', '-50%'] }}
+                            animate={{ x: ['0%', '-100%'] }}
                             transition={{
                                 x: {
                                     repeat: Infinity,
