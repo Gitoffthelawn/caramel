@@ -16,6 +16,8 @@ export default function SiteCard({ site }: { site: string }) {
             <Image
                 src={icon}
                 alt={site}
+                width={56}
+                height={56}
                 className="h-14 w-14 shrink-0 rounded-md sm:h-12 sm:w-12"
             />
             <div className="min-w-0">
