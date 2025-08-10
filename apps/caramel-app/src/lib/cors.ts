@@ -16,6 +16,7 @@ export const cors = initMiddleware(
             const extensionPatterns = [
                 /^chrome-extension:\/\/[a-z]{32}$/, // Chrome extension IDs (32 chars)
                 /^safari-web-extension:\/\/[a-z0-9-]+$/, // Safari extension IDs
+                /^moz-extension:\/\/[a-z0-9-]+$/, // Firefox extension IDs
             ]
 
             if (
