@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { RiCloseFill, RiMenu3Fill } from 'react-icons/ri'
 
 interface HeaderProps {
-    scrollRef?: React.RefObject<HTMLElement>
+    scrollRef?: React.RefObject<HTMLElement | HTMLDivElement | null>
 }
 
 interface NavLink {
