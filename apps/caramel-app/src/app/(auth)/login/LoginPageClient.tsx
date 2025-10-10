@@ -89,10 +89,7 @@ export default function LoginPageClient() {
                 </form>
                 <p className="mt-4 text-center text-sm text-gray-600">
                     Don&apos;t have an account?{' '}
-                    <Link
-                        className="text-caramel font-semibold"
-                        href="/signup"
-                    >
+                    <Link className="text-caramel font-semibold" href="/signup">
                         Sign Up
                     </Link>
                 </p>

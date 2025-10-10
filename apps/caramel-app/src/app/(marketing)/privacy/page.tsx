@@ -5,8 +5,7 @@ const title = 'Caramel | Privacy Policy'
 const description =
     'Learn how Caramel protects your privacy and handles your data. Our commitment to transparency and security.'
 const canonicalUrl = 'https://grabcaramel.com/privacy'
-const base =
-    process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
 const banner = `${base}/caramel_banner.png`
 
 export const metadata: Metadata = {

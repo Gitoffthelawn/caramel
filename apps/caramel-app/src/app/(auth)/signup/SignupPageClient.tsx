@@ -81,14 +81,8 @@ export default function SignupPageClient() {
         },
     })
 
-    const {
-        handleSubmit,
-        errors,
-        touched,
-        handleChange,
-        handleBlur,
-        values,
-    } = formik
+    const { handleSubmit, errors, touched, handleChange, handleBlur, values } =
+        formik
 
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -193,9 +187,7 @@ export default function SignupPageClient() {
                         )}
                     </div>
                     <button
-                        disabled={
-                            loading || Object.keys(errors).length > 0
-                        }
+                        disabled={loading || Object.keys(errors).length > 0}
                         type="submit"
                         className={`w-full ${loading || Object.keys(errors).length > 0 ? 'pointer-events-none bg-opacity-75' : 'hover:scale-105'} bg-caramel rounded-md py-2 font-semibold text-white transition`}
                     >

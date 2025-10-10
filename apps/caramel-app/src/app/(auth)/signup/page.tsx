@@ -2,11 +2,9 @@ import type { Metadata } from 'next'
 import SignupPageClient from './SignupPageClient'
 
 const title = 'Caramel | Sign Up'
-const description =
-    'Join Caramel and start enjoying our services. Sign up now!'
+const description = 'Join Caramel and start enjoying our services. Sign up now!'
 const canonicalUrl = 'https://grabcaramel.com/signup'
-const base =
-    process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
 const banner = `${base}/caramel_banner.png`
 
 export const metadata: Metadata = {

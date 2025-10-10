@@ -5,8 +5,7 @@ const title = 'Caramel | Supported Stores'
 const description =
     'Explore the stores supported by Caramel and start saving with our coupon extension.'
 const canonicalUrl = 'https://grabcaramel.com/supported-sites'
-const base =
-    process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
 const banner = `${base}/caramel_banner.png`
 
 export const metadata: Metadata = {

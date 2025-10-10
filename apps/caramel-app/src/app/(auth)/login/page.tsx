@@ -5,8 +5,7 @@ const title = 'Caramel | Login'
 const description =
     'Log in to your Caramel account to access exclusive features and start saving with our coupon extension.'
 const canonicalUrl = 'https://grabcaramel.com/login'
-const base =
-    process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
 const banner = `${base}/caramel_banner.png`
 
 export const metadata: Metadata = {
