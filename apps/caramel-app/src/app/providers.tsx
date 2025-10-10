@@ -1,5 +1,4 @@
 'use client'
-import AppHeader from '@/components/AppHeader'
 import { ThemeContext } from '@/lib/contexts'
 import * as gtag from '@/lib/gtag'
 import Hotjar from '@hotjar/browser'
@@ -60,7 +59,6 @@ export default function Providers({ children }: { children: ReactNode }) {
 
     return (
         <>
-            <AppHeader />
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
                 <SessionProvider>{content}</SessionProvider>
             </ThemeContext.Provider>
