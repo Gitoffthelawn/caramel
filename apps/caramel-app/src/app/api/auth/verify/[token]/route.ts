@@ -15,7 +15,12 @@ export async function GET(
     if (user) {
         await prisma.user.update({
             where: { id: user.id },
-            data: { token: null, tokenExpiry: null, status: 'ACTIVE_USER' },
+            data: {
+                token: null,
+                tokenExpiry: null,
+                status: 'ACTIVE_USER',
+                emailVerified: true,
+            },
         })
     }
     return NextResponse.redirect(

@@ -4,7 +4,11 @@
         "apps/*"
     ],
     "scripts": {
-        "dev": "pnpm -r --parallel dev",
+        "compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d",
+        "compose:down": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml down",
+        "dev:compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d --remove-orphans",
+        "dev": "pnpm run dev:compose && pnpm -r --parallel dev",
+        "dev:workspace": "pnpm -r --parallel dev",
         "build": "turbo run build",
         "lint": "turbo run lint",
         "test": "turbo run test",
@@ -13,6 +17,7 @@
     },
     "devDependencies": {
         "eslint": "^9.31.0",
+        "eslint-config-next": "16.0.3",
         "eslint-config-prettier": "^10.1.2",
         "prettier": "^3.6.2",
         "prettier-plugin-organize-imports": "^4.1.0",

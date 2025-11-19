@@ -1,13 +1,25 @@
 'use client'
 
+import { signIn } from '@/lib/auth/client'
 import { ThemeContext } from '@/lib/contexts'
 import { motion } from 'framer-motion'
-import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { FormEvent, useContext, useState } from 'react'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+
+const errorMessages: Record<string, string> = {
+    ERROR_CODE_USER_NOT_FOUND:
+        'No user found with that email. Please sign up first.',
+    ERROR_CODE_INACTIVE_USER:
+        'Your account is inactive. Contact support for help restoring access.',
+    ERROR_CODE_NO_PASSWORD_SET:
+        'No password is set for this account. Try a social login instead.',
+    ERROR_CODE_ACCOUNT_NOT_VERIFIED:
+        'Your account is not verified yet. Check your inbox for the verification link.',
+    ERROR_CODE_INCORRECT_PASSWORD: 'Incorrect password. Please try again.',
+}
 
 export default function LoginPageClient() {
     const [email, setEmail] = useState('')
@@ -18,13 +30,17 @@ export default function LoginPageClient() {
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault()
         setLoading(true)
-        const result = await signIn('credentials', {
-            redirect: false,
-            email,
+        const result = await signIn.email({
+            email: email.trim().toLowerCase(),
             password,
         })
-        if ((result as any)?.error) {
-            toast.error((result as any).error || 'Login failed!')
+
+        if (result?.error) {
+            const message =
+                errorMessages[result.error.message] ||
+                result.error.message ||
+                'Login failed!'
+            toast.error(message)
             setLoading(false)
             return
         }

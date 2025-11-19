@@ -1,9 +1,9 @@
 import VerificationRequestTemplate from '@/emails/VerificationRequestTemplate'
 import { nextApiResponse } from '@/lib/apiResponseNext'
 import { sendEmail } from '@/lib/email'
+import { auth } from '@/lib/auth/auth'
 import prisma from '@/lib/prisma'
 import { render } from '@react-email/render'
-import bcrypt from 'bcryptjs'
 import { NextRequest } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -50,21 +50,28 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        const hashedPassword = bcrypt.hashSync(
-            password,
-            Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
-        )
         const verificationToken =
             Math.random().toString(36).slice(2) +
             Math.random().toString(36).slice(2)
 
-        await prisma.user.create({
+        const { user } = await auth.api.signUpEmail({
+            body: {
+                email,
+                password,
+                name: username,
+                data: {
+                    username,
+                },
+            },
+        })
+
+        await prisma.user.update({
+            where: { id: user.id },
             data: {
                 username,
-                email,
-                password: hashedPassword,
                 token: verificationToken,
                 tokenExpiry: new Date(Date.now() + 60 * 60 * 1000),
+                status: 'NOT_VERIFIED',
             },
         })
 
