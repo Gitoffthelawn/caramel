@@ -59,9 +59,7 @@ export async function POST(req: NextRequest) {
                 email,
                 password,
                 name: username,
-                data: {
-                    username,
-                },
+                username,
             },
         })
 

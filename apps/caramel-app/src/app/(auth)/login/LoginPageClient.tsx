@@ -36,10 +36,15 @@ export default function LoginPageClient() {
         })
 
         if (result?.error) {
+            const errorKey =
+                typeof result.error.message === 'string'
+                    ? result.error.message
+                    : undefined
             const message =
-                errorMessages[result.error.message] ||
-                result.error.message ||
-                'Login failed!'
+                (errorKey ? errorMessages[errorKey] : undefined) ||
+                (typeof result.error.message === 'string'
+                    ? result.error.message
+                    : 'Login failed!')
             toast.error(message)
             setLoading(false)
             return
