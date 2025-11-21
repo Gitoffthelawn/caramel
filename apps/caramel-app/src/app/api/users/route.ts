@@ -1,7 +1,7 @@
 import VerificationRequestTemplate from '@/emails/VerificationRequestTemplate'
 import { nextApiResponse } from '@/lib/apiResponseNext'
-import { sendEmail } from '@/lib/email'
 import { auth } from '@/lib/auth/auth'
+import { sendEmail } from '@/lib/email'
 import prisma from '@/lib/prisma'
 import { render } from '@react-email/render'
 import { NextRequest } from 'next/server'

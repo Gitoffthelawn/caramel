@@ -10,10 +10,7 @@ const baseURL =
     process.env.NEXT_PUBLIC_BASE_URL ||
     fallbackBaseURL
 const trustedOrigins = Array.from(
-    new Set([
-        process.env.NEXT_PUBLIC_BASE_URL || '',
-        baseURL,
-    ].filter(Boolean)),
+    new Set([process.env.NEXT_PUBLIC_BASE_URL || '', baseURL].filter(Boolean)),
 )
 
 export const auth = betterAuth({
@@ -25,8 +22,13 @@ export const auth = betterAuth({
         requireEmailVerification: false,
         password: {
             hash: async (password: string) => bcrypt.hash(password, saltRounds),
-            verify: async ({ hash, password }: { hash: string; password: string }) =>
-                bcrypt.compare(password, hash),
+            verify: async ({
+                hash,
+                password,
+            }: {
+                hash: string
+                password: string
+            }) => bcrypt.compare(password, hash),
         },
     },
     user: {
