@@ -4,7 +4,7 @@ import Loader from '@/components/Loader'
 import { AnimatePresence, motion } from 'framer-motion'
 import debounce from 'lodash.debounce'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 import SiteCard from './site-card'
 import SuggestionForm from './suggestion-form'
 

@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             token,
-            username: data.user?.username || data.user?.name || data.user?.email || null,
+            username:
+                data.user?.username ||
+                data.user?.name ||
+                data.user?.email ||
+                null,
             image: data.user?.image || null,
         })
     } catch {

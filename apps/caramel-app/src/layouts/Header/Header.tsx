@@ -48,7 +48,8 @@ export default function Header({ scrollRef }: HeaderProps) {
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
     const handleSignOut = async () => {
