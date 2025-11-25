@@ -38,3 +38,12 @@ CREATE TABLE "verification_tokens" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "verification_tokens_identifier_value_key" ON "verification_tokens"("identifier", "value");
+
+-- Data migration: Set email_verified for active users
+UPDATE "users" SET "email_verified" = true WHERE "status" = 'ACTIVE_USER';
+
+-- Data migration: Create credential accounts for existing users with passwords
+INSERT INTO "accounts" ("id", "user_id", "provider", "provider_account_id", "password", "createdAt", "updatedAt")
+SELECT gen_random_uuid()::text, "id", 'credential', "id", "password", now(), now()
+FROM "users"
+WHERE "password" IS NOT NULL;
