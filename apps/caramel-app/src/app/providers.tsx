@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import Script from 'next/script'
 import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { Toaster } from 'sonner'
 
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
@@ -61,6 +62,16 @@ export default function Providers({ children }: { children: ReactNode }) {
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
                 {content}
             </ThemeContext.Provider>
+            <Toaster
+                position="bottom-right"
+                toastOptions={{
+                    style: {
+                        background: '#ea6925',
+                        color: '#ffffff',
+                        border: 'none',
+                    },
+                }}
+            />
             {/* GA */}
             <Script
                 strategy="afterInteractive"
