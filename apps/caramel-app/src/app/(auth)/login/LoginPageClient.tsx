@@ -1,31 +1,16 @@
 'use client'
 
 import { signIn } from '@/lib/auth/client'
-import { ThemeContext } from '@/lib/contexts'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
-import { FormEvent, useContext, useState } from 'react'
-import { toast, ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
-
-const errorMessages: Record<string, string> = {
-    ERROR_CODE_USER_NOT_FOUND:
-        'No user found with that email. Please sign up first.',
-    ERROR_CODE_INACTIVE_USER:
-        'Your account is inactive. Contact support for help restoring access.',
-    ERROR_CODE_NO_PASSWORD_SET:
-        'No password is set for this account. Try a social login instead.',
-    ERROR_CODE_ACCOUNT_NOT_VERIFIED:
-        'Your account is not verified yet. Check your inbox for the verification link.',
-    ERROR_CODE_INCORRECT_PASSWORD: 'Incorrect password. Please try again.',
-}
+import { FormEvent, useState } from 'react'
+import { toast } from 'sonner'
 
 export default function LoginPageClient() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
-    const { isDarkMode } = useContext(ThemeContext)
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault()
@@ -36,27 +21,25 @@ export default function LoginPageClient() {
         })
 
         if (result?.error) {
-            const errorKey =
-                typeof result.error.message === 'string'
-                    ? result.error.message
-                    : undefined
-            const message =
-                (errorKey ? errorMessages[errorKey] : undefined) ||
-                (typeof result.error.message === 'string'
-                    ? result.error.message
-                    : 'Login failed!')
-            toast.error(message)
+            if (result.error.code === 'EMAIL_NOT_VERIFIED') {
+                toast.error(
+                    'Please verify your email first. Check your inbox for the verification link.',
+                )
+            } else {
+                toast.error(
+                    'Unable to sign in. Please check your email and password.',
+                )
+            }
             setLoading(false)
             return
         }
-        toast.success('Login successful!')
+        toast.success('Welcome back!')
         window.location.href = '/'
         setLoading(false)
     }
 
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
-            <ToastContainer theme={isDarkMode ? 'dark' : 'light'} />
             <motion.div
                 className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg"
                 initial={{ opacity: 0, y: 20 }}

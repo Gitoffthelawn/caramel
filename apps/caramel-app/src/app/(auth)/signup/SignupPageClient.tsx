@@ -1,15 +1,13 @@
 'use client'
 
-import { ThemeContext } from '@/lib/contexts'
-import { decryptJsonData } from '@/lib/securityHelpers/decryptJsonData'
+import { signUp } from '@/lib/auth/client'
 import { useFormik } from 'formik'
 import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useContext, useState } from 'react'
-import { toast, ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import { object, ref, string } from 'yup'
 
 const PasswordChecker = dynamic(
@@ -34,7 +32,6 @@ const validationSchema = object().shape({
 })
 
 export default function SignupPageClient() {
-    const { isDarkMode } = useContext(ThemeContext)
     const [showPasswordChecker, setShowPasswordChecker] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -51,30 +48,28 @@ export default function SignupPageClient() {
             setLoading(true)
             setError('')
             try {
-                const response = await fetch('/api/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: username.trim().toLowerCase(),
-                        email: email.trim().toLowerCase(),
-                        password,
-                    }),
+                const result = await signUp.email({
+                    name: username.trim().toLowerCase(),
+                    email: email.trim().toLowerCase(),
+                    password,
+                    username: username.trim().toLowerCase(),
                 })
-                const resData = await response.json()
-                const plainObj = decryptJsonData(resData)
-                if (response.ok) {
-                    window.location.href = '/'
-                } else {
-                    setError(plainObj.error)
-                    toast.error(plainObj.error)
+
+                if (result?.error) {
+                    toast.error(
+                        'Unable to create your account. Please try again or use a different email.',
+                    )
+                    setError('Unable to create account')
+                    return
                 }
-            } catch (caughtError) {
-                const errorMessage =
-                    caughtError instanceof Error
-                        ? caughtError.message
-                        : 'An unexpected error occurred'
-                setError(errorMessage)
-                toast.error(errorMessage)
+
+                toast.success(
+                    'Account created! Please check your email to verify.',
+                )
+                window.location.href = '/login'
+            } catch {
+                toast.error('Something went wrong. Please try again later.')
+                setError('Something went wrong')
             } finally {
                 setLoading(false)
             }
@@ -86,7 +81,6 @@ export default function SignupPageClient() {
 
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
-            <ToastContainer theme={isDarkMode ? 'dark' : 'light'} />
             <motion.div
                 className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg"
                 initial={{ opacity: 0, y: 20 }}
