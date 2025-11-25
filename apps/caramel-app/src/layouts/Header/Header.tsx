@@ -1,11 +1,12 @@
 import ThemeToggle from '@/components/ThemeToggle'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
 import { useWindowSize } from '@/hooks/useWindowSize'
+import { signOut, useSession } from '@/lib/auth/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import Image from 'next/image'
 import L from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RiCloseFill, RiMenu3Fill } from 'react-icons/ri'
 
 interface HeaderProps {
@@ -28,11 +29,34 @@ const Link = motion.create(L)
 export default function Header({ scrollRef }: HeaderProps) {
     const [isInView, setIsInView] = useState(true)
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+    const userMenuRef = useRef<HTMLDivElement>(null)
     const { isScrollingDown, isScrollingUp } = useScrollDirection(scrollRef)
     const { windowSize } = useWindowSize()
+    const { data: session } = useSession()
 
     useEffect(() => {}, [windowSize])
     const pathname = usePathname()
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                userMenuRef.current &&
+                !userMenuRef.current.contains(event.target as Node)
+            ) {
+                setIsUserMenuOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const handleSignOut = async () => {
+        await signOut()
+        window.location.href = '/'
+    }
+
+    const userInitial = session?.user?.name?.charAt(0).toUpperCase() || 'U'
 
     useEffect(() => {
         if (isScrollingDown) {
@@ -67,7 +91,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                 />
             </Link>
             <motion.div
-                className={`dark:bg-darkerBg mx-auto flex w-full items-start justify-center gap-6 rounded-[28px] bg-white px-[26px] py-[15px] shadow lg:hidden`}
+                className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-6 rounded-[28px] bg-white px-[26px] py-[15px] shadow lg:hidden`}
             >
                 {links.map(link => {
                     const isActive = pathname === link.url
@@ -82,6 +106,36 @@ export default function Header({ scrollRef }: HeaderProps) {
                         </Link>
                     )
                 })}
+                {session?.user && (
+                    <div ref={userMenuRef} className="relative">
+                        <button
+                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            className="bg-caramel flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-white transition hover:scale-105"
+                        >
+                            {userInitial}
+                        </button>
+                        <AnimatePresence>
+                            {isUserMenuOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="dark:bg-darkerBg absolute right-0 top-full mt-2 min-w-[150px] rounded-lg bg-white py-2 shadow-lg"
+                                >
+                                    <div className="border-b px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                                        {session.user.email}
+                                    </div>
+                                    <button
+                                        onClick={handleSignOut}
+                                        className="text-caramel w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                        Sign out
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
             </motion.div>
             <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-auto" />
             <button
@@ -111,6 +165,17 @@ export default function Header({ scrollRef }: HeaderProps) {
                                 </Link>
                             )
                         })}
+                        {session?.user && (
+                            <button
+                                onClick={() => {
+                                    setIsMenuOpen(false)
+                                    handleSignOut()
+                                }}
+                                className="text-caramel inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl px-[30px] py-2.5"
+                            >
+                                Sign out
+                            </button>
+                        )}
                         <div className="h-full" />
                     </motion.div>
                 )}
