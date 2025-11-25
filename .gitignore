@@ -1,5 +1,6 @@
 .idea
 .env
+.claude
 .turbo/*
 node_modules
 dist
@@ -9,3 +10,4 @@ coverage
 .DS_Store
 *.log
 *.env.*
+!.env.ports
