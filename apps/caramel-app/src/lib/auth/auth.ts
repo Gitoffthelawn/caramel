@@ -1,7 +1,11 @@
+import VerificationRequestTemplate from '@/emails/VerificationRequestTemplate'
+import { sendEmail } from '@/lib/email'
 import prisma from '@/lib/prisma'
+import { render } from '@react-email/render'
 import bcrypt from 'bcryptjs'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
+import { bearer } from 'better-auth/plugins'
 
 const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10
 const fallbackBaseURL = 'http://localhost:3000'
@@ -19,7 +23,7 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
-        requireEmailVerification: false,
+        requireEmailVerification: true,
         password: {
             hash: async (password: string) => bcrypt.hash(password, saltRounds),
             verify: async ({
@@ -29,6 +33,18 @@ export const auth = betterAuth({
                 hash: string
                 password: string
             }) => bcrypt.compare(password, hash),
+        },
+    },
+    emailVerification: {
+        sendOnSignUp: true,
+        autoSignInAfterVerification: true,
+        sendVerificationEmail: async ({ user, url }) => {
+            const html = await render(VerificationRequestTemplate({ url }))
+            await sendEmail({
+                to: user.email,
+                subject: 'Verify your email for Caramel',
+                html,
+            })
         },
     },
     user: {
@@ -54,7 +70,7 @@ export const auth = betterAuth({
             status: {
                 type: 'string',
                 required: false,
-                defaultValue: 'ACTIVE_USER',
+                defaultValue: 'NOT_VERIFIED',
                 input: false,
             },
             encodedPictureUrl: {
@@ -80,4 +96,5 @@ export const auth = betterAuth({
     advanced: {
         useSecureCookies: process.env.NODE_ENV === 'production',
     },
+    plugins: [bearer()],
 })

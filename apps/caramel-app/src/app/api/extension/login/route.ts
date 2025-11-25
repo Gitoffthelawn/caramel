@@ -1,6 +1,4 @@
-import prisma from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { auth } from '@/lib/auth/auth'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -14,32 +12,33 @@ export async function POST(req: NextRequest) {
             { status: 400 },
         )
     try {
-        const user = await prisma.user.findUnique({ where: { email } })
-        if (!user || !user.password)
+        const response = await auth.api.signInEmail({
+            body: { email, password },
+            asResponse: true,
+        })
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
             return NextResponse.json(
-                { error: 'Invalid credentials' },
+                { error: errorData?.message || 'Invalid credentials' },
                 { status: 401 },
             )
-        const isValid = await bcrypt.compare(password, user.password)
-        if (!isValid)
+        }
+
+        const token = response.headers.get('set-auth-token')
+        const data = await response.json()
+
+        if (!token) {
             return NextResponse.json(
-                { error: 'Invalid credentials' },
-                { status: 401 },
-            )
-        if (!process.env.JWT_SECRET)
-            return NextResponse.json(
-                { error: 'Internal server error' },
+                { error: 'Failed to generate token' },
                 { status: 500 },
             )
-        const token = jwt.sign(
-            { sub: user.id, email: user.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' },
-        )
+        }
+
         return NextResponse.json({
             token,
-            username: user.username,
-            image: user.image || null,
+            username: data.user?.username || null,
+            image: data.user?.image || null,
         })
     } catch {
         return NextResponse.json(
