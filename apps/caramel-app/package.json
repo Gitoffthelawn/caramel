@@ -13,7 +13,11 @@
         "db:generate": "dotenv -e ../../local-dev/.env.ports -- pnpm prisma generate",
         "db:studio": "dotenv -e ../../local-dev/.env.ports -- pnpm prisma studio",
         "prettier-check": "prettier --check '**/*.{ts,tsx,js,jsx,html,css,json,md}'",
-        "prettier-write": "prettier --write '**/*.{ts,tsx,js,jsx,html,css,json,md}'"
+        "prettier-write": "prettier --write '**/*.{ts,tsx,js,jsx,html,css,json,md}'",
+        "knip": "knip",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "setup:ci-env": "tsx scripts/ci-env.ts"
     },
     "dependencies": {
         "@heroicons/react": "^2.2.0",
@@ -47,6 +51,9 @@
         "yup": "^1.7.0"
     },
     "devDependencies": {
+        "@argos-ci/cli": "^3.2.1",
+        "@argos-ci/playwright": "^6.3.1",
+        "@playwright/test": "^1.56.1",
         "@tailwindcss/forms": "^0.5.10",
         "@types/cors": "^2.8.19",
         "@types/gtag.js": "^0.0.20",
@@ -60,11 +67,13 @@
         "autoprefixer": "^10.4.21",
         "dotenv-cli": "^11.0.0",
         "eslint-config-next": "16.0.3",
+        "knip": "^5.56.0",
         "postcss": "^8.5.6",
         "prettier": "^3.6.2",
         "prettier-plugin-organize-imports": "^4.2.0",
         "prettier-plugin-tailwindcss": "^0.6.14",
         "tailwindcss": "^3.4.17",
+        "tsx": "^4.19.2",
         "typescript": "^5.9.2"
     }
 }
