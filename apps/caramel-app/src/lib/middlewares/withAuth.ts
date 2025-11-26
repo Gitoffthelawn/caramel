@@ -1,6 +1,5 @@
-import { authOptions } from '@/lib/authOptions'
+import { auth } from '@/lib/auth/auth'
 import { NextApiRequest, NextApiResponse } from 'next'
-import { getServerSession } from 'next-auth/next'
 
 type ApiHandler = (
     req: NextApiRequest,
@@ -16,7 +15,9 @@ type ApiHandler = (
 export function withAuth(handler: ApiHandler) {
     return async function (req: NextApiRequest, res: NextApiResponse) {
         try {
-            const session = await getServerSession(req, res, authOptions)
+            const session = await auth.api.getSession({
+                headers: buildHeadersFromRequest(req),
+            })
 
             if (!session?.user?.id) {
                 return res
@@ -38,4 +39,16 @@ export function withAuth(handler: ApiHandler) {
             })
         }
     }
+}
+
+function buildHeadersFromRequest(req: NextApiRequest) {
+    const headers = new Headers()
+    Object.entries(req.headers).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+            value.forEach(v => headers.append(key, v))
+        } else if (typeof value === 'string') {
+            headers.append(key, value)
+        }
+    })
+    return headers
 }

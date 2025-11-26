@@ -3,11 +3,11 @@ import { ThemeContext } from '@/lib/contexts'
 import * as gtag from '@/lib/gtag'
 import Hotjar from '@hotjar/browser'
 import { Loader } from '@react-three/drei'
-import { SessionProvider } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import Script from 'next/script'
 import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { Toaster } from 'sonner'
 
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
@@ -60,8 +60,18 @@ export default function Providers({ children }: { children: ReactNode }) {
     return (
         <>
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
-                <SessionProvider>{content}</SessionProvider>
+                {content}
             </ThemeContext.Provider>
+            <Toaster
+                position="bottom-right"
+                toastOptions={{
+                    style: {
+                        background: '#ea6925',
+                        color: '#ffffff',
+                        border: 'none',
+                    },
+                }}
+            />
             {/* GA */}
             <Script
                 strategy="afterInteractive"
