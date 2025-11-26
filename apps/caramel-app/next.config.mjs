@@ -1,6 +1,15 @@
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+const packageRoot = fileURLToPath(new URL('.', import.meta.url))
+const workspaceRoot = path.resolve(packageRoot, '..', '..')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    outputFileTracingRoot: process.cwd(),
+    outputFileTracingRoot: workspaceRoot,
+    turbopack: {
+        root: workspaceRoot,
+    },
     images: {
         remotePatterns: [
             {

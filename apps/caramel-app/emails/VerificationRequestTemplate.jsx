@@ -1,6 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
-
-export default function VerificationRequestTemplate({ token }) {
+export default function VerificationRequestTemplate({ url }) {
     return (
         <div style={{ background: '#ea6925', padding: '20px' }}>
             <div
@@ -34,12 +32,12 @@ export default function VerificationRequestTemplate({ token }) {
                     To verify your email address, please click the link below:
                 </p>
                 <a
-                    href={`${BASE_URL}/api/auth/verify/${token}`}
+                    href={url}
                     style={{
                         padding: '20px',
                     }}
                 >
-                    {`${BASE_URL}/api/auth/verify/${token}`}
+                    {url}
                 </a>
             </div>
         </div>

@@ -1,0 +1,42 @@
+# Local development infrastructure for Caramel
+# Backing services only; apps run outside Docker for fast reload
+
+name: caramel-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env.ports
+    environment:
+      POSTGRES_USER: caramel
+      POSTGRES_PASSWORD: caramel_password
+      POSTGRES_DB: caramel
+    ports:
+      - "127.0.0.1:${PG_PORT:-58005}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caramel -d caramel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    env_file:
+      - .env.ports
+    command: --save 60 1
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-58006}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+  redis_data:

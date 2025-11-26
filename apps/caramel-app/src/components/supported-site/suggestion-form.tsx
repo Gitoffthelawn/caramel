@@ -3,7 +3,7 @@
 import { isValidUrl } from '@/lib/urlHelper'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 
 export default function SuggestionForm({
     initialValue,
@@ -19,7 +19,7 @@ export default function SuggestionForm({
         e.preventDefault()
         if (!url.trim()) return
         if (!isValidUrl(url)) {
-            toast.warn('Please enter a valid URL.')
+            toast.warning('Please enter a valid URL.')
             return
         }
         setLoading(true)

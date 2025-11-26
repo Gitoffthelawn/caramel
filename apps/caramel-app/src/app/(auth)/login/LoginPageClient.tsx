@@ -1,41 +1,45 @@
 'use client'
 
-import { ThemeContext } from '@/lib/contexts'
+import { signIn } from '@/lib/auth/client'
 import { motion } from 'framer-motion'
-import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { FormEvent, useContext, useState } from 'react'
-import { toast, ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import { FormEvent, useState } from 'react'
+import { toast } from 'sonner'
 
 export default function LoginPageClient() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
-    const { isDarkMode } = useContext(ThemeContext)
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault()
         setLoading(true)
-        const result = await signIn('credentials', {
-            redirect: false,
-            email,
+        const result = await signIn.email({
+            email: email.trim().toLowerCase(),
             password,
         })
-        if ((result as any)?.error) {
-            toast.error((result as any).error || 'Login failed!')
+
+        if (result?.error) {
+            if (result.error.code === 'EMAIL_NOT_VERIFIED') {
+                toast.error(
+                    'Please verify your email first. Check your inbox for the verification link.',
+                )
+            } else {
+                toast.error(
+                    'Unable to sign in. Please check your email and password.',
+                )
+            }
             setLoading(false)
             return
         }
-        toast.success('Login successful!')
+        toast.success('Welcome back!')
         window.location.href = '/'
         setLoading(false)
     }
 
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
-            <ToastContainer theme={isDarkMode ? 'dark' : 'light'} />
             <motion.div
                 className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg"
                 initial={{ opacity: 0, y: 20 }}

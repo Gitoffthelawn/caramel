@@ -41,35 +41,49 @@ model Coupon {
 }
 
 model Account {
-  id                String   @id @default(cuid())
-  userId            String   @map("user_id")
-  type              String?
-  provider          String
-  providerAccountId String   @map("provider_account_id")
-  token_type        String?
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  scope             String?
-  id_token          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(cuid())
+  accountId             String    @map("provider_account_id")
+  providerId            String    @map("provider")
+  userId                String    @map("user_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
+  @@unique([providerId, accountId])
   @@map("accounts")
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String?  @map("user_id")
-  sessionToken String   @unique @map("session_token")
-  expires      DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
-  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  expiresAt DateTime @map("expires")
+  token     String   @unique @map("session_token")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verification_tokens")
 }
 
 model User {
@@ -79,6 +93,7 @@ model User {
   lastName          String?
   username          String?    @unique
   email             String?    @unique
+  emailVerified     Boolean    @default(false) @map("email_verified")
   password          String?
   token             String?    @unique
   image             String?

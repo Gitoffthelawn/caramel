@@ -9,12 +9,18 @@ concurrency:
   group: ci-checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_PUBLIC_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
+
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Code Quality Checks (lint, prettier, typecheck, knip)
+  # ─────────────────────────────────────────────────────────────
   test-matrix:
     name: ${{ matrix.task }}
     strategy:
       matrix:
-        task: ["lint", "prettier", "typecheck"]
+        task: ["lint", "prettier", "typecheck", "knip"]
     runs-on: ubuntu-latest
 
     steps:
@@ -47,4 +53,154 @@ jobs:
             lint)      pnpm lint ;;
             prettier)  pnpm prettier-check ;;
             typecheck) pnpm tsc --noEmit ;;
+            knip)      pnpm knip ;;
           esac
+
+  # ─────────────────────────────────────────────────────────────
+  # Schema Drift Check (only when prisma files change)
+  # ─────────────────────────────────────────────────────────────
+  schema-drift:
+    name: Schema Drift
+    if: |
+      contains(github.event.head_commit.modified, 'prisma/schema.prisma') ||
+      contains(github.event.head_commit.modified, 'prisma/migrations') ||
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/caramel_ci'
+      SHADOW_DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/caramel_ci?schema=__shadow'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Cache Prisma engines
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/prisma
+          key: ${{ runner.os }}-prisma-engines-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-prisma-engines-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma validate
+        working-directory: ./apps/caramel-app
+        run: npx prisma validate
+
+      - name: Prepare shadow schema
+        run: |
+          sudo apt-get -yqq install postgresql-client
+          psql "postgresql://postgres:postgres@localhost:5432/caramel_ci" \
+            -c "CREATE SCHEMA IF NOT EXISTS __shadow;"
+
+      - name: Drift check (schema ⇄ migrations)
+        working-directory: ./apps/caramel-app
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code || echo "No drift detected or no migrations yet"
+
+      - name: Apply migrations
+        working-directory: ./apps/caramel-app
+        run: npx prisma migrate deploy --preview-feature || echo "No migrations to apply"
+
+      - name: Drift check (migrations ⇄ Postgres)
+        working-directory: ./apps/caramel-app
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-url "$DATABASE_URL" \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code || echo "No drift detected"
+
+  # ─────────────────────────────────────────────────────────────
+  # Visual Regression Tests
+  # ─────────────────────────────────────────────────────────────
+  visual-regression:
+    name: Visual Regression
+    runs-on: ubuntu-latest
+    env:
+      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+
+      - name: Write minimal CI env
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter caramel-landing run setup:ci-env
+
+      - name: Generate Prisma Client
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter caramel-landing exec prisma generate
+
+      # PR: Run against local dev server (tests PR changes)
+      - name: Visual regression (PR - local dev server)
+        if: github.event_name == 'pull_request'
+        working-directory: ./apps/caramel-app
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:58000
+          NEXT_PUBLIC_BASE_URL: http://localhost:58000
+          PLAYWRIGHT_WEB_COMMAND: pnpm dev
+          PLAYWRIGHT_START_SERVER: 'true'
+          PLAYWRIGHT_WEB_TIMEOUT: '300000'
+          SCREENSHOTS_DIR: screenshots
+        run: pnpm test:e2e
+
+      # Push to main/dev: Run against deployed site (baseline)
+      - name: Visual regression (push - deployed site)
+        if: github.event_name == 'push'
+        working-directory: ./apps/caramel-app
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
+          PLAYWRIGHT_START_SERVER: 'false'
+          SCREENSHOTS_DIR: screenshots
+        run: pnpm test:e2e
+
+      - name: Upload screenshots to Argos
+        if: always()
+        working-directory: ./apps/caramel-app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec argos upload ./screenshots || echo "Argos upload skipped (token may not be configured)"

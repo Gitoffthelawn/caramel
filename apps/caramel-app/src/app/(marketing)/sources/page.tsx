@@ -4,7 +4,6 @@ import { ThemeContext } from '@/lib/contexts'
 import { decryptJsonData } from '@/lib/securityHelpers/decryptJsonData'
 import { motion } from 'framer-motion'
 import { useContext, useEffect, useState } from 'react'
-import { toast } from 'react-toastify'
 import {
     Bar,
     CartesianGrid,
@@ -16,6 +15,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
+import { toast } from 'sonner'
 
 interface Source {
     id: string
