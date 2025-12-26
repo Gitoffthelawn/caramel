@@ -46,8 +46,8 @@ export default function CouponsSection({
         hasPrefetched && typeof initialTotal === 'number'
             ? (initialCoupons?.length || 0) < initialTotal
             : hasPrefetched
-                ? (initialCoupons?.length || 0) >= ITEMS_PER_PAGE
-                : true
+              ? (initialCoupons?.length || 0) >= ITEMS_PER_PAGE
+              : true
 
     const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons || [])
     const [loading, setLoading] = useState(!hasPrefetched)
@@ -70,7 +70,7 @@ export default function CouponsSection({
     const sidebarTitle = storeDomain || 'Caramel'
     const sidebarDescription = storeDomain
         ? `Save at ${storeDomain} with verified coupon codes. Caramel applies the best deals automatically at checkout.`
-        : 'The open-source and privacy-first alternative to Honey. Automatically finds and applies the best coupon codes at checkout — without selling your data or hijacking creators\' commissions.'
+        : "The open-source and privacy-first alternative to Honey. Automatically finds and applies the best coupon codes at checkout — without selling your data or hijacking creators' commissions."
 
     useEffect(() => {
         couponsLengthRef.current = coupons.length
@@ -80,7 +80,9 @@ export default function CouponsSection({
     useEffect(() => {
         const loadFiltersMeta = async () => {
             try {
-                const res = await fetch('/api/coupons/filters?includeSites=false')
+                const res = await fetch(
+                    '/api/coupons/filters?includeSites=false',
+                )
                 if (!res.ok) throw new Error('Failed to load filter options')
                 const data = await res.json()
                 if (Array.isArray(data.discountTypes)) {
@@ -150,7 +152,6 @@ export default function CouponsSection({
                         couponsLengthRef.current = 0
                     }
                 }
-
             } catch (err) {
                 toast.error('Failed to load coupons')
                 console.error('Failed to load coupons:', err)
@@ -249,7 +250,7 @@ export default function CouponsSection({
                 transition={{ duration: 0.5 }}
                 className="mb-8 text-center"
             >
-                <h1 className="from-caramel dark:to-caramel mb-4 bg-gradient-to-r to-orange-600 bg-clip-text text-5xl font-extrabold text-transparent md:text-4xl sm:text-3xl dark:from-orange-400">
+                <h1 className="from-caramel dark:to-caramel mb-4 bg-gradient-to-r to-orange-600 bg-clip-text text-5xl font-extrabold text-transparent sm:text-3xl md:text-4xl dark:from-orange-400">
                     {heroTitle}
                 </h1>
                 {heroSubtitle ? (
@@ -263,7 +264,7 @@ export default function CouponsSection({
                 {/* Main Content */}
                 <div className="flex-1">
                     {/* Tabs removed until we have distinct categories backed by data */}
-                    
+
                     <CouponFiltersComponent
                         filters={filters}
                         onChange={handleFilterChange}
@@ -352,16 +353,20 @@ export default function CouponsSection({
                                 alt={`${sidebarTitle} logo`}
                                 width={storeDomain ? 56 : 200}
                                 height={storeDomain ? 56 : 80}
-                                className={storeDomain ? 'h-14 w-14 rounded-md' : 'h-auto w-auto max-w-[180px]'}
+                                className={
+                                    storeDomain
+                                        ? 'h-14 w-14 rounded-md'
+                                        : 'h-auto w-auto max-w-[180px]'
+                                }
                                 priority
                             />
                         </div>
                         {storeDomain ? (
-                            <p className="text-sm text-center font-semibold text-gray-800 dark:text-gray-100">
+                            <p className="text-center text-sm font-semibold text-gray-800 dark:text-gray-100">
                                 {sidebarTitle}
                             </p>
                         ) : null}
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 text-center">
+                        <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
                             {sidebarDescription}
                         </p>
                     </div>
@@ -374,14 +379,16 @@ export default function CouponsSection({
                             Start saving with Caramel on any browser!
                         </p>
                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {['Chrome', 'Safari', 'Firefox', 'Edge'].map(browser => (
-                                <span
-                                    key={browser}
-                                    className="rounded-xl bg-gray-50 px-3 py-2 text-center shadow-sm dark:bg-gray-800"
-                                >
-                                    {browser}
-                                </span>
-                            ))}
+                            {['Chrome', 'Safari', 'Firefox', 'Edge'].map(
+                                browser => (
+                                    <span
+                                        key={browser}
+                                        className="rounded-xl bg-gray-50 px-3 py-2 text-center shadow-sm dark:bg-gray-800"
+                                    >
+                                        {browser}
+                                    </span>
+                                ),
+                            )}
                         </div>
                     </div>
 
@@ -390,12 +397,12 @@ export default function CouponsSection({
                             5,000+ Supported Stores
                         </p>
                         <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                            From major retailers to niche marketplaces, Caramel works everywhere you
-                            shop online.
+                            From major retailers to niche marketplaces, Caramel
+                            works everywhere you shop online.
                         </p>
                         <Link
                             href="/supported-sites"
-                            className="mt-4 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-caramel to-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:opacity-90"
+                            className="from-caramel mt-4 inline-flex items-center justify-center rounded-full bg-gradient-to-r to-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:opacity-90"
                         >
                             View All Supported Sites
                         </Link>

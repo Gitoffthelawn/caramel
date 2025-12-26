@@ -41,7 +41,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
         >
             <div className="flex items-center gap-5 md:flex-col md:items-start">
                 {/* Left: Discount Badge */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-caramel to-orange-600 text-white shadow-md ring-1 ring-orange-200 dark:ring-orange-900/50">
+                <div className="from-caramel flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br to-orange-600 text-white shadow-md ring-1 ring-orange-200 dark:ring-orange-900/50">
                     <div className="text-center leading-tight">
                         <span className="block text-xl font-black md:text-lg">
                             {discount}
@@ -53,7 +53,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                 </div>
 
                 {/* Middle: Content */}
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                     <h3 className="mb-1 line-clamp-2 text-lg font-semibold text-gray-900 dark:text-white">
                         {coupon.title}
                     </h3>
@@ -97,7 +97,9 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                         <p className="from-caramel mb-3 bg-gradient-to-r to-orange-600 bg-clip-text text-3xl font-black text-transparent">
                             {coupon.code}
                         </p>
-                        <p className="text-xs text-gray-400">Code copied to clipboard!</p>
+                        <p className="text-xs text-gray-400">
+                            Code copied to clipboard!
+                        </p>
                     </div>
                 </motion.div>
             )}

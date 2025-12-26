@@ -2,7 +2,6 @@
 
 import Doodles from '@/components/Doodles'
 import PricingSection from '@/components/PricingSection'
-import { motion } from 'framer-motion'
 
 export default function PricingPageClient() {
     return (

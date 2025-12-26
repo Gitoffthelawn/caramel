@@ -183,15 +183,15 @@ export default function PricingSection() {
                         </div>
 
                         <div className="relative z-10">
-                            <div className="absolute right-0 top-0 rounded-bl-3xl bg-gradient-to-br from-caramel to-orange-600 px-8 py-3 text-sm font-bold text-white shadow-lg sm:px-4 sm:py-2 sm:text-xs lg:px-6 lg:py-2.5 lg:text-sm">
+                            <div className="from-caramel absolute right-0 top-0 rounded-bl-3xl bg-gradient-to-br to-orange-600 px-8 py-3 text-sm font-bold text-white shadow-lg sm:px-4 sm:py-2 sm:text-xs lg:px-6 lg:py-2.5 lg:text-sm">
                                 ALWAYS FREE
                             </div>
 
-                            <div className="mb-10 border-b border-caramel/20 pb-10">
-                                <h3 className="mb-4 text-4xl font-bold text-gray-900 lg:text-3xl sm:text-2xl dark:text-white">
+                            <div className="border-caramel/20 mb-10 border-b pb-10">
+                                <h3 className="mb-4 text-4xl font-bold text-gray-900 sm:text-2xl lg:text-3xl dark:text-white">
                                     Free Forever Plan
                                 </h3>
-                                <p className="text-xl text-gray-600 lg:text-lg sm:text-base dark:text-gray-300">
+                                <p className="text-xl text-gray-600 sm:text-base lg:text-lg dark:text-gray-300">
                                     Everything you need to save money while
                                     shopping online. No payment required, ever.
                                 </p>
@@ -241,10 +241,10 @@ export default function PricingSection() {
                     transition={{ duration: 0.6, delay: 0.4 }}
                     className="mt-20 text-center"
                 >
-                    <h3 className="mb-6 text-3xl font-bold text-gray-900 lg:text-2xl sm:text-xl dark:text-white">
+                    <h3 className="mb-6 text-3xl font-bold text-gray-900 sm:text-xl lg:text-2xl dark:text-white">
                         Why Is Caramel Free?
                     </h3>
-                    <div className="mx-auto max-w-3xl space-y-4 text-left text-gray-600 lg:text-base sm:text-sm dark:text-gray-300">
+                    <div className="mx-auto max-w-3xl space-y-4 text-left text-gray-600 sm:text-sm lg:text-base dark:text-gray-300">
                         <motion.p
                             initial={{ opacity: 0 }}
                             whileInView={{ opacity: 1 }}

@@ -5,8 +5,8 @@ import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import debounce from 'lodash.debounce'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FaFilter } from 'react-icons/fa'
-import AsyncSelect from 'react-select/async'
 import Select from 'react-select'
+import AsyncSelect from 'react-select/async'
 
 interface CouponFiltersProps {
     filters: CouponFilters
@@ -71,15 +71,13 @@ export default function CouponFilters({
         opts.map(type => ({
             value: type,
             label:
-                type.charAt(0) +
-                type
-                    .slice(1)
-                    .toLowerCase()
-                    .replace(/_/g, ' '),
+                type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, ' '),
         }))
 
     const resolvedDiscountOptions = normalizeOptions(
-        discountOptions.length ? discountOptions : ['PERCENTAGE', 'CASH', 'SAVE'],
+        discountOptions.length
+            ? discountOptions
+            : ['PERCENTAGE', 'CASH', 'SAVE'],
     )
 
     const selectedDiscount =
@@ -105,7 +103,7 @@ export default function CouponFilters({
         <div className="mb-8 space-y-3">
             <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
-                <div className="flex-1 min-w-[220px]">
+                <div className="min-w-[220px] flex-1">
                     <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Search
                     </label>
@@ -122,7 +120,7 @@ export default function CouponFilters({
                 </div>
 
                 {/* Store Filter */}
-                <div className="flex-1 min-w-[220px]">
+                <div className="min-w-[220px] flex-1">
                     <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Store
                     </label>
@@ -142,7 +140,7 @@ export default function CouponFilters({
                 </div>
 
                 {/* Type Filter */}
-                <div className="flex-1 min-w-[200px]">
+                <div className="min-w-[200px] flex-1">
                     <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Discount Type
                     </label>
@@ -154,7 +152,9 @@ export default function CouponFilters({
                         value={selectedDiscount}
                         onChange={(opt: Option | null) =>
                             onChange({
-                                type: (opt?.value as CouponFilters['type']) || 'all',
+                                type:
+                                    (opt?.value as CouponFilters['type']) ||
+                                    'all',
                             })
                         }
                         styles={selectStyles}
@@ -170,7 +170,7 @@ export default function CouponFilters({
                             onChange({ search: '', site: '', type: 'all' })
                             onClearAll?.()
                         }}
-                        className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-caramel to-orange-600 text-white shadow-md transition hover:opacity-90"
+                        className="from-caramel flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r to-orange-600 text-white shadow-md transition hover:opacity-90"
                         title="Clear filters"
                     >
                         <XMarkIcon className="h-5 w-5" />
@@ -181,14 +181,14 @@ export default function CouponFilters({
             {/* Mobile toggle (md and down per custom breakpoints) */}
             <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="text-caramel mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 shadow-md transition-all hover:shadow-lg dark:bg-gray-900 dark:text-orange-400 md:flex"
+                className="text-caramel mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 shadow-md transition-all hover:shadow-lg md:flex dark:bg-gray-900 dark:text-orange-400"
             >
                 <FaFilter className="h-4 w-4" />
                 <span className="font-semibold">Filters</span>
             </button>
 
             <div
-                className={`${showFilters ? 'max-h-full' : 'md:max-h-0'} overflow-visible md:overflow-hidden transition-all duration-300`}
+                className={`${showFilters ? 'max-h-full' : 'md:max-h-0'} overflow-visible transition-all duration-300 md:overflow-hidden`}
             />
         </div>
     )

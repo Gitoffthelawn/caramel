@@ -32,7 +32,6 @@
         "eslint-config-next",
         "prettier-plugin-organize-imports",
         "prettier-plugin-tailwindcss",
-        "@heroicons/react",
         "@use-gesture/react",
         "cors",
         "gsap",

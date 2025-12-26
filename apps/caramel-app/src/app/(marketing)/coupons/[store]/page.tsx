@@ -18,7 +18,9 @@ function safeDecode(value: string): string {
 function getBaseDomain(raw: string): string {
     let hostname = raw.trim()
     try {
-        const u = new URL(hostname.startsWith('http') ? hostname : `https://${hostname}`)
+        const u = new URL(
+            hostname.startsWith('http') ? hostname : `https://${hostname}`,
+        )
         hostname = u.hostname
     } catch {
         // fallback to raw slug
@@ -141,7 +143,9 @@ export default async function StoreCouponsPage({
             <script
                 type="application/ld+json"
                 suppressHydrationWarning
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(structuredData),
+                }}
             />
         </main>
     )
