@@ -29,7 +29,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             : `$${coupon.discount_amount}`
         : '20%'
 
-    const timesUsed = coupon.timesUsed || Math.floor(Math.random() * 500) + 100
+    const timesUsed = coupon.timesUsed ?? 0
 
     return (
         <motion.div
