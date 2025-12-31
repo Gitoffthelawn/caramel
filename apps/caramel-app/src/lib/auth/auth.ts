@@ -46,6 +46,7 @@ export const auth = betterAuth({
                 html,
             })
         },
+        callbackOnError: '/verify?error=token_expired',
     },
     user: {
         additionalFields: {

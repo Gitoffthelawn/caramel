@@ -28,7 +28,7 @@ const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
 export default function Providers({ children }: { children: ReactNode }) {
     const pathname = usePathname()
     const [isDarkMode, setDarkMode] = useState(false)
-    const pagesLayoutless = useMemo(() => ['/login', '/signup'], [])
+    const pagesLayoutless = useMemo(() => ['/login', '/signup', '/verify'], [])
 
     useEffect(() => {
         const handleRouteChange = (url: string) => gtag.pageView(url)
