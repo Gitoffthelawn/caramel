@@ -63,10 +63,8 @@ export default function SignupPageClient() {
                     return
                 }
 
-                toast.success(
-                    'Account created! Please check your email to verify.',
-                )
-                window.location.href = '/login'
+                // Redirect to verify page with success message
+                window.location.href = '/verify?signup=success'
             } catch {
                 toast.error('Something went wrong. Please try again later.')
                 setError('Something went wrong')

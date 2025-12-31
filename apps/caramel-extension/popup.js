@@ -142,6 +142,18 @@ function renderSignInPrompt(backFn) {
         <button type="submit" class="login-button">Login</button>
       </form>
 
+      <div id="resendVerificationContainer" style="display:none; text-align:center; margin-top:12px;">
+        <a
+          href="https://grabcaramel.com/verify"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="resend-verification-btn"
+          style="display:inline-block; text-decoration:none;"
+        >
+          Verify your email
+        </a>
+      </div>
+
       <p class="mt-6">
         Don't have an account?
         <a
@@ -165,6 +177,10 @@ function renderSignInPrompt(backFn) {
     const backBtn = document.getElementById('backBtn')
     if (backBtn && returnView) backBtn.addEventListener('click', returnView)
 
+    const resendVerificationContainer = document.getElementById(
+        'resendVerificationContainer',
+    )
+
     const loginForm = document.getElementById('loginForm')
     loginForm.addEventListener('submit', async e => {
         e.preventDefault()
@@ -172,6 +188,9 @@ function renderSignInPrompt(backFn) {
         const errorBox = document.getElementById('loginErrorMessage')
         errorBox.style.display = 'none'
         errorBox.textContent = ''
+        errorBox.style.color = ''
+        if (resendVerificationContainer)
+            resendVerificationContainer.style.display = 'none'
 
         try {
             const email = document.getElementById('email').value.trim()
@@ -188,7 +207,20 @@ function renderSignInPrompt(backFn) {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
-                throw new Error(data.error || 'Login failed')
+                const error = data.error || 'Login failed'
+
+                // Check if error is about email verification
+                if (
+                    error.toLowerCase().includes('verify') ||
+                    error.toLowerCase().includes('verification') ||
+                    error.toLowerCase().includes('not verified')
+                ) {
+                    if (resendVerificationContainer) {
+                        resendVerificationContainer.style.display = 'block'
+                    }
+                }
+
+                throw new Error(error)
             }
 
             const { token, username, image } = await res.json()
