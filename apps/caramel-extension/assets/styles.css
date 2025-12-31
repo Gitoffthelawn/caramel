@@ -307,6 +307,28 @@ body {
     color: #721c24; /* darker red text */
 }
 
+.resend-verification-btn {
+    background: none;
+    border: none;
+    color: #ea6925;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 8px;
+    transition: all 0.2s ease;
+}
+
+.resend-verification-btn:hover {
+    text-decoration: none;
+    opacity: 0.8;
+}
+
+.resend-verification-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .mt-6 {
     margin-top: 6px;
 }

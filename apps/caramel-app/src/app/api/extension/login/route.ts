@@ -19,8 +19,22 @@ export async function POST(req: NextRequest) {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}))
+            const errorMessage =
+                errorData?.message ||
+                errorData?.error?.message ||
+                'Invalid credentials'
+
+            // Check if error is about email verification
+            const isVerificationError =
+                errorData?.error?.code === 'EMAIL_NOT_VERIFIED' ||
+                errorMessage.toLowerCase().includes('verify')
+
             return NextResponse.json(
-                { error: errorData?.message || 'Invalid credentials' },
+                {
+                    error: isVerificationError
+                        ? 'Please verify your email first. Check your inbox for the verification link.'
+                        : errorMessage,
+                },
                 { status: 401 },
             )
         }

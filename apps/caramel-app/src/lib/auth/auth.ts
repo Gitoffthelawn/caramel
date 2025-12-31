@@ -38,6 +38,7 @@ export const auth = betterAuth({
     emailVerification: {
         sendOnSignUp: true,
         autoSignInAfterVerification: true,
+        expiresIn: 60 * 2, // 2 minutes (temporary for testing)
         sendVerificationEmail: async ({ user, url }) => {
             const html = await render(VerificationRequestTemplate({ url }))
             await sendEmail({
@@ -46,6 +47,7 @@ export const auth = betterAuth({
                 html,
             })
         },
+        callbackOnError: '/verify?error=token_expired',
     },
     user: {
         additionalFields: {
