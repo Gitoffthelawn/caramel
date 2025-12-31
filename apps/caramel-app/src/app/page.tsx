@@ -6,8 +6,20 @@ import OpenSourceSection from '@/components/OpenSourceSection'
 import SupportedSection from '@/components/SupportedSection'
 import WhyNotHoneySection from '@/components/WhyNot'
 import { motion } from 'framer-motion'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 
 export default function Page() {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const error = searchParams.get('error')
+        if (error === 'token_expired') {
+            router.push('/verify?error=token_expired')
+        }
+    }, [searchParams, router])
+
     return (
         <main className="relative -mt-[6.7rem] w-full overflow-x-clip">
             <Doodles />

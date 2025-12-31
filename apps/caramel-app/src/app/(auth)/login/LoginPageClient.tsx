@@ -4,17 +4,41 @@ import { signIn } from '@/lib/auth/client'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
-import { FormEvent, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { FormEvent, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 export default function LoginPageClient() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
+    const [showVerificationAlert, setShowVerificationAlert] = useState(false)
+    const router = useRouter()
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search)
+        const verified = urlParams.get('verified')
+        const error = urlParams.get('error')
+
+        if (verified === 'true' && error === 'token_expired') {
+            toast.error(
+                'Verification link has expired. Please request a new one.',
+                {
+                    duration: 5000,
+                },
+            )
+            setShowVerificationAlert(true)
+        } else if (verified === 'true') {
+            toast.success('Email verified successfully! You can now sign in.', {
+                duration: 5000,
+            })
+        }
+    }, [])
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault()
         setLoading(true)
+
         const result = await signIn.email({
             email: email.trim().toLowerCase(),
             password,
@@ -22,9 +46,7 @@ export default function LoginPageClient() {
 
         if (result?.error) {
             if (result.error.code === 'EMAIL_NOT_VERIFIED') {
-                toast.error(
-                    'Please verify your email first. Check your inbox for the verification link.',
-                )
+                router.push('/verify')
             } else {
                 toast.error(
                     'Unable to sign in. Please check your email and password.',
@@ -56,6 +78,30 @@ export default function LoginPageClient() {
                         className="my-auto mt-2"
                     />
                 </h2>
+
+                {showVerificationAlert && (
+                    <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-4">
+                        <div className="flex items-start">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-orange-800">
+                                    Email verification required
+                                </p>
+                                <p className="mt-1 text-sm text-orange-700">
+                                    Please verify your email address to
+                                    continue.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => router.push('/verify')}
+                            className="text-caramel mt-3 w-full rounded-md border border-orange-300 bg-white px-4 py-2 text-sm font-semibold transition hover:bg-orange-50"
+                        >
+                            Verify Email Now
+                        </button>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-black">
