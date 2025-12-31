@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import VerifyPageClient from './VerifyPageClient'
 
 const title = 'Caramel | Verify Email'
@@ -38,5 +39,9 @@ export const metadata: Metadata = {
 }
 
 export default function VerifyPage() {
-    return <VerifyPageClient />
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <VerifyPageClient />
+        </Suspense>
+    )
 }
