@@ -13,6 +13,7 @@ export default function LoginPageClient() {
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [showVerificationAlert, setShowVerificationAlert] = useState(false)
+    const [isTokenExpired, setIsTokenExpired] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -20,19 +21,28 @@ export default function LoginPageClient() {
         const verified = urlParams.get('verified')
         const error = urlParams.get('error')
 
-        if (verified === 'true' && error === 'token_expired') {
-            toast.error(
-                'Verification link has expired. Please request a new one.',
-                {
-                    duration: 5000,
-                },
-            )
-            setShowVerificationAlert(true)
-        } else if (verified === 'true') {
-            toast.success('Email verified successfully! You can now sign in.', {
-                duration: 5000,
-            })
-        }
+        // Small delay to ensure Toaster is ready
+        const timer = setTimeout(() => {
+            if (error === 'token_expired' || error === 'invalid_token') {
+                toast.error(
+                    'Verification link has expired or is invalid. Please request a new one.',
+                    {
+                        duration: 5000,
+                    },
+                )
+                setShowVerificationAlert(true)
+                setIsTokenExpired(true)
+            } else if (verified === 'true' && !error) {
+                toast.success(
+                    'Email verified successfully! You can now sign in.',
+                    {
+                        duration: 5000,
+                    },
+                )
+            }
+        }, 100)
+
+        return () => clearTimeout(timer)
     }, [])
 
     const handleSubmit = async (event: FormEvent) => {
@@ -84,11 +94,14 @@ export default function LoginPageClient() {
                         <div className="flex items-start">
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-orange-800">
-                                    Email verification required
+                                    {isTokenExpired
+                                        ? 'Verification link expired'
+                                        : 'Email verification required'}
                                 </p>
                                 <p className="mt-1 text-sm text-orange-700">
-                                    Please verify your email address to
-                                    continue.
+                                    {isTokenExpired
+                                        ? 'Your verification link has expired. Please request a new one to continue.'
+                                        : 'Please verify your email address to continue.'}
                                 </p>
                             </div>
                         </div>
@@ -97,7 +110,9 @@ export default function LoginPageClient() {
                             onClick={() => router.push('/verify')}
                             className="text-caramel mt-3 w-full rounded-md border border-orange-300 bg-white px-4 py-2 text-sm font-semibold transition hover:bg-orange-50"
                         >
-                            Verify Email Now
+                            {isTokenExpired
+                                ? 'Request New Link'
+                                : 'Verify Email Now'}
                         </button>
                     </div>
                 )}

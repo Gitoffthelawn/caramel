@@ -143,9 +143,15 @@ function renderSignInPrompt(backFn) {
       </form>
 
       <div id="resendVerificationContainer" style="display:none; text-align:center; margin-top:12px;">
-        <button id="resendVerificationBtn" class="resend-verification-btn" type="button">
-          Resend verification email
-        </button>
+        <a
+          href="https://grabcaramel.com/verify"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="resend-verification-btn"
+          style="display:inline-block; text-decoration:none;"
+        >
+          Verify your email
+        </a>
       </div>
 
       <p class="mt-6">
@@ -174,65 +180,6 @@ function renderSignInPrompt(backFn) {
     const resendVerificationContainer = document.getElementById(
         'resendVerificationContainer',
     )
-    const resendVerificationBtn = document.getElementById(
-        'resendVerificationBtn',
-    )
-
-    if (resendVerificationBtn) {
-        resendVerificationBtn.addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim()
-            if (!email) {
-                const errorBox = document.getElementById('loginErrorMessage')
-                errorBox.textContent =
-                    'Please enter your email address to resend verification'
-                errorBox.style.display = 'block'
-                return
-            }
-
-            resendVerificationBtn.textContent = 'Sending...'
-            resendVerificationBtn.disabled = true
-
-            try {
-                const res = await fetch(
-                    'https://grabcaramel.com/api/auth/send-verification-email',
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            email,
-                            callbackURL: '/login?verified=true',
-                        }),
-                    },
-                )
-
-                if (!res.ok) {
-                    throw new Error('Failed to send verification email')
-                }
-
-                const successMessage = document.getElementById(
-                    'loginErrorMessage',
-                )
-                successMessage.textContent =
-                    'Verification email sent! Please check your inbox and spam folder.'
-                successMessage.style.display = 'block'
-                successMessage.style.color = '#28a745'
-
-                setTimeout(() => {
-                    successMessage.style.display = 'none'
-                    successMessage.style.color = ''
-                }, 5000)
-
-                resendVerificationContainer.style.display = 'none'
-            } catch (err) {
-                const errorBox = document.getElementById('loginErrorMessage')
-                errorBox.textContent = 'Failed to send verification email'
-                errorBox.style.display = 'block'
-            } finally {
-                resendVerificationBtn.textContent = 'Resend verification email'
-                resendVerificationBtn.disabled = false
-            }
-        })
-    }
 
     const loginForm = document.getElementById('loginForm')
     loginForm.addEventListener('submit', async e => {
@@ -265,7 +212,8 @@ function renderSignInPrompt(backFn) {
                 // Check if error is about email verification
                 if (
                     error.toLowerCase().includes('verify') ||
-                    error.toLowerCase().includes('verification')
+                    error.toLowerCase().includes('verification') ||
+                    error.toLowerCase().includes('not verified')
                 ) {
                     if (resendVerificationContainer) {
                         resendVerificationContainer.style.display = 'block'
