@@ -12,17 +12,32 @@ export default function VerifyPageClient() {
     const [email, setEmail] = useState('')
     const [resendingEmail, setResendingEmail] = useState(false)
     const searchParams = useSearchParams()
+    const isNewSignup = searchParams.get('signup') === 'success'
 
     useEffect(() => {
         const error = searchParams.get('error')
-        if (error === 'token_expired') {
-            toast.error(
-                'Verification link has expired. Please request a new one.',
-                {
-                    duration: 5000,
-                },
-            )
-        }
+        const signup = searchParams.get('signup')
+
+        // Small delay to ensure Toaster is ready
+        const timer = setTimeout(() => {
+            if (signup === 'success') {
+                toast.success(
+                    'Account created! Please check your email to verify your account.',
+                    {
+                        duration: 6000,
+                    },
+                )
+            } else if (error === 'token_expired') {
+                toast.error(
+                    'Verification link has expired. Please request a new one.',
+                    {
+                        duration: 5000,
+                    },
+                )
+            }
+        }, 100)
+
+        return () => clearTimeout(timer)
     }, [searchParams])
 
     const handleResendVerification = async () => {
@@ -69,10 +84,15 @@ export default function VerifyPageClient() {
                 </h2>
 
                 <div className="mb-6 text-center text-gray-600">
-                    <p>Please verify your email address to continue.</p>
+                    <p>
+                        {isNewSignup
+                            ? "We've sent a verification email to your inbox."
+                            : 'Please verify your email address to continue.'}
+                    </p>
                     <p className="mt-2 text-sm">
-                        Enter your email below to receive a new verification
-                        link.
+                        {isNewSignup
+                            ? "Didn't receive it? Enter your email below to resend."
+                            : 'Enter your email below to receive a new verification link.'}
                     </p>
                 </div>
 
