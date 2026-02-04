@@ -83,7 +83,7 @@ export default function Header({ scrollRef }: HeaderProps) {
         >
             <Link
                 href="/"
-                className="absolute ml-5 flex h-full w-[185px] lg:static lg:ml-0"
+                className="absolute z-10 ml-5 flex h-full w-[185px] lg:static lg:z-auto lg:ml-0"
             >
                 <Image
                     src="/full-logo.png"
@@ -94,7 +94,11 @@ export default function Header({ scrollRef }: HeaderProps) {
                 />
             </Link>
             <motion.div
-                className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-6 rounded-[28px] bg-white px-[26px] py-[15px] shadow lg:hidden`}
+                className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-6 rounded-[28px] bg-white py-[15px] shadow lg:hidden`}
+                style={{ 
+                    paddingLeft: 'calc(185px + 1.25rem + 26px)',
+                    paddingRight: '26px'
+                }}
             >
                 {links.map(link => {
                     const isActive = pathname === link.url
