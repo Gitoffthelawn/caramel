@@ -13,6 +13,7 @@ export default function LoginPageClient() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null)
     const [showVerificationAlert, setShowVerificationAlert] = useState(false)
     const [isTokenExpired, setIsTokenExpired] = useState(false)
     const router = useRouter()
@@ -71,6 +72,30 @@ export default function LoginPageClient() {
         setLoading(false)
     }
 
+    const handleSocialSignIn = async (provider: 'google' | 'apple') => {
+        setOauthLoading(provider)
+        try {
+            const result = await signIn.social({
+                provider,
+                callbackURL: '/',
+            })
+
+            if (result?.error) {
+                toast.error(
+                    `Unable to sign in with ${provider === 'google' ? 'Google' : 'Apple'}. Please try again.`,
+                )
+                setOauthLoading(null)
+                return
+            }
+
+            // signIn.social automatically redirects to OAuth provider
+            // The callback will handle redirecting back to callbackURL
+        } catch (error) {
+            toast.error('Something went wrong. Please try again later.')
+            setOauthLoading(null)
+        }
+    }
+
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <motion.div
@@ -121,17 +146,29 @@ export default function LoginPageClient() {
                 <div className="mb-4 space-y-3">
                     <button
                         type="button"
-                        className="hover:bg-caramel/10 hover:border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition"
+                        onClick={() => handleSocialSignIn('google')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <FaGoogle className="h-5 w-5" />
-                        <span>Sign in with Google</span>
+                        <FaGoogle className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'google'
+                                ? 'Redirecting...'
+                                : 'Sign in with Google'}
+                        </span>
                     </button>
                     <button
                         type="button"
-                        className="hover:bg-caramel/10 hover:border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition"
+                        onClick={() => handleSocialSignIn('apple')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <FaApple className="h-5 w-5" />
-                        <span>Sign in with Apple</span>
+                        <FaApple className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'apple'
+                                ? 'Redirecting...'
+                                : 'Sign in with Apple'}
+                        </span>
                     </button>
                 </div>
 

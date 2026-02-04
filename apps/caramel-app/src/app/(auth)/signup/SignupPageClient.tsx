@@ -1,6 +1,6 @@
 'use client'
 
-import { signUp } from '@/lib/auth/client'
+import { signIn, signUp } from '@/lib/auth/client'
 import { useFormik } from 'formik'
 import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
@@ -35,6 +35,7 @@ const validationSchema = object().shape({
 export default function SignupPageClient() {
     const [showPasswordChecker, setShowPasswordChecker] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null)
     const [error, setError] = useState('')
 
     const formik = useFormik({
@@ -75,6 +76,30 @@ export default function SignupPageClient() {
         },
     })
 
+    const handleSocialSignIn = async (provider: 'google' | 'apple') => {
+        setOauthLoading(provider)
+        try {
+            const result = await signIn.social({
+                provider,
+                callbackURL: '/',
+            })
+
+            if (result?.error) {
+                toast.error(
+                    `Unable to sign up with ${provider === 'google' ? 'Google' : 'Apple'}. Please try again.`,
+                )
+                setOauthLoading(null)
+                return
+            }
+
+            // signIn.social automatically redirects to OAuth provider
+            // The callback will handle redirecting back to callbackURL
+        } catch (error) {
+            toast.error('Something went wrong. Please try again later.')
+            setOauthLoading(null)
+        }
+    }
+
     const { handleSubmit, errors, touched, handleChange, handleBlur, values } =
         formik
 
@@ -100,17 +125,29 @@ export default function SignupPageClient() {
                 <div className="mb-4 space-y-3">
                     <button
                         type="button"
-                        className="hover:bg-caramel/10 hover:border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition"
+                        onClick={() => handleSocialSignIn('google')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <FaGoogle className="h-5 w-5" />
-                        <span>Sign up with Google</span>
+                        <FaGoogle className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'google'
+                                ? 'Redirecting...'
+                                : 'Sign up with Google'}
+                        </span>
                     </button>
                     <button
                         type="button"
-                        className="hover:bg-caramel/10 hover:border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition"
+                        onClick={() => handleSocialSignIn('apple')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <FaApple className="h-5 w-5" />
-                        <span>Sign up with Apple</span>
+                        <FaApple className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'apple'
+                                ? 'Redirecting...'
+                                : 'Sign up with Apple'}
+                        </span>
                     </button>
                 </div>
 
