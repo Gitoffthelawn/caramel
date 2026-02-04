@@ -18,9 +18,7 @@ export default function Layout({ children }: LayoutProps) {
             } font-Roboto`}
         >
             <Header scrollRef={ref} />
-            <div className="flex-1">
-                {children}
-            </div>
+            <div className="flex-1">{children}</div>
             <Footer />
         </div>
     )
