@@ -16,7 +16,7 @@ export default function ProfilePageClient() {
 
     if (isPending) {
         return (
-            <main className="relative -mt-[6.7rem] w-full overflow-x-clip">
+            <main className="relative -mt-[6.7rem] w-full">
                 <div className="container mx-auto px-4 py-16">
                     <div className="flex items-center justify-center">
                         <div className="text-lg">Loading...</div>
@@ -37,7 +37,7 @@ export default function ProfilePageClient() {
         'U'
 
     return (
-        <main className="relative -mt-[6.7rem] w-full overflow-x-clip">
+        <main className="relative -mt-[6.7rem] w-full">
             <div className="container mx-auto px-4 py-16">
                 <div className="mx-auto max-w-2xl">
                     <h1 className="text-caramel mb-8 text-4xl font-bold">
