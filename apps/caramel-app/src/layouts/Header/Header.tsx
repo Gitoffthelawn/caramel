@@ -95,9 +95,9 @@ export default function Header({ scrollRef }: HeaderProps) {
             </Link>
             <motion.div
                 className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-8 rounded-[28px] bg-white py-[15px] shadow lg:hidden`}
-                style={{ 
+                style={{
                     paddingLeft: 'calc(185px + 1.25rem + 32px)',
-                    paddingRight: '32px'
+                    paddingRight: '32px',
                 }}
             >
                 {links.map(link => {
@@ -146,7 +146,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                     <div className="ml-6 flex items-center gap-4">
                         <Link
                             href="/login"
-                            className="text-caramel hover:bg-caramel/10 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border border-caramel px-6 py-2.5 font-medium transition hover:scale-105"
+                            className="text-caramel hover:bg-caramel/10 border-caramel inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border px-6 py-2.5 font-medium transition hover:scale-105"
                         >
                             Login
                         </Link>
@@ -202,7 +202,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                                 <Link
                                     onClick={() => setIsMenuOpen(false)}
                                     href="/login"
-                                    className="text-caramel hover:bg-caramel/10 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border border-caramel px-[30px] py-2.5 font-medium transition"
+                                    className="text-caramel hover:bg-caramel/10 border-caramel inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border px-[30px] py-2.5 font-medium transition"
                                 >
                                     Login
                                 </Link>
