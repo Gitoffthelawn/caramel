@@ -9,12 +9,19 @@ import { bearer } from 'better-auth/plugins'
 
 const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10
 const fallbackBaseURL = 'http://localhost:3000'
+const appleIdTrustedOrigins = ['https://appleid.apple.com']
 const baseURL =
     process.env.BETTER_AUTH_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
     fallbackBaseURL
 const trustedOrigins = Array.from(
-    new Set([process.env.NEXT_PUBLIC_BASE_URL || '', baseURL].filter(Boolean)),
+    new Set(
+        [
+            process.env.NEXT_PUBLIC_BASE_URL || '',
+            baseURL,
+            ...appleIdTrustedOrigins,
+        ].filter(Boolean),
+    ),
 )
 
 export const auth = betterAuth({
@@ -47,6 +54,17 @@ export const auth = betterAuth({
             })
         },
         callbackOnError: '/verify?error=token_expired',
+    },
+    socialProviders: {
+        google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            prompt: 'select_account',
+        },
+        apple: {
+            clientId: process.env.APPLE_CLIENT_ID as string,
+            clientSecret: process.env.APPLE_CLIENT_SECRET as string,
+        },
     },
     user: {
         additionalFields: {
