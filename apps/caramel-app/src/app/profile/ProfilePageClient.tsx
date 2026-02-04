@@ -50,13 +50,13 @@ export default function ProfilePageClient() {
                                 {userInitial}
                             </div>
                             <div>
-                                <h2 className="text-2xl font-semibold">
+                                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                                     {user.firstName && user.lastName
                                         ? `${user.firstName} ${user.lastName}`
                                         : user.name}
                                 </h2>
                                 {user.email && (
-                                    <p className="text-gray-600 dark:text-gray-400">
+                                    <p className="text-gray-600 dark:text-gray-200">
                                         {user.email}
                                     </p>
                                 )}
