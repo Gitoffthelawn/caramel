@@ -79,7 +79,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                 scale: isInView ? 1 : 1.05,
             }}
             transition={{ duration: 0.3 }}
-            className={`lg:dark:bg-darkerBg sticky top-4 z-[999] mx-auto flex w-full max-w-[min(75rem,93svw)] items-center justify-between rounded-2xl p-4 px-8 py-4 lg:rounded-[28px] lg:bg-white lg:py-3 lg:shadow`}
+            className={`lg:dark:bg-darkerBg sticky top-4 z-[999] mx-auto flex w-full max-w-[min(90rem,95svw)] items-center justify-between rounded-2xl p-4 px-8 py-4 lg:rounded-[28px] lg:bg-white lg:py-3 lg:shadow`}
         >
             <Link
                 href="/"
@@ -94,10 +94,10 @@ export default function Header({ scrollRef }: HeaderProps) {
                 />
             </Link>
             <motion.div
-                className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-6 rounded-[28px] bg-white py-[15px] shadow lg:hidden`}
+                className={`dark:bg-darkerBg mx-auto flex w-full items-center justify-center gap-8 rounded-[28px] bg-white py-[15px] shadow lg:hidden`}
                 style={{ 
-                    paddingLeft: 'calc(185px + 1.25rem + 26px)',
-                    paddingRight: '26px'
+                    paddingLeft: 'calc(185px + 1.25rem + 32px)',
+                    paddingRight: '32px'
                 }}
             >
                 {links.map(link => {
@@ -113,8 +113,8 @@ export default function Header({ scrollRef }: HeaderProps) {
                         </Link>
                     )
                 })}
-                {session?.user && (
-                    <div ref={userMenuRef} className="relative">
+                {session?.user ? (
+                    <div ref={userMenuRef} className="relative ml-6">
                         <button
                             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                             className="bg-caramel flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-white transition hover:scale-105"
@@ -142,9 +142,24 @@ export default function Header({ scrollRef }: HeaderProps) {
                             )}
                         </AnimatePresence>
                     </div>
+                ) : (
+                    <div className="ml-6 flex items-center gap-4">
+                        <Link
+                            href="/login"
+                            className="text-caramel hover:bg-caramel/10 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border border-caramel px-6 py-2.5 font-medium transition hover:scale-105"
+                        >
+                            Login
+                        </Link>
+                        <Link
+                            href="/signup"
+                            className="bg-caramel hover:bg-caramel/90 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl px-6 py-2.5 font-medium text-white transition hover:scale-105"
+                        >
+                            Sign Up
+                        </Link>
+                    </div>
                 )}
             </motion.div>
-            <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-auto" />
+            <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-6" />
             <button
                 className="text-caramel ml-3 hidden text-2xl lg:block"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -172,7 +187,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                                 </Link>
                             )
                         })}
-                        {session?.user && (
+                        {session?.user ? (
                             <button
                                 onClick={() => {
                                     setIsMenuOpen(false)
@@ -182,6 +197,23 @@ export default function Header({ scrollRef }: HeaderProps) {
                             >
                                 Sign out
                             </button>
+                        ) : (
+                            <>
+                                <Link
+                                    onClick={() => setIsMenuOpen(false)}
+                                    href="/login"
+                                    className="text-caramel hover:bg-caramel/10 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border border-caramel px-[30px] py-2.5 font-medium transition"
+                                >
+                                    Login
+                                </Link>
+                                <Link
+                                    onClick={() => setIsMenuOpen(false)}
+                                    href="/signup"
+                                    className="bg-caramel hover:bg-caramel/90 inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl px-[30px] py-2.5 font-medium text-white transition"
+                                >
+                                    Sign Up
+                                </Link>
+                            </>
                         )}
                         <div className="h-full" />
                     </motion.div>
