@@ -132,6 +132,13 @@ export default function Header({ scrollRef }: HeaderProps) {
                                     <div className="border-b px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
                                         {session.user.email}
                                     </div>
+                                    <Link
+                                        href="/profile"
+                                        onClick={() => setIsUserMenuOpen(false)}
+                                        className="text-caramel block w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                        Profile
+                                    </Link>
                                     <button
                                         onClick={handleSignOut}
                                         className="text-caramel w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
