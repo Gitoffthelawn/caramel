@@ -298,6 +298,67 @@ body {
     transform: scale(1.05);
 }
 
+.oauth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.oauth-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #ea6925;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.oauth-button:hover:not(:disabled) {
+    background-color: rgba(234, 105, 37, 0.1);
+    border-color: #ea6925;
+    transform: scale(1.02);
+}
+
+.oauth-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.oauth-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+}
+
+.oauth-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 16px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.oauth-divider span {
+    padding: 0 12px;
+}
+
 .error-message {
     padding: 8px;
     margin: 8px 0;
