@@ -116,6 +116,159 @@ function renderUnsupportedSite(user) {
 }
 
 /* ------------------------------------------------------------ */
+/*  OAuth Social Sign-In Handler                                */
+/* ------------------------------------------------------------ */
+async function handleSocialSignIn(provider) {
+    const errorBox = document.getElementById('loginErrorMessage')
+    const googleBtn = document.getElementById('googleSignInBtn')
+    const appleBtn = document.getElementById('appleSignInBtn')
+    const button = provider === 'google' ? googleBtn : appleBtn
+
+    // Disable button and show loading state
+    if (button) {
+        button.disabled = true
+        const span = button.querySelector('span')
+        if (span) {
+            span.textContent = 'Redirecting...'
+        }
+    }
+
+    if (errorBox) {
+        errorBox.style.display = 'none'
+        errorBox.textContent = ''
+    }
+
+    try {
+        // Base URL - change to 'http://localhost:58000' for local testing
+        const baseURL = 'http://localhost:58000' // Change back to 'https://grabcaramel.com' for production
+
+        // Check if identity API is available
+        const identity =
+            currentBrowser.identity || currentBrowser.chrome?.identity
+        if (!identity || !identity.launchWebAuthFlow) {
+            throw new Error(
+                'OAuth not supported in this browser. Please use email/password login.',
+            )
+        }
+
+        // Get the extension's redirect URL
+        // This will be something like: https://[extension-id].chromiumapp.org/
+        const redirectUri = identity.getRedirectURL()
+
+        // First, get the OAuth authorization URL from our backend
+        // This endpoint will fetch the actual OAuth provider URL from better-auth
+        const authorizeUrl = `${baseURL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(redirectUri)}`
+        
+        const authorizeResponse = await fetch(authorizeUrl, {
+            method: 'GET',
+        })
+
+        if (!authorizeResponse.ok) {
+            const errorData = await authorizeResponse.json().catch(() => ({}))
+            const errorMessage = errorData.error || 
+                `HTTP ${authorizeResponse.status}: Failed to get OAuth authorization URL`
+            console.error('Authorize endpoint error:', {
+                status: authorizeResponse.status,
+                statusText: authorizeResponse.statusText,
+                error: errorData,
+            })
+            throw new Error(errorMessage)
+        }
+
+        const responseData = await authorizeResponse.json().catch(() => ({}))
+        
+        if (!responseData.authorizationUrl) {
+            console.error('Invalid response from authorize endpoint:', responseData)
+            throw new Error(
+                `Failed to get OAuth authorization URL. Response: ${JSON.stringify(responseData)}`,
+            )
+        }
+
+        const { authorizationUrl } = responseData
+
+        // Launch OAuth flow using chrome.identity with the actual OAuth provider URL
+        // This opens a popup window for the user to authenticate
+        // The OAuth provider will redirect to our extension's redirect URL with the code
+        const finalCallbackUrl = await identity.launchWebAuthFlow({
+            url: authorizationUrl,
+            interactive: true,
+        })
+
+        // Extract code and state from the callback URL
+        // Google redirects to the extension's redirect URI: https://[extension-id].chromiumapp.org/?code=...&state=...
+        // chrome.identity captures this URL, and we extract the code from it
+        const callbackUrlObj = new URL(finalCallbackUrl)
+        const code = callbackUrlObj.searchParams.get('code')
+        const receivedState = callbackUrlObj.searchParams.get('state')
+        const error = callbackUrlObj.searchParams.get('error')
+
+        if (error) {
+            throw new Error(
+                `OAuth error: ${error}. Please try again or use email/password login.`,
+            )
+        }
+
+        if (!code) {
+            // If no code, check if better-auth redirected us to a success page
+            // In that case, we might need to extract the code from a different parameter
+            // or make a follow-up request
+            throw new Error(
+                'Failed to receive authorization code. Please try again.',
+            )
+        }
+
+        // Send the code to our OAuth endpoint
+        // Include the redirect URI so the backend can exchange the code for tokens
+        const oauthResponse = await fetch(`${baseURL}/api/extension/oauth`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider,
+                code,
+                state: receivedState, // Send state back to the backend
+                redirectUri, // Include redirect URI for token exchange
+            }),
+        })
+
+        if (!oauthResponse.ok) {
+            const errorData = await oauthResponse.json().catch(() => ({}))
+            const errorMessage =
+                errorData.error ||
+                `OAuth authentication failed. Please try again.`
+            throw new Error(errorMessage)
+        }
+
+        const { token, username, image } = await oauthResponse.json()
+        const user = { username, image }
+
+        // Store token and user data
+        currentBrowser.storage.sync.set({ token, user }, () => {
+            initPopup()
+        })
+    } catch (err) {
+        console.error('OAuth error:', err)
+
+        // Show error message
+        if (errorBox) {
+            errorBox.textContent = `OAuth sign-in failed: ${err.message}`
+            errorBox.style.display = 'block'
+        }
+
+        // Re-enable button
+        if (button) {
+            button.disabled = false
+            const span = button.querySelector('span')
+            if (span) {
+                span.textContent =
+                    provider === 'google'
+                        ? 'Sign in with Google'
+                        : 'Sign in with Apple'
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------ */
 /*  Login prompt                                                */
 /* ------------------------------------------------------------ */
 function renderSignInPrompt(backFn) {
@@ -203,6 +356,24 @@ function renderSignInPrompt(backFn) {
         'resendVerificationContainer',
     )
 
+    // OAuth button handlers
+    const googleSignInBtn = document.getElementById('googleSignInBtn')
+    const appleSignInBtn = document.getElementById('appleSignInBtn')
+
+    if (googleSignInBtn) {
+        googleSignInBtn.disabled = false
+        googleSignInBtn.addEventListener('click', () =>
+            handleSocialSignIn('google'),
+        )
+    }
+
+    if (appleSignInBtn) {
+        appleSignInBtn.disabled = false
+        appleSignInBtn.addEventListener('click', () =>
+            handleSocialSignIn('apple'),
+        )
+    }
+
     const loginForm = document.getElementById('loginForm')
     loginForm.addEventListener('submit', async e => {
         e.preventDefault()
@@ -219,7 +390,7 @@ function renderSignInPrompt(backFn) {
             const password = document.getElementById('password').value
 
             const res = await fetch(
-                'https://grabcaramel.com/api/extension/login',
+                'http://localhost:58000/api/extension/login', // Change back to 'https://grabcaramel.com/api/extension/login' for production
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
