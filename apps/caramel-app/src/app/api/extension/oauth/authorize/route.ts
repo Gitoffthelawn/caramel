@@ -1,4 +1,3 @@
-import { auth } from '@/lib/auth/auth'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Handle OPTIONS request for CORS preflight
@@ -95,7 +94,7 @@ export async function GET(req: NextRequest) {
             // IMPORTANT: For Chrome extensions, we MUST use the extension's redirect URI
             // This URI format is: https://[extension-id].chromiumapp.org/
             // This MUST be registered in Google Cloud Console as an authorized redirect URI
-            // 
+            //
             // We cannot use better-auth's callback URL because better-auth manages its own
             // state verification, and we need to bypass that for extension flows.
             oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
@@ -106,12 +105,19 @@ export async function GET(req: NextRequest) {
             oauthUrl.searchParams.set('access_type', 'offline')
             oauthUrl.searchParams.set('prompt', 'select_account')
             oauthUrl.searchParams.set('state', state) // Use our own state (not better-auth's)
-            
+
             const authUrl = oauthUrl.toString()
-            console.log('Generated OAuth URL for', provider, ':', authUrl.substring(0, 100) + '...')
+            console.log(
+                'Generated OAuth URL for',
+                provider,
+                ':',
+                authUrl.substring(0, 100) + '...',
+            )
             console.log('Using extension redirect URI:', redirectUri)
-            console.log('NOTE: This redirect URI must be registered in Google Cloud Console')
-            
+            console.log(
+                'NOTE: This redirect URI must be registered in Google Cloud Console',
+            )
+
             // Return the state for the extension to verify
             return NextResponse.json(
                 {
@@ -140,11 +146,16 @@ export async function GET(req: NextRequest) {
             oauthUrl.searchParams.set('scope', 'email') // Removed 'name' to allow query mode
             oauthUrl.searchParams.set('response_mode', 'query')
             oauthUrl.searchParams.set('state', state)
-            
+
             const authUrl = oauthUrl.toString()
-            console.log('Generated OAuth URL for', provider, ':', authUrl.substring(0, 100) + '...')
+            console.log(
+                'Generated OAuth URL for',
+                provider,
+                ':',
+                authUrl.substring(0, 100) + '...',
+            )
             console.log('Extension redirect URI:', redirectUri)
-            
+
             // Return the original state for Apple
             return NextResponse.json(
                 {
@@ -176,7 +187,9 @@ export async function GET(req: NextRequest) {
         }
 
         return NextResponse.json(
-            { error: `Internal server error while getting OAuth URL: ${error instanceof Error ? error.message : 'Unknown error'}` },
+            {
+                error: `Internal server error while getting OAuth URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
             { status: 500, headers },
         )
     }

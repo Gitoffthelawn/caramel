@@ -1,7 +1,6 @@
-import { auth } from '@/lib/auth/auth'
 import prisma from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
 
 // Helper function to create CORS headers for extension requests
 function getCorsHeaders(req: NextRequest): Headers {
@@ -168,7 +167,9 @@ export async function POST(req: NextRequest) {
                         name: googleUser.name || null,
                         image: googleUser.picture || null,
                         emailVerified: googleUser.verified_email || false,
-                        status: googleUser.verified_email ? 'ACTIVE_USER' : 'NOT_VERIFIED',
+                        status: googleUser.verified_email
+                            ? 'ACTIVE_USER'
+                            : 'NOT_VERIFIED',
                     },
                     include: { accounts: true },
                 })
@@ -250,7 +251,8 @@ export async function POST(req: NextRequest) {
                 )
 
                 if (bearerTokenResponse.ok) {
-                    authToken = bearerTokenResponse.headers.get('set-auth-token')
+                    authToken =
+                        bearerTokenResponse.headers.get('set-auth-token')
                 }
             } catch (error) {
                 console.error('Error getting bearer token:', error)
@@ -277,7 +279,12 @@ export async function POST(req: NextRequest) {
             const appleTeamId = process.env.APPLE_TEAM_ID
             const appleKeyId = process.env.APPLE_KEY_ID
 
-            if (!appleClientId || !appleClientSecret || !appleTeamId || !appleKeyId) {
+            if (
+                !appleClientId ||
+                !appleClientSecret ||
+                !appleTeamId ||
+                !appleKeyId
+            ) {
                 return NextResponse.json(
                     { error: 'Apple OAuth not configured' },
                     { status: 500, headers: corsHeaders },
@@ -394,8 +401,7 @@ export async function POST(req: NextRequest) {
                 if (!appleUser.email) {
                     return NextResponse.json(
                         {
-                            error:
-                                'Email is required for Apple sign-in. Please ensure you grant email access.',
+                            error: 'Email is required for Apple sign-in. Please ensure you grant email access.',
                         },
                         { status: 400, headers: corsHeaders },
                     )
@@ -406,7 +412,9 @@ export async function POST(req: NextRequest) {
                     data: {
                         email: appleUser.email.toLowerCase().trim(),
                         emailVerified: appleUser.emailVerified || false,
-                        status: appleUser.emailVerified ? 'ACTIVE_USER' : 'NOT_VERIFIED',
+                        status: appleUser.emailVerified
+                            ? 'ACTIVE_USER'
+                            : 'NOT_VERIFIED',
                     },
                     include: { accounts: true },
                 })
@@ -483,7 +491,8 @@ export async function POST(req: NextRequest) {
                 )
 
                 if (bearerTokenResponse.ok) {
-                    authToken = bearerTokenResponse.headers.get('set-auth-token')
+                    authToken =
+                        bearerTokenResponse.headers.get('set-auth-token')
                 }
             } catch (error) {
                 console.error('Error getting bearer token:', error)
