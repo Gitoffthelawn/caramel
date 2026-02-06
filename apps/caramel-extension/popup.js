@@ -158,14 +158,15 @@ async function handleSocialSignIn(provider) {
         // First, get the OAuth authorization URL from our backend
         // This endpoint will fetch the actual OAuth provider URL from better-auth
         const authorizeUrl = `${baseURL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(redirectUri)}`
-        
+
         const authorizeResponse = await fetch(authorizeUrl, {
             method: 'GET',
         })
 
         if (!authorizeResponse.ok) {
             const errorData = await authorizeResponse.json().catch(() => ({}))
-            const errorMessage = errorData.error || 
+            const errorMessage =
+                errorData.error ||
                 `HTTP ${authorizeResponse.status}: Failed to get OAuth authorization URL`
             console.error('Authorize endpoint error:', {
                 status: authorizeResponse.status,
@@ -176,9 +177,12 @@ async function handleSocialSignIn(provider) {
         }
 
         const responseData = await authorizeResponse.json().catch(() => ({}))
-        
+
         if (!responseData.authorizationUrl) {
-            console.error('Invalid response from authorize endpoint:', responseData)
+            console.error(
+                'Invalid response from authorize endpoint:',
+                responseData,
+            )
             throw new Error(
                 `Failed to get OAuth authorization URL. Response: ${JSON.stringify(responseData)}`,
             )
