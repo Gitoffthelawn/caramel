@@ -136,16 +136,35 @@ export async function GET(req: NextRequest) {
                 )
             }
 
+            // Apple requires HTTPS redirect URIs (doesn't accept localhost or HTTP)
+            if (!baseURL.startsWith('https://')) {
+                return NextResponse.json(
+                    {
+                        error: 'Apple OAuth requires HTTPS. Please set BETTER_AUTH_URL or NEXT_PUBLIC_BASE_URL to your HTTPS URL (e.g., ngrok URL).',
+                        details: `Current baseURL: ${baseURL}. Apple does not accept HTTP or localhost redirect URIs.`,
+                    },
+                    { status: 400, headers: corsHeaders },
+                )
+            }
+
+            // Apple requires form_post when requesting 'email' or 'name' scope
+            // Since chrome.identity can't handle form_post directly, we use an intermediate redirect endpoint
+            // that receives the POST from Apple and redirects to the extension's redirect URI
+            const intermediateRedirectUri = `${baseURL}/api/extension/oauth/redirect`
+
+            // Encode the extension redirect URI in the state so we can retrieve it after Apple POSTs back
+            // Apple will POST the state back to us, and we'll decode it to get the extension redirect URI
+            const stateWithRedirect = Buffer.from(
+                JSON.stringify({ r: redirectUri, s: state }),
+            ).toString('base64')
+
             oauthUrl = new URL('https://appleid.apple.com/auth/authorize')
             oauthUrl.searchParams.set('client_id', appleClientId)
-            oauthUrl.searchParams.set('redirect_uri', redirectUri)
+            oauthUrl.searchParams.set('redirect_uri', intermediateRedirectUri)
             oauthUrl.searchParams.set('response_type', 'code')
-            // IMPORTANT: Apple requires form_post when requesting 'name' scope
-            // Since chrome.identity can't handle form_post, we only request 'email' scope
-            // This allows us to use 'query' mode which chrome.identity can capture
-            oauthUrl.searchParams.set('scope', 'email') // Removed 'name' to allow query mode
-            oauthUrl.searchParams.set('response_mode', 'query')
-            oauthUrl.searchParams.set('state', state)
+            oauthUrl.searchParams.set('scope', 'email')
+            oauthUrl.searchParams.set('response_mode', 'form_post') // Required by Apple for email scope
+            oauthUrl.searchParams.set('state', stateWithRedirect)
 
             const authUrl = oauthUrl.toString()
             console.log(
@@ -155,12 +174,13 @@ export async function GET(req: NextRequest) {
                 authUrl.substring(0, 100) + '...',
             )
             console.log('Extension redirect URI:', redirectUri)
+            console.log('Intermediate redirect URI:', intermediateRedirectUri)
 
-            // Return the original state for Apple
+            // Return the original state (not the encoded one) for the extension to verify
             return NextResponse.json(
                 {
                     authorizationUrl: authUrl,
-                    state, // Return original state for Apple
+                    state, // Return original state for extension to verify
                 },
                 { headers: corsHeaders },
             )

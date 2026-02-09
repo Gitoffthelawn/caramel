@@ -91,15 +91,27 @@ If you need a persistent domain:
 
 ## Apple Developer Console Configuration
 
-Once you have your HTTPS domain, share it with your team lead. They need to add:
+Once you have your HTTPS domain, share it with your team lead. They need to add **both** redirect URIs:
 
-```
-https://[your-domain]/api/auth/callback/apple
-```
+1. **Better-auth callback** (for web app):
+   ```
+   https://[your-domain]/api/auth/callback/apple
+   ```
+
+2. **Extension intermediate redirect** (for extension OAuth):
+   ```
+   https://[your-domain]/api/extension/oauth/redirect
+   ```
 
 For example:
-- ngrok: `https://abc123.ngrok-free.app/api/auth/callback/apple`
-- Cloudflare: `https://caramel-local.yourdomain.com/api/auth/callback/apple`
+- ngrok: 
+  - `https://abc123.ngrok-free.app/api/auth/callback/apple`
+  - `https://abc123.ngrok-free.app/api/extension/oauth/redirect`
+- Cloudflare: 
+  - `https://caramel-local.yourdomain.com/api/auth/callback/apple`
+  - `https://caramel-local.yourdomain.com/api/extension/oauth/redirect`
+
+**Note**: The extension uses `form_post` response mode (required by Apple when requesting email scope), so the intermediate redirect endpoint handles the POST from Apple and forwards the code to the extension.
 
 ---
 
