@@ -24,6 +24,9 @@ const trustedOrigins = Array.from(
     ),
 )
 
+// Detect if baseURL uses HTTPS (required for secure cookies with ngrok/tunnels)
+const isHTTPS = baseURL.startsWith('https://')
+
 export const auth = betterAuth({
     database: prismaAdapter(prisma, {
         provider: 'postgresql',
@@ -113,7 +116,14 @@ export const auth = betterAuth({
     baseURL,
     trustedOrigins,
     advanced: {
-        useSecureCookies: process.env.NODE_ENV === 'production',
+        // Enable secure cookies when using HTTPS (required for ngrok/tunnels)
+        // This ensures cookies are properly sent during OAuth redirects
+        useSecureCookies: isHTTPS || process.env.NODE_ENV === 'production',
+        // SameSite=None so state cookie is sent when OAuth provider POSTs back to our callback.
+        // Apple (and some others) use a cross-site POST; Lax would block cookies on that request.
+        defaultCookieAttributes: {
+            sameSite: 'none',
+        },
     },
     plugins: [bearer()],
 })
