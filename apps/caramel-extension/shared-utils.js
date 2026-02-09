@@ -10,7 +10,7 @@ if (typeof window !== 'undefined') {
         // Don't redeclare to avoid errors
     } else {
         window.__caramel_shared_utils_loaded = true
-        
+
         // First load - create currentBrowser on window
         window.currentBrowser = (() => {
             if (typeof chrome !== 'undefined') return chrome
