@@ -3,15 +3,48 @@
  ********************************************************************/
 
 /* --------------------------------------------------  bootstrap */
-const currentBrowser = (() => {
-    if (typeof chrome !== 'undefined') return chrome
-    if (typeof browser !== 'undefined') return browser
-    throw new Error('Browser is not supported!')
-})()
+// Track script loading to prevent redeclaration errors on multiple loads
+if (typeof window !== 'undefined') {
+    if (window.__caramel_shared_utils_loaded) {
+        // Script already loaded - use existing window.currentBrowser
+        // Don't redeclare to avoid errors
+    } else {
+        window.__caramel_shared_utils_loaded = true
+        
+        // First load - create currentBrowser on window
+        window.currentBrowser = (() => {
+            if (typeof chrome !== 'undefined') return chrome
+            if (typeof browser !== 'undefined') return browser
+            throw new Error('Browser is not supported!')
+        })()
+    }
+    // Ensure window.currentBrowser exists
+    if (!window.currentBrowser) {
+        window.currentBrowser = (() => {
+            if (typeof chrome !== 'undefined') return chrome
+            if (typeof browser !== 'undefined') return browser
+            throw new Error('Browser is not supported!')
+        })()
+    }
+    // Create local reference - var allows redeclaration, so this is safe even on second load
+    var currentBrowser = window.currentBrowser
+} else {
+    // Non-window environment (service worker) - safe to declare normally
+    var currentBrowser = (() => {
+        if (typeof chrome !== 'undefined') return chrome
+        if (typeof browser !== 'undefined') return browser
+        throw new Error('Browser is not supported!')
+    })()
+}
 
 /* --------------------------------------------------  tiny helpers */
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-const log = (...a) => console.log('Caramel:', ...a)
+// Check if already declared to prevent redeclaration errors on script reload
+if (typeof sleep === 'undefined') {
+    var sleep = ms => new Promise(r => setTimeout(r, ms))
+}
+if (typeof log === 'undefined') {
+    var log = (...a) => console.log('Caramel:', ...a)
+}
 
 /* ---------- DOM waiters ---------- */
 function waitForElement(sel, timeout = 4000) {
