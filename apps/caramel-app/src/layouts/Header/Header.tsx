@@ -197,15 +197,24 @@ export default function Header({ scrollRef }: HeaderProps) {
                             )
                         })}
                         {session?.user ? (
-                            <button
-                                onClick={() => {
-                                    setIsMenuOpen(false)
-                                    handleSignOut()
-                                }}
-                                className="text-caramel inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl px-[30px] py-2.5"
-                            >
-                                Sign out
-                            </button>
+                            <>
+                                <Link
+                                    onClick={() => setIsMenuOpen(false)}
+                                    href="/profile"
+                                    className={`px-[30px] py-2.5 ${pathname === '/profile' ? 'bg-caramel text-white' : 'text-caramel'} inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl`}
+                                >
+                                    Profile
+                                </Link>
+                                <button
+                                    onClick={() => {
+                                        setIsMenuOpen(false)
+                                        handleSignOut()
+                                    }}
+                                    className="text-caramel inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl px-[30px] py-2.5"
+                                >
+                                    Sign out
+                                </button>
+                            </>
                         ) : (
                             <>
                                 <Link
