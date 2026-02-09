@@ -166,13 +166,15 @@ export default function Header({ scrollRef }: HeaderProps) {
                     </div>
                 )}
             </motion.div>
-            <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-6" />
-            <button
-                className="text-caramel ml-3 hidden text-2xl lg:block"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-                {isMenuOpen ? <RiCloseFill /> : <RiMenu3Fill />}
-            </button>
+            <div className="flex items-center gap-2 lg:ml-6">
+                <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-0" />
+                <button
+                    className="text-caramel hidden text-2xl lg:block"
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                >
+                    {isMenuOpen ? <RiCloseFill /> : <RiMenu3Fill />}
+                </button>
+            </div>
             <AnimatePresence>
                 {isMenuOpen && (
                     <motion.div
