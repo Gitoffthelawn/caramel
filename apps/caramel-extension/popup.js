@@ -245,10 +245,24 @@ async function handleSocialSignIn(provider) {
         const { token, username, image } = await oauthResponse.json()
         const user = { username, image }
 
-        // Store token and user data
-        currentBrowser.storage.sync.set({ token, user }, () => {
-            initPopup()
+        // Store token and user data using Promise wrapper to ensure completion
+        await new Promise((resolve, reject) => {
+            currentBrowser.storage.sync.set({ token, user }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message))
+                    return
+                }
+                resolve()
+            })
         })
+
+        // Small delay to ensure storage is fully persisted
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Only call initPopup if popup is still open
+        if (document.visibilityState === 'visible') {
+            initPopup()
+        }
     } catch (err) {
         console.error('OAuth error:', err)
 
