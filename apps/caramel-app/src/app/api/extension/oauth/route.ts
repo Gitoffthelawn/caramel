@@ -299,7 +299,18 @@ export async function POST(req: NextRequest) {
                 )
             }
 
+            // For Apple OAuth, we MUST use the intermediate redirect URI in the token exchange
+            // because that's what was used in the authorization request
+            // The extension redirect URI is only used for the final redirect to the extension
+            const baseURL =
+                process.env.BETTER_AUTH_URL ||
+                process.env.NEXT_PUBLIC_BASE_URL ||
+                'http://localhost:3000'
+            const intermediateRedirectUri = `${baseURL}/api/extension/oauth/redirect`
+
             // Exchange code for tokens with Apple
+            // IMPORTANT: Use intermediateRedirectUri, not the extension redirectUri
+            // Apple requires the redirect_uri in token exchange to match the authorization request
             const tokenResponse = await fetch(
                 'https://appleid.apple.com/auth/token',
                 {
@@ -311,7 +322,7 @@ export async function POST(req: NextRequest) {
                         code,
                         client_id: appleClientId,
                         client_secret: appleClientSecret,
-                        redirect_uri: redirectUri,
+                        redirect_uri: intermediateRedirectUri, // Use intermediate URI, not extension URI
                         grant_type: 'authorization_code',
                     }),
                 },
