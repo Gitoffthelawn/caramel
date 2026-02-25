@@ -126,6 +126,12 @@ currentBrowser.runtime.onMessage.addListener(
             sendResponse({ status: 'alive' }) // Respond to the message
         } else if (message.action === 'scrapeAmazonCartKeywords') {
             const originalTabId = sender?.tab?.id
+            try {
+                console.log('AUTO_INSERT_AMAZON_SCRAPE_START', {
+                    originalTabId,
+                    t: performance.now(),
+                })
+            } catch (e) {}
             currentBrowser.tabs
                 .create({
                     url: 'https://www.amazon.com/gp/cart/view.html?ref_=nav_cart',
@@ -139,9 +145,22 @@ currentBrowser.runtime.onMessage.addListener(
                             action: 'caramel:scrapeAmazonCartKeywordsFromCart',
                         })
 
+                        try {
+                            console.log('AUTO_INSERT_AMAZON_SCRAPE_END', {
+                                count: (resp?.keywords || []).length,
+                                t: performance.now(),
+                            })
+                        } catch (e) {}
+
                         sendResponse({ keywords: resp?.keywords || [] })
                     } catch (error) {
                         console.error('Error during Amazon cart scraping:', error)
+                        try {
+                            console.log('AUTO_INSERT_AMAZON_SCRAPE_ERROR', {
+                                error: String(error),
+                                t: performance.now(),
+                            })
+                        } catch (e) {}
                         sendResponse({ keywords: [], error: 'Failed to scrape Amazon cart' })
                     } finally {
                         if (cartTab?.id) currentBrowser.tabs.remove(cartTab.id)
@@ -152,6 +171,22 @@ currentBrowser.runtime.onMessage.addListener(
                     console.error('Error creating Amazon cart tab:', error)
                     sendResponse({ keywords: [], error: 'Failed to open Amazon cart' })
                 })
+
+            return true
+        } else if (message.action === 'fetchCoupons') {
+            const { site, kw } = message
+            const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(
+                kw || '',
+            )}&limit=20`
+            console.log('BACKGROUND: fetchCoupons', { site, kw, url, t: Date.now() })
+            fetch(url)
+                .then(async r => {
+                    if (!r.ok) return { coupons: [] }
+                    const json = await r.json()
+                    return { coupons: json }
+                })
+                .then(resp => sendResponse(resp))
+                .catch(err => sendResponse({ coupons: [], error: String(err) }))
 
             return true
         } else if (message.action === 'getActiveTabDomainRecord') {

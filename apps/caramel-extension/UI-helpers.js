@@ -70,7 +70,16 @@ async function insertCaramelPrompt(domainRecord) {
             return
         }
         // If the container itself is clicked, start applying coupons
-        startApplyingCoupons(domainRecord)
+      try {
+          if (typeof log !== 'undefined')
+              log('AUTO_INSERT_TRIGGERED_BY_UI', {
+                  domain: domainRecord?.domain || location.hostname,
+                  t: performance.now(),
+              })
+      } catch (e) {
+          // ignore
+      }
+      startApplyingCoupons(domainRecord)
         document.body.removeChild(container)
     })
 
