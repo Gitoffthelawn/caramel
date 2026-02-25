@@ -17,7 +17,9 @@ currentBrowser.runtime.onMessage.addListener((req, _sender, sendResponse) => {
     if (req.action !== 'caramel:scrapeAmazonCartKeywordsFromCart') return
 
     try {
-        const titles = Array.from(document.querySelectorAll('.sc-product-title'))
+        const titles = Array.from(
+            document.querySelectorAll('.sc-product-title'),
+        )
             .map(el => (el.textContent || '').trim())
             .filter(Boolean)
 

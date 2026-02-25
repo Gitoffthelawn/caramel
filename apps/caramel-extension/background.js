@@ -67,7 +67,10 @@ function waitForTabComplete(tabId, timeoutMs = 15000) {
 
 function sendMessageToTab(tabId, msg, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('sendMessage timeout')), timeoutMs)
+        const timer = setTimeout(
+            () => reject(new Error('sendMessage timeout')),
+            timeoutMs,
+        )
 
         currentBrowser.tabs.sendMessage(tabId, msg, resp => {
             clearTimeout(timer)
@@ -154,22 +157,34 @@ currentBrowser.runtime.onMessage.addListener(
 
                         sendResponse({ keywords: resp?.keywords || [] })
                     } catch (error) {
-                        console.error('Error during Amazon cart scraping:', error)
+                        console.error(
+                            'Error during Amazon cart scraping:',
+                            error,
+                        )
                         try {
                             console.log('AUTO_INSERT_AMAZON_SCRAPE_ERROR', {
                                 error: String(error),
                                 t: performance.now(),
                             })
                         } catch (e) {}
-                        sendResponse({ keywords: [], error: 'Failed to scrape Amazon cart' })
+                        sendResponse({
+                            keywords: [],
+                            error: 'Failed to scrape Amazon cart',
+                        })
                     } finally {
                         if (cartTab?.id) currentBrowser.tabs.remove(cartTab.id)
-                        if (originalTabId) currentBrowser.tabs.update(originalTabId, { active: true })
+                        if (originalTabId)
+                            currentBrowser.tabs.update(originalTabId, {
+                                active: true,
+                            })
                     }
                 })
                 .catch(error => {
                     console.error('Error creating Amazon cart tab:', error)
-                    sendResponse({ keywords: [], error: 'Failed to open Amazon cart' })
+                    sendResponse({
+                        keywords: [],
+                        error: 'Failed to open Amazon cart',
+                    })
                 })
 
             return true
@@ -178,7 +193,12 @@ currentBrowser.runtime.onMessage.addListener(
             const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(
                 kw || '',
             )}&limit=20`
-            console.log('BACKGROUND: fetchCoupons', { site, kw, url, t: Date.now() })
+            console.log('BACKGROUND: fetchCoupons', {
+                site,
+                kw,
+                url,
+                t: Date.now(),
+            })
             fetch(url)
                 .then(async r => {
                     if (!r.ok) return { coupons: [] }
@@ -190,26 +210,32 @@ currentBrowser.runtime.onMessage.addListener(
 
             return true
         } else if (message.action === 'getActiveTabDomainRecord') {
-            currentBrowser.tabs.query({ active: true, lastFocusedWindow: true }, tabs => {
-                if (!tabs || !tabs.length) {
-                    sendResponse({ domainRecord: null, url: null })
-                    return
-                }
-
-                try {
-                    const url = tabs[0].url || null
-                    let hostname = null
-                    try {
-                        hostname = url ? new URL(url).hostname : null
-                    } catch (e) {
-                        hostname = null
+            currentBrowser.tabs.query(
+                { active: true, lastFocusedWindow: true },
+                tabs => {
+                    if (!tabs || !tabs.length) {
+                        sendResponse({ domainRecord: null, url: null })
+                        return
                     }
-                    sendResponse({ domainRecord: null, url: hostname })
-                } catch (err) {
-                    console.error('Error while getting active tab domain:', err)
-                    sendResponse({ domainRecord: null, url: null })
-                }
-            })
+
+                    try {
+                        const url = tabs[0].url || null
+                        let hostname = null
+                        try {
+                            hostname = url ? new URL(url).hostname : null
+                        } catch (e) {
+                            hostname = null
+                        }
+                        sendResponse({ domainRecord: null, url: hostname })
+                    } catch (err) {
+                        console.error(
+                            'Error while getting active tab domain:',
+                            err,
+                        )
+                        sendResponse({ domainRecord: null, url: null })
+                    }
+                },
+            )
 
             return true
         }
