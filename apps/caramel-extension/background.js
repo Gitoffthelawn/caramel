@@ -39,6 +39,45 @@ function execScript(details) {
     return currentBrowser.tabs.executeScript(tabId, { code: `(${func})();` })
 }
 
+// NOTE: Do not use `execScript` to inject full content-script bundles
+// that are declared in `manifest.json` (e.g. `shared-utils.js`).
+// Injecting the same bundle twice into the same isolated world can
+// cause redeclaration errors for top-level `const`/`let`/`class`.
+// Prefer `tabs.query` for URL-only needs, or `tabs.sendMessage` to
+// message an already-loaded content script for DOM reads.
+
+function waitForTabComplete(tabId, timeoutMs = 15000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            currentBrowser.tabs.onUpdated.removeListener(onUpdated)
+            reject(new Error('Timed out waiting for tab to load'))
+        }, timeoutMs)
+
+        function onUpdated(updatedTabId, changeInfo) {
+            if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                clearTimeout(timer)
+                currentBrowser.tabs.onUpdated.removeListener(onUpdated)
+                resolve()
+            }
+        }
+
+        currentBrowser.tabs.onUpdated.addListener(onUpdated)
+    })
+}
+
+function sendMessageToTab(tabId, msg, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('sendMessage timeout')), timeoutMs)
+
+        currentBrowser.tabs.sendMessage(tabId, msg, resp => {
+            clearTimeout(timer)
+            const err = currentBrowser.runtime.lastError
+            if (err) return reject(err)
+            resolve(resp)
+        })
+    })
+}
+
 // Keep-Alive Mechanism
 function keepAlive() {
     if (isServiceWorker) {
@@ -86,100 +125,57 @@ currentBrowser.runtime.onMessage.addListener(
             console.log('Received keep-alive message from content script')
             sendResponse({ status: 'alive' }) // Respond to the message
         } else if (message.action === 'scrapeAmazonCartKeywords') {
-            const originalTab = sender.tab
+            const originalTabId = sender?.tab?.id
             currentBrowser.tabs
                 .create({
                     url: 'https://www.amazon.com/gp/cart/view.html?ref_=nav_cart',
+                    active: false,
                 })
-                .then(async amazonCartPage => {
-                    await execScript({
-                        target: { tabId: amazonCartPage.id },
-                        files: ['shared-utils.js', 'UI-helpers.js'],
-                    })
+                .then(async cartTab => {
+                    try {
+                        await waitForTabComplete(cartTab.id)
 
-                    const result = await execScript({
-                        target: { tabId: amazonCartPage.id },
-                        func: async () => {
-                            window.showTestingModal(
-                                'Fetching coupon keywords...',
-                                true,
-                            )
-                            return new Promise(async (resolve, reject) => {
-                                try {
-                                    const productTitleElements =
-                                        document.querySelectorAll(
-                                            '.sc-product-title',
-                                        )
-                                    const titles = Array.from(
-                                        productTitleElements,
-                                    ).map(element => element.textContent.trim())
-                                    const keywords = titles.join(' ').split(' ')
-                                    console.log('Keywords:', keywords)
-                                    const filteredKeywords =
-                                        await window.filterKeywords(keywords)
-                                    console.log(
-                                        'Filtered Keywords:',
-                                        filteredKeywords,
-                                    )
-                                    resolve(filteredKeywords)
-                                } catch (error) {
-                                    reject(error)
-                                }
-                            })
-                        },
-                    })
-                    console.log('Amazon cart keywords:', result[0].result) // result is wrapped in an array
-                    sendResponse({ keywords: result[0].result }) // Send filtered keywords as respons
-                    currentBrowser.tabs.remove(amazonCartPage.id)
-                    currentBrowser.tabs.update(originalTab.id, { active: true })
+                        const resp = await sendMessageToTab(cartTab.id, {
+                            action: 'caramel:scrapeAmazonCartKeywordsFromCart',
+                        })
+
+                        sendResponse({ keywords: resp?.keywords || [] })
+                    } catch (error) {
+                        console.error('Error during Amazon cart scraping:', error)
+                        sendResponse({ keywords: [], error: 'Failed to scrape Amazon cart' })
+                    } finally {
+                        if (cartTab?.id) currentBrowser.tabs.remove(cartTab.id)
+                        if (originalTabId) currentBrowser.tabs.update(originalTabId, { active: true })
+                    }
                 })
                 .catch(error => {
-                    console.error('Error during Amazon cart scraping:', error)
-                    sendResponse({ error: 'Failed to scrape Amazon cart' })
+                    console.error('Error creating Amazon cart tab:', error)
+                    sendResponse({ keywords: [], error: 'Failed to open Amazon cart' })
                 })
+
             return true
         } else if (message.action === 'getActiveTabDomainRecord') {
-            currentBrowser.tabs.query(
-                { active: true, lastFocusedWindow: true },
-                async tabs => {
-                    if (!tabs || !tabs.length) {
-                        sendResponse({ domainRecord: null, url: null })
-                        return
-                    }
+            currentBrowser.tabs.query({ active: true, lastFocusedWindow: true }, tabs => {
+                if (!tabs || !tabs.length) {
+                    sendResponse({ domainRecord: null, url: null })
+                    return
+                }
 
-                    const tabId = tabs[0].id
-
+                try {
+                    const url = tabs[0].url || null
+                    let hostname = null
                     try {
-                        await execScript({
-                            target: { tabId },
-                            files: ['shared-utils.js', 'UI-helpers.js'],
-                        })
-                        const [result] = await execScript({
-                            target: { tabId },
-                            func: async () => {
-                                try {
-                                    const hostname = window.location.hostname
-                                    return { url: hostname }
-                                } catch (err) {
-                                    console.error(
-                                        'Error while getting domain record:',
-                                        err,
-                                    )
-                                    return null
-                                }
-                            },
-                        })
-                        const { domainRecord, url } = result?.result || null
-                        sendResponse({ domainRecord, url })
-                    } catch (err) {
-                        console.error(
-                            'Error injecting or executing domain-record script:',
-                            err,
-                        )
-                        sendResponse({ domainRecord: null, url: null })
+                        hostname = url ? new URL(url).hostname : null
+                    } catch (e) {
+                        hostname = null
                     }
-                },
-            )
+                    sendResponse({ domainRecord: null, url: hostname })
+                } catch (err) {
+                    console.error('Error while getting active tab domain:', err)
+                    sendResponse({ domainRecord: null, url: null })
+                }
+            })
+
             return true
         }
     },
