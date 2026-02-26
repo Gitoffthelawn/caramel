@@ -6,12 +6,14 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useState } from 'react'
+import { FaApple, FaGoogle } from 'react-icons/fa'
 import { toast } from 'sonner'
 
 export default function LoginPageClient() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null)
     const [showVerificationAlert, setShowVerificationAlert] = useState(false)
     const [isTokenExpired, setIsTokenExpired] = useState(false)
     const router = useRouter()
@@ -70,6 +72,30 @@ export default function LoginPageClient() {
         setLoading(false)
     }
 
+    const handleSocialSignIn = async (provider: 'google' | 'apple') => {
+        setOauthLoading(provider)
+        try {
+            const result = await signIn.social({
+                provider,
+                callbackURL: '/',
+            })
+
+            if (result?.error) {
+                toast.error(
+                    `Unable to sign in with ${provider === 'google' ? 'Google' : 'Apple'}. Please try again.`,
+                )
+                setOauthLoading(null)
+                return
+            }
+
+            // signIn.social automatically redirects to OAuth provider
+            // The callback will handle redirecting back to callbackURL
+        } catch (error) {
+            toast.error('Something went wrong. Please try again later.')
+            setOauthLoading(null)
+        }
+    }
+
     return (
         <div className="flex h-screen items-center justify-center bg-gray-50">
             <motion.div
@@ -116,6 +142,44 @@ export default function LoginPageClient() {
                         </button>
                     </div>
                 )}
+
+                <div className="mb-4 space-y-3">
+                    <button
+                        type="button"
+                        onClick={() => handleSocialSignIn('google')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <FaGoogle className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'google'
+                                ? 'Redirecting...'
+                                : 'Sign in with Google'}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSocialSignIn('apple')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <FaApple className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'apple'
+                                ? 'Redirecting...'
+                                : 'Sign in with Apple'}
+                        </span>
+                    </button>
+                </div>
+
+                <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="bg-white px-2 text-gray-500">or</span>
+                    </div>
+                </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>

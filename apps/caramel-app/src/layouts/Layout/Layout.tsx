@@ -13,12 +13,12 @@ export default function Layout({ children }: LayoutProps) {
     return (
         <div
             ref={ref}
-            className={`h-screen overflow-x-hidden scroll-smooth ${
+            className={`flex min-h-screen flex-col overflow-x-hidden scroll-smooth ${
                 isDarkMode ? 'bg-darkBg dark' : 'light bg-gray-50'
             } font-Roboto`}
         >
             <Header scrollRef={ref} />
-            {children}
+            <div className="flex-1">{children}</div>
             <Footer />
         </div>
     )
