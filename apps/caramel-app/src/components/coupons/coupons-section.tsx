@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { FaChrome, FaEdge, FaFirefox, FaSafari } from 'react-icons/fa'
 import InfiniteScroll from 'react-infinite-scroll-component'
 import { toast } from 'sonner'
 import CouponCard from './coupon-card'
@@ -379,16 +380,43 @@ export default function CouponsSection({
                             Start saving with Caramel on any browser!
                         </p>
                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {['Chrome', 'Safari', 'Firefox', 'Edge'].map(
-                                browser => (
-                                    <span
-                                        key={browser}
-                                        className="rounded-xl bg-gray-50 px-3 py-2 text-center shadow-sm dark:bg-gray-800"
-                                    >
-                                        {browser}
-                                    </span>
-                                ),
-                            )}
+                            {[
+                                {
+                                    name: 'Chrome',
+                                    icon: <FaChrome />,
+                                    href: 'https://chromewebstore.google.com/detail/caramel/gaimofgglbackoimfjopicmbmnlccfoe',
+                                    available: true,
+                                },
+                                {
+                                    name: 'Safari',
+                                    icon: <FaSafari />,
+                                    href: 'https://apps.apple.com/ke/app/caramel/id6741873881',
+                                    available: true,
+                                },
+                                {
+                                    name: 'Firefox',
+                                    icon: <FaFirefox />,
+                                    href: 'https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/',
+                                    available: true,
+                                },
+                                {
+                                    name: 'Edge',
+                                    icon: <FaEdge />,
+                                    href: 'https://microsoftedge.microsoft.com/addons/detail/caramel/leodahchedhnenmiengkfpmmcdendnof',
+                                    available: true,
+                                },
+                            ].map(browser => (
+                                <a
+                                    key={browser.name}
+                                    href={browser.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-6 py-3 text-center shadow-sm transition hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                >
+                                    {browser.icon}
+                                    {browser.name}
+                                </a>
+                            ))}
                         </div>
                     </div>
 
@@ -401,10 +429,10 @@ export default function CouponsSection({
                             works everywhere you shop online.
                         </p>
                         <Link
-                            href="/supported-sites"
+                            href="/supported-stores"
                             className="from-caramel mt-4 inline-flex items-center justify-center rounded-full bg-gradient-to-r to-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:opacity-90"
                         >
-                            View All Supported Sites
+                            View All Supported Stores
                         </Link>
                     </div>
                 </aside>

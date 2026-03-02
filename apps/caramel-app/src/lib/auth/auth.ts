@@ -9,13 +9,27 @@ import { bearer } from 'better-auth/plugins'
 
 const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10
 const fallbackBaseURL = 'http://localhost:3000'
+const appleIdTrustedOrigins = ['https://appleid.apple.com']
 const baseURL =
     process.env.BETTER_AUTH_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
     fallbackBaseURL
 const trustedOrigins = Array.from(
-    new Set([process.env.NEXT_PUBLIC_BASE_URL || '', baseURL].filter(Boolean)),
+    new Set(
+        [
+            process.env.NEXT_PUBLIC_BASE_URL || '',
+            baseURL,
+            ...appleIdTrustedOrigins,
+        ].filter(Boolean),
+    ),
 )
+
+// Detect if baseURL uses HTTPS (required for secure cookies with ngrok/tunnels)
+const isHTTPS = baseURL.startsWith('https://')
+// SameSite=None requires Secure; browsers silently reject None+insecure cookies.
+// In non-HTTPS local dev we fall back to Lax (sufficient for GET-redirect providers
+// like Google). Apple requires None, but also requires HTTPS anyway (ngrok/tunnel).
+const useSecure = isHTTPS || process.env.NODE_ENV === 'production'
 
 export const auth = betterAuth({
     database: prismaAdapter(prisma, {
@@ -111,7 +125,15 @@ export const auth = betterAuth({
     baseURL,
     trustedOrigins,
     advanced: {
-        useSecureCookies: process.env.NODE_ENV === 'production',
+        // Enable secure cookies when using HTTPS (required for ngrok/tunnels)
+        // This ensures cookies are properly sent during OAuth redirects
+        useSecureCookies: useSecure,
+        // SameSite=None so state cookie is sent when OAuth provider POSTs back to our callback.
+        // Apple (and some others) use a cross-site POST; Lax would block cookies on that request.
+        // Only use None when Secure is true (spec requirement); fall back to Lax for HTTP dev.
+        defaultCookieAttributes: {
+            sameSite: useSecure ? 'none' : 'lax',
+        },
     },
     plugins: [bearer()],
 })
