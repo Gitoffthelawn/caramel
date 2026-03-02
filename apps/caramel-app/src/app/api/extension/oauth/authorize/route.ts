@@ -52,8 +52,6 @@ export async function GET(req: NextRequest) {
     const provider = searchParams.get('provider') as 'google' | 'apple' | null
     const redirectUri = searchParams.get('redirect_uri')
 
-    console.log('OAuth authorize request:', { provider, redirectUri })
-
     // Helper to get CORS headers
     const getCorsHeaders = () => {
         const headers = new Headers()
@@ -131,16 +129,6 @@ export async function GET(req: NextRequest) {
             oauthUrl.searchParams.set('state', state) // Use our own state (not better-auth's)
 
             const authUrl = oauthUrl.toString()
-            console.log(
-                'Generated OAuth URL for',
-                provider,
-                ':',
-                authUrl.substring(0, 100) + '...',
-            )
-            console.log('Using extension redirect URI:', redirectUri)
-            console.log(
-                'NOTE: This redirect URI must be registered in Google Cloud Console',
-            )
 
             // Return the state for the extension to verify
             return NextResponse.json(
@@ -191,14 +179,6 @@ export async function GET(req: NextRequest) {
             oauthUrl.searchParams.set('state', stateWithRedirect)
 
             const authUrl = oauthUrl.toString()
-            console.log(
-                'Generated OAuth URL for',
-                provider,
-                ':',
-                authUrl.substring(0, 100) + '...',
-            )
-            console.log('Extension redirect URI:', redirectUri)
-            console.log('Intermediate redirect URI:', intermediateRedirectUri)
 
             // Return the original state (not the encoded one) for the extension to verify
             return NextResponse.json(
