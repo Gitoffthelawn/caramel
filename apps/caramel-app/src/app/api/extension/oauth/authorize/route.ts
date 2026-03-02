@@ -1,10 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
 
 const KNOWN_EXTENSION_ORIGINS = [
     process.env.CHROME_EXTENSION_ORIGIN,
     process.env.FIREFOX_EXTENSION_ORIGIN,
     process.env.SAFARI_EXTENSION_ORIGIN,
 ].filter((o): o is string => Boolean(o))
+
+const OAUTH_STATE_SECRET = process.env.EXTENSION_OAUTH_STATE_SECRET
+
+const createSignedState = (payload: {
+    provider: 'google' | 'apple'
+    redirectUri: string
+}) => {
+    if (!OAUTH_STATE_SECRET) {
+        throw new Error('EXTENSION_OAUTH_STATE_SECRET is not configured')
+    }
+
+    const data = JSON.stringify({
+        ...payload,
+        iat: Date.now(),
+    })
+
+    const sig = createHmac('sha256', OAUTH_STATE_SECRET)
+        .update(data)
+        .digest('base64url')
+
+    return `${Buffer.from(data).toString('base64url')}.${sig}`
+}
 
 const isKnownExtensionOrigin = (origin: string | null) =>
     !!origin && KNOWN_EXTENSION_ORIGINS.includes(origin)
@@ -79,10 +102,8 @@ export async function GET(req: NextRequest) {
         let oauthUrl: URL
         let state: string
 
-        // Generate state for CSRF protection
-        // Use a simple base64 encoding that works in Node.js
-        const stateString = `${Date.now()}-${Math.random()}`
-        state = Buffer.from(stateString).toString('base64')
+        // Generate signed state for CSRF protection that can be validated on exchange
+        state = createSignedState({ provider, redirectUri })
 
         if (provider === 'google') {
             // Google OAuth 2.0 authorization endpoint

@@ -1,6 +1,59 @@
 import prisma from '@/lib/prisma'
-import { randomBytes } from 'crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
+
+const OAUTH_STATE_SECRET = process.env.EXTENSION_OAUTH_STATE_SECRET
+
+function verifySignedState(
+    state: string,
+    expected: { provider: 'google' | 'apple'; redirectUri: string },
+): boolean {
+    if (!OAUTH_STATE_SECRET) {
+        console.error('EXTENSION_OAUTH_STATE_SECRET is not configured')
+        return false
+    }
+
+    const [payloadB64, sig] = state.split('.')
+    if (!payloadB64 || !sig) return false
+
+    let payloadJson: string
+    try {
+        payloadJson = Buffer.from(payloadB64, 'base64url').toString()
+    } catch {
+        return false
+    }
+
+    const expectedSig = createHmac('sha256', OAUTH_STATE_SECRET)
+        .update(payloadJson)
+        .digest('base64url')
+
+    const sigBuf = Buffer.from(sig)
+    const expectedBuf = Buffer.from(expectedSig)
+
+    if (sigBuf.length !== expectedBuf.length) {
+        return false
+    }
+
+    if (!timingSafeEqual(sigBuf, expectedBuf)) {
+        return false
+    }
+
+    let payload: any
+    try {
+        payload = JSON.parse(payloadJson)
+    } catch {
+        return false
+    }
+
+    if (payload.provider !== expected.provider) return false
+    if (payload.redirectUri !== expected.redirectUri) return false
+
+    if (typeof payload.iat !== 'number') return false
+    const maxAgeMs = 5 * 60 * 1000
+    if (Date.now() - payload.iat > maxAgeMs) return false
+
+    return true
+}
 
 // Helper function to create CORS headers for extension requests
 function getCorsHeaders(req: NextRequest): Headers {
@@ -46,6 +99,17 @@ export async function POST(req: NextRequest) {
     if (provider !== 'google' && provider !== 'apple') {
         return NextResponse.json(
             { error: 'Invalid provider. Must be "google" or "apple"' },
+            { status: 400, headers: corsHeaders },
+        )
+    }
+
+    if (
+        !state ||
+        !redirectUri ||
+        !verifySignedState(state, { provider, redirectUri })
+    ) {
+        return NextResponse.json(
+            { error: 'Invalid or expired OAuth state' },
             { status: 400, headers: corsHeaders },
         )
     }
