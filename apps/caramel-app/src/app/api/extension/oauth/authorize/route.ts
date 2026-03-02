@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
 
 const KNOWN_EXTENSION_ORIGINS = [
     process.env.CHROME_EXTENSION_ORIGIN,
