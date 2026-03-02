@@ -76,7 +76,28 @@ async function handleRedirect(req: NextRequest) {
 
     // Redirect to extension's redirect URI with the code
     // Use originalState (which may be the decoded state from Apple's response)
-    const redirectUrl = new URL(extensionRedirectUri)
+    let redirectUrl: URL
+    try {
+        redirectUrl = new URL(extensionRedirectUri)
+    } catch {
+        return NextResponse.json(
+            { error: 'Invalid extension redirect URI' },
+            { status: 400 },
+        )
+    }
+
+    const isChromeExtension = redirectUrl.protocol === 'chrome-extension:'
+    const isChromiumAppOrigin =
+        redirectUrl.protocol === 'https:' &&
+        redirectUrl.hostname.endsWith('.chromiumapp.org')
+
+    if (!isChromeExtension && !isChromiumAppOrigin) {
+        return NextResponse.json(
+            { error: 'Disallowed extension redirect origin' },
+            { status: 400 },
+        )
+    }
+
     redirectUrl.searchParams.set('code', code)
     if (originalState) redirectUrl.searchParams.set('state', originalState)
 
