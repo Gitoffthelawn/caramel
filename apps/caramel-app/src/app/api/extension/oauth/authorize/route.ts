@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const KNOWN_EXTENSION_ORIGINS = [
+    process.env.CHROME_EXTENSION_ORIGIN,
+    process.env.FIREFOX_EXTENSION_ORIGIN,
+    process.env.SAFARI_EXTENSION_ORIGIN,
+].filter((o): o is string => Boolean(o))
+
+const isKnownExtensionOrigin = (origin: string | null) =>
+    !!origin && KNOWN_EXTENSION_ORIGINS.includes(origin)
+
 // Handle OPTIONS request for CORS preflight
 export async function OPTIONS(req: NextRequest) {
     const origin = req.headers.get('origin')
-    const isExtensionOrigin =
-        origin?.startsWith('chrome-extension://') ||
-        origin?.startsWith('moz-extension://') ||
-        origin?.startsWith('safari-web-extension://')
+    const isExtensionOrigin = isKnownExtensionOrigin(origin)
 
     const headers = new Headers()
     if (isExtensionOrigin && origin) {
@@ -29,10 +35,7 @@ export async function GET(req: NextRequest) {
     const getCorsHeaders = () => {
         const headers = new Headers()
         const origin = req.headers.get('origin')
-        const isExtensionOrigin =
-            origin?.startsWith('chrome-extension://') ||
-            origin?.startsWith('moz-extension://') ||
-            origin?.startsWith('safari-web-extension://')
+        const isExtensionOrigin = isKnownExtensionOrigin(origin)
 
         if (isExtensionOrigin && origin) {
             headers.set('Access-Control-Allow-Origin', origin)
@@ -195,10 +198,7 @@ export async function GET(req: NextRequest) {
         // Re-create CORS headers in catch block
         const headers = new Headers()
         const origin = req.headers.get('origin')
-        const isExtensionOrigin =
-            origin?.startsWith('chrome-extension://') ||
-            origin?.startsWith('moz-extension://') ||
-            origin?.startsWith('safari-web-extension://')
+        const isExtensionOrigin = isKnownExtensionOrigin(origin)
 
         if (isExtensionOrigin && origin) {
             headers.set('Access-Control-Allow-Origin', origin)
