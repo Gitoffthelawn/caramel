@@ -140,7 +140,7 @@ async function handleSocialSignIn(provider) {
 
     try {
         // Base URL - change to 'http://localhost:58000' for local testing
-        const baseURL = 'http://localhost:58000' // Change back to 'https://grabcaramel.com' for production
+        const baseURL = 'https://grabcaramel.com'
 
         // Check if identity API is available
         const identity =
@@ -408,7 +408,7 @@ function renderSignInPrompt(backFn) {
             const password = document.getElementById('password').value
 
             const res = await fetch(
-                'http://localhost:58000/api/extension/login', // Change back to 'https://grabcaramel.com/api/extension/login' for production
+                'https://grabcaramel.com/api/extension/login',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
