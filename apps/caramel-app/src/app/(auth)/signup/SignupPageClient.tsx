@@ -1,12 +1,13 @@
 'use client'
 
-import { signUp } from '@/lib/auth/client'
+import { signIn, signUp } from '@/lib/auth/client'
 import { useFormik } from 'formik'
 import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
+import { FaApple, FaGoogle } from 'react-icons/fa'
 import { toast } from 'sonner'
 import { object, ref, string } from 'yup'
 
@@ -34,6 +35,7 @@ const validationSchema = object().shape({
 export default function SignupPageClient() {
     const [showPasswordChecker, setShowPasswordChecker] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null)
     const [error, setError] = useState('')
 
     const formik = useFormik({
@@ -74,6 +76,30 @@ export default function SignupPageClient() {
         },
     })
 
+    const handleSocialSignIn = async (provider: 'google' | 'apple') => {
+        setOauthLoading(provider)
+        try {
+            const result = await signIn.social({
+                provider,
+                callbackURL: '/',
+            })
+
+            if (result?.error) {
+                toast.error(
+                    `Unable to sign up with ${provider === 'google' ? 'Google' : 'Apple'}. Please try again.`,
+                )
+                setOauthLoading(null)
+                return
+            }
+
+            // signIn.social automatically redirects to OAuth provider
+            // The callback will handle redirecting back to callbackURL
+        } catch (error) {
+            toast.error('Something went wrong. Please try again later.')
+            setOauthLoading(null)
+        }
+    }
+
     const { handleSubmit, errors, touched, handleChange, handleBlur, values } =
         formik
 
@@ -96,6 +122,44 @@ export default function SignupPageClient() {
                     />
                     <div className="my-auto">account</div>
                 </h2>
+                <div className="mb-4 space-y-3">
+                    <button
+                        type="button"
+                        onClick={() => handleSocialSignIn('google')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <FaGoogle className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'google'
+                                ? 'Redirecting...'
+                                : 'Sign up with Google'}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSocialSignIn('apple')}
+                        disabled={!!oauthLoading}
+                        className="hover:bg-caramel/10 hover:border-caramel border-caramel flex w-full items-center justify-center gap-3 rounded-md border bg-white px-4 py-2 font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <FaApple className="text-caramel h-5 w-5" />
+                        <span>
+                            {oauthLoading === 'apple'
+                                ? 'Redirecting...'
+                                : 'Sign up with Apple'}
+                        </span>
+                    </button>
+                </div>
+
+                <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="bg-white px-2 text-gray-500">or</span>
+                    </div>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-black">
