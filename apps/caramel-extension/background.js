@@ -243,10 +243,15 @@ currentBrowser.runtime.onMessage.addListener(
                     // Content scripts are injected by manifest. Use tab URL directly
                     // to avoid reinjection and duplicate declaration errors.
                     try {
-                        const hostname = tabUrl ? new URL(tabUrl).hostname : null
+                        const hostname = tabUrl
+                            ? new URL(tabUrl).hostname
+                            : null
                         sendResponse({ domainRecord: null, url: hostname })
                     } catch (err) {
-                        console.error('Error getting hostname from tab URL:', err)
+                        console.error(
+                            'Error getting hostname from tab URL:',
+                            err,
+                        )
                         sendResponse({ domainRecord: null, url: null })
                     }
                 },
