@@ -218,20 +218,35 @@ currentBrowser.runtime.onMessage.addListener(
                         return
                     }
 
-                    try {
-                        const url = tabs[0].url || null
-                        let hostname = null
+                    const tab = tabs[0]
+                    const tabUrl = tab.url || ''
+
+                    // Don't inject into extension pages (popup, options, etc.)
+                    if (
+                        tabUrl.startsWith('chrome-extension://') ||
+                        tabUrl.startsWith('moz-extension://') ||
+                        tabUrl.startsWith('safari-web-extension://')
+                    ) {
+                        // For extension pages, just return the URL without injecting
                         try {
-                            hostname = url ? new URL(url).hostname : null
-                        } catch (e) {
-                            hostname = null
+                            const url = new URL(tabUrl)
+                            sendResponse({
+                                domainRecord: null,
+                                url: url.hostname,
+                            })
+                        } catch {
+                            sendResponse({ domainRecord: null, url: null })
                         }
+                        return
+                    }
+
+                    // Content scripts are injected by manifest. Use tab URL directly
+                    // to avoid reinjection and duplicate declaration errors.
+                    try {
+                        const hostname = tabUrl ? new URL(tabUrl).hostname : null
                         sendResponse({ domainRecord: null, url: hostname })
                     } catch (err) {
-                        console.error(
-                            'Error while getting active tab domain:',
-                            err,
-                        )
+                        console.error('Error getting hostname from tab URL:', err)
                         sendResponse({ domainRecord: null, url: null })
                     }
                 },
