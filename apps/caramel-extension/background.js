@@ -148,32 +148,37 @@ currentBrowser.runtime.onMessage.addListener(
                     }
 
                     const tabId = tabs[0].id
+                    const tab = tabs[0]
 
+                    // Don't inject into extension pages (popup, options, etc.)
+                    if (
+                        tab.url?.startsWith('chrome-extension://') ||
+                        tab.url?.startsWith('moz-extension://') ||
+                        tab.url?.startsWith('safari-web-extension://')
+                    ) {
+                        // For extension pages, just return the URL without injecting
+                        try {
+                            const url = new URL(tab.url)
+                            sendResponse({
+                                domainRecord: null,
+                                url: url.hostname,
+                            })
+                        } catch {
+                            sendResponse({ domainRecord: null, url: null })
+                        }
+                        return
+                    }
+
+                    // Content scripts are automatically injected by manifest.json for supported domains
+                    // We don't need to inject scripts again - just get the hostname directly from the tab URL
+                    // This prevents duplicate script injection and "already declared" errors on web pages
                     try {
-                        await execScript({
-                            target: { tabId },
-                            files: ['shared-utils.js', 'UI-helpers.js'],
-                        })
-                        const [result] = await execScript({
-                            target: { tabId },
-                            func: async () => {
-                                try {
-                                    const hostname = window.location.hostname
-                                    return { url: hostname }
-                                } catch (err) {
-                                    console.error(
-                                        'Error while getting domain record:',
-                                        err,
-                                    )
-                                    return null
-                                }
-                            },
-                        })
-                        const { domainRecord, url } = result?.result || null
-                        sendResponse({ domainRecord, url })
+                        const url = new URL(tab.url)
+                        const hostname = url.hostname
+                        sendResponse({ domainRecord: null, url: hostname })
                     } catch (err) {
                         console.error(
-                            'Error injecting or executing domain-record script:',
+                            'Error getting hostname from tab URL:',
                             err,
                         )
                         sendResponse({ domainRecord: null, url: null })

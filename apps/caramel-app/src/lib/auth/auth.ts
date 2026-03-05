@@ -71,6 +71,11 @@ export const auth = betterAuth({
         apple: {
             clientId: process.env.APPLE_CLIENT_ID as string,
             clientSecret: process.env.APPLE_CLIENT_SECRET as string,
+            // Use production domain for Apple redirect URI (Apple doesn't accept localhost)
+            // The callback will be handled on production, then redirect back to localhost
+            redirectURI:
+                process.env.APPLE_REDIRECT_URI ||
+                'https://grabcaramel.com/api/auth/callback/apple',
         },
     },
     user: {
