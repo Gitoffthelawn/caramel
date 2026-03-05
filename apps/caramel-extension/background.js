@@ -39,6 +39,48 @@ function execScript(details) {
     return currentBrowser.tabs.executeScript(tabId, { code: `(${func})();` })
 }
 
+// NOTE: Do not use `execScript` to inject full content-script bundles
+// that are declared in `manifest.json` (e.g. `shared-utils.js`).
+// Injecting the same bundle twice into the same isolated world can
+// cause redeclaration errors for top-level `const`/`let`/`class`.
+// Prefer `tabs.query` for URL-only needs, or `tabs.sendMessage` to
+// message an already-loaded content script for DOM reads.
+
+function waitForTabComplete(tabId, timeoutMs = 15000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            currentBrowser.tabs.onUpdated.removeListener(onUpdated)
+            reject(new Error('Timed out waiting for tab to load'))
+        }, timeoutMs)
+
+        function onUpdated(updatedTabId, changeInfo) {
+            if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                clearTimeout(timer)
+                currentBrowser.tabs.onUpdated.removeListener(onUpdated)
+                resolve()
+            }
+        }
+
+        currentBrowser.tabs.onUpdated.addListener(onUpdated)
+    })
+}
+
+function sendMessageToTab(tabId, msg, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(
+            () => reject(new Error('sendMessage timeout')),
+            timeoutMs,
+        )
+
+        currentBrowser.tabs.sendMessage(tabId, msg, resp => {
+            clearTimeout(timer)
+            const err = currentBrowser.runtime.lastError
+            if (err) return reject(err)
+            resolve(resp)
+        })
+    })
+}
+
 // Keep-Alive Mechanism
 function keepAlive() {
     if (isServiceWorker) {
@@ -86,79 +128,108 @@ currentBrowser.runtime.onMessage.addListener(
             console.log('Received keep-alive message from content script')
             sendResponse({ status: 'alive' }) // Respond to the message
         } else if (message.action === 'scrapeAmazonCartKeywords') {
-            const originalTab = sender.tab
+            const originalTabId = sender?.tab?.id
+            try {
+                console.log('AUTO_INSERT_AMAZON_SCRAPE_START', {
+                    originalTabId,
+                    t: performance.now(),
+                })
+            } catch (e) {}
             currentBrowser.tabs
                 .create({
                     url: 'https://www.amazon.com/gp/cart/view.html?ref_=nav_cart',
+                    active: false,
                 })
-                .then(async amazonCartPage => {
-                    await execScript({
-                        target: { tabId: amazonCartPage.id },
-                        files: ['shared-utils.js', 'UI-helpers.js'],
-                    })
+                .then(async cartTab => {
+                    try {
+                        await waitForTabComplete(cartTab.id)
 
-                    const result = await execScript({
-                        target: { tabId: amazonCartPage.id },
-                        func: async () => {
-                            window.showTestingModal(
-                                'Fetching coupon keywords...',
-                                true,
-                            )
-                            return new Promise(async (resolve, reject) => {
-                                try {
-                                    const productTitleElements =
-                                        document.querySelectorAll(
-                                            '.sc-product-title',
-                                        )
-                                    const titles = Array.from(
-                                        productTitleElements,
-                                    ).map(element => element.textContent.trim())
-                                    const keywords = titles.join(' ').split(' ')
-                                    console.log('Keywords:', keywords)
-                                    const filteredKeywords =
-                                        await window.filterKeywords(keywords)
-                                    console.log(
-                                        'Filtered Keywords:',
-                                        filteredKeywords,
-                                    )
-                                    resolve(filteredKeywords)
-                                } catch (error) {
-                                    reject(error)
-                                }
+                        const resp = await sendMessageToTab(cartTab.id, {
+                            action: 'caramel:scrapeAmazonCartKeywordsFromCart',
+                        })
+
+                        try {
+                            console.log('AUTO_INSERT_AMAZON_SCRAPE_END', {
+                                count: (resp?.keywords || []).length,
+                                t: performance.now(),
                             })
-                        },
-                    })
-                    console.log('Amazon cart keywords:', result[0].result) // result is wrapped in an array
-                    sendResponse({ keywords: result[0].result }) // Send filtered keywords as respons
-                    currentBrowser.tabs.remove(amazonCartPage.id)
-                    currentBrowser.tabs.update(originalTab.id, { active: true })
+                        } catch (e) {}
+
+                        sendResponse({ keywords: resp?.keywords || [] })
+                    } catch (error) {
+                        console.error(
+                            'Error during Amazon cart scraping:',
+                            error,
+                        )
+                        try {
+                            console.log('AUTO_INSERT_AMAZON_SCRAPE_ERROR', {
+                                error: String(error),
+                                t: performance.now(),
+                            })
+                        } catch (e) {}
+                        sendResponse({
+                            keywords: [],
+                            error: 'Failed to scrape Amazon cart',
+                        })
+                    } finally {
+                        if (cartTab?.id) currentBrowser.tabs.remove(cartTab.id)
+                        if (originalTabId)
+                            currentBrowser.tabs.update(originalTabId, {
+                                active: true,
+                            })
+                    }
                 })
                 .catch(error => {
-                    console.error('Error during Amazon cart scraping:', error)
-                    sendResponse({ error: 'Failed to scrape Amazon cart' })
+                    console.error('Error creating Amazon cart tab:', error)
+                    sendResponse({
+                        keywords: [],
+                        error: 'Failed to open Amazon cart',
+                    })
                 })
+
+            return true
+        } else if (message.action === 'fetchCoupons') {
+            const { site, kw } = message
+            const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(
+                kw || '',
+            )}&limit=20`
+            console.log('BACKGROUND: fetchCoupons', {
+                site,
+                kw,
+                url,
+                t: Date.now(),
+            })
+            fetch(url)
+                .then(async r => {
+                    if (!r.ok) return { coupons: [] }
+                    const json = await r.json()
+                    return { coupons: json }
+                })
+                .then(resp => sendResponse(resp))
+                .catch(err => sendResponse({ coupons: [], error: String(err) }))
+
             return true
         } else if (message.action === 'getActiveTabDomainRecord') {
             currentBrowser.tabs.query(
                 { active: true, lastFocusedWindow: true },
-                async tabs => {
+                tabs => {
                     if (!tabs || !tabs.length) {
                         sendResponse({ domainRecord: null, url: null })
                         return
                     }
 
-                    const tabId = tabs[0].id
                     const tab = tabs[0]
+                    const tabUrl = tab.url || ''
 
                     // Don't inject into extension pages (popup, options, etc.)
                     if (
-                        tab.url?.startsWith('chrome-extension://') ||
-                        tab.url?.startsWith('moz-extension://') ||
-                        tab.url?.startsWith('safari-web-extension://')
+                        tabUrl.startsWith('chrome-extension://') ||
+                        tabUrl.startsWith('moz-extension://') ||
+                        tabUrl.startsWith('safari-web-extension://')
                     ) {
                         // For extension pages, just return the URL without injecting
                         try {
-                            const url = new URL(tab.url)
+                            const url = new URL(tabUrl)
                             sendResponse({
                                 domainRecord: null,
                                 url: url.hostname,
@@ -169,12 +240,12 @@ currentBrowser.runtime.onMessage.addListener(
                         return
                     }
 
-                    // Content scripts are automatically injected by manifest.json for supported domains
-                    // We don't need to inject scripts again - just get the hostname directly from the tab URL
-                    // This prevents duplicate script injection and "already declared" errors on web pages
+                    // Content scripts are injected by manifest. Use tab URL directly
+                    // to avoid reinjection and duplicate declaration errors.
                     try {
-                        const url = new URL(tab.url)
-                        const hostname = url.hostname
+                        const hostname = tabUrl
+                            ? new URL(tabUrl).hostname
+                            : null
                         sendResponse({ domainRecord: null, url: hostname })
                     } catch (err) {
                         console.error(
@@ -185,6 +256,7 @@ currentBrowser.runtime.onMessage.addListener(
                     }
                 },
             )
+
             return true
         }
     },
