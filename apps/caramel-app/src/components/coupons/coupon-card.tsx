@@ -3,7 +3,6 @@
 import type { Coupon } from '@/types/coupon'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { HiCheckCircle } from 'react-icons/hi'
 import { toast } from 'sonner'
 
 interface CouponCardProps {
@@ -28,8 +27,6 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             ? `${coupon.discount_amount}%`
             : `$${coupon.discount_amount}`
         : '20%'
-
-    const timesUsed = coupon.timesUsed ?? 0
 
     return (
         <motion.div
@@ -62,16 +59,11 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                             {coupon.description}
                         </p>
                     )}
-                    <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                        <span className="flex items-center gap-1.5">
-                            <HiCheckCircle className="h-4 w-4 text-emerald-500" />
-                            Coupon verified
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                            <HiCheckCircle className="h-4 w-4 text-orange-500" />
-                            {timesUsed} used today
-                        </span>
-                    </div>
+                    {(coupon.timesUsed ?? 0) > 0 && (
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            {coupon.timesUsed} used today
+                        </p>
+                    )}
                 </div>
 
                 {/* Right: CTA Button */}
