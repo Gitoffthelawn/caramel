@@ -457,7 +457,7 @@ async function startApplyingCoupons(rec) {
 
 /* --------------------------------------------------  listeners (unchanged) */
 window.addEventListener('message', ev => {
-    if (ev.origin !== 'https://dev.grabcaramel.com') return
+    if (ev.origin !== 'https://grabcaramel.com') return
     if (ev.data?.token) {
         currentBrowser.storage.sync.set(
             {
