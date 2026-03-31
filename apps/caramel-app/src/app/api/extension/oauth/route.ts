@@ -340,15 +340,8 @@ export async function POST(req: NextRequest) {
             // Apple OAuth flow
             const appleClientId = process.env.APPLE_CLIENT_ID
             const appleClientSecret = process.env.APPLE_CLIENT_SECRET
-            const appleTeamId = process.env.APPLE_TEAM_ID
-            const appleKeyId = process.env.APPLE_KEY_ID
 
-            if (
-                !appleClientId ||
-                !appleClientSecret ||
-                !appleTeamId ||
-                !appleKeyId
-            ) {
+            if (!appleClientId || !appleClientSecret) {
                 return NextResponse.json(
                     { error: 'Apple OAuth not configured' },
                     { status: 500, headers: corsHeaders },
