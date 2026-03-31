@@ -392,7 +392,7 @@ async function startApplyingCoupons(rec) {
     }
     if (!Array.isArray(coupons) || !coupons.length) {
         log('AUTO_INSERT_STOP', { result: 'no-coupons', t: performance.now() })
-        showFinalModal(0, null, 'No coupons found.')
+        showFinalModal(0, null, 'No coupons available for this store right now.')
         return
     }
 
@@ -457,7 +457,7 @@ async function startApplyingCoupons(rec) {
 
 /* --------------------------------------------------  listeners (unchanged) */
 window.addEventListener('message', ev => {
-    if (ev.origin !== 'https://grabcaramel.com') return
+    if (ev.origin !== 'https://dev.grabcaramel.com') return
     if (ev.data?.token) {
         currentBrowser.storage.sync.set(
             {

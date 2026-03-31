@@ -225,6 +225,7 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
 
     // Determine if user saved money
     const isSuccess = savingsAmount > 0
+    const noCouponsAvailable = !!message // when message is provided, it means no coupons or error
 
     // If no savings found, encourage the user that it's already the best price
     const defaultMessage = isSuccess
@@ -256,7 +257,7 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
       font-size: 24px; 
       font-weight: bold;
     ">
-      ${isSuccess ? '🎉 Savings Found! 🎉' : isSignIn ? 'Oups..' : 'Great News!'}
+      ${isSuccess ? '🎉 Savings Found! 🎉' : isSignIn ? 'Oups..' : noCouponsAvailable ? 'No Savings This Time' : 'Best Price Already!'}
     </h2>
     <p style="font-size: 13px; color: #333; margin: 0 0 10px 0;">
       ${finalMessage}
