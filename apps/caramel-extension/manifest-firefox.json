@@ -21,7 +21,9 @@
         "https://www.amazon.com/*",
         "https://*.ebay.com/*",
         "https://*.codecademy.com/*",
-        "https://*.grabcaramel.com/*"
+        "https://*.grabcaramel.com/*",
+        "https://accounts.google.com/*",
+        "https://appleid.apple.com/*"
     ],
     "web_accessible_resources": [
         {

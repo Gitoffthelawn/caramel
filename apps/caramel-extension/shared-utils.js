@@ -3,15 +3,68 @@
  ********************************************************************/
 
 /* --------------------------------------------------  bootstrap */
-const currentBrowser = (() => {
-    if (typeof chrome !== 'undefined') return chrome
-    if (typeof browser !== 'undefined') return browser
-    throw new Error('Browser is not supported!')
-})()
+// Track script loading to prevent redeclaration errors on multiple loads
+if (typeof window !== 'undefined') {
+    if (window.__caramel_shared_utils_loaded) {
+        // Script already loaded - use existing window.currentBrowser
+        // Don't redeclare to avoid errors
+    } else {
+        window.__caramel_shared_utils_loaded = true
+
+        // First load - create currentBrowser on window
+        window.currentBrowser = (() => {
+            if (typeof chrome !== 'undefined') return chrome
+            if (typeof browser !== 'undefined') return browser
+            throw new Error('Browser is not supported!')
+        })()
+    }
+    // Ensure window.currentBrowser exists
+    if (!window.currentBrowser) {
+        window.currentBrowser = (() => {
+            if (typeof chrome !== 'undefined') return chrome
+            if (typeof browser !== 'undefined') return browser
+            throw new Error('Browser is not supported!')
+        })()
+    }
+    // Create local reference - var allows redeclaration, so this is safe even on second load
+    var currentBrowser = window.currentBrowser
+} else {
+    // Non-window environment (service worker) - safe to declare normally
+    var currentBrowser = (() => {
+        if (typeof chrome !== 'undefined') return chrome
+        if (typeof browser !== 'undefined') return browser
+        throw new Error('Browser is not supported!')
+    })()
+}
 
 /* --------------------------------------------------  tiny helpers */
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-const log = (...a) => console.log('Caramel:', ...a)
+// Check if already declared to prevent redeclaration errors on script reload
+if (typeof sleep === 'undefined') {
+    var sleep = ms => new Promise(r => setTimeout(r, ms))
+}
+if (typeof log === 'undefined') {
+    var log = (...a) => console.log('Caramel:', ...a)
+}
+if (typeof recordTiming === 'undefined') {
+    var recordTiming = (event, meta = {}) => {
+        try {
+            const entry = { event, t: performance.now(), meta }
+            if (
+                currentBrowser &&
+                currentBrowser.storage &&
+                currentBrowser.storage.local
+            ) {
+                currentBrowser.storage.local.get(['caramel_timings'], res => {
+                    const arr = (res && res.caramel_timings) || []
+                    arr.push(entry)
+                    currentBrowser.storage.local.set({ caramel_timings: arr })
+                })
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
+    }
+}
 
 /* ---------- DOM waiters ---------- */
 function waitForElement(sel, timeout = 4000) {
@@ -61,6 +114,34 @@ function waitForAmazonFetch() {
             return p
         }
     })
+}
+
+/* ---------- Amazon helpers (fast scrape without opening a new tab) ---------- */
+async function getAmazonCartKeywords() {
+    try {
+        // 1) try to read from current DOM
+        const titles = Array.from(
+            document.querySelectorAll('.sc-product-title'),
+        )
+            .map(el => el.textContent.trim())
+            .filter(Boolean)
+        if (titles.length) return titles
+
+        // 2) fetch cart HTML same-origin (keeps cookies)
+        const r = await fetch('/gp/cart/view.html?ref_=nav_cart', {
+            credentials: 'include',
+        })
+        if (!r.ok) return []
+        const html = await r.text()
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+        const fetched = Array.from(doc.querySelectorAll('.sc-product-title'))
+            .map(el => el.textContent.trim())
+            .filter(Boolean)
+        return fetched
+    } catch (e) {
+        log('getAmazonCartKeywords error', e)
+        return []
+    }
 }
 
 /* ---------- UI readiness helper (new) ---------- */
@@ -143,7 +224,9 @@ async function tryInitialize() {
 
 /* --------------------------------------------------  coupon attempt */
 async function applyCoupon(code, rec) {
-    log('► Trying', code)
+    const attemptStart = performance.now()
+    log('AUTO_INSERT_ATTEMPT_START', code, { t: attemptStart })
+    recordTiming('AUTO_INSERT_ATTEMPT_START', { code })
     try {
         /* 1] dismiss popup if present */
         if (rec.dismissButton) {
@@ -172,6 +255,10 @@ async function applyCoupon(code, rec) {
         const applyBtn = document.querySelector(rec.couponSubmit)
         if (!input || !applyBtn) {
             log('Input / apply button missing')
+            log('AUTO_INSERT_ATTEMPT_END', code, {
+                success: false,
+                elapsed: performance.now() - attemptStart,
+            })
             return { success: false }
         }
 
@@ -183,7 +270,7 @@ async function applyCoupon(code, rec) {
         applyBtn.click()
 
         /* 4] wait for result */
-        const waiters = [sleep(3500).then(() => 'timeout-3.5s')] // shorter fallback
+        const waiters = [sleep(1200).then(() => 'timeout-1.2s')] // shorter fallback
         const priceEl =
             document.querySelector(rec.priceContainer) ||
             document.getElementById(
@@ -197,37 +284,90 @@ async function applyCoupon(code, rec) {
         log('Wait finished via', via)
 
         const newTotal = getPrice(rec.priceContainer, { returnLargest: true })
-        return { success: !isNaN(newTotal) && newTotal < original, newTotal }
+        const success = !isNaN(newTotal) && newTotal < original
+        const elapsed = performance.now() - attemptStart
+        log('AUTO_INSERT_ATTEMPT_END', code, { success, newTotal, elapsed })
+        recordTiming('AUTO_INSERT_ATTEMPT_END', {
+            code,
+            success,
+            newTotal,
+            elapsed,
+        })
+        return { success, newTotal }
     } catch (err) {
         console.error('applyCoupon error', err)
+        log('AUTO_INSERT_ATTEMPT_END', code, {
+            success: false,
+            error: String(err),
+            elapsed: performance.now() - attemptStart,
+        })
+        recordTiming('AUTO_INSERT_ATTEMPT_END', {
+            code,
+            success: false,
+            error: String(err),
+            elapsed: performance.now() - attemptStart,
+        })
         return { success: false }
     }
 }
 
 /* --------------------------------------------------  coupon list */
 async function fetchCoupons(site, kw) {
-    const url = `https://grabcaramel.com/api/coupons?site=${site}&key_words=${encodeURIComponent(kw)}&limit=20`
+    // Delegate network fetch to background/service worker to avoid CORS failures
+    const meta = { site, kw }
     try {
-        const r = await fetch(url)
-        const d = r.ok ? await r.json() : []
+        log(
+            'AUTO_INSERT_FETCHCOUPONS_START',
+            Object.assign({}, meta, { t: performance.now() }),
+        )
+        recordTiming('AUTO_INSERT_FETCHCOUPONS_START', meta)
+        const resp = await new Promise(res =>
+            currentBrowser.runtime.sendMessage(
+                { action: 'fetchCoupons', site, kw },
+                res,
+            ),
+        )
+        if (resp?.error) {
+            log('fetchCoupons background error', resp.error)
+            recordTiming('AUTO_INSERT_FETCHCOUPONS_END', {
+                count: 0,
+                error: resp.error,
+            })
+            throw new Error(resp.error)
+        }
+        const d = resp?.coupons || []
+        log('AUTO_INSERT_FETCHCOUPONS_END', {
+            count: d.length,
+            t: performance.now(),
+        })
+        recordTiming('AUTO_INSERT_FETCHCOUPONS_END', { count: d.length })
         log('Fetched', d.length, 'coupons')
         return d
     } catch (e) {
         log('fetchCoupons error', e)
-        return []
+        recordTiming('AUTO_INSERT_FETCHCOUPONS_END', {
+            count: 0,
+            error: String(e),
+        })
+        throw e
     }
 }
 async function getCoupons(rec) {
     let kw = ''
     if (rec.domain === 'amazon.com') {
-        const resp = await new Promise(res =>
-            currentBrowser.runtime.sendMessage(
-                { action: 'scrapeAmazonCartKeywords' },
-                res,
-            ),
-        )
-        kw = (resp?.keywords || []).join(',')
+        // Use fast in-page scrape (or same-origin cart fetch) instead of opening a new tab
+        recordTiming('AUTO_INSERT_AMAZON_SCRAPE_REQUEST')
+        const titles = await getAmazonCartKeywords()
+        recordTiming('AUTO_INSERT_AMAZON_SCRAPE_RESPONSE', {
+            count: titles.length,
+        })
+        kw = (titles || []).join(',')
         log('Amazon keywords', kw)
+    }
+    // Dev hook: deterministic coupons when using #caramel-test
+    if (location.hash && location.hash.includes('caramel-test')) {
+        log('DEV MODE: returning mocked coupons')
+        return [{ code: 'TEST10' }, { code: 'TEST20' }, { code: 'TEST30' }]
     }
     return fetchCoupons(rec.domain, kw)
 }
@@ -235,13 +375,34 @@ async function getCoupons(rec) {
 /* --------------------------------------------------  main runner */
 async function startApplyingCoupons(rec) {
     log('=== Starting coupon flow ===')
+    log('AUTO_INSERT_START', { domain: rec?.domain, t: performance.now() })
     await showTestingModal()
 
-    const coupons = await getCoupons(rec)
-    if (!coupons.length) {
-        showFinalModal(0, null, 'No coupons found.')
+    let coupons
+    try {
+        coupons = await getCoupons(rec)
+    } catch (e) {
+        log('AUTO_INSERT_STOP', {
+            result: 'coupon-fetch-failed',
+            error: String(e),
+            t: performance.now(),
+        })
+        showFinalModal(0, null, 'Network error fetching coupons')
         return
     }
+    if (!Array.isArray(coupons) || !coupons.length) {
+        log('AUTO_INSERT_STOP', { result: 'no-coupons', t: performance.now() })
+        showFinalModal(
+            0,
+            null,
+            'No coupons available for this store right now.',
+        )
+        return
+    }
+
+    // Cap attempts to a reasonable number to limit runtime
+    const MAX_ATTEMPTS = 8
+    if (coupons.length > MAX_ATTEMPTS) coupons = coupons.slice(0, MAX_ATTEMPTS)
 
     const original = getPrice(rec.priceContainer, { returnLargest: true })
     let bestSave = 0,
@@ -276,12 +437,24 @@ async function startApplyingCoupons(rec) {
 
     if (bestCode) {
         await applyCoupon(bestCode, rec)
+        log('AUTO_INSERT_STOP', {
+            result: 'applied',
+            bestCode,
+            bestSave,
+            t: performance.now(),
+        })
         showFinalModal(
             bestSave,
             bestCode,
             'We found a coupon that saves you money!',
         )
     } else {
+        log('AUTO_INSERT_STOP', {
+            result: 'none',
+            bestCode: null,
+            bestSave: 0,
+            t: performance.now(),
+        })
         showFinalModal(0, null, 'Already the best price.')
     }
 }
@@ -304,6 +477,7 @@ window.addEventListener('message', ev => {
 })
 currentBrowser.runtime.onMessage.addListener(async (req, _s, send) => {
     if (req.action === 'userLoggedIn') {
+        log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })
         const rec = await getDomainRecord(location.hostname)
         await startApplyingCoupons(rec)
         send({ success: true })
