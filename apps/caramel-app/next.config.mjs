@@ -29,6 +29,7 @@ const sentryConfig =
         ? withSentryConfig(nextConfig, {
               org: 'devino',
               project: 'caramel',
+              sentryUrl: 'https://sentry.devino.ca',
               silent: !process.env.CI,
               widenClientFileUpload: true,
               tunnelRoute: '/monitoring',
