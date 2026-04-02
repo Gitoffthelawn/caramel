@@ -146,6 +146,19 @@ jobs:
   e2e-tests:
     name: E2E & Visual Regression
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
       ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
@@ -175,6 +188,11 @@ jobs:
       - name: Generate Prisma Client
         if: github.event_name == 'pull_request'
         run: pnpm --filter caramel-landing exec prisma generate
+
+      - name: Apply Prisma migrations
+        if: github.event_name == 'pull_request'
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
 
       # PR: Run against local dev server (tests PR changes)
       - name: E2E tests (PR - local dev server)
