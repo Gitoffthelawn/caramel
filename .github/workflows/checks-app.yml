@@ -141,13 +141,14 @@ jobs:
             --exit-code || echo "No drift detected"
 
   # ─────────────────────────────────────────────────────────────
-  # Visual Regression Tests
+  # E2E & Visual Regression Tests
   # ─────────────────────────────────────────────────────────────
-  visual-regression:
-    name: Visual Regression
+  e2e-tests:
+    name: E2E & Visual Regression
     runs-on: ubuntu-latest
     env:
       ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+      ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +177,7 @@ jobs:
         run: pnpm --filter caramel-landing exec prisma generate
 
       # PR: Run against local dev server (tests PR changes)
-      - name: Visual regression (PR - local dev server)
+      - name: E2E tests (PR - local dev server)
         if: github.event_name == 'pull_request'
         working-directory: ./apps/caramel-app
         env:
@@ -185,22 +186,13 @@ jobs:
           PLAYWRIGHT_WEB_COMMAND: pnpm dev
           PLAYWRIGHT_START_SERVER: 'true'
           PLAYWRIGHT_WEB_TIMEOUT: '300000'
-          SCREENSHOTS_DIR: screenshots
         run: pnpm test:e2e
 
       # Push to main/dev: Run against deployed site (baseline)
-      - name: Visual regression (push - deployed site)
+      - name: E2E tests (push - deployed site)
         if: github.event_name == 'push'
         working-directory: ./apps/caramel-app
         env:
           PLAYWRIGHT_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
           PLAYWRIGHT_START_SERVER: 'false'
-          SCREENSHOTS_DIR: screenshots
         run: pnpm test:e2e
-
-      - name: Upload screenshots to Argos
-        if: always()
-        working-directory: ./apps/caramel-app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec argos upload ./screenshots || echo "Argos upload skipped (token may not be configured)"
