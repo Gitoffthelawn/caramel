@@ -29,7 +29,6 @@ test.describe('SEO & Accessibility Basics', () => {
 
     test('images have alt text', async ({ page }) => {
         await page.goto('/')
-        await page.waitForLoadState('networkidle')
 
         const images = page.locator('img')
         const count = await images.count()
@@ -49,7 +48,6 @@ test.describe('Responsive - Mobile Viewport', () => {
 
     test('mobile menu toggle exists on home page', async ({ page }) => {
         await page.goto('/')
-        await page.waitForLoadState('networkidle')
 
         // On mobile, there should be a hamburger menu button
         const menuButton = page.locator('header button').first()
@@ -58,7 +56,6 @@ test.describe('Responsive - Mobile Viewport', () => {
 
     test('login page is usable on mobile', async ({ page }) => {
         await page.goto('/login')
-        await page.waitForLoadState('networkidle')
 
         await expect(page.getByPlaceholder('Enter your email')).toBeVisible()
         await expect(page.getByPlaceholder('Enter your password')).toBeVisible()

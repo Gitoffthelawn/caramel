@@ -8,7 +8,7 @@ async function gotoHomePage(page: Page) {
 }
 
 test.describe('Home Page - Critical Sections', () => {
-    test.describe.configure({ mode: 'serial', timeout: 60000 })
+    test.describe.configure({ timeout: 60000 })
 
     test.beforeEach(async ({ page }) => {
         await gotoHomePage(page)

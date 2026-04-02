@@ -6,7 +6,7 @@ async function gotoHomePage(page: Page) {
 }
 
 test.describe('Navigation & Header', () => {
-    test.describe.configure({ mode: 'serial', timeout: 60000 })
+    test.describe.configure({ timeout: 60000 })
 
     test('header renders with all nav links', async ({ page }) => {
         await gotoHomePage(page)

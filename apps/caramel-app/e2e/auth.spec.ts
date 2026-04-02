@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test.describe('Login Page', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/login')
-        await page.waitForLoadState('networkidle')
+        await expect(page.getByRole('button', { name: /login/i })).toBeVisible()
     })
 
     test('login form renders with all fields', async ({ page }) => {
@@ -25,7 +25,6 @@ test.describe('Login Page', () => {
         const signupLink = page.getByRole('link', { name: /sign up/i })
         await expect(signupLink).toBeVisible()
         await signupLink.click()
-        await page.waitForLoadState('networkidle')
         await expect(page).toHaveURL(/\/signup/)
     })
 
@@ -43,7 +42,9 @@ test.describe('Login Page', () => {
 test.describe('Signup Page', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/signup')
-        await page.waitForLoadState('networkidle')
+        await expect(
+            page.getByRole('button', { name: 'Sign Up', exact: true }),
+        ).toBeVisible()
     })
 
     test('signup form renders with all fields', async ({ page }) => {
@@ -69,7 +70,6 @@ test.describe('Signup Page', () => {
         const loginLink = page.getByRole('link', { name: /login/i })
         await expect(loginLink).toBeVisible()
         await loginLink.click()
-        await page.waitForLoadState('networkidle')
         await expect(page).toHaveURL(/\/login/)
     })
 

@@ -3,51 +3,9 @@ import { Page, test } from '@playwright/test'
 
 test.describe.configure({ timeout: 60000 })
 
-async function waitForPageAssets(page: Page) {
-    await page.evaluate(async () => {
-        const waitWithTimeout = async (
-            promise: Promise<unknown>,
-            timeoutMs: number,
-        ) => {
-            await Promise.race([
-                promise,
-                new Promise(resolve => setTimeout(resolve, timeoutMs)),
-            ])
-        }
-
-        if (document.fonts?.ready) {
-            await waitWithTimeout(document.fonts.ready, 5000)
-        }
-
-        await waitWithTimeout(
-            Promise.allSettled(
-                Array.from(document.images)
-                    .filter(image => !image.complete)
-                    .map(
-                        image =>
-                            new Promise<void>(resolve => {
-                                image.addEventListener(
-                                    'load',
-                                    () => resolve(),
-                                    {
-                                        once: true,
-                                    },
-                                )
-                                image.addEventListener(
-                                    'error',
-                                    () => resolve(),
-                                    {
-                                        once: true,
-                                    },
-                                )
-                            }),
-                    ),
-            ),
-            5000,
-        )
-    })
-}
-
+// Scroll through the page to trigger Framer Motion whileInView animations.
+// Argos handles font/image loading and animation stabilization natively,
+// but can't trigger scroll-dependent state changes.
 async function triggerInViewAnimations(page: Page) {
     await page.evaluate(async () => {
         const step = Math.max(Math.floor(window.innerHeight * 0.8), 1)
@@ -73,25 +31,12 @@ async function prepareVisualPage(
     readySelector?: string,
 ) {
     await page.goto(path, { waitUntil: 'domcontentloaded' })
-    await page.addStyleTag({
-        content: `
-            *, *::before, *::after {
-                animation-duration: 0s !important;
-                animation-delay: 0s !important;
-                transition-duration: 0s !important;
-                transition-delay: 0s !important;
-                scroll-behavior: auto !important;
-            }
-        `,
-    })
-    await waitForPageAssets(page)
 
     if (readySelector) {
         await page.locator(readySelector).first().waitFor({ state: 'visible' })
     }
 
     await triggerInViewAnimations(page)
-    await page.waitForTimeout(250)
 }
 
 test.describe('Visual Regression - Caramel Public Pages', () => {

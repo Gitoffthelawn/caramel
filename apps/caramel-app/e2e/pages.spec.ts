@@ -3,7 +3,6 @@ import { expect, test } from '@playwright/test'
 test.describe('Coupons Page', () => {
     test('coupons page loads with content', async ({ page }) => {
         await page.goto('/coupons')
-        await page.waitForLoadState('networkidle')
 
         await expect(page.getByText(/all coupons/i).first()).toBeVisible()
         await expect(page.getByText(/browse.*coupon/i).first()).toBeVisible()
@@ -11,7 +10,6 @@ test.describe('Coupons Page', () => {
 
     test('sidebar has browser install links', async ({ page }) => {
         await page.goto('/coupons')
-        await page.waitForLoadState('networkidle')
 
         const chromeLink = page.getByRole('link', { name: /chrome/i })
         await expect(chromeLink.first()).toBeVisible()
@@ -19,7 +17,6 @@ test.describe('Coupons Page', () => {
 
     test('sidebar links to supported stores', async ({ page }) => {
         await page.goto('/coupons')
-        await page.waitForLoadState('networkidle')
 
         const supportedLink = page.getByRole('link', {
             name: /view all supported stores/i,
@@ -32,7 +29,9 @@ test.describe('Coupons Page', () => {
 test.describe('Pricing Page', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/pricing')
-        await page.waitForLoadState('networkidle')
+        await expect(
+            page.getByText('Simple, Transparent Pricing').first(),
+        ).toBeVisible()
     })
 
     test('shows free pricing', async ({ page }) => {
@@ -69,7 +68,6 @@ test.describe('Pricing Page', () => {
 test.describe('Privacy Page', () => {
     test('privacy page renders content', async ({ page }) => {
         await page.goto('/privacy')
-        await page.waitForLoadState('networkidle')
 
         await expect(page.getByText(/privacy/i).first()).toBeVisible()
     })
@@ -78,7 +76,6 @@ test.describe('Privacy Page', () => {
 test.describe('Supported Stores Page', () => {
     test('supported stores page loads', async ({ page }) => {
         await page.goto('/supported-stores')
-        await page.waitForLoadState('networkidle')
 
         // The page should have a search or list of stores
         await expect(page.locator('body')).toContainText(/supported|stores/i)
@@ -88,7 +85,6 @@ test.describe('Supported Stores Page', () => {
 test.describe('Sources Page', () => {
     test('sources page loads with content', async ({ page }) => {
         await page.goto('/sources')
-        await page.waitForLoadState('networkidle')
 
         // The page should show coupon source information
         await expect(page.locator('body')).toContainText(/source/i)
