@@ -253,12 +253,7 @@ export function EmailButton({
     const isPrimary = variant === 'primary'
     const bg = isPrimary ? brand.accent : brand.danger
     return (
-        <table
-            role="presentation"
-            width="100%"
-            cellPadding={0}
-            cellSpacing={0}
-        >
+        <table role="presentation" width="100%" cellPadding={0} cellSpacing={0}>
             <tbody>
                 <tr>
                     <td align="center" style={{ padding: '16px 0 24px' }}>
@@ -300,12 +295,7 @@ export function EmailNotice({
     const borderColor = isWarning ? '#f59e0b' : brand.orangeLight
     const icon = isWarning ? '\u26A0\uFE0F' : '\u2139\uFE0F'
     return (
-        <table
-            role="presentation"
-            width="100%"
-            cellPadding={0}
-            cellSpacing={0}
-        >
+        <table role="presentation" width="100%" cellPadding={0} cellSpacing={0}>
             <tbody>
                 <tr>
                     <td

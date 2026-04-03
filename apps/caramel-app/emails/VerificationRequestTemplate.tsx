@@ -1,4 +1,3 @@
-import React from 'react'
 import EmailLayout, { EmailButton, EmailNotice, text } from './EmailLayout'
 
 interface VerificationEmailProps {
