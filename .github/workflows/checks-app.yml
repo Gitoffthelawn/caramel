@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-checks-${{ github.workflow }}-${{ github.ref }}
@@ -61,10 +65,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   schema-drift:
     name: Schema Drift
-    if: |
-      contains(github.event.head_commit.modified, 'prisma/schema.prisma') ||
-      contains(github.event.head_commit.modified, 'prisma/migrations') ||
-      github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     services:
@@ -141,13 +142,29 @@ jobs:
             --exit-code || echo "No drift detected"
 
   # ─────────────────────────────────────────────────────────────
-  # Visual Regression Tests
+  # E2E & Visual Regression (PR – local dev server)
   # ─────────────────────────────────────────────────────────────
-  visual-regression:
-    name: Visual Regression
+  e2e-pr:
+    name: E2E & Visual Regression (PR)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+      ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -168,16 +185,16 @@ jobs:
         run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
 
       - name: Write minimal CI env
-        if: github.event_name == 'pull_request'
         run: pnpm --filter caramel-landing run setup:ci-env
 
       - name: Generate Prisma Client
-        if: github.event_name == 'pull_request'
         run: pnpm --filter caramel-landing exec prisma generate
 
-      # PR: Run against local dev server (tests PR changes)
-      - name: Visual regression (PR - local dev server)
-        if: github.event_name == 'pull_request'
+      - name: Apply Prisma migrations
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Run E2E tests
         working-directory: ./apps/caramel-app
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:58000
@@ -185,22 +202,57 @@ jobs:
           PLAYWRIGHT_WEB_COMMAND: pnpm dev
           PLAYWRIGHT_START_SERVER: 'true'
           PLAYWRIGHT_WEB_TIMEOUT: '300000'
-          SCREENSHOTS_DIR: screenshots
         run: pnpm test:e2e
 
-      # Push to main/dev: Run against deployed site (baseline)
-      - name: Visual regression (push - deployed site)
-        if: github.event_name == 'push'
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-pr
+          path: apps/caramel-app/playwright-report/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # E2E & Visual Regression (push – deployed site baseline)
+  # ─────────────────────────────────────────────────────────────
+  e2e-push:
+    name: E2E & Visual Regression (push)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+      ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+
+      - name: Run E2E tests
         working-directory: ./apps/caramel-app
         env:
           PLAYWRIGHT_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
           PLAYWRIGHT_START_SERVER: 'false'
-          SCREENSHOTS_DIR: screenshots
         run: pnpm test:e2e
 
-      - name: Upload screenshots to Argos
-        if: always()
-        working-directory: ./apps/caramel-app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec argos upload ./screenshots || echo "Argos upload skipped (token may not be configured)"
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-push
+          path: apps/caramel-app/playwright-report/
+          retention-days: 14

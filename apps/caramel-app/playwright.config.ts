@@ -1,3 +1,4 @@
+import { createArgosReporterOptions } from '@argos-ci/playwright/reporter'
 import { defineConfig, devices } from '@playwright/test'
 
 const baseURL =
@@ -12,12 +13,26 @@ export default defineConfig({
     testDir: './e2e',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
+    failOnFlakyTests: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : undefined,
-    reporter: 'html',
+    reporter: [
+        ['github'],
+        process.env.CI ? ['dot'] : ['list'],
+        [
+            '@argos-ci/playwright/reporter',
+            createArgosReporterOptions({
+                uploadToArgos: !!process.env.CI,
+                buildName: 'caramel-app',
+                token: process.env.ARGOS_TOKEN,
+                apiBaseUrl: process.env.ARGOS_API_BASE_URL,
+            }),
+        ],
+    ],
     use: {
         baseURL,
         trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
     },
     ...(startServer
         ? {
