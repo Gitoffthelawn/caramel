@@ -1,27 +1,40 @@
-import type { SendMailOptions } from 'nodemailer'
-import nodemailer from 'nodemailer'
+import { UseSend } from 'usesend-js'
 
-// Replace with your SMTP credentials
-const smtpOptions = {
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-    },
+type EmailPayload = {
+    to: string
+    subject: string
+    html?: string
+    text?: string
 }
 
-export const sendEmail = async (data: SendMailOptions) => {
-    const transporter = nodemailer.createTransport({
-        ...smtpOptions,
+const getClient = () => {
+    const apiKey = process.env.USESEND_API_KEY
+    if (!apiKey) {
+        throw new Error(
+            'USESEND_API_KEY is not defined in environment variables',
+        )
+    }
+    return new UseSend(apiKey)
+}
+
+export const sendEmail = async (data: EmailPayload) => {
+    const fromEmail =
+        process.env.USESEND_FROM_EMAIL || 'no_reply@grabcaramel.com'
+    const fromName = process.env.USESEND_FROM_NAME || 'Caramel'
+
+    const client = getClient()
+    const result = await client.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: data.to,
+        subject: data.subject,
+        html: data.html || data.text || '',
     })
 
-    return await transporter.sendMail({
-        from: {
-            name: process.env.SMTP_FROM_NAME || '',
-            address: process.env.SMTP_FROM_ADDRESS || '',
-        },
-        ...data,
-    })
+    if (result?.error) {
+        const raw = result.error as Record<string, unknown>
+        const nested = (raw.error ?? raw) as Record<string, unknown>
+        const msg = nested.message || JSON.stringify(result.error)
+        const code = nested.code || 'UNKNOWN'
+        throw new Error(`useSend email failed: ${msg} (${code})`)
+    }
 }
