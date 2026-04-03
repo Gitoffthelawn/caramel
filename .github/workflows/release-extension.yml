@@ -149,8 +149,14 @@ jobs:
             --api-issuer "$ASC_ISSUER_ID" \
             --json > builds.json || true
 
-          mac_entry=$(jq '[.[] | select(.platform=="MAC_OS")] | sort_by(.uploadedDate) | .[-1]' builds.json)
-          ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.uploadedDate) | .[-1]' builds.json)
+          echo "=== RAW builds.json ==="
+          cat builds.json
+
+          mac_entry=$(jq '[.[] | select(.platform=="MAC_OS")] | sort_by(.buildNumber | tonumber) | .[-1]' builds.json)
+          ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.buildNumber | tonumber) | .[-1]' builds.json)
+
+          echo "=== mac_entry ===" ; echo "$mac_entry"
+          echo "=== ios_entry ===" ; echo "$ios_entry"
 
           # Fail loudly if either entry is missing — avoids silent wrong-build-number uploads
           if [ "$(echo "$mac_entry" | jq -r 'type')" = "null" ]; then
@@ -166,6 +172,9 @@ jobs:
           MACOS_CURRENT_BUILD=$( echo "$mac_entry" | jq -r '.buildNumber // "1"' )
           IOS_CURRENT_VERSION=$( echo "$ios_entry" | jq -r '.version      // "1.0.0"' )
           IOS_CURRENT_BUILD=$( echo "$ios_entry" | jq -r '.buildNumber // "1"' )
+
+          echo "macOS current: $MACOS_CURRENT_VERSION ($MACOS_CURRENT_BUILD)"
+          echo "iOS   current: $IOS_CURRENT_VERSION ($IOS_CURRENT_BUILD)"
 
           IFS='.' read -r major minor patch <<< "$MACOS_CURRENT_VERSION"
           case "$bump" in
