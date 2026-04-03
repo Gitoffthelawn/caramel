@@ -26,17 +26,27 @@ echo "Generating Safari icons from $SOURCE_ICON"
 for size in "${ICON_SIZES[@]}"; do
   echo "Creating $size×$size icon..."
 
-  # Create a rounded square icon with proper corner radius (following Apple's guidelines)
-  # The corner radius is approximately 23% of the icon size for iOS/macOS app icons
-  radius=$(echo "$size * 0.23" | bc)
+  if [ "$size" -eq 1024 ]; then
+    # App Store Connect requires the 1024×1024 icon to have NO alpha channel.
+    # Apple applies corner-rounding in the UI itself for this size.
+    convert "$SOURCE_ICON" \
+      -resize ${size}x${size} \
+      -background white \
+      -alpha remove -alpha off \
+      "$OUTPUT_DIR/icon_${size}x${size}.png"
+  else
+    # Create a rounded square icon with proper corner radius (following Apple's guidelines)
+    # The corner radius is approximately 23% of the icon size for iOS/macOS app icons
+    radius=$(echo "$size * 0.23" | bc)
 
-  convert "$SOURCE_ICON" \
-    -resize ${size}x${size} \
-    \( +clone -alpha extract \
-      -draw "roundrectangle 0,0,$size,$size,$radius,$radius" \
-      -alpha on \
-    \) -compose CopyOpacity -composite \
-    "$OUTPUT_DIR/icon_${size}x${size}.png"
+    convert "$SOURCE_ICON" \
+      -resize ${size}x${size} \
+      \( +clone -alpha extract \
+        -draw "roundrectangle 0,0,$size,$size,$radius,$radius" \
+        -alpha on \
+      \) -compose CopyOpacity -composite \
+      "$OUTPUT_DIR/icon_${size}x${size}.png"
+  fi
 done
 
 echo "Safari icons generated in $OUTPUT_DIR"

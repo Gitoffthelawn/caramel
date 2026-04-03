@@ -144,13 +144,23 @@ jobs:
 
           asc testflight builds list \
             --filter-bundle-ids "$SAFARI_BUNDLE_ID" \
-            --include-expired --limit 10 \
+            --include-expired --limit 200 \
             --api-key-id "$ASC_KEY_ID" \
             --api-issuer "$ASC_ISSUER_ID" \
             --json > builds.json || true
 
           mac_entry=$(jq '[.[] | select(.platform=="MAC_OS")] | sort_by(.uploadedDate) | .[-1]' builds.json)
           ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.uploadedDate) | .[-1]' builds.json)
+
+          # Fail loudly if either entry is missing — avoids silent wrong-build-number uploads
+          if [ "$(echo "$mac_entry" | jq -r 'type')" = "null" ]; then
+            echo "ERROR: Could not determine current macOS build from TestFlight. Aborting."
+            exit 1
+          fi
+          if [ "$(echo "$ios_entry" | jq -r 'type')" = "null" ]; then
+            echo "ERROR: Could not determine current iOS build from TestFlight. Aborting."
+            exit 1
+          fi
 
           MACOS_CURRENT_VERSION=$( echo "$mac_entry" | jq -r '.version      // "1.0.0"' )
           MACOS_CURRENT_BUILD=$( echo "$mac_entry" | jq -r '.buildNumber // "1"' )
