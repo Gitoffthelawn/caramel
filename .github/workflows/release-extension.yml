@@ -142,18 +142,30 @@ jobs:
           export APPSTORE_CONNECT_ISSUER_ID="$ASC_ISSUER_ID"
           export APPSTORE_CONNECT_API_KEY="$(cat private_keys/AuthKey_${ASC_KEY_ID}.p8)"
 
+          # Max limit per sub-resource is 50 — make two separate calls per platform
           asc testflight builds list \
             --filter-bundle-ids "$SAFARI_BUNDLE_ID" \
-            --include-expired --limit 200 \
+            --filter-platforms MAC_OS \
+            --include-expired --limit 50 \
             --api-key-id "$ASC_KEY_ID" \
             --api-issuer "$ASC_ISSUER_ID" \
-            --json > builds.json || true
+            --json > builds_mac.json || true
 
-          echo "=== RAW builds.json ==="
-          cat builds.json
+          asc testflight builds list \
+            --filter-bundle-ids "$SAFARI_BUNDLE_ID" \
+            --filter-platforms IOS \
+            --include-expired --limit 50 \
+            --api-key-id "$ASC_KEY_ID" \
+            --api-issuer "$ASC_ISSUER_ID" \
+            --json > builds_ios.json || true
 
-          mac_entry=$(jq '[.[] | select(.platform=="MAC_OS")] | sort_by(.buildNumber | tonumber) | .[-1]' builds.json)
-          ios_entry=$(jq '[.[] | select(.platform=="IOS")]   | sort_by(.buildNumber | tonumber) | .[-1]' builds.json)
+          echo "=== RAW builds_mac.json ==="
+          cat builds_mac.json
+          echo "=== RAW builds_ios.json ==="
+          cat builds_ios.json
+
+          mac_entry=$(jq 'sort_by(.buildNumber | tonumber) | .[-1]' builds_mac.json)
+          ios_entry=$(jq 'sort_by(.buildNumber | tonumber) | .[-1]' builds_ios.json)
 
           echo "=== mac_entry ===" ; echo "$mac_entry"
           echo "=== ios_entry ===" ; echo "$ios_entry"
