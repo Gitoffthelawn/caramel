@@ -80,8 +80,8 @@ test.describe('Signup Page', () => {
 
         // The password checker component should become visible
         const checker = page
-            .locator('[class*="password"]')
-            .or(page.getByText(/uppercase|special character|number/i).first())
+            .getByText(/uppercase|special character|number/i)
+            .first()
         await expect(checker).toBeVisible({ timeout: 5000 })
     })
 

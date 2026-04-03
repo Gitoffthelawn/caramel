@@ -50,7 +50,7 @@ test.describe('Responsive - Mobile Viewport', () => {
         await page.goto('/')
 
         // On mobile, there should be a hamburger menu button
-        const menuButton = page.locator('header button').first()
+        const menuButton = page.getByRole('banner').getByRole('button').first()
         await expect(menuButton).toBeVisible()
     })
 

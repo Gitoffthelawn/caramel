@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-checks-${{ github.workflow }}-${{ github.ref }}
@@ -61,10 +65,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   schema-drift:
     name: Schema Drift
-    if: |
-      contains(github.event.head_commit.modified, 'prisma/schema.prisma') ||
-      contains(github.event.head_commit.modified, 'prisma/migrations') ||
-      github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     services:

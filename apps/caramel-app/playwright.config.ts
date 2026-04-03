@@ -23,6 +23,7 @@ export default defineConfig({
             '@argos-ci/playwright/reporter',
             createArgosReporterOptions({
                 uploadToArgos: !!process.env.CI,
+                buildName: 'caramel-app',
                 token: process.env.ARGOS_TOKEN,
                 apiBaseUrl: process.env.ARGOS_API_BASE_URL,
             }),
