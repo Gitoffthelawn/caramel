@@ -68,6 +68,19 @@ export default function EmailLayout({
                 style={{ backgroundColor: brand.bg }}
             >
                 <tbody>
+                    {/* Top spacer */}
+                    <tr>
+                        <td
+                            style={{
+                                backgroundColor: brand.bg,
+                                height: '16px',
+                                fontSize: 0,
+                                lineHeight: 0,
+                            }}
+                        >
+                            &nbsp;
+                        </td>
+                    </tr>
                     <tr>
                         <td align="center" style={{ padding: '0 20px 32px' }}>
                             <table
@@ -78,29 +91,28 @@ export default function EmailLayout({
                                 style={{ maxWidth: '580px' }}
                             >
                                 <tbody>
-                                    {/* Dark branded header */}
+                                    {/* Soft orange branded header */}
                                     <tr>
                                         <td
                                             style={{
-                                                backgroundColor:
-                                                    brand.orangeDark,
-                                                backgroundImage: `linear-gradient(135deg, #a8400f 0%, ${brand.orangeDark} 50%, ${brand.orange} 100%)`,
+                                                backgroundColor: '#fef0e6',
+                                                backgroundImage:
+                                                    'linear-gradient(135deg, #fef5ee 0%, #fef0e6 50%, #fde8d5 100%)',
                                                 borderRadius: '16px 16px 0 0',
                                                 padding: '44px 44px 38px',
                                                 textAlign: 'center' as const,
                                             }}
                                         >
-                                            <a
-                                                href={APP_URL}
-                                                style={{
-                                                    fontSize: '28px',
-                                                    fontWeight: 700,
-                                                    color: '#ffffff',
-                                                    textDecoration: 'none',
-                                                    letterSpacing: '-0.5px',
-                                                }}
-                                            >
-                                                Caramel
+                                            <a href={APP_URL}>
+                                                <img
+                                                    src={`${PROD_URL}/full-logo.png`}
+                                                    alt="Caramel"
+                                                    height="48"
+                                                    style={{
+                                                        display: 'block',
+                                                        margin: '0 auto',
+                                                    }}
+                                                />
                                             </a>
                                             <table
                                                 role="presentation"
