@@ -13,12 +13,24 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "prettier-write": "turbo run prettier-write",
-        "prettier-check": "turbo run prettier-check"
+        "prettier-check": "turbo run prettier-check",
+        "prepare": "husky"
+    },
+    "lint-staged": {
+        "*.{ts,tsx,js,jsx,mjs,cjs}": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "*.{json,md,css,yaml,yml}": [
+            "prettier --write"
+        ]
     },
     "devDependencies": {
         "eslint": "^9.31.0",
         "eslint-config-next": "16.0.3",
         "eslint-config-prettier": "^10.1.2",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.4.0",
         "prettier": "^3.6.2",
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.14",
