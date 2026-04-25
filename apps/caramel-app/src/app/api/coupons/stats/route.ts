@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
                 COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE expired = TRUE)::int AS expired
             FROM coupons
+            WHERE status = 'valid'
         `
         const row = (rows[0] ?? { total: 0, expired: 0 }) as {
             total: number

@@ -46,14 +46,14 @@ async function fetchStoreCoupons(storeParam: string) {
                    discount_type, discount_amount, expiry, expired,
                    times_used AS "timesUsed"
             FROM coupons
-            WHERE expired = FALSE
+            WHERE status = 'valid' AND status = 'valid' AND expired = FALSE
               AND (site = ${base} OR site LIKE ${'%.' + base})
             ORDER BY rating DESC, created_at DESC
             LIMIT ${PAGE_SIZE}
         `,
         couponsSql`
             SELECT COUNT(*)::int AS total FROM coupons
-            WHERE expired = FALSE
+            WHERE status = 'valid' AND status = 'valid' AND expired = FALSE
               AND (site = ${base} OR site LIKE ${'%.' + base})
         `,
     ])

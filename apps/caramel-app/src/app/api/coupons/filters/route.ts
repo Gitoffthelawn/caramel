@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
             includeSites && sitesLimit > 0
                 ? couponsSql<Array<{ site: string }>>`
                       SELECT DISTINCT site FROM coupons
-                      WHERE expired = FALSE AND site IS NOT NULL
+                      WHERE status = 'valid' AND expired = FALSE AND site IS NOT NULL
                       ORDER BY site ASC
                       LIMIT ${sitesLimit}
                   `
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
         const typesPromise = couponsSql<Array<{ discount_type: string }>>`
             SELECT DISTINCT discount_type FROM coupons
-            WHERE expired = FALSE AND discount_type IS NOT NULL
+            WHERE status = 'valid' AND expired = FALSE AND discount_type IS NOT NULL
         `
 
         const [sitesRaw, discountTypesRaw] = await Promise.all([

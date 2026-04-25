@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
     try {
-        const conditions = [couponsSql`expired = FALSE`]
+        const conditions = [couponsSql`status = 'valid' AND expired = FALSE`]
 
         if (site) {
             const base = getBaseDomain(site)

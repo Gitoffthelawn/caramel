@@ -15,14 +15,14 @@ export async function GET(req: NextRequest) {
         const rows = q
             ? await couponsSql<Array<{ site: string }>>`
                   SELECT DISTINCT site FROM coupons
-                  WHERE expired = FALSE
+                  WHERE status = 'valid' AND status = 'valid' AND expired = FALSE
                     AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
                   ORDER BY site ASC
                   LIMIT ${limit}
               `
             : await couponsSql<Array<{ site: string }>>`
                   SELECT DISTINCT site FROM coupons
-                  WHERE expired = FALSE
+                  WHERE status = 'valid' AND status = 'valid' AND expired = FALSE
                   ORDER BY site ASC
                   LIMIT ${limit}
               `
