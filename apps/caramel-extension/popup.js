@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loading-container')
     if (loader) setTimeout(() => (loader.style.display = 'none'), 400)
 
+    // If a Safari OAuth flow was in progress when the popup last closed,
+    // resume polling so the user lands signed-in instead of stuck.
+    await resumePendingSafariOauthIfAny()
+
     await initPopup()
 })
 
@@ -116,20 +120,155 @@ function renderUnsupportedSite(user) {
 }
 
 /* ------------------------------------------------------------ */
+/*  Safari OAuth: persistent nonce + resume                     */
+/* ------------------------------------------------------------ */
+const SAFARI_OAUTH_BASE_URL = 'https://grabcaramel.com'
+const SAFARI_OAUTH_TTL_MS = 5 * 60 * 1000
+
+function safariStorageGet(keys) {
+    return new Promise(resolve => {
+        currentBrowser.storage.sync.get(keys, res => resolve(res || {}))
+    })
+}
+
+function safariStorageSet(obj) {
+    return new Promise((resolve, reject) => {
+        currentBrowser.storage.sync.set(obj, () => {
+            const err = chrome.runtime.lastError
+            if (err) reject(new Error(err.message))
+            else resolve()
+        })
+    })
+}
+
+function safariStorageRemove(keys) {
+    return new Promise(resolve => {
+        currentBrowser.storage.sync.remove(keys, () => resolve())
+    })
+}
+
+async function pollSafariOauthOnce(nonce) {
+    const pollUrl = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/poll?nonce=${encodeURIComponent(nonce)}`
+    try {
+        const resp = await fetch(pollUrl, { method: 'GET' })
+        if (resp.status === 204) return { status: 'pending' }
+        if (resp.ok) {
+            const data = await resp.json().catch(() => ({}))
+            if (data && data.token) return { status: 'ok', data }
+            return { status: 'error', error: 'Empty response from poll' }
+        }
+        const errorData = await resp.json().catch(() => ({}))
+        return {
+            status: 'error',
+            error: errorData?.error || `Poll failed (${resp.status})`,
+        }
+    } catch (e) {
+        return { status: 'pending' } // network blip — keep polling
+    }
+}
+
+async function pollSafariOauthUntilDone(nonce, deadlineMs) {
+    while (Date.now() < deadlineMs) {
+        const r = await pollSafariOauthOnce(nonce)
+        if (r.status === 'ok') return r
+        if (r.status === 'error') return r
+        await new Promise(res => setTimeout(res, 2000))
+    }
+    return { status: 'error', error: 'Sign-in timed out. Please try again.' }
+}
+
+async function applySafariOauthResult(data) {
+    const user = {
+        username: data.username || null,
+        image: data.image || null,
+    }
+    await safariStorageSet({ token: data.token, user })
+    await safariStorageRemove([
+        'pendingOauthNonce',
+        'pendingOauthExpiresAt',
+        'pendingOauthProvider',
+    ])
+}
+
+async function resumePendingSafariOauthIfAny() {
+    try {
+        const res = await safariStorageGet([
+            'pendingOauthNonce',
+            'pendingOauthExpiresAt',
+        ])
+        const nonce = res.pendingOauthNonce
+        const expiresAt = res.pendingOauthExpiresAt
+        if (!nonce) return
+        if (!expiresAt || Date.now() > expiresAt) {
+            await safariStorageRemove([
+                'pendingOauthNonce',
+                'pendingOauthExpiresAt',
+                'pendingOauthProvider',
+            ])
+            return
+        }
+
+        const errorBox = document.getElementById('loginErrorMessage')
+        if (errorBox) {
+            errorBox.textContent = 'Completing sign-in…'
+            errorBox.style.display = 'block'
+        }
+
+        // Cap the wait at 30s so popup doesn't hang. If the result is
+        // already stashed by the backend, the very first poll returns it.
+        const deadline = Math.min(expiresAt, Date.now() + 30 * 1000)
+        const result = await pollSafariOauthUntilDone(nonce, deadline)
+
+        if (result.status === 'ok') {
+            await applySafariOauthResult(result.data)
+            if (errorBox) {
+                errorBox.textContent = ''
+                errorBox.style.display = 'none'
+            }
+            return
+        }
+
+        // Either timed out within 30s (backend likely still pending — keep
+        // the nonce so a future popup open can try again, unless TTL expired)
+        // OR explicit error — clear pending state.
+        if (/timed out|timeout/i.test(result.error || '')) {
+            // Leave pendingOauthNonce in place; user can reopen popup later.
+            if (errorBox) {
+                errorBox.textContent =
+                    "Still waiting on sign-in… reopen this popup once you've finished signing in."
+                errorBox.style.display = 'block'
+            }
+        } else {
+            await safariStorageRemove([
+                'pendingOauthNonce',
+                'pendingOauthExpiresAt',
+                'pendingOauthProvider',
+            ])
+            if (errorBox) {
+                errorBox.textContent = `Sign-in failed: ${result.error || 'unknown error'}`
+                errorBox.style.display = 'block'
+            }
+        }
+    } catch (err) {
+        console.error('resumePendingSafariOauth error:', err)
+    }
+}
+
+/* ------------------------------------------------------------ */
 /*  Safari Social Sign-In (tab + nonce polling)                 */
 /* ------------------------------------------------------------ */
 async function handleSafariSocialSignIn(provider, button, errorBox) {
-    const baseURL = 'https://grabcaramel.com'
-    const safariRedirectUri = `${baseURL}/api/extension/oauth/redirect`
+    const safariRedirectUri = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/redirect`
 
     // Generate a one-shot nonce; embedded in the signed OAuth state by the backend.
     const nonce =
         typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
             : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+    const expiresAt = Date.now() + SAFARI_OAUTH_TTL_MS
 
     try {
-        const authorizeUrl = `${baseURL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(
+        const authorizeUrl = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(
             safariRedirectUri,
         )}&nonce=${encodeURIComponent(nonce)}`
 
@@ -146,8 +285,15 @@ async function handleSafariSocialSignIn(provider, button, errorBox) {
             throw new Error('Failed to get OAuth authorization URL')
         }
 
-        // Open the auth URL in a real Safari tab — works on iOS/macOS where
-        // launchWebAuthFlow isn't available.
+        // Persist nonce BEFORE opening the auth tab. Safari closes the popup
+        // when the new tab takes focus — without this, polling dies and the
+        // user lands at "✅ signed in" but the extension never gets the token.
+        await safariStorageSet({
+            pendingOauthNonce: nonce,
+            pendingOauthExpiresAt: expiresAt,
+            pendingOauthProvider: provider,
+        })
+
         if (currentBrowser.tabs && currentBrowser.tabs.create) {
             currentBrowser.tabs.create({ url: responseData.authorizationUrl })
         } else {
@@ -156,70 +302,44 @@ async function handleSafariSocialSignIn(provider, button, errorBox) {
 
         if (button) {
             const span = button.querySelector('span')
-            if (span) span.textContent = 'Waiting for sign-in...'
+            if (span) span.textContent = 'Waiting for sign-in…'
         }
         if (errorBox) {
             errorBox.textContent =
-                'Complete sign-in in the new tab — then return here.'
+                'Complete sign-in in the new tab. You can close this popup — it will pick up the result when you reopen it.'
             errorBox.style.display = 'block'
         }
 
-        // Poll for up to 5 minutes (matches the nonce TTL on the backend).
-        const pollUrl = `${baseURL}/api/extension/oauth/poll?nonce=${encodeURIComponent(nonce)}`
-        const startedAt = Date.now()
-        const maxDurationMs = 5 * 60 * 1000
-        let pollResult = null
+        // While the popup is still open, poll up to the nonce TTL. If the
+        // popup closes (Safari often does), resumePendingSafariOauthIfAny
+        // takes over the next time the popup is opened.
+        const result = await pollSafariOauthUntilDone(nonce, expiresAt)
 
-        while (Date.now() - startedAt < maxDurationMs) {
-            await new Promise(r => setTimeout(r, 2000))
-            let resp
-            try {
-                resp = await fetch(pollUrl, { method: 'GET' })
-            } catch {
-                continue
+        if (result.status === 'ok') {
+            await applySafariOauthResult(result.data)
+            if (errorBox) {
+                errorBox.textContent = ''
+                errorBox.style.display = 'none'
             }
-            if (resp.status === 204) continue
-            if (!resp.ok) {
-                const errorData = await resp.json().catch(() => ({}))
-                throw new Error(errorData.error || 'OAuth sign-in failed')
+            if (document.visibilityState === 'visible') {
+                initPopup()
             }
-            pollResult = await resp.json()
-            break
+            return
         }
 
-        if (!pollResult || !pollResult.token) {
-            throw new Error('Sign-in timed out. Please try again.')
-        }
-
-        const user = {
-            username: pollResult.username || null,
-            image: pollResult.image || null,
-        }
-        await new Promise((resolve, reject) => {
-            currentBrowser.storage.sync.set(
-                { token: pollResult.token, user },
-                () => {
-                    if (chrome.runtime.lastError) {
-                        reject(new Error(chrome.runtime.lastError.message))
-                        return
-                    }
-                    resolve()
-                },
-            )
-        })
-
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        if (errorBox) {
-            errorBox.style.display = 'none'
-            errorBox.textContent = ''
-        }
-
-        if (document.visibilityState === 'visible') {
-            initPopup()
-        }
+        throw new Error(result.error || 'Sign-in failed')
     } catch (err) {
         console.error('Safari OAuth error:', err)
+        // Don't clear pending state on a transient failure unless the user
+        // explicitly hit an error path — leave the nonce so the next popup
+        // open can resume. Only clear on hard errors.
+        if (!/timed out|timeout/i.test(err.message || '')) {
+            await safariStorageRemove([
+                'pendingOauthNonce',
+                'pendingOauthExpiresAt',
+                'pendingOauthProvider',
+            ])
+        }
         if (errorBox) {
             errorBox.textContent = `OAuth sign-in failed: ${err.message}`
             errorBox.style.display = 'block'
