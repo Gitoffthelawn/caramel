@@ -116,6 +116,128 @@ function renderUnsupportedSite(user) {
 }
 
 /* ------------------------------------------------------------ */
+/*  Safari Social Sign-In (tab + nonce polling)                 */
+/* ------------------------------------------------------------ */
+async function handleSafariSocialSignIn(provider, button, errorBox) {
+    const baseURL = 'https://grabcaramel.com'
+    const safariRedirectUri = `${baseURL}/api/extension/oauth/redirect`
+
+    // Generate a one-shot nonce; embedded in the signed OAuth state by the backend.
+    const nonce =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+
+    try {
+        const authorizeUrl = `${baseURL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(
+            safariRedirectUri,
+        )}&nonce=${encodeURIComponent(nonce)}`
+
+        const authorizeResponse = await fetch(authorizeUrl, { method: 'GET' })
+        if (!authorizeResponse.ok) {
+            const errorData = await authorizeResponse.json().catch(() => ({}))
+            throw new Error(
+                errorData.error ||
+                    `HTTP ${authorizeResponse.status}: Failed to get OAuth authorization URL`,
+            )
+        }
+        const responseData = await authorizeResponse.json()
+        if (!responseData.authorizationUrl) {
+            throw new Error('Failed to get OAuth authorization URL')
+        }
+
+        // Open the auth URL in a real Safari tab — works on iOS/macOS where
+        // launchWebAuthFlow isn't available.
+        if (currentBrowser.tabs && currentBrowser.tabs.create) {
+            currentBrowser.tabs.create({ url: responseData.authorizationUrl })
+        } else {
+            window.open(responseData.authorizationUrl, '_blank')
+        }
+
+        if (button) {
+            const span = button.querySelector('span')
+            if (span) span.textContent = 'Waiting for sign-in...'
+        }
+        if (errorBox) {
+            errorBox.textContent =
+                'Complete sign-in in the new tab — then return here.'
+            errorBox.style.display = 'block'
+        }
+
+        // Poll for up to 5 minutes (matches the nonce TTL on the backend).
+        const pollUrl = `${baseURL}/api/extension/oauth/poll?nonce=${encodeURIComponent(nonce)}`
+        const startedAt = Date.now()
+        const maxDurationMs = 5 * 60 * 1000
+        let pollResult = null
+
+        while (Date.now() - startedAt < maxDurationMs) {
+            await new Promise(r => setTimeout(r, 2000))
+            let resp
+            try {
+                resp = await fetch(pollUrl, { method: 'GET' })
+            } catch {
+                continue
+            }
+            if (resp.status === 204) continue
+            if (!resp.ok) {
+                const errorData = await resp.json().catch(() => ({}))
+                throw new Error(errorData.error || 'OAuth sign-in failed')
+            }
+            pollResult = await resp.json()
+            break
+        }
+
+        if (!pollResult || !pollResult.token) {
+            throw new Error('Sign-in timed out. Please try again.')
+        }
+
+        const user = {
+            username: pollResult.username || null,
+            image: pollResult.image || null,
+        }
+        await new Promise((resolve, reject) => {
+            currentBrowser.storage.sync.set(
+                { token: pollResult.token, user },
+                () => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message))
+                        return
+                    }
+                    resolve()
+                },
+            )
+        })
+
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        if (errorBox) {
+            errorBox.style.display = 'none'
+            errorBox.textContent = ''
+        }
+
+        if (document.visibilityState === 'visible') {
+            initPopup()
+        }
+    } catch (err) {
+        console.error('Safari OAuth error:', err)
+        if (errorBox) {
+            errorBox.textContent = `OAuth sign-in failed: ${err.message}`
+            errorBox.style.display = 'block'
+        }
+        if (button) {
+            button.disabled = false
+            const span = button.querySelector('span')
+            if (span) {
+                span.textContent =
+                    provider === 'google'
+                        ? 'Continue with Google'
+                        : 'Continue with Apple'
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------ */
 /*  OAuth Social Sign-In Handler                                */
 /* ------------------------------------------------------------ */
 async function handleSocialSignIn(provider) {
@@ -142,13 +264,15 @@ async function handleSocialSignIn(provider) {
         // Base URL - change to 'http://localhost:58000' for local testing
         const baseURL = 'https://grabcaramel.com'
 
-        // Check if identity API is available
+        // Check if identity API is available.
+        // Safari (iOS/macOS) extensions don't reliably expose launchWebAuthFlow,
+        // so we fall back to a tab-based flow that opens auth in a real Safari
+        // tab and polls our backend for the result keyed by a one-shot nonce.
         const identity =
             currentBrowser.identity || currentBrowser.chrome?.identity
         if (!identity || !identity.launchWebAuthFlow) {
-            throw new Error(
-                'OAuth not supported in this browser. Please use email/password login.',
-            )
+            await handleSafariSocialSignIn(provider, button, errorBox)
+            return
         }
 
         // Get the extension's redirect URL
