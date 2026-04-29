@@ -12,6 +12,7 @@ const OAUTH_STATE_SECRET = process.env.EXTENSION_OAUTH_STATE_SECRET
 const createSignedState = (payload: {
     provider: 'google' | 'apple'
     redirectUri: string
+    nonce?: string
 }) => {
     if (!OAUTH_STATE_SECRET) {
         throw new Error('EXTENSION_OAUTH_STATE_SECRET is not configured')
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const provider = searchParams.get('provider') as 'google' | 'apple' | null
     const redirectUri = searchParams.get('redirect_uri')
+    const nonce = searchParams.get('nonce') || undefined
 
     // Helper to get CORS headers
     const getCorsHeaders = () => {
@@ -100,8 +102,11 @@ export async function GET(req: NextRequest) {
         let oauthUrl: URL
         let state: string
 
-        // Generate signed state for CSRF protection that can be validated on exchange
-        state = createSignedState({ provider, redirectUri })
+        // Generate signed state for CSRF protection that can be validated on exchange.
+        // When nonce is present (Safari path), it's embedded in the signed state so the
+        // /redirect handler can complete the OAuth exchange server-side and stash the
+        // result keyed by nonce for the popup to poll.
+        state = createSignedState({ provider, redirectUri, nonce })
 
         if (provider === 'google') {
             // Google OAuth 2.0 authorization endpoint
