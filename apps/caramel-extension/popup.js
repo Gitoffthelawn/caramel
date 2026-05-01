@@ -531,16 +531,47 @@ function renderCouponsView(coupons, user, domain) {
             coupons.length === 0
                 ? '<p>No coupons available for this store right now.</p>'
                 : coupons
-                      .map(
-                          c => `
-            <div data-code="${c.code}" class="coupon-item">
+                      .map(c => {
+                          const restrictedSet = new Set([
+                              'product_restriction',
+                              'category_restricted',
+                              'seller_specific',
+                              'valid_with_warning',
+                          ])
+                          const isRestricted = restrictedSet.has(c.status)
+                          let warning = ''
+                          if (isRestricted) {
+                              const baseMsg =
+                                  c.status === 'category_restricted'
+                                      ? 'Limited to specific categories'
+                                      : c.status === 'seller_specific'
+                                        ? 'Only for items from a specific seller'
+                                        : c.status === 'valid_with_warning'
+                                          ? 'May have restrictions'
+                                          : 'Limited to specific items'
+                              const cartHint = c.cartCategory
+                                  ? ` — your cart looks like <b>${c.cartCategory}</b>${c.cartCategorySecondary ? ` / ${c.cartCategorySecondary}` : ''}`
+                                  : ''
+                              const verifierMsg = c.verificationMessage
+                                  ? `<div class="coupon-restriction-detail">${c.verificationMessage}</div>`
+                                  : ''
+                              warning = `
+              <div class="coupon-restriction" title="${c.verificationMessage || baseMsg}">
+                <span class="coupon-restriction-icon">⚠</span>
+                <span class="coupon-restriction-text">${baseMsg}${cartHint}</span>
+                ${verifierMsg}
+              </div>`
+                          }
+                          return `
+            <div data-code="${c.code}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
               <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
               <div class="coupon-desc">${c.description || ''}</div>
+              ${warning}
               <div class="coupon-action">
                 <button class="copyBtn">Copy "${c.code}"</button>
               </div>
-            </div>`,
-                      )
+            </div>`
+                      })
                       .join('')
         }
       </div>

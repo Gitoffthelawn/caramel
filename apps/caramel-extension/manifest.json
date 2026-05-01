@@ -25,10 +25,7 @@
         "management"
     ],
     "host_permissions": [
-        "https://www.amazon.com/*",
-        "https://*.ebay.com/*",
-        "https://*.codecademy.com/*",
-        "https://*.grabcaramel.com/*",
+        "https://*/*",
         "http://localhost:58000/*",
         "https://accounts.google.com/*",
         "https://appleid.apple.com/*"
@@ -41,11 +38,7 @@
     ],
     "content_scripts": [
         {
-            "matches": [
-                "https://www.amazon.com/*",
-                "https://*.ebay.com/*",
-                "https://*.codecademy.com/*"
-            ],
+            "matches": ["https://*/*"],
             "js": [
                 "cart-signals.js",
                 "shared-utils.js",

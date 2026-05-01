@@ -825,3 +825,39 @@ body {
         font-size: 14px;
     }
 }
+
+/* Restriction warning chip on restricted coupons */
+.coupon-item-restricted {
+    border-color: #f0b34d;
+    background: linear-gradient(180deg, #fffaf0 0%, #fff 80%);
+}
+.coupon-restriction {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 6px 0 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: #8a5a00;
+    background: #fff5e0;
+    border-left: 3px solid #f0b34d;
+    border-radius: 4px;
+}
+.coupon-restriction-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+.coupon-restriction-text {
+    flex: 1;
+    line-height: 1.35;
+}
+.coupon-restriction-text b {
+    color: #d97706;
+}
+.coupon-restriction-detail {
+    margin-top: 2px;
+    color: #6b4500;
+    font-size: 11px;
+    opacity: 0.85;
+    font-style: italic;
+}

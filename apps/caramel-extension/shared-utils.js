@@ -75,9 +75,9 @@ const CARAMEL_ALLOWED_ORIGINS = new Set([
 /* ---------- DOM waiters ---------- */
 function waitForElement(sel, timeout = 4000) {
     return new Promise((res, rej) => {
-        if (document.querySelector(sel)) return res('found-immediately')
+        if (qOne(sel)) return res('found-immediately')
         const mo = new MutationObserver(() => {
-            if (document.querySelector(sel)) {
+            if (qOne(sel)) {
                 mo.disconnect()
                 res('appeared')
             }
@@ -152,7 +152,7 @@ async function getAmazonCartKeywords() {
 
 /* ---------- UI readiness helper (new) ---------- */
 async function waitUntilReady(rec, timeout = 2000) {
-    const btn = document.querySelector(rec.couponSubmit)
+    const btn = qOne(rec.couponSubmit)
     const start = performance.now()
     return new Promise(resolve => {
         ;(function loop() {
@@ -165,8 +165,8 @@ async function waitUntilReady(rec, timeout = 2000) {
 
 /* --------------------------------------------------  price grabber */
 function getPrice(selector, { returnLargest } = {}) {
-    let el = document.querySelector(selector)
-    if (!el && selector.includes('[id=')) {
+    let el = qOne(selector)
+    if (!el && typeof selector === 'string' && selector.includes('[id=')) {
         const id = selector.match(/\[id=['"]([^'"]+)['"]\]/)?.[1]
         if (id) el = document.getElementById(id)
     }
@@ -186,22 +186,102 @@ function getPrice(selector, { returnLargest } = {}) {
     return returnLargest ? Math.max(...prices) : prices[0]
 }
 
+/* --------------------------------------------------  selector helper
+ * Configs may store either a CSS selector or an XPath expression. The agent
+ * picks whichever uniquely identifies the element on each store. Detect by
+ * leading char and dispatch to the right DOM API.
+ *   "input#code"           → CSS  → querySelector
+ *   "//input[@id='code']"  → XPath → document.evaluate
+ *   "(//div)[2]"           → XPath
+ */
+function _isXPath(sel) {
+    if (typeof sel !== 'string' || !sel) return false
+    const t = sel.trim()
+    return t.startsWith('/') || t.startsWith('(/') || t.startsWith('./')
+}
+function qOne(sel, root) {
+    if (!sel) return null
+    root = root || document
+    try {
+        if (_isXPath(sel)) {
+            const res = document.evaluate(
+                sel,
+                root,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null,
+            )
+            return res.singleNodeValue
+        }
+        return root.querySelector(sel)
+    } catch (e) {
+        return null
+    }
+}
+function qAll(sel, root) {
+    if (!sel) return []
+    root = root || document
+    try {
+        if (_isXPath(sel)) {
+            const res = document.evaluate(
+                sel,
+                root,
+                null,
+                XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+                null,
+            )
+            const out = []
+            for (let i = 0; i < res.snapshotLength; i++)
+                out.push(res.snapshotItem(i))
+            return out
+        }
+        return Array.from(root.querySelectorAll(sel))
+    } catch (e) {
+        return []
+    }
+}
+
 /* --------------------------------------------------  config cache */
 const STORE_CACHE_KEY = 'caramel_supported_stores'
-const STORE_CACHE_TTL = 60 * 60 * 1000 // 1 hour
+const STORE_CACHE_PROD_TTL = 60 * 60 * 1000 // 1 hour
+const STORE_CACHE_DEV_TTL = 0 // bypass cache when loaded as unpacked dev extension
+
+// Dev-mode detection that works in BOTH popup AND content-script contexts.
+// chrome.management only exists in the service worker, but
+// chrome.runtime.getManifest() works everywhere.
+// Production (Chrome Web Store) installs have an `update_url` field;
+// unpacked dev extensions don't.
+function _isDevInstall() {
+    try {
+        if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest)
+            return false
+        const m = chrome.runtime.getManifest()
+        return !m.update_url
+    } catch (_) {
+        return false
+    }
+}
+
+function _getCacheTtl() {
+    return _isDevInstall() ? STORE_CACHE_DEV_TTL : STORE_CACHE_PROD_TTL
+}
 
 async function getDomainRecord(domain) {
     if (!getDomainRecord.cache) {
+        const ttl = _getCacheTtl()
         // Check chrome.storage.local for a recent cached copy first
         try {
-            const stored = await new Promise(r =>
-                currentBrowser.storage.local.get([STORE_CACHE_KEY], r),
-            )
+            const stored =
+                ttl > 0
+                    ? await new Promise(r =>
+                          currentBrowser.storage.local.get(
+                              [STORE_CACHE_KEY],
+                              r,
+                          ),
+                      )
+                    : null
             const entry = stored?.[STORE_CACHE_KEY]
-            if (
-                entry?.data?.length &&
-                Date.now() - entry.ts < STORE_CACHE_TTL
-            ) {
+            if (ttl > 0 && entry?.data?.length && Date.now() - entry.ts < ttl) {
                 getDomainRecord.cache = entry.data
                 log('Loaded supported domains from local cache')
             }
@@ -257,20 +337,13 @@ getDomainRecord.cache = null
 async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return false
-    if (
-        document.querySelector(rec.couponInput) ||
-        document.querySelector(rec.showInput)
-    )
-        return true
+    if (qOne(rec.couponInput) || qOne(rec.showInput)) return true
     try {
         await waitForElement(`${rec.couponInput},${rec.showInput}`, 3000)
     } catch (e) {
         log(e)
     }
-    return !!(
-        document.querySelector(rec.couponInput) ||
-        document.querySelector(rec.showInput)
-    )
+    return !!(qOne(rec.couponInput) || qOne(rec.showInput))
 }
 
 /* --------------------------------------------------  init hook */
@@ -281,6 +354,91 @@ async function tryInitialize() {
     }
 }
 
+// Generic selectors used when the per-store config doesn't specify them.
+// These cover the most common Honey-style cart UIs.
+const GENERIC_APPLIED_SELECTORS =
+    '[class*="coupon-applied" i], [class*="discount-applied" i], ' +
+    '[class*="cart-coupon-list" i] li, [class*="applied-coupon" i], ' +
+    '[class*="coupon-list-item" i], [class*="redeemed" i]'
+const GENERIC_REMOVE_SELECTORS =
+    '[class*="cart-coupon-list" i] li button, [class*="coupon-list-item" i] button, ' +
+    '[class*="applied-coupon" i] button, [aria-label*="Remove" i], ' +
+    '[aria-label*="Delete" i], button[title*="Remove" i]'
+const GENERIC_ERROR_TEXT_RE =
+    /\b(invalid|expired|not\s+(valid|applicable|eligible)|limited\s+to|cannot\s+be\s+(applied|redeemed)|doesn'?t\s+apply|no\s+eligible|enter\s+a\s+valid|nicht|ungültig)\b/i
+
+function findAppliedSelector(rec) {
+    return rec.successIndicator || GENERIC_APPLIED_SELECTORS
+}
+function findRemoveSelector(rec) {
+    return rec.couponRemove || GENERIC_REMOVE_SELECTORS
+}
+
+// Set value on a (possibly React-controlled) input + fire input/change events.
+function setInputValue(input, code) {
+    const proto = window.HTMLInputElement.prototype
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
+    if (setter) setter.call(input, code)
+    else input.value = code
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+// Try to remove the most-recently-applied coupon. Returns true if a remove
+// button was clicked. Caller should wait for the cart to update.
+async function removeAppliedCoupon(rec) {
+    // Prefer per-config remove; fall back to generic.
+    const sel = findRemoveSelector(rec)
+    const candidates = [...document.querySelectorAll(sel)].filter(
+        b => b.offsetParent !== null && !b.disabled,
+    )
+    if (candidates.length) {
+        // The newest applied coupon is usually rendered last → click last one.
+        const btn = candidates[candidates.length - 1]
+        btn.click()
+        await sleep(600)
+        log('Removed applied coupon via', sel)
+        return true
+    }
+    // Last resort: clear the input. Some sites tie this to "remove".
+    const input = qOne(rec.couponInput)
+    if (input && input.value) {
+        setInputValue(input, '')
+        await sleep(300)
+        log('Cleared input as remove fallback')
+        return true
+    }
+    return false
+}
+
+// Detect if an error message appeared near the cart/coupon UI.
+function detectCouponError(rec) {
+    if (rec.errorIndicator) {
+        const el = qOne(rec.errorIndicator)
+        if (el && el.offsetParent !== null) {
+            const t = (el.innerText || '').trim()
+            if (t.length) return t
+        }
+    }
+    // Generic: look near the input for an inline error matching common phrases.
+    const input = qOne(rec.couponInput)
+    if (!input) return null
+    let scope = input.parentElement
+    for (let d = 0; d < 5 && scope; d++) {
+        const text = (scope.innerText || '').trim()
+        if (text && GENERIC_ERROR_TEXT_RE.test(text)) {
+            const m = text.match(GENERIC_ERROR_TEXT_RE)
+            const idx = text.search(GENERIC_ERROR_TEXT_RE)
+            return text
+                .slice(Math.max(0, idx - 40), idx + 120)
+                .replace(/\s+/g, ' ')
+                .trim()
+        }
+        scope = scope.parentElement
+    }
+    return null
+}
+
 /* --------------------------------------------------  coupon attempt */
 async function applyCoupon(code, rec) {
     const attemptStart = performance.now()
@@ -289,7 +447,7 @@ async function applyCoupon(code, rec) {
     try {
         /* 1] dismiss popup if present */
         if (rec.dismissButton) {
-            const btn = document.querySelector(rec.dismissButton)
+            const btn = qOne(rec.dismissButton)
             if (btn) {
                 btn.click()
                 await sleep(180)
@@ -298,9 +456,9 @@ async function applyCoupon(code, rec) {
         }
 
         /* 2] ensure input visible */
-        let input = document.querySelector(rec.couponInput)
+        let input = qOne(rec.couponInput)
         if (!input && rec.showInput) {
-            const showBtn = document.querySelector(rec.showInput)
+            const showBtn = qOne(rec.showInput)
             if (showBtn) {
                 showBtn.click()
                 try {
@@ -308,33 +466,58 @@ async function applyCoupon(code, rec) {
                 } catch (e) {
                     log(e)
                 }
-                input = document.querySelector(rec.couponInput)
+                input = qOne(rec.couponInput)
             }
         }
-        const applyBtn = document.querySelector(rec.couponSubmit)
+        const applyBtn = qOne(rec.couponSubmit)
         if (!input || !applyBtn) {
             log('Input / apply button missing')
             log('AUTO_INSERT_ATTEMPT_END', code, {
                 success: false,
                 elapsed: performance.now() - attemptStart,
             })
-            return { success: false }
+            return { success: false, applied: false }
         }
 
-        const original = getPrice(rec.priceContainer, { returnLargest: true })
+        const hasPriceCfg = !!rec.priceContainer
+        const original = hasPriceCfg
+            ? getPrice(rec.priceContainer, { returnLargest: true })
+            : NaN
 
-        /* 3] fill & click */
-        input.value = code
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-        applyBtn.click()
+        // Snapshot DOM signals BEFORE we apply, so we can compare after.
+        const appliedSel = findAppliedSelector(rec)
+        const beforeAppliedNodes = qAll(appliedSel).length
+
+        /* 3] fill & apply — choose method dynamically:
+             a) if applyBtn === input → auto-validate on input event
+             b) if applyBtn is a button/element distinct → click
+             c) Enter-key submit also dispatched as a fallback for forms */
+        setInputValue(input, code)
+        if (applyBtn !== input) {
+            applyBtn.click()
+        }
+        // Always dispatch Enter on the input — harmless when no submit handler,
+        // but lets sites that listen to keydown="Enter" pick it up.
+        input.dispatchEvent(
+            new KeyboardEvent('keydown', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                bubbles: true,
+            }),
+        )
 
         /* 4] wait for result */
-        const waiters = [sleep(1200).then(() => 'timeout-1.2s')] // shorter fallback
-        const priceEl =
-            document.querySelector(rec.priceContainer) ||
-            document.getElementById(
-                rec.priceContainer.match(/\[id=['"]([^'"]+)['"]\]/)?.[1] || '',
-            )
+        const waiters = [sleep(1200).then(() => 'timeout-1.2s')]
+        let priceEl = null
+        if (hasPriceCfg) {
+            priceEl =
+                qOne(rec.priceContainer) ||
+                document.getElementById(
+                    rec.priceContainer.match(/\[id=['"]([^'"]+)['"]\]/)?.[1] ||
+                        '',
+                )
+        }
         if (priceEl && rec.domain !== 'amazon.com')
             waiters.push(waitForTextChange(priceEl, 3000))
         if (rec.domain === 'amazon.com') waiters.push(waitForAmazonFetch())
@@ -342,17 +525,41 @@ async function applyCoupon(code, rec) {
         const via = await Promise.race(waiters)
         log('Wait finished via', via)
 
-        const newTotal = getPrice(rec.priceContainer, { returnLargest: true })
-        const success = !isNaN(newTotal) && newTotal < original
+        // 5] Determine outcome:
+        //   - committed = something visibly applied (DOM mutation)
+        //   - errorMsg = error text appeared near input
+        //   - savings = price actually dropped
+        const afterAppliedNodes = qAll(appliedSel).length
+        const committed = afterAppliedNodes > beforeAppliedNodes
+        const errorMsg = detectCouponError(rec)
+        let newTotal = NaN
+        let priceDropped = false
+        if (hasPriceCfg) {
+            newTotal = getPrice(rec.priceContainer, { returnLargest: true })
+            priceDropped = !isNaN(newTotal) && newTotal < original
+        }
+        // Success rules (in priority order):
+        //  1. price dropped → real win
+        //  2. committed AND no error → likely worked, treat as success
+        //  3. otherwise → fail
+        const success = priceDropped || (committed && !errorMsg)
         const elapsed = performance.now() - attemptStart
-        log('AUTO_INSERT_ATTEMPT_END', code, { success, newTotal, elapsed })
+        log('AUTO_INSERT_ATTEMPT_END', code, {
+            success,
+            newTotal,
+            committed,
+            errorMsg,
+            elapsed,
+        })
         recordTiming('AUTO_INSERT_ATTEMPT_END', {
             code,
             success,
             newTotal,
+            committed,
+            errorMsg,
             elapsed,
         })
-        return { success, newTotal }
+        return { success, newTotal, committed, errorMsg }
     } catch (err) {
         console.error('applyCoupon error', err)
         log('AUTO_INSERT_ATTEMPT_END', code, {
@@ -366,7 +573,7 @@ async function applyCoupon(code, rec) {
             error: String(err),
             elapsed: performance.now() - attemptStart,
         })
-        return { success: false }
+        return { success: false, committed: false, errorMsg: String(err) }
     }
 }
 
@@ -411,11 +618,50 @@ async function fetchCoupons(site, kw, category) {
         throw e
     }
 }
+// Statuses that signal a coupon has restrictions the user might trip over.
+// When ANY returned coupon carries one of these, we classify the cart so the
+// UI can warn the user "your cart is X, this code is for Y."
+const RESTRICTED_STATUSES = new Set([
+    'product_restriction',
+    'category_restricted',
+    'seller_specific',
+    'valid_with_warning',
+])
+
+async function classifyCartCategory() {
+    try {
+        const cs = window.CaramelCartSignals
+        if (!cs || typeof cs.collectCartSignals !== 'function') return null
+        const signals = await cs.collectCartSignals()
+        const result = await new Promise(res =>
+            currentBrowser.runtime.sendMessage(
+                { action: 'classifyCart', signals },
+                res,
+            ),
+        )
+        if (result && result.primary && !result.error) {
+            log(
+                'Cart category:',
+                result.primary,
+                '(conf:',
+                result.confidence,
+                ')',
+            )
+            return {
+                primary: result.primary,
+                secondary: result.secondary,
+                confidence: result.confidence,
+            }
+        }
+    } catch (e) {
+        log('classifyCart non-fatal error', e)
+    }
+    return null
+}
+
 async function getCoupons(rec) {
     let kw = ''
-    let category = ''
     if (rec.domain === 'amazon.com') {
-        // Use fast in-page scrape (or same-origin cart fetch) instead of opening a new tab
         recordTiming('AUTO_INSERT_AMAZON_SCRAPE_REQUEST')
         const titles = await getAmazonCartKeywords()
         recordTiming('AUTO_INSERT_AMAZON_SCRAPE_RESPONSE', {
@@ -424,37 +670,45 @@ async function getCoupons(rec) {
         kw = (titles || []).join(',')
         log('Amazon keywords', kw)
     }
-    // Classify cart category for relevant coupon selection
-    try {
-        const cs = window.CaramelCartSignals
-        if (cs && typeof cs.collectCartSignals === 'function') {
-            const signals = await cs.collectCartSignals()
-            const result = await new Promise(res =>
-                currentBrowser.runtime.sendMessage(
-                    { action: 'classifyCart', signals },
-                    res,
-                ),
-            )
-            if (result && result.primary && !result.error) {
-                category = result.primary
-                log(
-                    'Cart category:',
-                    category,
-                    '(conf:',
-                    result.confidence,
-                    ')',
-                )
-            }
-        }
-    } catch (e) {
-        log('classifyCart non-fatal error', e)
-    }
+
     // Dev hook: deterministic coupons when using #caramel-test
     if (location.hash && location.hash.includes('caramel-test')) {
         log('DEV MODE: returning mocked coupons')
         return [{ code: 'TEST10' }, { code: 'TEST20' }, { code: 'TEST30' }]
     }
-    return fetchCoupons(rec.domain, kw, category)
+
+    // 1) Fetch coupons FIRST — no LLM call yet.
+    const list = await fetchCoupons(rec.domain, kw, '')
+
+    // 2) Only classify the cart if any returned coupon is flagged as restricted
+    //    — that's when the category meaningfully helps the user decide.
+    const hasRestricted = (list || []).some(c =>
+        RESTRICTED_STATUSES.has(c.status),
+    )
+    if (!hasRestricted) {
+        log(
+            `getCoupons: ${list?.length || 0} coupons, none restricted — skipping classify-cart`,
+        )
+        return list
+    }
+    log(
+        `getCoupons: restricted coupon(s) present — classifying cart for insights`,
+    )
+    const cat = await classifyCartCategory()
+    // 3) Annotate restricted coupons with cart category so the popup can render
+    //    a contextual "may not apply — your cart is X" hint.
+    if (cat?.primary) {
+        return list.map(c =>
+            RESTRICTED_STATUSES.has(c.status)
+                ? {
+                      ...c,
+                      cartCategory: cat.primary,
+                      cartCategorySecondary: cat.secondary,
+                  }
+                : c,
+        )
+    }
+    return list
 }
 
 /* --------------------------------------------------  main runner */
@@ -489,50 +743,71 @@ async function startApplyingCoupons(rec) {
     const MAX_ATTEMPTS = 8
     if (coupons.length > MAX_ATTEMPTS) coupons = coupons.slice(0, MAX_ATTEMPTS)
 
-    const original = getPrice(rec.priceContainer, { returnLargest: true })
-    let bestSave = 0,
-        bestCode = null
+    const hasPriceCfg = !!rec.priceContainer
+    const original = hasPriceCfg
+        ? getPrice(rec.priceContainer, { returnLargest: true })
+        : NaN
+    let bestSave = 0
+    let bestCode = null
+    const triedCodes = []
 
     for (let i = 0; i < coupons.length; i++) {
         const { code } = coupons[i]
+        triedCodes.push(code)
         await updateTestingModal(i + 1, coupons.length, code)
 
         const res = await applyCoupon(code, rec)
 
-        /* clear field & wait until UI ready for next pass */
-        const inp = document.querySelector(rec.couponInput)
-        if (inp) {
-            inp.value = ''
-            inp.dispatchEvent(new Event('input', { bubbles: true }))
+        if (res.success) {
+            // Real success — keep this code applied, stop here.
+            const diff =
+                hasPriceCfg && !isNaN(res.newTotal)
+                    ? original - res.newTotal
+                    : 0
+            log(`✓ ${code} saved ${diff || '(unknown — no priceContainer)'}`)
+            bestSave = diff
+            bestCode = code
+            break
+        }
+
+        // Apply FAILED. Decide what cleanup is needed before next attempt:
+        //   - If the cart visibly accepted the code (`committed`) but an error
+        //     showed up → remove that pending coupon so the next try starts
+        //     from a clean cart.
+        //   - If nothing committed → just clear the input field so the next
+        //     try doesn't append to leftover text.
+        //   - Either way, then move on to the next code.
+        log(`✗ ${code} failed`, {
+            committed: res.committed,
+            errorMsg: res.errorMsg,
+        })
+        if (res.committed) {
+            await removeAppliedCoupon(rec)
+        } else {
+            const inp = qOne(rec.couponInput)
+            if (inp && inp.value) {
+                setInputValue(inp, '')
+            }
         }
         await waitUntilReady(rec)
-        await sleep(120) // tiny visual pause
-
-        if (res.success) {
-            const diff = original - res.newTotal
-            log(`✓ ${code} saved ${diff}`)
-            if (diff > bestSave) {
-                bestSave = diff
-                bestCode = code
-            }
-        } else {
-            log(`✗ ${code} no savings`)
-        }
+        await sleep(160) // tiny visual pause between tries
     }
 
     if (bestCode) {
-        await applyCoupon(bestCode, rec)
+        // bestCode was already applied during the successful loop iteration.
+        // Do NOT re-apply — would double-stack on sites that don't dedupe.
         log('AUTO_INSERT_STOP', {
             result: 'applied',
             bestCode,
             bestSave,
+            tried: triedCodes,
             t: performance.now(),
         })
-        showFinalModal(
-            bestSave,
-            bestCode,
-            'We found a coupon that saves you money!',
-        )
+        const headline =
+            hasPriceCfg && bestSave > 0
+                ? 'We found a coupon that saves you money!'
+                : `Applied ${bestCode}`
+        showFinalModal(bestSave, bestCode, headline)
     } else {
         log('AUTO_INSERT_STOP', {
             result: 'none',
