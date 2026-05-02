@@ -567,10 +567,21 @@ async function applyCoupon(code, rec) {
 
         // 5] Determine outcome:
         //   - committed = something visibly applied (DOM mutation)
-        //   - errorMsg = error text appeared near input
-        //   - savings = price actually dropped
+        //   - stuck     = the row was still there 1.2s later (site didn't
+        //                 auto-revert it). On no-priceContainer sites this
+        //                 is the real "did it apply?" signal — sites like
+        //                 logos.com keep an aria-live error region with
+        //                 stale text that defeats errorMsg-based detection.
+        //   - errorMsg  = error text appeared near input
+        //   - savings   = price actually dropped
         const afterAppliedNodes = qAll(appliedSel).length
         const committed = afterAppliedNodes > beforeAppliedNodes
+        let stuck = false
+        if (committed) {
+            await sleep(1200)
+            const stuckCount = qAll(appliedSel).length
+            stuck = stuckCount > beforeAppliedNodes
+        }
         const errorMsg = detectCouponError(rec, errorBaseline, code)
         let newTotal = NaN
         let priceDropped = false
@@ -579,10 +590,15 @@ async function applyCoupon(code, rec) {
             priceDropped = !isNaN(newTotal) && newTotal < original
         }
         // Success rules (in priority order):
-        //  1. price dropped → real win
-        //  2. committed AND no error → likely worked, treat as success
-        //  3. otherwise → fail
-        const success = priceDropped || (committed && !errorMsg)
+        //  1. price dropped                       → real win
+        //  2. committed AND row stuck             → site accepted it (no
+        //                                            need to trust the
+        //                                            often-noisy error region)
+        //  3. committed AND no errorMsg           → fallback for sites that
+        //                                            don't keep their list mounted
+        //  4. otherwise                           → fail
+        const success =
+            priceDropped || (committed && stuck) || (committed && !errorMsg)
         const elapsed = performance.now() - attemptStart
         log('AUTO_INSERT_ATTEMPT_END', code, {
             success,
