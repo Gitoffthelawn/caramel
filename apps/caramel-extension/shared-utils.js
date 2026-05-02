@@ -548,10 +548,40 @@ async function applyCoupon(code, rec) {
 
         /* 3] fill & apply — choose method dynamically:
              a) if applyBtn === input → auto-validate on input event
-             b) if applyBtn is a button/element distinct → click
-             c) Enter-key submit also dispatched as a fallback for forms */
+             b) if applyBtn is a button/element distinct → full pointer+click sequence
+             c) Enter-key submit also dispatched as a fallback for forms
+
+           Why a full pointer sequence and not just .click(): some Shopify themes
+           (paragonsports-class) gate the apply on `pointerdown` rather than the
+           click event. A bare .click() fires the click handler but not the
+           pointer chain, so the site's own JS rejects it. This sequence makes
+           the extension match what a real user click dispatches (pointerdown →
+           pointerup → mousedown → mouseup → click). Sites that genuinely
+           require event.isTrusted=true (olaplex / paleoonthego) still won't
+           accept this — those are correctly flagged extension_compatible:false
+           by the agent's HARD VALIDATION 2 step. */
         setInputValue(input, code)
         if (applyBtn !== input) {
+            try {
+                const r = applyBtn.getBoundingClientRect()
+                const cx = r.x + r.width / 2
+                const cy = r.y + r.height / 2
+                const evtInit = {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: cx,
+                    clientY: cy,
+                    view: window,
+                    button: 0,
+                }
+                applyBtn.dispatchEvent(new PointerEvent('pointerdown', evtInit))
+                applyBtn.dispatchEvent(new PointerEvent('pointerup', evtInit))
+                applyBtn.dispatchEvent(new MouseEvent('mousedown', evtInit))
+                applyBtn.dispatchEvent(new MouseEvent('mouseup', evtInit))
+            } catch (_) {
+                // Older browsers without PointerEvent constructor — fall through
+                // to plain click which still works on most sites.
+            }
             applyBtn.click()
         }
         // Always dispatch Enter on the input — harmless when no submit handler,
