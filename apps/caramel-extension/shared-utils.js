@@ -547,8 +547,27 @@ async function applyCoupon(code, rec) {
             }),
         )
 
-        /* 4] wait for result */
-        const waiters = [sleep(1200).then(() => 'timeout-1.2s')]
+        /* 4] wait for result — smart waiter: poll DOM up to 4s for the
+             FIRST observable signal (success row appears OR error region
+             gains text). Many sites (logos.com, hybris-style carts) need
+             1.5-3s to render their applied row; fixed 1.2s sleeps cause
+             the next attempt to mis-attribute the prior code's row. */
+        async function waitForCartSignal(maxMs) {
+            const baseSuccess = qAll(appliedSel).length
+            const baseErr = (qOne(rec.errorIndicator)?.innerText || '').trim()
+            const startedAt = performance.now()
+            while (performance.now() - startedAt < maxMs) {
+                const nowSuccess = qAll(appliedSel).length
+                if (nowSuccess > baseSuccess) return 'committed'
+                const errEl = qOne(rec.errorIndicator)
+                if (errEl && errEl.offsetParent !== null) {
+                    const t = (errEl.innerText || '').trim()
+                    if (t.length && t !== baseErr) return 'errored'
+                }
+                await sleep(200)
+            }
+            return 'timeout-' + maxMs + 'ms'
+        }
         let priceEl = null
         if (hasPriceCfg) {
             priceEl =
@@ -558,8 +577,9 @@ async function applyCoupon(code, rec) {
                         '',
                 )
         }
+        const waiters = [waitForCartSignal(4000)]
         if (priceEl && rec.domain !== 'amazon.com')
-            waiters.push(waitForTextChange(priceEl, 3000))
+            waiters.push(waitForTextChange(priceEl, 4000))
         if (rec.domain === 'amazon.com') waiters.push(waitForAmazonFetch())
 
         const via = await Promise.race(waiters)
