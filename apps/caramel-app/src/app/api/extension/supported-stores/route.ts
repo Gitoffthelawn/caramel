@@ -51,8 +51,15 @@ export async function GET(req: NextRequest) {
             FROM store_verification_configs cfg
             JOIN verification_stores s ON s.id = cfg.store_id
             WHERE cfg.is_active = TRUE
-              AND cfg.coupon_input_xpath IS NOT NULL
-              AND cfg.apply_button_xpath IS NOT NULL
+              -- Require the FULL 5-field extension contract. Partial configs
+              -- (missing success/error/remove) cause the try-loop to either
+              -- false-success on rejected codes or stack invalid coupons —
+              -- the exact UX failures observed on logos.com pre-2026-05-02.
+              AND cfg.coupon_input_xpath      IS NOT NULL
+              AND cfg.apply_button_xpath      IS NOT NULL
+              AND cfg.success_indicator_xpath IS NOT NULL
+              AND cfg.error_indicator_xpath   IS NOT NULL
+              AND cfg.coupon_remove_xpath     IS NOT NULL
             ORDER BY s.store_name, cfg.priority DESC, cfg.updated_at DESC
         `) as Row[]
 
