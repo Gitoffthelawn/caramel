@@ -223,17 +223,31 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
     modal.style.textAlign = 'center'
     modal.style.position = 'relative'
 
-    // Determine if user saved money
-    const isSuccess = savingsAmount > 0
-    const noCouponsAvailable = !!message // when message is provided, it means no coupons or error
+    // Three terminal states the user might be in:
+    //   savedMoney   = we computed a real price drop ($X off)
+    //   appliedCode  = we applied a code but couldn't measure savings
+    //                  (site has no priceContainer in config — the cart
+    //                  may show the discount inline; we just can't read
+    //                  the number reliably). Still a win for the user.
+    //   noLuck       = nothing applied (or signed-out / network error)
+    const savedMoney = savingsAmount > 0
+    const appliedCode = !savedMoney && !!code
+    const isSuccess = savedMoney || appliedCode
 
-    // If no savings found, encourage the user that it's already the best price
-    const defaultMessage = isSuccess
-        ? `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
-        : "Looks like you're already getting the best deal. Go ahead and buy!"
-
-    // You can decide whether to use `message` or `defaultMessage` or combine them
-    const finalMessage = message || defaultMessage
+    // Build the secondary message based on which state we landed in.
+    let defaultMessage
+    if (savedMoney) {
+        defaultMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+    } else if (appliedCode) {
+        defaultMessage = `Code ${code} is applied to your cart — review the discount before you check out.`
+    } else {
+        defaultMessage =
+            "Looks like you're already getting the best deal. Go ahead and buy!"
+    }
+    // Caller-supplied message takes precedence ONLY when we have no win
+    // to celebrate (otherwise the appliedCode message wins so the user
+    // sees what we did for them).
+    const finalMessage = isSuccess ? defaultMessage : message || defaultMessage
 
     // Caramel brand/logo
     const brandColor = '#ea6925'
@@ -257,22 +271,38 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
       font-size: 24px; 
       font-weight: bold;
     ">
-      ${isSuccess ? '🎉 Savings Found! 🎉' : isSignIn ? 'Oups..' : noCouponsAvailable ? 'No Savings This Time' : 'Best Price Already!'}
+      ${
+          savedMoney
+              ? '🎉 Savings Found! 🎉'
+              : appliedCode
+                ? '✓ Coupon Applied'
+                : isSignIn
+                  ? 'Oups..'
+                  : message
+                    ? 'No Savings This Time'
+                    : 'Best Price Already!'
+      }
     </h2>
     <p style="font-size: 13px; color: #333; margin: 0 0 10px 0;">
       ${finalMessage}
     </p>
-    
-    <!-- If user saved money, show how much -->
+
     ${
         isSuccess
             ? `
-            <p style="font-size: 24px;">
-            Coupon: <span style="color: ${brandColor}; text-decoration: underline;font-weight: bold;">${code}</span>
-          </p>
-            <p style="font-size: 18px; color: ${brandColor}; font-weight: bold;">
-            You saved $${savingsAmount.toFixed(2)}!
-          </p>`
+            <p style="font-size: 22px; margin: 6px 0;">
+              Code: <span style="color: ${brandColor}; text-decoration: underline; font-weight: bold;">${code}</span>
+            </p>
+            ${
+                savedMoney
+                    ? `<p style="font-size: 18px; color: ${brandColor}; font-weight: bold; margin: 4px 0 0;">
+                        You saved $${savingsAmount.toFixed(2)}!
+                      </p>`
+                    : `<p style="font-size: 13px; color: #777; margin: 4px 0 0;">
+                        Discount visible in your cart.
+                      </p>`
+            }
+          `
             : ''
     }
     
