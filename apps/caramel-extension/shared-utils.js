@@ -572,12 +572,16 @@ async function applyCoupon(code, rec) {
              the next attempt to mis-attribute the prior code's row. */
         async function waitForCartSignal(maxMs) {
             const baseSuccess = qAll(appliedSel).length
-            const baseErr = (qOne(rec.errorIndicator)?.innerText || '').trim()
+            // Use _firstVisibleErrorEl so multi-error-container sites
+            // (paragonsports-class — empty placeholder + real error) aren't
+            // permanently latched to the empty placeholder's "" baseline.
+            const baseErrEl = _firstVisibleErrorEl(rec)
+            const baseErr = baseErrEl ? (baseErrEl.innerText || '').trim() : ''
             const startedAt = performance.now()
             while (performance.now() - startedAt < maxMs) {
                 const nowSuccess = qAll(appliedSel).length
                 if (nowSuccess > baseSuccess) return 'committed'
-                const errEl = qOne(rec.errorIndicator)
+                const errEl = _firstVisibleErrorEl(rec)
                 if (errEl && errEl.offsetParent !== null) {
                     const t = (errEl.innerText || '').trim()
                     if (t.length && t !== baseErr) return 'errored'
