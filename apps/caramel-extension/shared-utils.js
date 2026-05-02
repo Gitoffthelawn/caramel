@@ -412,6 +412,24 @@ async function removeAppliedCoupon(rec) {
 }
 
 // Detect if an error message appeared near the cart/coupon UI.
+// Pick the first VISIBLE non-empty match across all elements that match the
+// errorIndicator selector. Some Shopify themes (paragonsports, others) ship
+// two `.alert.alert--error` elements: a hidden empty placeholder and a
+// real one that fills with text. `qOne` would return the placeholder and
+// miss the real error. Iterate so we always observe the live one.
+function _firstVisibleErrorEl(rec) {
+    if (!rec.errorIndicator) return null
+    const all = qAll(rec.errorIndicator)
+    for (const el of all) {
+        if (!el || el.offsetParent === null) continue
+        const t = (el.innerText || '').trim()
+        if (t.length) return el
+    }
+    // No visible non-empty match — return the first match (so callers can
+    // still observe "exists but hidden/empty" baseline state).
+    return all[0] || null
+}
+
 function snapshotErrorState(rec) {
     // Capture the error region's text + visibility BEFORE we apply, so we can
     // tell whether an error appeared *because of this attempt* vs. a stale
@@ -420,7 +438,7 @@ function snapshotErrorState(rec) {
     // would treat permanently-mounted empty error containers as "error
     // present" and loop forever even after a valid coupon applied.
     if (!rec.errorIndicator) return { text: '', visible: false }
-    const el = qOne(rec.errorIndicator)
+    const el = _firstVisibleErrorEl(rec)
     if (!el) return { text: '', visible: false }
     return {
         text: (el.innerText || '').trim(),
@@ -441,7 +459,7 @@ function detectCouponError(rec, baseline, code) {
     // hints, prior errors) — naive presence checks on those false-positive
     // forever and the loop never stops on a valid coupon.
     if (rec.errorIndicator) {
-        const el = qOne(rec.errorIndicator)
+        const el = _firstVisibleErrorEl(rec)
         if (el && el.offsetParent !== null) {
             const t = (el.innerText || '').trim()
             if (t.length) {
