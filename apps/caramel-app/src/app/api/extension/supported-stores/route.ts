@@ -26,6 +26,9 @@ type Row = {
     coupon_input_xpath: string | null
     apply_button_xpath: string | null
     price_container_xpath: string | null
+    success_indicator_xpath: string | null
+    error_indicator_xpath: string | null
+    coupon_remove_xpath: string | null
 }
 
 export async function GET(req: NextRequest) {
@@ -41,7 +44,10 @@ export async function GET(req: NextRequest) {
                 cfg.dismiss_button_xpath,
                 cfg.coupon_input_xpath,
                 cfg.apply_button_xpath,
-                cfg.price_container_xpath
+                cfg.price_container_xpath,
+                cfg.success_indicator_xpath,
+                cfg.error_indicator_xpath,
+                cfg.coupon_remove_xpath
             FROM store_verification_configs cfg
             JOIN verification_stores s ON s.id = cfg.store_id
             WHERE cfg.is_active = TRUE
@@ -57,6 +63,9 @@ export async function GET(req: NextRequest) {
             priceContainer: r.price_container_xpath ?? undefined,
             showInput: r.show_input_xpath ?? undefined,
             dismissButton: r.dismiss_button_xpath ?? undefined,
+            successIndicator: r.success_indicator_xpath ?? undefined,
+            errorIndicator: r.error_indicator_xpath ?? undefined,
+            couponRemove: r.coupon_remove_xpath ?? undefined,
         }))
 
         return NextResponse.json(

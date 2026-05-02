@@ -412,12 +412,47 @@ async function removeAppliedCoupon(rec) {
 }
 
 // Detect if an error message appeared near the cart/coupon UI.
-function detectCouponError(rec) {
+function snapshotErrorState(rec) {
+    // Capture the error region's text + visibility BEFORE we apply, so we can
+    // tell whether an error appeared *because of this attempt* vs. a stale
+    // error container that some sites keep mounted (aria-live regions,
+    // placeholder error rows, etc.). Without this snapshot the extension
+    // would treat permanently-mounted empty error containers as "error
+    // present" and loop forever even after a valid coupon applied.
+    if (!rec.errorIndicator) return { text: '', visible: false }
+    const el = qOne(rec.errorIndicator)
+    if (!el) return { text: '', visible: false }
+    return {
+        text: (el.innerText || '').trim(),
+        visible: el.offsetParent !== null,
+    }
+}
+
+function detectCouponError(rec, baseline) {
+    // baseline is what snapshotErrorState() returned BEFORE the apply.
+    // We only call something an "error" if the state CHANGED — first
+    // appearance, or text changed (e.g. now mentions the failed code).
     if (rec.errorIndicator) {
         const el = qOne(rec.errorIndicator)
         if (el && el.offsetParent !== null) {
             const t = (el.innerText || '').trim()
-            if (t.length) return t
+            if (t.length) {
+                if (!baseline) return t // back-compat, no snapshot
+                const wasVisible = baseline.visible
+                const wasText = baseline.text
+                // Treat as a real error only when:
+                //   - text appeared (was empty, now has content), OR
+                //   - text actually changed (new error string), OR
+                //   - element became visible (was hidden, now shown)
+                if (
+                    (!wasVisible && el.offsetParent !== null) ||
+                    t !== wasText
+                ) {
+                    return t
+                }
+                // Same text + same visibility = stale container, ignore.
+                return null
+            }
         }
     }
     // Generic: look near the input for an inline error matching common phrases.
@@ -427,7 +462,6 @@ function detectCouponError(rec) {
     for (let d = 0; d < 5 && scope; d++) {
         const text = (scope.innerText || '').trim()
         if (text && GENERIC_ERROR_TEXT_RE.test(text)) {
-            const m = text.match(GENERIC_ERROR_TEXT_RE)
             const idx = text.search(GENERIC_ERROR_TEXT_RE)
             return text
                 .slice(Math.max(0, idx - 40), idx + 120)
@@ -487,6 +521,7 @@ async function applyCoupon(code, rec) {
         // Snapshot DOM signals BEFORE we apply, so we can compare after.
         const appliedSel = findAppliedSelector(rec)
         const beforeAppliedNodes = qAll(appliedSel).length
+        const errorBaseline = snapshotErrorState(rec)
 
         /* 3] fill & apply — choose method dynamically:
              a) if applyBtn === input → auto-validate on input event
@@ -531,7 +566,7 @@ async function applyCoupon(code, rec) {
         //   - savings = price actually dropped
         const afterAppliedNodes = qAll(appliedSel).length
         const committed = afterAppliedNodes > beforeAppliedNodes
-        const errorMsg = detectCouponError(rec)
+        const errorMsg = detectCouponError(rec, errorBaseline)
         let newTotal = NaN
         let priceDropped = false
         if (hasPriceCfg) {

@@ -38,7 +38,12 @@ export async function GET(req: NextRequest) {
         (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
     try {
-        const conditions = [couponsSql`status = 'valid' AND expired = FALSE`]
+        // Surface valid + restriction-tagged coupons. The extension uses the
+        // status field to decide whether to classify the cart and surface
+        // a "may not apply" warning to the user.
+        const conditions = [
+            couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific') AND expired = FALSE`,
+        ]
 
         if (site) {
             const base = getBaseDomain(site)
@@ -84,7 +89,8 @@ export async function GET(req: NextRequest) {
             couponsSql`
                 SELECT id, code, site, title, description, rating,
                        discount_type, discount_amount, expiry, expired,
-                       times_used AS "timesUsed"
+                       times_used AS "timesUsed",
+                       status, verification_message AS "verificationMessage"
                 FROM coupons
                 WHERE ${whereClause}
                 ORDER BY rating DESC, created_at DESC
