@@ -60,6 +60,12 @@ export async function GET(req: NextRequest) {
               AND cfg.success_indicator_xpath IS NOT NULL
               AND cfg.error_indicator_xpath   IS NOT NULL
               AND cfg.coupon_remove_xpath     IS NOT NULL
+              -- Honor the agent's extension_compatible verdict. Stores like
+              -- christianbook.com have full xpaths but they live on the
+              -- checkout page, not the entry_url cart page — the extension
+              -- can't reach them. Agent / manual review sets this to false
+              -- when it observes that selectors don't render at entry_url.
+              AND COALESCE(cfg.metadata->>'extension_compatible', 'true') <> 'false'
             ORDER BY s.store_name, cfg.priority DESC, cfg.updated_at DESC
         `) as Row[]
 
