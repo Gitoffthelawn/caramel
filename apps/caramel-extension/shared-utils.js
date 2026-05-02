@@ -428,30 +428,35 @@ function snapshotErrorState(rec) {
     }
 }
 
-function detectCouponError(rec, baseline) {
+const ERROR_WORDS_RE =
+    /\b(invalid|expired|not valid|doesn'?t apply|cannot be applied|cannot apply|already used|no longer|reached the limit|minimum|coupon code is required|wrong code)\b/i
+
+function detectCouponError(rec, baseline, code) {
     // baseline is what snapshotErrorState() returned BEFORE the apply.
-    // We only call something an "error" if the state CHANGED — first
-    // appearance, or text changed (e.g. now mentions the failed code).
+    // code is the coupon string we just tried.
+    //
+    // We only call something an "error" if the change is "about" this
+    // attempt. Sites like logos.com keep an aria-live status region
+    // permanently mounted and rotate text through it (success messages,
+    // hints, prior errors) — naive presence checks on those false-positive
+    // forever and the loop never stops on a valid coupon.
     if (rec.errorIndicator) {
         const el = qOne(rec.errorIndicator)
         if (el && el.offsetParent !== null) {
             const t = (el.innerText || '').trim()
             if (t.length) {
-                if (!baseline) return t // back-compat, no snapshot
-                const wasVisible = baseline.visible
-                const wasText = baseline.text
-                // Treat as a real error only when:
-                //   - text appeared (was empty, now has content), OR
-                //   - text actually changed (new error string), OR
-                //   - element became visible (was hidden, now shown)
-                if (
-                    (!wasVisible && el.offsetParent !== null) ||
-                    t !== wasText
-                ) {
+                const tl = t.toLowerCase()
+                // Strongest signal: text mentions the code we just tried.
+                if (code && tl.includes(code.toLowerCase())) return t
+                // Strong signal: classic rejection vocabulary.
+                if (ERROR_WORDS_RE.test(tl)) return t
+                // Otherwise — ambiguous status text. Treat as new error
+                // only if the container first appeared (was hidden, now
+                // shown) — never on text-changed-but-still-vague.
+                if (baseline && !baseline.visible && el.offsetParent !== null) {
                     return t
                 }
-                // Same text + same visibility = stale container, ignore.
-                return null
+                return null // generic / stale status copy → not our error
             }
         }
     }
@@ -566,7 +571,7 @@ async function applyCoupon(code, rec) {
         //   - savings = price actually dropped
         const afterAppliedNodes = qAll(appliedSel).length
         const committed = afterAppliedNodes > beforeAppliedNodes
-        const errorMsg = detectCouponError(rec, errorBaseline)
+        const errorMsg = detectCouponError(rec, errorBaseline, code)
         let newTotal = NaN
         let priceDropped = false
         if (hasPriceCfg) {
