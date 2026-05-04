@@ -574,9 +574,16 @@ async function applyCoupon(code, rec) {
                     view: window,
                     button: 0,
                 }
+                // Canonical browser ordering for a primary-pointer click:
+                // pointerdown → mousedown → pointerup → mouseup → click.
+                // The previous pd→pu→md→mu order broke React handlers on
+                // Polaris-class checkouts (alwaystoast / skinnyfit / others
+                // — verifier-validated codes silently dropped). Real-click
+                // probe confirmed the UI accepts these codes when events fire
+                // in canonical order.
                 applyBtn.dispatchEvent(new PointerEvent('pointerdown', evtInit))
-                applyBtn.dispatchEvent(new PointerEvent('pointerup', evtInit))
                 applyBtn.dispatchEvent(new MouseEvent('mousedown', evtInit))
+                applyBtn.dispatchEvent(new PointerEvent('pointerup', evtInit))
                 applyBtn.dispatchEvent(new MouseEvent('mouseup', evtInit))
             } catch (_) {
                 // Older browsers without PointerEvent constructor — fall through
@@ -629,9 +636,13 @@ async function applyCoupon(code, rec) {
                         '',
                 )
         }
-        const waiters = [waitForCartSignal(4000)]
+        // Polaris (Shopify) checkouts often respond in 5-8s for the apply
+        // round-trip — 4s was clipping valid codes. Bumped to 10s; the loop
+        // still races so a faster site exits as soon as a signal lands.
+        const APPLY_WAIT_MS = 10000
+        const waiters = [waitForCartSignal(APPLY_WAIT_MS)]
         if (priceEl && rec.domain !== 'amazon.com')
-            waiters.push(waitForTextChange(priceEl, 4000))
+            waiters.push(waitForTextChange(priceEl, APPLY_WAIT_MS))
         if (rec.domain === 'amazon.com') waiters.push(waitForAmazonFetch())
 
         const via = await Promise.race(waiters)
