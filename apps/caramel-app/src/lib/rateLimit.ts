@@ -54,7 +54,10 @@ function getClientIp(req: NextRequest): string {
 }
 
 function isExtensionClient(req: NextRequest): boolean {
-    const key = req.headers.get('x-extension-api-key')
+    // Accept both header names: the extension sends `x-api-key` (same name the
+    // supported-stores route validates); `x-extension-api-key` kept for back-compat.
+    const key =
+        req.headers.get('x-api-key') || req.headers.get('x-extension-api-key')
     const expected = process.env.EXTENSION_API_KEY
     return Boolean(key && expected && key === expected)
 }

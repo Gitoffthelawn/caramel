@@ -6,19 +6,27 @@ import {
 } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
+// Usage counter for a coupon. POST (not GET) so it can't be triggered by
+// browser/CDN prefetch — a mutation must never ride a cacheable GET.
+// id accepted via ?id= (back-compat) or JSON body; coupons.id is an integer.
+export async function POST(req: NextRequest) {
     if (!isOriginAllowed(req)) return forbiddenOrigin()
     const limited = await checkRateLimit(req, 'mutation')
     if (limited) return limited
 
     const url = new URL(req.url)
-    const id = url.searchParams.get('id')
-    if (!id) {
+    let idRaw = url.searchParams.get('id') || ''
+    if (!idRaw) {
+        const body = (await req.json().catch(() => ({}))) as { id?: unknown }
+        idRaw = body?.id != null ? String(body.id) : ''
+    }
+    if (!/^\d{1,18}$/.test(idRaw)) {
         return NextResponse.json(
             { error: 'Invalid or missing coupon ID' },
             { status: 400 },
         )
     }
+    const id = Number(idRaw)
 
     try {
         const rows = await couponsSql`

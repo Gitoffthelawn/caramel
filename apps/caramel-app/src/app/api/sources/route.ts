@@ -82,6 +82,19 @@ export async function POST(req: NextRequest) {
         if (!website) {
             return nextApiResponse(req, 400, 'Missing required fields.', null)
         }
+        // Validate it's a plausible domain/URL and bound the length, so this
+        // public "request a store" endpoint can't be used to bulk-insert junk.
+        let host = website
+        try {
+            host = new URL(
+                website.startsWith('http') ? website : `https://${website}`,
+            ).hostname
+        } catch {
+            return nextApiResponse(req, 400, 'Invalid website.', null)
+        }
+        if (host.length > 253 || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host)) {
+            return nextApiResponse(req, 400, 'Invalid website.', null)
+        }
 
         await couponsSql`
             INSERT INTO sources (id, source, websites, status, created_at, updated_at)

@@ -1,31 +1,37 @@
-import prisma from '@/lib/prisma'
+import { couponsSql } from '@/lib/couponsDb'
+import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Store-name autocomplete. Post-DB-split this must read the coupons catalog
+// via couponsSql (the old Prisma "Coupon" model was dropped). Surfaces any
+// store that has visible coupons (verified, restricted, or not-yet-verified).
 export async function POST(req: NextRequest) {
-    let body: any = {}
+    const limited = await checkRateLimit(req, 'read')
+    if (limited) return limited
+
+    let body: { query?: string } = {}
     try {
-        body = await req.json()
+        body = (await req.json()) as { query?: string }
     } catch {}
-    const q = String((body?.query ?? '') as string).trim()
+    const q = String(body?.query ?? '')
+        .trim()
+        .slice(0, 100)
     if (!q) return NextResponse.json({ sites: [] })
-    const likePattern = `%${q}%`
+
     try {
-        const rows = await prisma.$queryRaw<
-            { site: string; sim_score: number }[]
-        >`
-      SELECT DISTINCT c.site,
-             COALESCE(similarity(c.site, ${q}), 0) as sim_score
-      FROM "Coupon" c
-      WHERE c.site ILIKE ${likePattern}
-         OR similarity(c.site, ${q}) > 0.25
-      ORDER BY sim_score DESC, c.site ASC
-    `
-        const sites = rows.map(r => r.site)
-        return NextResponse.json({ sites })
-    } catch (err: any) {
-        return NextResponse.json(
-            { error: 'Search failed', details: err?.message },
-            { status: 500 },
-        )
+        const rows = await couponsSql<Array<{ site: string }>>`
+            SELECT DISTINCT site FROM coupons
+            WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry')
+              AND expired = FALSE
+              AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
+            ORDER BY site ASC
+            LIMIT 20
+        `
+        return NextResponse.json({
+            sites: rows.map(r => r.site).filter(Boolean),
+        })
+    } catch (err) {
+        console.error('search-supported failed:', err)
+        return NextResponse.json({ error: 'Search failed' }, { status: 500 })
     }
 }
