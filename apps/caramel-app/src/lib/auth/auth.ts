@@ -121,7 +121,11 @@ export const auth = betterAuth({
     secret:
         process.env.BETTER_AUTH_SECRET ||
         process.env.JWT_SECRET ||
-        'caramel-better-auth-secret',
+        (() => {
+            throw new Error(
+                'BETTER_AUTH_SECRET (or JWT_SECRET) must be set — refusing to start with a hardcoded default signing key',
+            )
+        })(),
     baseURL,
     trustedOrigins,
     advanced: {

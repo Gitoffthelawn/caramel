@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         const rows = await couponsSql<Array<{ site: string }>>`
             SELECT site, COUNT(*)::int AS coupon_count
             FROM coupons
-            WHERE status = 'valid' AND status = 'valid' AND expired = FALSE
+            WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE
             GROUP BY site
             ORDER BY coupon_count DESC
             LIMIT 4
