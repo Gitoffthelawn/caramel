@@ -1,6 +1,6 @@
 'use client'
 
-import type { Coupon } from '@/types/coupon'
+import type { Coupon, CouponStatus } from '@/types/coupon'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -8,6 +8,29 @@ import { toast } from 'sonner'
 interface CouponCardProps {
     coupon: Coupon
     index: number
+}
+
+// Verification badge: green = machine-verified, amber = verified-but-restricted,
+// grey = not yet verified (grace), red = known not valid.
+const AMBER =
+    'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-900/50'
+const GREY =
+    'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
+const RED =
+    'bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-900/50'
+const STATUS_BADGE: Record<CouponStatus, { label: string; cls: string }> = {
+    valid: {
+        label: '✓ Verified',
+        cls: 'bg-green-100 text-green-700 ring-green-200 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-900/50',
+    },
+    valid_with_warning: { label: 'Verified · may vary', cls: AMBER },
+    product_restriction: { label: 'Restrictions apply', cls: AMBER },
+    category_restricted: { label: 'Category-limited', cls: AMBER },
+    seller_specific: { label: 'Seller-specific', cls: AMBER },
+    pending: { label: 'Unverified', cls: GREY },
+    retry: { label: 'Checking…', cls: GREY },
+    invalid: { label: 'Not valid', cls: RED },
+    expired: { label: 'Expired', cls: RED },
 }
 
 export default function CouponCard({ coupon, index }: CouponCardProps) {
@@ -63,6 +86,14 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                             {coupon.timesUsed} used today
                         </p>
+                    )}
+                    {coupon.status && STATUS_BADGE[coupon.status] && (
+                        <span
+                            title={coupon.verificationMessage ?? undefined}
+                            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${STATUS_BADGE[coupon.status].cls}`}
+                        >
+                            {STATUS_BADGE[coupon.status].label}
+                        </span>
                     )}
                 </div>
 

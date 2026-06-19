@@ -38,11 +38,14 @@ export async function GET(req: NextRequest) {
         (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
     try {
-        // Surface valid + restriction-tagged coupons. The extension uses the
-        // status field to decide whether to classify the cart and surface
-        // a "may not apply" warning to the user.
+        // Surface verified, restriction-tagged, AND not-yet-verified coupons.
+        // The bulk of the catalog sits at status='pending' (scraped, not yet
+        // run through the verification module); those must still show to users
+        // with a neutral "Unverified" badge. 'retry' = mid-verification. We
+        // exclude 'invalid'/'expired' so known-dead codes are never surfaced.
+        // The status field drives the verified/unverified/not-valid badge.
         const conditions = [
-            couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific') AND expired = FALSE`,
+            couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE`,
         ]
 
         if (site) {

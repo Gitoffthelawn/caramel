@@ -562,10 +562,44 @@ function renderCouponsView(coupons, user, domain) {
                 ${verifierMsg}
               </div>`
                           }
+                          // Verification badge: green=verified, amber=restricted,
+                          // grey=not yet verified (grace), red=known not valid.
+                          const BADGE = {
+                              valid: ['✓ Verified', '#15803d', '#dcfce7'],
+                              valid_with_warning: [
+                                  'Verified · may vary',
+                                  '#b45309',
+                                  '#fef3c7',
+                              ],
+                              product_restriction: [
+                                  'Restrictions apply',
+                                  '#b45309',
+                                  '#fef3c7',
+                              ],
+                              category_restricted: [
+                                  'Category-limited',
+                                  '#b45309',
+                                  '#fef3c7',
+                              ],
+                              seller_specific: [
+                                  'Seller-specific',
+                                  '#b45309',
+                                  '#fef3c7',
+                              ],
+                              pending: ['Unverified', '#4b5563', '#f3f4f6'],
+                              retry: ['Checking…', '#4b5563', '#f3f4f6'],
+                              invalid: ['Not valid', '#b91c1c', '#fee2e2'],
+                              expired: ['Expired', '#b91c1c', '#fee2e2'],
+                          }
+                          const bd = BADGE[c.status]
+                          const badge = bd
+                              ? `<span class="coupon-badge" title="${c.verificationMessage || ''}" style="display:inline-block;margin-top:4px;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
+                              : ''
                           return `
             <div data-code="${c.code}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
               <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
               <div class="coupon-desc">${c.description || ''}</div>
+              ${badge}
               ${warning}
               <div class="coupon-action">
                 <button class="copyBtn">Copy "${c.code}"</button>
