@@ -851,9 +851,17 @@ async function getCoupons(rec) {
 }
 
 /* --------------------------------------------------  main runner */
+// Set true when the user dismisses the testing overlay, so the loop stops
+// instead of trapping them. Shared across content-script files (same realm).
+// Guarded `var` (matches this file's re-injection convention — see sleep/log)
+// so a second content-script injection doesn't throw on redeclaration.
+if (typeof _caramelCancelled === 'undefined') {
+    var _caramelCancelled = false
+}
 async function startApplyingCoupons(rec) {
     log('=== Starting coupon flow ===')
     log('AUTO_INSERT_START', { domain: rec?.domain, t: performance.now() })
+    _caramelCancelled = false
     await showTestingModal()
 
     let coupons
@@ -865,7 +873,11 @@ async function startApplyingCoupons(rec) {
             error: String(e),
             t: performance.now(),
         })
-        showFinalModal(0, null, 'Network error fetching coupons')
+        showFinalModal(
+            0,
+            null,
+            "Couldn't load codes right now — give it another go in a sec 🙂",
+        )
         return
     }
     if (!Array.isArray(coupons) || !coupons.length) {
@@ -873,7 +885,7 @@ async function startApplyingCoupons(rec) {
         showFinalModal(
             0,
             null,
-            'No coupons available for this store right now.',
+            "No codes for this store just yet — we're on it! 🐝",
         )
         return
     }
@@ -889,8 +901,15 @@ async function startApplyingCoupons(rec) {
     let bestSave = 0
     let bestCode = null
     const triedCodes = []
+    // Pattern-based early-exit: if the checkout gives ZERO feedback (no applied
+    // row, no error text) for the first couple of codes, it isn't accepting our
+    // injected input at all — stop probing instead of freezing the page ~10s ×
+    // every code. Checks DOM *signals*, never the config's content.
+    const EARLY_PROBE = 2
+    let sawSignal = false
 
     for (let i = 0; i < coupons.length; i++) {
+        if (_caramelCancelled) break
         const { code } = coupons[i]
         triedCodes.push(code)
         await updateTestingModal(i + 1, coupons.length, code)
@@ -928,8 +947,24 @@ async function startApplyingCoupons(rec) {
                 setInputValue(inp, '')
             }
         }
+        // A committed row or an error message means the checkout IS reacting to
+        // us — keep going. Zero signal after EARLY_PROBE codes means it isn't.
+        if (res.committed || res.errorMsg) sawSignal = true
+        if (!sawSignal && i + 1 >= EARLY_PROBE) {
+            log('AUTO_INSERT_EARLY_EXIT', {
+                tried: i + 1,
+                reason: 'no cart signal — checkout not accepting injection',
+                t: performance.now(),
+            })
+            break
+        }
         await waitUntilReady(rec)
         await sleep(160) // tiny visual pause between tries
+    }
+
+    if (_caramelCancelled) {
+        log('AUTO_INSERT_STOP', { result: 'cancelled', t: performance.now() })
+        return
     }
 
     if (bestCode) {
@@ -952,9 +987,13 @@ async function startApplyingCoupons(rec) {
             result: 'none',
             bestCode: null,
             bestSave: 0,
+            tried: triedCodes,
             t: performance.now(),
         })
-        showFinalModal(0, null, 'Already the best price.')
+        // Nothing auto-applied. Hand the tried codes to the modal so the user
+        // gets a manual copy/paste fallback (covers valid codes the store's
+        // checkout rejected only because our synthetic click isn't trusted).
+        showFinalModal(0, null, null, false, coupons)
     }
 }
 
@@ -978,7 +1017,10 @@ currentBrowser.runtime.onMessage.addListener(async (req, _s, send) => {
     if (req.action === 'userLoggedIn') {
         log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })
         const rec = await getDomainRecord(location.hostname)
-        await startApplyingCoupons(rec)
+        await startApplyingCoupons(rec).catch(err => {
+            console.error('Caramel: apply flow error', err)
+            hideTestingModal()
+        })
         send({ success: true })
     }
 })

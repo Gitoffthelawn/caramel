@@ -79,7 +79,11 @@ async function insertCaramelPrompt(domainRecord) {
         } catch (e) {
             // ignore
         }
-        startApplyingCoupons(domainRecord)
+        startApplyingCoupons(domainRecord).catch(err => {
+            // A throw mid-flow must never leave the overlay trapping the page.
+            console.error('Caramel: apply flow error', err)
+            hideTestingModal()
+        })
         document.body.removeChild(container)
     })
 
@@ -142,6 +146,7 @@ async function showTestingModal(title = '', noLoading = false) {
       "></div>
     </div>`
     modal.innerHTML = `
+    <button id="caramel-testing-close" title="Stop" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border:none;border-radius:50%;background:#fff;color:#ea6925;font-size:16px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3)">×</button>
     <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
       <img src="${logoUrl}" alt="Caramel Logo" style="width: 40px; height: 40px; margin-right: 8px;" />
       <h2 style="margin: 0; font-size: 18px;text-align: center">
@@ -168,6 +173,14 @@ async function showTestingModal(title = '', noLoading = false) {
     // Append modal to overlay, and overlay to body
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
+
+    // Let the user bail out — never trap them behind the overlay.
+    const _close = modal.querySelector('#caramel-testing-close')
+    if (_close)
+        _close.addEventListener('click', () => {
+            _caramelCancelled = true
+            hideTestingModal()
+        })
 }
 
 /**
@@ -196,7 +209,43 @@ function hideTestingModal() {
     }
 }
 
-async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
+/* Robust, accurate copy of an exact coupon code. Tries the async clipboard
+ * API first (works on the user-gesture from the Copy click); falls back to a
+ * hidden textarea + execCommand for pages that block the async API. */
+async function caramelCopyText(text) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text)
+            return true
+        }
+    } catch (e) {
+        // page may block the async clipboard API — fall through to execCommand
+    }
+    try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.top = '-1000px'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        return ok
+    } catch (e) {
+        return false
+    }
+}
+
+async function showFinalModal(
+    savingsAmount,
+    code,
+    message,
+    isSignIn = false,
+    couponList = [],
+) {
     hideTestingModal()
     // Create overlay
     const overlay = document.createElement('div')
@@ -234,24 +283,76 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
     const appliedCode = !savedMoney && !!code
     const isSuccess = savedMoney || appliedCode
 
+    // Manual fallback: auto-apply found nothing but we still have codes. Many
+    // codes are valid yet the store's checkout ignores the extension's
+    // synthetic click (Shopify one-page checkout requires event.isTrusted),
+    // so a hand-pasted code still works — offer the user a copy list.
+    const manualCodes = (
+        !isSuccess && Array.isArray(couponList) ? couponList : []
+    )
+        .filter(c => c && c.code)
+        .slice(0, 8)
+    const hasManual = manualCodes.length > 0
+
+    const esc = s =>
+        String(s == null ? '' : s).replace(
+            /[&<>"']/g,
+            ch =>
+                ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                })[ch],
+        )
+
     // Build the secondary message based on which state we landed in.
-    let defaultMessage
+    let finalMessage
     if (savedMoney) {
-        defaultMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+        finalMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
     } else if (appliedCode) {
-        defaultMessage = `Code ${code} is applied to your cart — review the discount before you check out.`
+        finalMessage = `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
+    } else if (hasManual) {
+        finalMessage =
+            "Auto-apply didn't stick this time — no biggie! Copy a code and drop it in the store's promo box 👇"
     } else {
-        defaultMessage =
+        finalMessage =
+            message ||
             "Looks like you're already getting the best deal. Go ahead and buy!"
     }
-    // Caller-supplied message takes precedence ONLY when we have no win
-    // to celebrate (otherwise the appliedCode message wins so the user
-    // sees what we did for them).
-    const finalMessage = isSuccess ? defaultMessage : message || defaultMessage
 
     // Caramel brand/logo
     const brandColor = '#ea6925'
     const logoUrl = currentBrowser.runtime.getURL('assets/logo.png') // Adjust if needed
+
+    const heading = savedMoney
+        ? '🎉 Savings Found! 🎉'
+        : appliedCode
+          ? '✓ Coupon Applied'
+          : isSignIn
+            ? 'Oups..'
+            : hasManual
+              ? 'Grab a code 🎟️'
+              : 'Heads up 🙂'
+
+    const manualBlock = hasManual
+        ? `
+        <div style="max-height: 190px; overflow-y: auto; margin: 10px 0 2px; text-align: left;">
+          ${manualCodes
+              .map(
+                  c => `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; margin: 6px 0;">
+              <div style="min-width: 0; flex: 1;">
+                <div style="font-weight: bold; color: #333; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(c.code)}</div>
+                ${c.title ? `<div style="font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(c.title)}</div>` : ''}
+              </div>
+              <button class="caramel-manual-copy" data-code="${esc(c.code)}" style="flex: none; background: ${brandColor}; border: none; color: #fff; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy</button>
+            </div>`,
+              )
+              .join('')}
+        </div>`
+        : ''
 
     // Modal inner HTML
     modal.innerHTML = `
@@ -271,27 +372,18 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
       font-size: 24px; 
       font-weight: bold;
     ">
-      ${
-          savedMoney
-              ? '🎉 Savings Found! 🎉'
-              : appliedCode
-                ? '✓ Coupon Applied'
-                : isSignIn
-                  ? 'Oups..'
-                  : message
-                    ? 'No Savings This Time'
-                    : 'Best Price Already!'
-      }
+      ${heading}
     </h2>
     <p style="font-size: 13px; color: #333; margin: 0 0 10px 0;">
       ${finalMessage}
     </p>
+    ${manualBlock}
 
     ${
         isSuccess
             ? `
             <p style="font-size: 22px; margin: 6px 0;">
-              Code: <span style="color: ${brandColor}; text-decoration: underline; font-weight: bold;">${code}</span>
+              Code: <span style="color: ${brandColor}; text-decoration: underline; font-weight: bold;">${esc(code)}</span>
             </p>
             ${
                 savedMoney
@@ -322,7 +414,7 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
         transition: background 0.3s;
       "
     >
-      ${isSignIn ? 'sing In' : 'Proceed to Checkout'}
+      ${isSignIn ? 'Sign In' : hasManual ? 'Done' : 'Proceed to Checkout'}
     </button>
   `
 
@@ -337,6 +429,22 @@ async function showFinalModal(savingsAmount, code, message, isSignIn = false) {
 
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
+
+    // Wire manual-copy buttons — copies the EXACT code shown (data-code).
+    modal.querySelectorAll('.caramel-manual-copy').forEach(btn => {
+        btn.addEventListener('click', async ev => {
+            ev.stopPropagation()
+            const cc = btn.getAttribute('data-code')
+            const ok = await caramelCopyText(cc)
+            const prev = btn.textContent
+            btn.textContent = ok ? 'Copied!' : 'Press Ctrl+C'
+            btn.style.background = ok ? '#1f9d55' : brandColor
+            setTimeout(() => {
+                btn.textContent = prev
+                btn.style.background = brandColor
+            }, 1600)
+        })
+    })
 
     // Close the modal on button click
     modal
