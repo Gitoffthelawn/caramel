@@ -39,12 +39,12 @@
     "content_scripts": [
         {
             "matches": ["https://*/*"],
+            "css": ["caramel-content.css"],
             "js": [
                 "cart-signals.js",
                 "shared-utils.js",
                 "UI-helpers.js",
-                "inject.js",
-                "amazon.js"
+                "inject.js"
             ]
         }
     ],

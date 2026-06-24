@@ -105,52 +105,7 @@ function waitForTextChange(el, timeout = 3000) {
         }, timeout)
     })
 }
-function waitForAmazonFetch() {
-    return new Promise(resolve => {
-        const orig = window.fetch
-        window.fetch = (...args) => {
-            const [url] = args
-            const p = orig(...args)
-            if (url.includes('/apply-discount')) {
-                p.finally(() => {
-                    window.fetch = orig
-                    resolve('network-reply')
-                })
-            }
-            return p
-        }
-    })
-}
-
-/* ---------- Amazon helpers (fast scrape without opening a new tab) ---------- */
-async function getAmazonCartKeywords() {
-    try {
-        // 1) try to read from current DOM
-        const titles = Array.from(
-            document.querySelectorAll('.sc-product-title'),
-        )
-            .map(el => el.textContent.trim())
-            .filter(Boolean)
-        if (titles.length) return titles
-
-        // 2) fetch cart HTML same-origin (keeps cookies)
-        const r = await fetch('/gp/cart/view.html?ref_=nav_cart', {
-            credentials: 'include',
-        })
-        if (!r.ok) return []
-        const html = await r.text()
-        const doc = new DOMParser().parseFromString(html, 'text/html')
-        const fetched = Array.from(doc.querySelectorAll('.sc-product-title'))
-            .map(el => el.textContent.trim())
-            .filter(Boolean)
-        return fetched
-    } catch (e) {
-        log('getAmazonCartKeywords error', e)
-        return []
-    }
-}
-
-/* ---------- UI readiness helper (new) ---------- */
+/* ---------- UI readiness helper ---------- */
 async function waitUntilReady(rec, timeout = 2000) {
     const btn = qOne(rec.couponSubmit)
     const start = performance.now()
@@ -641,9 +596,7 @@ async function applyCoupon(code, rec) {
         // still races so a faster site exits as soon as a signal lands.
         const APPLY_WAIT_MS = 10000
         const waiters = [waitForCartSignal(APPLY_WAIT_MS)]
-        if (priceEl && rec.domain !== 'amazon.com')
-            waiters.push(waitForTextChange(priceEl, APPLY_WAIT_MS))
-        if (rec.domain === 'amazon.com') waiters.push(waitForAmazonFetch())
+        if (priceEl) waiters.push(waitForTextChange(priceEl, APPLY_WAIT_MS))
 
         const via = await Promise.race(waiters)
         log('Wait finished via', via)
@@ -800,16 +753,6 @@ async function classifyCartCategory() {
 
 async function getCoupons(rec) {
     let kw = ''
-    if (rec.domain === 'amazon.com') {
-        recordTiming('AUTO_INSERT_AMAZON_SCRAPE_REQUEST')
-        const titles = await getAmazonCartKeywords()
-        recordTiming('AUTO_INSERT_AMAZON_SCRAPE_RESPONSE', {
-            count: titles.length,
-        })
-        kw = (titles || []).join(',')
-        log('Amazon keywords', kw)
-    }
-
     // Dev hook: deterministic coupons when using #caramel-test
     if (location.hash && location.hash.includes('caramel-test')) {
         log('DEV MODE: returning mocked coupons')
@@ -997,30 +940,36 @@ async function startApplyingCoupons(rec) {
     }
 }
 
-/* --------------------------------------------------  listeners (unchanged) */
-window.addEventListener('message', ev => {
-    if (!CARAMEL_ALLOWED_ORIGINS.has(ev.origin)) return
-    if (ev.data?.token) {
-        currentBrowser.storage.sync.set(
-            {
-                token: ev.data.token,
-                user: {
-                    username: ev.data.username || 'CaramelUser',
-                    image: ev.data.image,
+/* --------------------------------------------------  listeners
+ * Guard: register once per realm. Without this, SPA re-injections stack
+ * duplicate listeners → double-fires, memory leaks. */
+if (!window.__caramel_listeners_bound) {
+    window.__caramel_listeners_bound = true
+
+    window.addEventListener('message', ev => {
+        if (!CARAMEL_ALLOWED_ORIGINS.has(ev.origin)) return
+        if (ev.data?.token) {
+            currentBrowser.storage.sync.set(
+                {
+                    token: ev.data.token,
+                    user: {
+                        username: ev.data.username || 'CaramelUser',
+                        image: ev.data.image,
+                    },
                 },
-            },
-            tryInitialize,
-        )
-    }
-})
-currentBrowser.runtime.onMessage.addListener(async (req, _s, send) => {
-    if (req.action === 'userLoggedIn') {
-        log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })
-        const rec = await getDomainRecord(location.hostname)
-        await startApplyingCoupons(rec).catch(err => {
-            console.error('Caramel: apply flow error', err)
-            hideTestingModal()
-        })
-        send({ success: true })
-    }
-})
+                tryInitialize,
+            )
+        }
+    })
+    currentBrowser.runtime.onMessage.addListener(async (req, _s, send) => {
+        if (req.action === 'userLoggedIn') {
+            log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })
+            const rec = await getDomainRecord(location.hostname)
+            await startApplyingCoupons(rec).catch(err => {
+                console.error('Caramel: apply flow error', err)
+                hideTestingModal()
+            })
+            send({ success: true })
+        }
+    })
+}

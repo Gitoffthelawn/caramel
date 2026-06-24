@@ -9,6 +9,15 @@ const EXTENSION_API_KEY = 'WXqEpm2uOV5jjJXPpnQFyZiNdaPVUrtd2LIrf4kc1JA'
 const caramelUrl = path =>
     new URL(path, `${globalThis.CARAMEL_BASE_URL}/`).toString()
 
+const FETCH_TIMEOUT_MS = 8000
+function fetchWithTimeout(url, opts = {}) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
+    return fetch(url, { ...opts, signal: ctrl.signal }).finally(() =>
+        clearTimeout(timer),
+    )
+}
+
 // Auto-switch to localhost when loaded as unpacked dev extension
 if (typeof chrome !== 'undefined' && chrome.management) {
     chrome.management.getSelf(info => {
@@ -142,69 +151,8 @@ currentBrowser.runtime.onMessage.addListener(
         } else if (message.action === 'keepAlive') {
             console.log('Received keep-alive message from content script')
             sendResponse({ status: 'alive' }) // Respond to the message
-        } else if (message.action === 'scrapeAmazonCartKeywords') {
-            const originalTabId = sender?.tab?.id
-            try {
-                console.log('AUTO_INSERT_AMAZON_SCRAPE_START', {
-                    originalTabId,
-                    t: performance.now(),
-                })
-            } catch (e) {}
-            currentBrowser.tabs
-                .create({
-                    url: 'https://www.amazon.com/gp/cart/view.html?ref_=nav_cart',
-                    active: false,
-                })
-                .then(async cartTab => {
-                    try {
-                        await waitForTabComplete(cartTab.id)
-
-                        const resp = await sendMessageToTab(cartTab.id, {
-                            action: 'caramel:scrapeAmazonCartKeywordsFromCart',
-                        })
-
-                        try {
-                            console.log('AUTO_INSERT_AMAZON_SCRAPE_END', {
-                                count: (resp?.keywords || []).length,
-                                t: performance.now(),
-                            })
-                        } catch (e) {}
-
-                        sendResponse({ keywords: resp?.keywords || [] })
-                    } catch (error) {
-                        console.error(
-                            'Error during Amazon cart scraping:',
-                            error,
-                        )
-                        try {
-                            console.log('AUTO_INSERT_AMAZON_SCRAPE_ERROR', {
-                                error: String(error),
-                                t: performance.now(),
-                            })
-                        } catch (e) {}
-                        sendResponse({
-                            keywords: [],
-                            error: 'Failed to scrape Amazon cart',
-                        })
-                    } finally {
-                        if (cartTab?.id) currentBrowser.tabs.remove(cartTab.id)
-                        if (originalTabId)
-                            currentBrowser.tabs.update(originalTabId, {
-                                active: true,
-                            })
-                    }
-                })
-                .catch(error => {
-                    console.error('Error creating Amazon cart tab:', error)
-                    sendResponse({
-                        keywords: [],
-                        error: 'Failed to open Amazon cart',
-                    })
-                })
-
-            return true
         } else if (message.action === 'classifyCart') {
-            fetch(caramelUrl('api/classify-cart'), {
+            fetchWithTimeout(caramelUrl('api/classify-cart'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(message.signals || {}),
@@ -233,7 +181,7 @@ currentBrowser.runtime.onMessage.addListener(
                 url: url.toString(),
                 t: Date.now(),
             })
-            fetch(url.toString())
+            fetchWithTimeout(url.toString())
                 .then(async r => {
                     if (!r.ok) return { coupons: [] }
                     const json = await r.json()
@@ -249,7 +197,7 @@ currentBrowser.runtime.onMessage.addListener(
             return true
         } else if (message.action === 'fetchSupportedStores') {
             const url = caramelUrl('api/extension/supported-stores')
-            fetch(url, {
+            fetchWithTimeout(url, {
                 headers: { 'x-api-key': EXTENSION_API_KEY },
             })
                 .then(async r => {
