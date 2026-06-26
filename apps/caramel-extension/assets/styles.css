@@ -494,25 +494,45 @@ body {
         url('data:image/svg+xml;base64,PHN2Zw0KICAgICAgICB3aWR0aD0iNjAiDQogICAgICAgIGhlaWdodD0iMTYiDQogICAgICAgIHZpZXdCb3g9IjAgMCA2MCAxNiINCiAgICAgICAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIg0KPg0KICAgIDwhLS0gT3ZlcmxhcHBpbmcgc3F1YXJlcyAocmVwcmVzZW50IHRoZSAiY29weSIgaWNvbikgLS0+DQogICAgPHJlY3QNCiAgICAgICAgICAgIHg9IjAiDQogICAgICAgICAgICB5PSIzIg0KICAgICAgICAgICAgd2lkdGg9IjgiDQogICAgICAgICAgICBoZWlnaHQ9IjEwIg0KICAgICAgICAgICAgZmlsbD0ibm9uZSINCiAgICAgICAgICAgIHN0cm9rZT0iI2VhNjkyNSINCiAgICAgICAgICAgIHN0cm9rZS13aWR0aD0iMSINCiAgICAgICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCINCiAgICAgICAgICAgIHN0cm9rZS1saW5lam9pbj0icm91bmQiDQogICAgLz4NCiAgICA8cmVjdA0KICAgICAgICAgICAgeD0iMiINCiAgICAgICAgICAgIHk9IjEiDQogICAgICAgICAgICB3aWR0aD0iOCINCiAgICAgICAgICAgIGhlaWdodD0iMTAiDQogICAgICAgICAgICBmaWxsPSJub25lIg0KICAgICAgICAgICAgc3Ryb2tlPSIjZWE2OTI1Ig0KICAgICAgICAgICAgc3Ryb2tlLXdpZHRoPSIxIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCINCiAgICAvPg0KDQogICAgPCEtLSBUaGUgd29yZCAiQ29weSIgdG8gdGhlIHJpZ2h0IC0tPg0KICAgIDx0ZXh0DQogICAgICAgICAgICB4PSIxOCINCiAgICAgICAgICAgIHk9IjEyIg0KICAgICAgICAgICAgZmlsbD0iI2VhNjkyNSINCiAgICAgICAgICAgIGZvbnQtc2l6ZT0iMTAiDQogICAgICAgICAgICBmb250LWZhbWlseT0ic2Fucy1zZXJpZiINCiAgICA+DQogICAgICAgIENvcHkNCiAgICA8L3RleHQ+DQo8L3N2Zz4NCg==')
             8 8,
         copy;
-    border: 1.5px dashed #f0a874;
-    border-radius: 12px;
+    border: 1.5px dashed #ecd5c2;
+    border-radius: 13px;
     padding: 14px 16px;
     margin-bottom: 12px;
     transition:
         background-color 0.18s ease,
         border-color 0.18s ease,
         box-shadow 0.18s ease,
+        opacity 0.18s ease,
         transform 0.18s ease;
     background-color: #fff;
-    box-shadow: 0 1px 2px rgba(234, 105, 37, 0.05);
+    box-shadow:
+        0 1px 2px rgba(20, 14, 10, 0.04),
+        0 8px 20px -12px rgba(20, 14, 10, 0.18);
     position: relative;
 }
 
-/* Subtle hover effect */
+/* Hover brings the brand orange back and lifts the ticket. */
 .coupon-item:hover {
     background-color: #fffaf6;
     border-color: #ea6925;
-    box-shadow: 0 6px 16px rgba(234, 105, 37, 0.12);
+    box-shadow:
+        0 2px 4px rgba(20, 14, 10, 0.05),
+        0 12px 24px -10px rgba(234, 105, 37, 0.26);
+    transform: translateY(-1px);
+}
+
+/* Dead codes (invalid / expired) recede so live codes draw the eye first —
+   the visual rhythm that was missing when every card shouted equally. */
+.coupon-item-dead {
+    opacity: 0.6;
+    border-color: #e3ddd6;
+    background-color: #fcfbfa;
+    box-shadow: none;
+}
+.coupon-item-dead:hover {
+    opacity: 0.9;
+    border-color: #d2cbc4;
+    box-shadow: 0 8px 18px -12px rgba(20, 14, 10, 0.22);
     transform: translateY(-1px);
 }
 

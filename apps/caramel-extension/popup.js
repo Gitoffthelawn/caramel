@@ -561,6 +561,8 @@ function renderCouponsView(coupons, user, domain) {
                               'valid_with_warning',
                           ])
                           const isRestricted = restrictedSet.has(c.status)
+                          const isDead =
+                              c.status === 'invalid' || c.status === 'expired'
                           let warning = ''
                           if (isRestricted) {
                               const baseMsg =
@@ -618,7 +620,7 @@ function renderCouponsView(coupons, user, domain) {
                               ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''
                           return `
-            <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
+            <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}${isDead ? ' coupon-item-dead' : ''}">
               <div class="coupon-head">
                 <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
                 ${badge}
