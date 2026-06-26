@@ -227,13 +227,26 @@
     margin: 0 0 10px 0;
 }
 #caramel-final-overlay .caramel-final-code {
-    font-size: 22px;
-    margin: 6px 0;
+    font-size: 15px;
+    color: #6b6460;
+    margin: 12px 0 6px;
 }
+/* The applied/found code rendered as a monospace chip (matches the popup
+   code pills) rather than an underlined hyperlink. */
 #caramel-final-overlay .caramel-final-code span {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 4px 12px;
     color: #ea6925;
-    text-decoration: underline;
-    font-weight: bold;
+    background: #fff3ec;
+    border: 1px solid #f6d3bd;
+    border-radius: 8px;
+    font-family:
+        'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-decoration: none;
 }
 #caramel-final-overlay .caramel-final-savings {
     font-size: 18px;
@@ -286,9 +299,12 @@
     flex: 1;
 }
 .caramel-manual-row .caramel-manual-code {
-    font-weight: bold;
-    color: #333;
-    font-size: 14px;
+    font-family:
+        'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+    font-weight: 700;
+    color: #1c1917;
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
