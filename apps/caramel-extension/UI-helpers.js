@@ -190,11 +190,10 @@ async function showFinalModal(
         finalMessage = `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
     } else if (hasManual) {
         finalMessage =
-            "Auto-apply didn't stick this time — no biggie! Copy a code and drop it in the store's promo box 👇"
+            "Auto-apply didn't stick this time. Copy a code and paste it in the store's promo box."
     } else {
         finalMessage =
-            message ||
-            "Looks like you're already getting the best deal. Go ahead and buy!"
+            message || "Looks like you're already getting the best deal."
     }
 
     // Caramel brand/logo
@@ -202,14 +201,14 @@ async function showFinalModal(
     const logoUrl = currentBrowser.runtime.getURL('assets/logo.png') // Adjust if needed
 
     const heading = savedMoney
-        ? '🎉 Savings Found! 🎉'
+        ? 'Savings Found'
         : appliedCode
           ? '✓ Coupon Applied'
           : isSignIn
-            ? 'Oups..'
+            ? 'Sign in to continue'
             : hasManual
-              ? 'Grab a code 🎟️'
-              : 'Heads up 🙂'
+              ? 'Grab a code'
+              : 'Heads up'
 
     const manualBlock = hasManual
         ? `

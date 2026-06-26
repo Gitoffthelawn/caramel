@@ -841,7 +841,7 @@ async function startApplyingCoupons(rec) {
         showFinalModal(
             0,
             null,
-            "Couldn't load codes right now — give it another go in a sec 🙂",
+            "Couldn't load codes right now — give it another go in a moment.",
         )
         return
     }
@@ -850,7 +850,7 @@ async function startApplyingCoupons(rec) {
         showFinalModal(
             0,
             null,
-            "No codes for this store just yet — we're on it! 🐝",
+            "No codes for this store just yet — we're working on it.",
         )
         return
     }
