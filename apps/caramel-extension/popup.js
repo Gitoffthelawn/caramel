@@ -614,8 +614,10 @@ function renderCouponsView(coupons, user, domain) {
                               : ''
                           return `
             <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
-              ${badge}
-              <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
+              <div class="coupon-head">
+                <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
+                ${badge}
+              </div>
               <div class="coupon-desc">${escHtml(c.description || '')}</div>
               ${warning}
               <div class="coupon-action">

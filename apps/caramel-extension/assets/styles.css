@@ -540,13 +540,23 @@ body {
     right: -7px;
 }
 
-/* Verification status tag — pinned to the ticket's top-right corner so it
-   reads as a stamp on the coupon. Colour/background come from popup.js per
-   status (green=verified, amber=restricted, grey=pending, red=invalid). */
+/* Title + status tag share a flex row: the title (flex:1) shrinks and wraps
+   beside the badge, so a wide badge ("Verified · may vary") can never overlap
+   the title text regardless of length. */
+.coupon-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* Verification status tag — sits at the top-right of the ticket as a stamp.
+   Colour/background come from popup.js per status (green=verified,
+   amber=restricted, grey=pending, red=invalid). */
 .coupon-badge {
-    position: absolute;
-    top: 12px;
-    right: 13px;
+    flex: none;
+    margin-top: 1px;
     padding: 2px 9px;
     border-radius: 999px;
     font-size: 10.5px;
@@ -559,12 +569,12 @@ body {
 
 /* The coupon's title */
 .coupon-title {
+    flex: 1;
+    min-width: 0;
     font-weight: 700;
     font-size: 14px;
     line-height: 1.35;
-    margin-bottom: 4px;
     color: #1c1917;
-    padding-right: 96px; /* reserve room for the top-right status tag */
 }
 
 /* The coupon's description text */
