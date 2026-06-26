@@ -1,5 +1,18 @@
 //UI HELPERS
 
+// Inline icon set (Lucide-style strokes, no emoji). Guarded `var` so a second
+// content-script injection into the same realm doesn't throw on redeclaration.
+if (typeof CARAMEL_ICONS === 'undefined') {
+    var CARAMEL_ICONS = {
+        x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+        check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+        tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/></svg>',
+        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+        spark: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M11.2 3.5a.85.85 0 0 1 1.6 0l1.5 3.9a.85.85 0 0 0 .5.5l3.9 1.5a.85.85 0 0 1 0 1.6l-3.9 1.5a.85.85 0 0 0-.5.5l-1.5 3.9a.85.85 0 0 1-1.6 0l-1.5-3.9a.85.85 0 0 0-.5-.5l-3.9-1.5a.85.85 0 0 1 0-1.6l3.9-1.5a.85.85 0 0 0 .5-.5l1.5-3.9z"/><path d="M19 3.2c.13 0 .25.08.3.2l.5 1.3c.04.1.12.18.22.22l1.3.5a.32.32 0 0 1 0 .6l-1.3.5a.32.32 0 0 0-.22.22l-.5 1.3a.32.32 0 0 1-.6 0l-.5-1.3a.32.32 0 0 0-.22-.22l-1.3-.5a.32.32 0 0 1 0-.6l1.3-.5a.32.32 0 0 0 .22-.22l.5-1.3a.32.32 0 0 1 .3-.2z"/></svg>',
+        copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    }
+}
+
 /* -------------------------------------------------- UI prompt   */
 
 async function insertCaramelPrompt(domainRecord) {
@@ -8,16 +21,18 @@ async function insertCaramelPrompt(domainRecord) {
     container.id = 'caramel-small-prompt'
     const logoUrl = await currentBrowser.runtime.getURL('assets/logo-light.png')
     container.innerHTML = `
-    <div class="caramel-prompt-header">
-        <img class="caramel-prompt-logo" src="${logoUrl}" alt="logo"/>
-        <div class="caramel-prompt-label">Try Caramel Coupons? </div>
-     </div><br>
-      <button id="caramel-close-btn">×</button>
-    <small>Save more with automatic coupons!</small>
+    <button id="caramel-close-btn" aria-label="Dismiss">${CARAMEL_ICONS.x}</button>
+    <div class="caramel-prompt-body">
+        <img class="caramel-prompt-logo" src="${logoUrl}" alt="Caramel"/>
+        <div class="caramel-prompt-text">
+            <div class="caramel-prompt-title">Coupons available</div>
+            <div class="caramel-prompt-sub">${CARAMEL_ICONS.spark}Apply the best code automatically</div>
+        </div>
+    </div>
 `
 
     container.addEventListener('click', event => {
-        if (event.target.id === 'caramel-close-btn') {
+        if (event.target.closest('#caramel-close-btn')) {
             // If the close button is clicked, just remove the popup
             document.body.removeChild(container)
             return
@@ -50,18 +65,16 @@ async function showTestingModal(title = '', noLoading = false) {
     const modal = document.createElement('div')
     modal.id = 'caramel-testing-modal'
 
-    const logoUrl = currentBrowser.runtime.getURL('assets/logo-light.png')
-
-    const loadingHTML = `<p id="caramel-test-status">Loading...</p>
+    const loadingHTML = `<p id="caramel-test-status">Looking for the best code…</p>
     <div id="caramel-progress-container">
       <div id="caramel-progress-bar"></div>
     </div>`
 
     modal.innerHTML = `
-    <button id="caramel-testing-close" title="Stop">×</button>
-    <div class="caramel-modal-header">
-      <img class="caramel-modal-logo" src="${logoUrl}" alt="Caramel Logo" />
-      <h2>${title || 'Applying Coupons...'}</h2>
+    <button id="caramel-testing-close" title="Stop" aria-label="Stop">${CARAMEL_ICONS.x}</button>
+    <div class="caramel-modal-head">
+      <span class="caramel-spinner"></span>
+      <h2>${title || 'Applying coupons'}</h2>
     </div>
    ${noLoading ? '' : loadingHTML}`
 
@@ -185,31 +198,35 @@ async function showFinalModal(
     // Build the secondary message based on which state we landed in.
     let finalMessage
     if (savedMoney) {
-        finalMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+        finalMessage = 'Caramel applied the best code it found at checkout.'
     } else if (appliedCode) {
         finalMessage = `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
     } else if (hasManual) {
         finalMessage =
-            "Auto-apply didn't stick this time — no biggie! Copy a code and drop it in the store's promo box 👇"
+            "Auto-apply didn't catch this one. Copy a code and paste it at checkout."
     } else {
         finalMessage =
             message ||
-            "Looks like you're already getting the best deal. Go ahead and buy!"
+            'Looks like you already have the best price. Go ahead and check out.'
     }
 
-    // Caramel brand/logo
-    const brandColor = '#ea6925'
-    const logoUrl = currentBrowser.runtime.getURL('assets/logo.png') // Adjust if needed
-
     const heading = savedMoney
-        ? '🎉 Savings Found! 🎉'
+        ? 'Savings found'
         : appliedCode
-          ? '✓ Coupon Applied'
+          ? 'Coupon applied'
           : isSignIn
-            ? 'Oups..'
+            ? 'Sign in to continue'
             : hasManual
-              ? 'Grab a code 🎟️'
-              : 'Heads up 🙂'
+              ? 'Grab a code'
+              : "You're all set"
+    const tone = isSuccess ? 'success' : hasManual ? 'brand' : 'info'
+    const iconSvg = savedMoney
+        ? CARAMEL_ICONS.spark
+        : appliedCode
+          ? CARAMEL_ICONS.check
+          : hasManual
+            ? CARAMEL_ICONS.tag
+            : CARAMEL_ICONS.info
 
     const manualBlock = hasManual
         ? `
@@ -222,7 +239,7 @@ async function showFinalModal(
                 <div class="caramel-manual-code">${esc(c.code)}</div>
                 ${c.title ? `<div class="caramel-manual-title">${esc(c.title)}</div>` : ''}
               </div>
-              <button class="caramel-manual-copy" data-code="${esc(c.code)}">Copy</button>
+              <button class="caramel-manual-copy" data-code="${esc(c.code)}">${CARAMEL_ICONS.copy}Copy</button>
             </div>`,
               )
               .join('')}
@@ -230,28 +247,27 @@ async function showFinalModal(
         : ''
 
     modal.innerHTML = `
-    <div class="caramel-final-logo">
-      <img src="${logoUrl}" alt="Caramel Logo" />
-    </div>
+    <div class="caramel-final-icon caramel-final-icon--${tone}">${iconSvg}</div>
     <h2>${heading}</h2>
     <p class="caramel-final-msg">${finalMessage}</p>
-    ${manualBlock}
     ${
         isSuccess
             ? `
-            <p class="caramel-final-code">
-              Code: <span>${esc(code)}</span>
-            </p>
+            <div class="caramel-final-code">
+              <span class="caramel-final-code-label">Code</span>
+              <span class="caramel-final-code-val">${esc(code)}</span>
+            </div>
             ${
                 savedMoney
-                    ? `<p class="caramel-final-savings">You saved $${savingsAmount.toFixed(2)}!</p>`
-                    : `<p class="caramel-final-hint">Discount visible in your cart.</p>`
+                    ? `<p class="caramel-final-savings">You saved $${savingsAmount.toFixed(2)}</p>`
+                    : `<p class="caramel-final-hint">Discount applied in your cart</p>`
             }
           `
             : ''
     }
+    ${manualBlock}
     <button id="caramel-final-ok-btn">
-      ${isSignIn ? 'Sign In' : hasManual ? 'Done' : 'Proceed to Checkout'}
+      ${isSignIn ? 'Sign in' : hasManual ? 'Done' : 'Continue to checkout'}
     </button>
   `
 
@@ -264,12 +280,15 @@ async function showFinalModal(
             ev.stopPropagation()
             const cc = btn.getAttribute('data-code')
             const ok = await caramelCopyText(cc)
-            const prev = btn.textContent
-            btn.textContent = ok ? 'Copied!' : 'Press Ctrl+C'
-            btn.style.background = ok ? '#1f9d55' : brandColor
+            btn.textContent = ok ? 'Copied' : 'Press Ctrl+C'
+            btn.style.background = ok ? '#15803d' : ''
+            btn.style.borderColor = ok ? '#15803d' : ''
+            btn.style.color = ok ? '#fff' : ''
             setTimeout(() => {
-                btn.textContent = prev
-                btn.style.background = brandColor
+                btn.innerHTML = `${CARAMEL_ICONS.copy}Copy`
+                btn.style.background = ''
+                btn.style.borderColor = ''
+                btn.style.color = ''
             }, 1600)
         })
     })

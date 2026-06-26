@@ -1,863 +1,822 @@
-/* --- Global Reset & Base --- */
+/* ============================================================
+   Caramel popup — modern UI (2026 refresh)
+   Brand caramel kept; refined toward a clean, professional system.
+   ============================================================ */
+
+:root {
+    /* Brand */
+    --cm-brand: #ea6925;
+    --cm-brand-600: #d65d1f;
+    --cm-brand-700: #b94d18;
+    --cm-brand-50: #fff4ec;
+    --cm-brand-100: #ffe6d5;
+
+    /* Neutrals (warm) */
+    --cm-ink: #1c1917;
+    --cm-ink-2: #57534e;
+    --cm-ink-3: #8a817c;
+    --cm-line: #ece9e6;
+    --cm-line-2: #f4f2f0;
+    --cm-surface: #ffffff;
+    --cm-surface-2: #faf8f6;
+
+    /* Semantic */
+    --cm-green: #15803d;
+    --cm-green-bg: #e7f6ec;
+    --cm-amber: #b45309;
+    --cm-amber-bg: #fdf2e0;
+    --cm-red: #b91c1c;
+    --cm-red-bg: #fdeaea;
+    --cm-gray: #57534e;
+    --cm-gray-bg: #f1efed;
+
+    /* Form */
+    --cm-r-sm: 8px;
+    --cm-r: 12px;
+    --cm-r-lg: 16px;
+    --cm-pill: 999px;
+
+    --cm-shadow-sm:
+        0 1px 2px rgba(28, 25, 23, 0.06), 0 1px 3px rgba(28, 25, 23, 0.08);
+    --cm-shadow-md: 0 6px 16px rgba(28, 25, 23, 0.1);
+    --cm-shadow-lg: 0 16px 40px rgba(28, 25, 23, 0.16);
+
+    --cm-font:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+        'Apple Color Emoji', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 html,
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Arial', sans-serif;
-    overflow: hidden; /* Keep extension popup from scrolling */
+    font-family: var(--cm-font);
+    color: var(--cm-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
+
 body {
-    width: 420px;
-    height: 470px;
-    display: flex;
-    justify-content: center;
-    position: relative;
-    background: #ffffff;
+    width: 384px;
+    min-height: 240px;
+    background: var(--cm-surface);
+    overflow-x: hidden;
 }
 
-/* --- Doodles & Wave Background --- */
-.popup-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px; /* Match body width */
-    height: 600px; /* Match body height */
-    overflow: hidden;
-    z-index: 1;
-}
-
-/* Wave shape at top */
-.popup-wave {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px;
-    height: 220px;
-    z-index: 2;
-}
-
-/* Doodles */
+/* Kill the old decorative layers */
+.popup-bg,
+.popup-wave,
 .doodle {
-    position: absolute;
-    width: 420px;
-    opacity: 0.15;
-    z-index: 1;
+    display: none !important;
 }
 
-/* --- Loading Overlay --- */
+/* --- Loading overlay --- */
 .loading-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px;
-    height: 600px;
-    background: rgba(0, 0, 0, 0.35);
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(2px);
     display: flex;
     justify-content: center;
     align-items: center;
-    border-radius: 20px;
     z-index: 999;
 }
 .loading-container img {
-    width: 60px;
-    height: 60px;
-    animation: fadeIn 0.5s ease-in-out infinite alternate;
+    width: 40px;
+    height: 40px;
+    animation: cmSpin 0.9s linear infinite;
 }
 
-/* --- Popup Container (on top of wave) --- */
+/* --- Shell --- */
 .popup-container {
     position: relative;
     z-index: 10;
-    width: 380px;
-    border-radius: 20px;
-    margin: auto; /* space from wave */
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    animation: fadeIn 0.8s ease forwards;
+    width: 100%;
+    background: var(--cm-surface);
+    animation: cmRise 0.28s ease both;
 }
 
 /* --- Header --- */
 .popup-header {
     position: relative;
-    text-align: center;
-    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--cm-line);
+    background: var(--cm-surface);
 }
-
+.popup-header a {
+    display: inline-flex;
+    line-height: 0;
+}
 .popup-logo {
-    width: 140px;
+    width: 116px;
     height: auto;
-    animation: bounce 2s ease-in-out;
+    animation: none;
 }
 .popup-logo:hover {
-    animation: bounce 2s infinite;
+    animation: none;
 }
-/* Profile settings icon in top-right corner */
 .profile-settings {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 28px;
-    height: 28px;
-    background: url('assets/default-profile.png') no-repeat center center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: url('default-profile.png') no-repeat center center;
     background-size: cover;
+    border: 1px solid var(--cm-line);
     cursor: pointer;
-    display: none; /* shown only on login */
+    display: none;
 }
 
-/* --- Main Content --- */
 #mainContent {
-    padding: 16px;
-    text-align: center;
+    padding: 14px 16px 18px;
+    text-align: left;
 }
 
-/* --- Login Prompt --- */
-.login-prompt h2 {
-    font-size: 24px;
-    color: #ea6925;
+/* ============================================================
+   Coupons view
+   ============================================================ */
+.coupons-profile-card {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: cmRise 0.28s ease both;
+    max-width: none;
+    margin: 0;
+    overflow: visible;
+}
+
+.coupons-profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 12px;
 }
-.login-prompt p {
-    font-size: 14px !important;
-    color: #444;
-    margin-bottom: 16px;
+.coupons-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
-.login-prompt a {
-    color: #ea6925;
-    text-decoration: none;
-}
-.login-button {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* --- Profile Card --- */
-.profile-card {
-    padding: 16px;
-}
-.profile-image {
-    width: 80px;
-    height: 80px;
+.coupons-profile-image {
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--cm-line);
 }
-.welcome-message {
-    font-size: 18px;
-    color: #ea6925;
-    margin-top: 12px;
-    font-weight: bold;
+.coupons-user-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cm-ink-2);
 }
-.username {
-    font-size: 14px;
-    color: #555;
-    margin-bottom: 16px;
+
+.coupon-header {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--cm-ink-3);
+    margin: 0 0 10px 0;
+    font-weight: 600;
+    text-align: left;
+    text-transform: none;
 }
-.profile-actions {
+.coupon-header strong {
+    color: var(--cm-ink);
+    font-weight: 700;
+}
+
+/* --- Coupon list --- */
+.coupon-list {
+    max-height: 372px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0 -4px;
+    padding: 2px 4px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 12px;
+    gap: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cm-line) transparent;
 }
+.coupon-list::-webkit-scrollbar {
+    width: 8px;
+}
+.coupon-list::-webkit-scrollbar-thumb {
+    background: var(--cm-line);
+    border-radius: 999px;
+    border: 2px solid var(--cm-surface);
+}
+.coupon-list > p {
+    color: var(--cm-ink-3);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px 0;
+    margin: 0;
+}
+
+/* --- Coupon card (ticket): keep the signature perforation + notches, modernized --- */
+.coupon-item {
+    cursor: pointer;
+    border: 1.5px dashed #f0b48b;
+    border-radius: var(--cm-r);
+    padding: 13px 15px;
+    margin: 0;
+    background: var(--cm-surface);
+    box-shadow: var(--cm-shadow-sm);
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease,
+        background 0.16s ease;
+    position: relative;
+}
+.coupon-item:hover {
+    border-color: var(--cm-brand);
+    background: var(--cm-brand-50);
+    box-shadow: var(--cm-shadow-md);
+    transform: translateY(-1px);
+}
+.coupon-item:active {
+    transform: translateY(0);
+}
+/* punched ticket notches on the left & right edges */
+.coupon-item::before,
+.coupon-item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    background: var(--cm-surface);
+    border: 1px solid var(--cm-line);
+    border-radius: 50%;
+}
+.coupon-item::before {
+    left: -8px;
+}
+.coupon-item::after {
+    right: -8px;
+}
+
+/* top row: code + badge */
+.coupon-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.coupon-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--cm-brand-700);
+    background: var(--cm-brand-50);
+    border: 1px solid var(--cm-brand-100);
+    border-radius: var(--cm-r-sm);
+    padding: 4px 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 62%;
+}
+
+.coupon-title {
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--cm-ink);
+    margin: 0 0 2px 0;
+}
+.coupon-desc {
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--cm-ink-2);
+    margin: 0 0 8px 0;
+}
+
+/* --- Badges --- */
+.coupon-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    padding: 3px 9px;
+    border-radius: var(--cm-pill);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+.coupon-badge svg {
+    width: 12px;
+    height: 12px;
+}
+.coupon-badge--valid {
+    color: var(--cm-green);
+    background: var(--cm-green-bg);
+}
+.coupon-badge--warn {
+    color: var(--cm-amber);
+    background: var(--cm-amber-bg);
+}
+.coupon-badge--neutral {
+    color: var(--cm-gray);
+    background: var(--cm-gray-bg);
+}
+.coupon-badge--bad {
+    color: var(--cm-red);
+    background: var(--cm-red-bg);
+}
+
+/* --- Action row --- */
+.coupon-action {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    justify-content: flex-end;
+}
+.copyBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--cm-brand);
+    color: #fff;
+    border: none;
+    border-radius: var(--cm-r-sm);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    transition:
+        background 0.16s ease,
+        transform 0.1s ease;
+}
+.copyBtn svg {
+    width: 14px;
+    height: 14px;
+}
+.copyBtn:hover {
+    background: var(--cm-brand-600);
+}
+.copyBtn:active {
+    transform: scale(0.97);
+}
+.copyBtn:focus-visible {
+    outline: 2px solid var(--cm-brand);
+    outline-offset: 2px;
+}
+
+/* --- Restriction note --- */
+.coupon-item-restricted {
+    border-color: var(--cm-amber-bg);
+}
+.coupon-restriction {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--cm-amber);
+    background: var(--cm-amber-bg);
+    border-radius: var(--cm-r-sm);
+}
+.coupon-restriction-icon {
+    flex: none;
+    line-height: 0;
+    margin-top: 1px;
+}
+.coupon-restriction-icon svg {
+    width: 14px;
+    height: 14px;
+}
+.coupon-restriction-text {
+    flex: 1;
+    line-height: 1.4;
+    color: #7c4a12;
+}
+.coupon-restriction-text b {
+    color: var(--cm-amber);
+    font-weight: 700;
+}
+.coupon-restriction-detail {
+    margin-top: 2px;
+    color: #8a5a1f;
+    font-size: 11px;
+    opacity: 0.9;
+}
+
+/* --- Logout chip in coupons header --- */
+.coupons-logout-button {
+    background: var(--cm-surface);
+    color: var(--cm-ink-2);
+    border: 1px solid var(--cm-line);
+    border-radius: var(--cm-r-sm);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    transition:
+        background 0.16s ease,
+        border-color 0.16s ease;
+}
+.coupons-logout-button:hover {
+    background: var(--cm-surface-2);
+    border-color: var(--cm-ink-3);
+}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.copy-toast-container {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    max-width: 90%;
+}
+.copy-toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--cm-ink);
+    color: #fff;
+    padding: 9px 14px;
+    border-radius: var(--cm-pill);
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: var(--cm-shadow-lg);
+    animation: cmToastIn 0.22s ease forwards;
+}
+.copy-toast.fade-out {
+    animation: cmToastOut 0.25s ease forwards;
+}
+
+/* ============================================================
+   Empty / unsupported / login states
+   ============================================================ */
+.no-coupons-view {
+    background: var(--cm-surface);
+    border-radius: var(--cm-r);
+    padding: 26px 18px;
+    text-align: center;
+    animation: cmRise 0.28s ease both;
+}
+.no-coupons-illus {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 12px;
+    color: var(--cm-brand);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cm-brand-50);
+    border-radius: 50%;
+}
+.no-coupons-illus svg {
+    width: 24px;
+    height: 24px;
+}
+.no-coupons-view h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--cm-ink);
+    margin: 0 0 4px;
+}
+.no-coupons-view p {
+    font-size: 13px;
+    color: var(--cm-ink-2);
+    line-height: 1.45;
+    margin: 0 auto 16px;
+    max-width: 260px;
+}
+.no-coupons-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 1px solid var(--cm-line);
+}
+.no-coupons-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.cm-gh-link {
+    display: inline-flex;
+    margin-top: 16px;
+}
+
+/* --- Buttons (primary / ghost) --- */
+.supported-sites-btn,
+.toggle-login-btn,
+.login-button,
 .settings-button,
 .logout-button {
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: var(--cm-r-sm);
+    font-weight: 600;
+    font-size: 13.5px;
+    font-family: inherit;
     cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    text-decoration: none;
+    transition:
+        background 0.16s ease,
+        border-color 0.16s ease,
+        transform 0.1s ease;
 }
+.supported-sites-btn,
+.login-button,
 .settings-button {
-    background: #ea6925;
+    background: var(--cm-brand);
     color: #fff;
+    border: 1px solid var(--cm-brand);
+    box-shadow: var(--cm-shadow-sm);
 }
-.logout-button {
-    border: 1px solid #ea6925;
-    color: #ea6925;
-}
+.supported-sites-btn:hover,
+.login-button:hover,
 .settings-button:hover {
-    background: #da7f52;
+    background: var(--cm-brand-600);
+    border-color: var(--cm-brand-600);
 }
+.toggle-login-btn,
+.logout-button {
+    background: var(--cm-surface);
+    color: var(--cm-ink);
+    border: 1px solid var(--cm-line);
+}
+.toggle-login-btn:hover,
 .logout-button:hover {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-surface-2);
+    border-color: var(--cm-ink-3);
+}
+.supported-sites-btn:active,
+.toggle-login-btn:active,
+.login-button:active {
+    transform: scale(0.98);
 }
 
-/* --- Animations --- */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+.back-btn {
+    background: none;
+    border: none;
+    color: var(--cm-ink-2);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 8px;
+    margin-top: 8px;
 }
-@keyframes bounce {
-    0%,
-    20%,
-    50%,
-    80%,
-    100% {
-        transform: translateY(0);
-    }
-    40% {
-        transform: translateY(-10px);
-    }
-    60% {
-        transform: translateY(-5px);
-    }
+.back-btn:hover {
+    color: var(--cm-ink);
 }
-.fade-in-up {
-    animation: fadeInUp 0.6s ease forwards;
+.github-icon {
+    width: 24px;
+    height: 24px;
+    opacity: 0.7;
+    transition: opacity 0.16s ease;
 }
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(15px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.github-icon:hover {
+    opacity: 1;
 }
 
+/* ============================================================
+   Login form
+   ============================================================ */
 .login-prompt {
-    max-width: 250px;
+    max-width: 300px;
     margin: 0 auto;
     text-align: center;
-    font-family: sans-serif;
 }
-
 .login-prompt h2 {
-    margin: 0 0 10px;
-    font-size: 1.5em;
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cm-ink);
 }
-
 .login-prompt p {
-    font-size: 0.9em;
-    color: #555;
-    margin-bottom: 6px;
-    margin-top: 5px;
+    font-size: 13px;
+    color: var(--cm-ink-2);
+    margin: 0 0 14px;
+    line-height: 1.45;
 }
-
+.login-prompt a {
+    color: var(--cm-brand);
+    text-decoration: none;
+    font-weight: 600;
+}
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     text-align: left;
 }
-
-.login-form label {
-    text-align: left;
-    font-weight: 500;
-    margin-bottom: 5px;
-    font-size: 0.8rem;
-    color: #444;
-}
-
-.login-form input {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
-    border-radius: 0.375rem;
-    font-size: 1rem;
-    outline: none;
-}
-.login-form div {
+.login-form > div {
     display: flex;
     flex-direction: column;
+    gap: 5px;
 }
-
-.login-form input:focus {
-    border-color: #ea6925; /* highlight border on focus */
-}
-
-.login-button {
-    padding: 10px;
-    border: none;
-    border-radius: 4px;
+.login-form label {
     font-weight: 600;
-    cursor: pointer;
-    background-color: #ea6925;
-    color: #fff;
-    transform: scale(1);
-    transition: 0.3s;
+    font-size: 12px;
+    color: var(--cm-ink-2);
 }
-
-.login-button:hover {
-    transform: scale(1.05);
+.login-form input {
+    padding: 10px 12px;
+    border: 1px solid var(--cm-line);
+    border-radius: var(--cm-r-sm);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--cm-ink);
+    outline: none;
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease;
 }
-
+.login-form input:focus {
+    border-color: var(--cm-brand);
+    box-shadow: 0 0 0 3px var(--cm-brand-50);
+}
 .oauth-buttons {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
-
 .oauth-button {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 10px 16px;
-    border: 1px solid #ea6925;
-    border-radius: 4px;
-    background-color: #fff;
-    color: #333;
-    font-size: 14px;
-    font-weight: 500;
+    border: 1px solid var(--cm-line);
+    border-radius: var(--cm-r-sm);
+    background: var(--cm-surface);
+    color: var(--cm-ink);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition:
+        background 0.16s ease,
+        border-color 0.16s ease;
     width: 100%;
 }
-
 .oauth-button:hover:not(:disabled) {
-    background-color: rgba(234, 105, 37, 0.1);
-    border-color: #ea6925;
-    transform: scale(1.02);
+    background: var(--cm-surface-2);
+    border-color: var(--cm-ink-3);
 }
-
 .oauth-button:disabled {
-    opacity: 0.6;
+    opacity: 0.55;
     cursor: not-allowed;
 }
-
 .oauth-icon {
     flex-shrink: 0;
     width: 18px;
     height: 18px;
 }
-
 .oauth-divider {
     display: flex;
     align-items: center;
     text-align: center;
-    margin: 16px 0;
-    color: #666;
-    font-size: 14px;
+    margin: 14px 0;
+    color: var(--cm-ink-3);
+    font-size: 12px;
 }
-
 .oauth-divider::before,
 .oauth-divider::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--cm-line);
 }
-
 .oauth-divider span {
     padding: 0 12px;
 }
-
 .error-message {
-    padding: 8px;
-    margin: 8px 0;
-    border: 1px solid #cc0000;
-    border-radius: 4px;
-    background-color: #f8d7da; /* light red background */
-    color: #721c24; /* darker red text */
+    padding: 10px 12px;
+    margin: 10px 0;
+    border: 1px solid #f3c2c2;
+    border-radius: var(--cm-r-sm);
+    background: var(--cm-red-bg);
+    color: var(--cm-red);
+    font-size: 13px;
+    text-align: left;
 }
-
 .resend-verification-btn {
     background: none;
     border: none;
-    color: #ea6925;
-    font-size: 14px;
+    color: var(--cm-brand);
+    font-size: 13px;
     font-weight: 600;
-    text-decoration: underline;
     cursor: pointer;
     padding: 8px;
-    transition: all 0.2s ease;
+    font-family: inherit;
 }
-
 .resend-verification-btn:hover {
-    text-decoration: none;
-    opacity: 0.8;
+    text-decoration: underline;
 }
-
 .resend-verification-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
-
 .mt-6 {
     margin-top: 6px;
 }
 
-/* -------------- Overall Card -------------- */
-.coupons-profile-card {
-    /* Subtle gradient with your brand color (#ea6925) in mind */
-    background: linear-gradient(135deg, #fff 50%, #fff3ec 100%);
-    padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-    animation: fadeInUp 0.3s ease forwards;
-    max-width: 420px;
-    margin: 0 auto;
-    position: relative;
-    overflow: hidden;
-}
-
-/* Optional fade-in keyframe for the card */
-@keyframes fadeInUp {
-    0% {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* -------------- Header / Profile Row -------------- */
-.coupons-profile-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-}
-
-.coupons-profile-info {
-    display: flex;
-    align-items: center;
-}
-
-/* The user profile image */
-.coupons-profile-image {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: 10px;
-    border: 2px solid #ea6925;
-}
-
-/* The user label (e.g., "@username" or "Guest") */
-.coupons-user-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #333;
-}
-
-/* -------------- Header text for the coupon list -------------- */
-.coupon-header {
-    font-size: 16px;
-    color: #ea6925;
-    margin: 0 0 8px 0;
-    font-weight: bold;
+/* --- Profile card (logged-in landing) --- */
+.profile-card {
+    padding: 8px 0;
     text-align: center;
 }
-
-/* -------------- Coupon List + Items -------------- */
-.coupon-list {
-    max-height: 220px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    margin: 8px 0;
-    padding-right: 4px; /* helps avoid overlap with scrollbar */
-}
-
-/*
-   "Coupon" item style:
-   - dashed border to evoke real coupons
-   - slight background tint
-*/
-.coupon-item {
-    cursor:
-        url('data:image/svg+xml;base64,PHN2Zw0KICAgICAgICB3aWR0aD0iNjAiDQogICAgICAgIGhlaWdodD0iMTYiDQogICAgICAgIHZpZXdCb3g9IjAgMCA2MCAxNiINCiAgICAgICAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIg0KPg0KICAgIDwhLS0gT3ZlcmxhcHBpbmcgc3F1YXJlcyAocmVwcmVzZW50IHRoZSAiY29weSIgaWNvbikgLS0+DQogICAgPHJlY3QNCiAgICAgICAgICAgIHg9IjAiDQogICAgICAgICAgICB5PSIzIg0KICAgICAgICAgICAgd2lkdGg9IjgiDQogICAgICAgICAgICBoZWlnaHQ9IjEwIg0KICAgICAgICAgICAgZmlsbD0ibm9uZSINCiAgICAgICAgICAgIHN0cm9rZT0iI2VhNjkyNSINCiAgICAgICAgICAgIHN0cm9rZS13aWR0aD0iMSINCiAgICAgICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCINCiAgICAgICAgICAgIHN0cm9rZS1saW5lam9pbj0icm91bmQiDQogICAgLz4NCiAgICA8cmVjdA0KICAgICAgICAgICAgeD0iMiINCiAgICAgICAgICAgIHk9IjEiDQogICAgICAgICAgICB3aWR0aD0iOCINCiAgICAgICAgICAgIGhlaWdodD0iMTAiDQogICAgICAgICAgICBmaWxsPSJub25lIg0KICAgICAgICAgICAgc3Ryb2tlPSIjZWE2OTI1Ig0KICAgICAgICAgICAgc3Ryb2tlLXdpZHRoPSIxIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCINCiAgICAvPg0KDQogICAgPCEtLSBUaGUgd29yZCAiQ29weSIgdG8gdGhlIHJpZ2h0IC0tPg0KICAgIDx0ZXh0DQogICAgICAgICAgICB4PSIxOCINCiAgICAgICAgICAgIHk9IjEyIg0KICAgICAgICAgICAgZmlsbD0iI2VhNjkyNSINCiAgICAgICAgICAgIGZvbnQtc2l6ZT0iMTAiDQogICAgICAgICAgICBmb250LWZhbWlseT0ic2Fucy1zZXJpZiINCiAgICA+DQogICAgICAgIENvcHkNCiAgICA8L3RleHQ+DQo8L3N2Zz4NCg==')
-            8 8,
-        copy;
-    border: 2px dashed #ea6925;
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    transition:
-        background-color 0.2s,
-        box-shadow 0.2s;
-    background-color: #fff;
-    position: relative;
-}
-
-/* Subtle hover effect */
-.coupon-item:hover {
-    background-color: #fff8f5;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
-}
-
-/* Optional "ticket notch" effect (using :before/:after) */
-.coupon-item:before,
-.coupon-item:after {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    background: #fff;
-    border: 2px solid #ea6925;
+.profile-image {
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--cm-line);
 }
-
-.coupon-item:before {
-    top: -9px;
-    left: -9px;
+.welcome-message {
+    font-size: 17px;
+    color: var(--cm-ink);
+    margin-top: 12px;
+    font-weight: 700;
 }
-.coupon-item:after {
-    bottom: -9px;
-    right: -9px;
-}
-
-/* The coupon's title */
-.coupon-title {
-    font-weight: bold;
-    font-size: 14px;
-    margin-bottom: 4px;
-    color: #333;
-}
-
-/* The coupon's description text */
-.coupon-desc {
+.username {
     font-size: 13px;
-    color: #666;
-    margin-bottom: 6px;
+    color: var(--cm-ink-3);
+    margin-bottom: 16px;
 }
-
-/* A container for the copy button */
-.coupon-action {
+.profile-actions {
     display: flex;
-    align-items: center;
-    margin-top: 5px;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 10px;
 }
 
-/* -------------- The big, obvious Copy button -------------- */
-.copyBtn {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    transition:
-        background 0.3s ease,
-        transform 0.1s;
-}
-
-.copyBtn:hover {
-    background: #cf581f;
-}
-
-.copyBtn:active {
-    transform: scale(0.97);
-}
-
-/* -------------- Logout / Login Button -------------- */
-.coupons-logout-button {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
-    border-radius: 6px;
-    padding: 6px 16px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
-
-.coupons-logout-button:hover {
-    background: #ea6925;
-    color: #fff;
-}
-
-/* -------------- Toast / Confirmation -------------- */
-.copy-toast-container {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
-}
-
-.copy-toast {
-    background-color: #333;
-    color: #fff;
-    padding: 10px 16px;
-    border-radius: 4px;
-    margin-bottom: 8px;
-    opacity: 0.95;
-    animation: fadeIn 0.3s ease forwards;
-    font-size: 14px;
-}
-
-/* Fade out after the setTimeout triggers 'fade-out' class */
-.copy-toast.fade-out {
-    animation: fadeOut 0.3s ease forwards;
-}
-
-@keyframes fadeIn {
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes cmRise {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(8px);
     }
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
-
-@keyframes fadeOut {
+@keyframes cmSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes cmToastIn {
     from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
         opacity: 1;
         transform: translateY(0);
     }
+}
+@keyframes cmToastOut {
     to {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(8px);
     }
 }
+.fade-in-up {
+    animation: cmRise 0.28s ease both;
+}
 
-/* -------------- Media Queries (for small screens) -------------- */
-/* only apply when viewport ≤480px AND on a touch device (no hover) */
-@media only screen and (max-width: 480px) and (hover: none) and (pointer: coarse) {
-    body,
-    .popup-bg,
-    .popup-wave {
-        width: 100%;
-        max-width: none;
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
     }
-
-    .popup-container {
-        width: 90%;
-        max-width: none;
-    }
-}
-
-.no-coupons-view {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.no-coupons-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-}
-
-.no-coupons-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-}
-
-.supported-sites-btn,
-.toggle-login-btn {
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    text-decoration: none;
-    transition:
-        background 0.3s ease,
-        color 0.3s ease;
-}
-
-.supported-sites-btn {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-}
-.supported-sites-btn:hover {
-    background: #cf581f;
-}
-
-.toggle-login-btn {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
-}
-.toggle-login-btn:hover {
-    background: #ea6925;
-    color: #fff;
-}
-
-.back-btn {
-    background: none;
-    border: none;
-    color: #ea6925;
-    font-size: 14px;
-    cursor: pointer;
-    margin-top: 16px;
-}
-
-.github-icon {
-    width: 28px;
-    height: 28px;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
-}
-.github-icon:hover {
-    opacity: 1;
-}
-/* --- Unsupported-site section ----------------------------------- */
-
-.no-coupons-view {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.no-coupons-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-}
-
-.no-coupons-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-}
-
-.supported-sites-btn,
-.toggle-login-btn {
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    text-decoration: none;
-    transition:
-        background 0.3s ease,
-        color 0.3s ease;
-}
-
-.supported-sites-btn {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-}
-.supported-sites-btn:hover {
-    background: #cf581f;
-}
-
-.toggle-login-btn {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
-}
-.toggle-login-btn:hover {
-    background: #ea6925;
-    color: #fff;
-}
-
-.back-btn {
-    background: none;
-    border: none;
-    color: #ea6925;
-    font-size: 14px;
-    cursor: pointer;
-    margin-bottom: 12px;
-}
-
-.github-icon {
-    width: 28px;
-    height: 28px;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
-}
-.github-icon:hover {
-    opacity: 1;
-}
-
-@media (max-width: 480px) {
-    .no-coupons-view {
-        width: 90%;
-        padding: 12px;
-    }
-    .coupons-profile-card {
-        width: 90%;
-        padding: 12px;
-    }
-
-    .coupon-item {
-        padding: 8px;
-        margin-bottom: 8px;
-    }
-
-    .coupon-title {
-        font-size: 15px;
-    }
-
-    .copyBtn {
-        width: 100%;
-        justify-content: center;
-        padding: 12px;
-        font-size: 15px;
-    }
-
-    .coupons-logout-button {
-        padding: 6px 12px;
-        font-size: 14px;
-    }
-}
-
-/* Restriction warning chip on restricted coupons */
-.coupon-item-restricted {
-    border-color: #f0b34d;
-    background: linear-gradient(180deg, #fffaf0 0%, #fff 80%);
-}
-.coupon-restriction {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin: 6px 0 8px;
-    padding: 6px 8px;
-    font-size: 12px;
-    color: #8a5a00;
-    background: #fff5e0;
-    border-left: 3px solid #f0b34d;
-    border-radius: 4px;
-}
-.coupon-restriction-icon {
-    font-size: 14px;
-    line-height: 1;
-}
-.coupon-restriction-text {
-    flex: 1;
-    line-height: 1.35;
-}
-.coupon-restriction-text b {
-    color: #d97706;
-}
-.coupon-restriction-detail {
-    margin-top: 2px;
-    color: #6b4500;
-    font-size: 11px;
-    opacity: 0.85;
-    font-style: italic;
 }

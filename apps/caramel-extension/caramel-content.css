@@ -1,290 +1,459 @@
-/* Caramel extension content-script styles.
- * External file so strict-CSP sites don't block the UI.
- * Loaded via manifest.json content_scripts.css. */
+/* Caramel content-script UI — modern refresh (2026).
+ * External file so strict-CSP sites don't block it (manifest content_scripts.css).
+ * All selectors scoped under Caramel IDs; key inherited props are reset on the
+ * roots so host-page styles can't leak in. No emoji, no infinite bounce. */
+
+#caramel-small-prompt,
+#caramel-testing-overlay,
+#caramel-final-overlay {
+    --cm-brand: #ea6925;
+    --cm-brand-600: #d65d1f;
+    --cm-ink: #1c1917;
+    --cm-ink-2: #57534e;
+    --cm-ink-3: #8a817c;
+    --cm-line: #ece9e6;
+    --cm-surface: #ffffff;
+    --cm-surface-2: #faf8f6;
+    --cm-green: #15803d;
+    --cm-green-bg: #e7f6ec;
+    --cm-amber: #b45309;
+    --cm-amber-bg: #fdf2e0;
+    --cm-shadow-lg: 0 20px 48px rgba(20, 14, 10, 0.28);
+    --cm-font:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif;
+
+    box-sizing: border-box;
+    font-family: var(--cm-font);
+    line-height: 1.5;
+    color: var(--cm-ink);
+    letter-spacing: normal;
+    text-align: left;
+    -webkit-font-smoothing: antialiased;
+}
+#caramel-small-prompt *,
+#caramel-testing-overlay *,
+#caramel-final-overlay * {
+    box-sizing: border-box;
+    font-family: var(--cm-font);
+}
+#caramel-small-prompt svg,
+#caramel-testing-overlay svg,
+#caramel-final-overlay svg {
+    display: block;
+}
 
 @keyframes caramelFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(8px);
     }
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
-@keyframes caramelBounce {
-    0%,
-    20%,
-    50%,
-    80%,
-    100% {
-        transform: translateY(0);
+@keyframes caramelPop {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
     }
-    40% {
-        transform: translateY(-10px);
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
-    60% {
-        transform: translateY(-5px);
+}
+@keyframes caramelSpin {
+    to {
+        transform: rotate(360deg);
     }
 }
 
-/* ---- Prompt ("Try Caramel Coupons?") ---- */
+/* ============================================================
+   Prompt
+   ============================================================ */
 #caramel-small-prompt {
     position: fixed;
-    top: 60px;
-    right: 20px;
-    z-index: 999999;
-    background: #ea6925;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: max(20px, env(safe-area-inset-right));
+    z-index: 2147483646;
+    width: min(86vw, 290px);
+    background: var(--cm-surface);
+    padding: 14px 16px;
+    border: 1px solid var(--cm-line);
+    border-radius: 14px;
+    box-shadow: var(--cm-shadow-lg);
     cursor: pointer;
-    color: white;
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-    text-align: center;
-    animation:
-        caramelFadeIn 0.5s ease-in-out,
-        caramelBounce 2s infinite;
+    animation: caramelFadeIn 0.3s ease both;
+    transition:
+        transform 0.16s ease,
+        box-shadow 0.16s ease;
 }
-#caramel-small-prompt .caramel-prompt-header {
-    font-weight: bold;
+#caramel-small-prompt:hover {
+    transform: translateY(-2px);
+}
+#caramel-small-prompt .caramel-prompt-body {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: 12px;
 }
 #caramel-small-prompt .caramel-prompt-logo {
-    width: 30px;
-    height: 30px;
-    margin-top: auto;
-    margin-bottom: auto;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: 9px;
+    object-fit: contain;
+    background: var(--cm-surface-2);
+    padding: 4px;
 }
-#caramel-small-prompt .caramel-prompt-label {
-    margin-top: auto;
-    margin-bottom: auto;
-    padding-top: 5px;
+#caramel-small-prompt .caramel-prompt-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--cm-ink);
+    margin: 0;
+}
+#caramel-small-prompt .caramel-prompt-sub {
+    font-size: 12.5px;
+    color: var(--cm-ink-2);
+    margin: 2px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+#caramel-small-prompt .caramel-prompt-sub svg {
+    width: 13px;
+    height: 13px;
+    color: var(--cm-brand);
 }
 #caramel-close-btn {
-    background: white;
     position: absolute;
-    top: -5px;
-    right: -5px;
-    width: 20px;
-    height: 20px;
-    padding: 1px;
-    border-radius: 50%;
-    color: #ea6925;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    color: var(--cm-ink-3);
     border: none;
-    font-size: 18px;
+    border-radius: 50%;
     cursor: pointer;
-    margin-left: 10px;
+    transition:
+        background 0.16s ease,
+        color 0.16s ease;
 }
-#caramel-small-prompt small {
-    font-size: 14px;
+#caramel-close-btn:hover {
+    background: var(--cm-surface-2);
+    color: var(--cm-ink);
+}
+#caramel-close-btn svg {
+    width: 14px;
+    height: 14px;
 }
 
-/* ---- Testing overlay ("Applying Coupons...") ---- */
+/* ============================================================
+   Testing overlay
+   ============================================================ */
 #caramel-testing-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.6);
-    z-index: 1000000;
+    background: rgba(15, 12, 10, 0.5);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    z-index: 2147483647;
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 20px;
 }
 #caramel-testing-modal {
     position: relative;
-    background-color: #ea6925;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    color: white;
-    width: 320px;
-    font-family: Arial, sans-serif;
+    background: var(--cm-surface);
+    padding: 26px 24px 24px;
+    border-radius: 18px;
+    box-shadow: var(--cm-shadow-lg);
+    width: min(92vw, 360px);
     text-align: center;
-    animation:
-        caramelFadeIn 0.5s ease-in-out,
-        caramelBounce 2s infinite;
+    animation: caramelPop 0.26s ease both;
 }
 #caramel-testing-close {
     position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 24px;
-    height: 24px;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: none;
     border-radius: 50%;
-    background: #fff;
-    color: #ea6925;
-    font-size: 16px;
-    line-height: 1;
+    background: var(--cm-surface-2);
+    color: var(--cm-ink-3);
     cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    transition:
+        background 0.16s ease,
+        color 0.16s ease;
 }
-#caramel-testing-modal .caramel-modal-header {
+#caramel-testing-close:hover {
+    background: var(--cm-line);
+    color: var(--cm-ink);
+}
+#caramel-testing-close svg {
+    width: 15px;
+    height: 15px;
+}
+#caramel-testing-modal .caramel-modal-head {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    margin-bottom: 10px;
+    gap: 14px;
+    margin-bottom: 8px;
 }
-#caramel-testing-modal .caramel-modal-logo {
-    width: 40px;
-    height: 40px;
-    margin-right: 8px;
+.caramel-spinner {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 3px solid var(--cm-brand-100, #ffe6d5);
+    border-top-color: var(--cm-brand);
+    animation: caramelSpin 0.8s linear infinite;
 }
 #caramel-testing-modal h2 {
     margin: 0;
     font-size: 18px;
+    font-weight: 700;
+    color: var(--cm-ink);
     text-align: center;
 }
 #caramel-test-status {
-    margin: 10px 0;
-    font-size: 15px;
+    margin: 6px 0 0;
+    font-size: 13.5px;
+    color: var(--cm-ink-2);
 }
 #caramel-progress-container {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
+    background: var(--cm-surface-2);
+    border: 1px solid var(--cm-line);
+    border-radius: 999px;
     width: 100%;
-    height: 10px;
-    margin: 10px 0;
-    position: relative;
+    height: 8px;
+    margin: 16px 0 0;
     overflow: hidden;
 }
 #caramel-progress-bar {
-    background: #ffbf47;
+    background: var(--cm-brand);
     width: 0%;
     height: 100%;
-    border-radius: 6px;
-    transition: width 0.3s ease;
+    border-radius: 999px;
+    transition: width 0.35s ease;
 }
 
-/* ---- Final modal ---- */
+/* ============================================================
+   Final modal
+   ============================================================ */
 #caramel-final-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1000000;
+    background: rgba(15, 12, 10, 0.55);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    z-index: 2147483647;
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 20px;
 }
 #caramel-final-overlay .caramel-final-modal {
-    background-color: #fff;
-    padding: 30px;
-    border-radius: 12px;
-    width: 400px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-    font-family: Arial, sans-serif;
+    background: var(--cm-surface);
+    padding: 28px 24px 24px;
+    border-radius: 18px;
+    width: min(92vw, 384px);
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: var(--cm-shadow-lg);
     text-align: center;
     position: relative;
 }
-#caramel-final-overlay .caramel-final-logo {
+.caramel-final-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
     display: flex;
+    align-items: center;
     justify-content: center;
-    margin-bottom: 10px;
+    background: var(--cm-surface-2);
+    color: var(--cm-ink-2);
 }
-#caramel-final-overlay .caramel-final-logo img {
-    width: 60px;
-    height: 60px;
+.caramel-final-icon svg {
+    width: 28px;
+    height: 28px;
+}
+.caramel-final-icon--success {
+    background: var(--cm-green-bg);
+    color: var(--cm-green);
+}
+.caramel-final-icon--brand {
+    background: #fff1e7;
+    color: var(--cm-brand);
+}
+.caramel-final-icon--info {
+    background: var(--cm-surface-2);
+    color: var(--cm-ink-3);
 }
 #caramel-final-overlay h2 {
-    margin: 0 0 15px 0;
-    color: #ea6925;
-    font-size: 24px;
-    font-weight: bold;
+    margin: 0 0 8px 0;
+    color: var(--cm-ink);
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
 }
 #caramel-final-overlay .caramel-final-msg {
-    font-size: 13px;
-    color: #333;
-    margin: 0 0 10px 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--cm-ink-2);
+    margin: 0 auto;
+    max-width: 300px;
 }
 #caramel-final-overlay .caramel-final-code {
-    font-size: 22px;
-    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 18px 0 0;
 }
-#caramel-final-overlay .caramel-final-code span {
-    color: #ea6925;
-    text-decoration: underline;
-    font-weight: bold;
+.caramel-final-code-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cm-ink-3);
+}
+.caramel-final-code-val {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--cm-ink);
+    background: var(--cm-surface-2);
+    border: 1px dashed var(--cm-line);
+    border-radius: 8px;
+    padding: 5px 12px;
 }
 #caramel-final-overlay .caramel-final-savings {
-    font-size: 18px;
-    color: #ea6925;
-    font-weight: bold;
-    margin: 4px 0 0;
+    font-size: 15px;
+    color: var(--cm-green);
+    font-weight: 700;
+    margin: 12px 0 0;
 }
 #caramel-final-overlay .caramel-final-hint {
     font-size: 13px;
-    color: #777;
-    margin: 4px 0 0;
+    color: var(--cm-ink-3);
+    margin: 10px 0 0;
 }
 #caramel-final-ok-btn {
-    margin-top: 20px;
-    background: #ea6925;
+    margin-top: 22px;
+    width: 100%;
+    background: var(--cm-brand);
     border: none;
     color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
+    padding: 13px 24px;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    transition: background 0.3s;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--cm-font);
+    transition:
+        background 0.16s ease,
+        transform 0.1s ease;
 }
 #caramel-final-ok-btn:hover {
-    background: #ffbf47;
+    background: var(--cm-brand-600);
+}
+#caramel-final-ok-btn:active {
+    transform: scale(0.99);
 }
 
 /* ---- Manual copy list ---- */
 .caramel-manual-list {
-    max-height: 190px;
+    max-height: 230px;
     overflow-y: auto;
-    margin: 10px 0 2px;
+    margin: 18px 0 0;
     text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 .caramel-manual-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    border: 1px solid #eee;
-    border-radius: 8px;
-    padding: 8px 10px;
-    margin: 6px 0;
+    gap: 10px;
+    border: 1px solid var(--cm-line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: var(--cm-surface);
+    transition: border-color 0.16s ease;
+}
+.caramel-manual-row:hover {
+    border-color: #ffd9bf;
 }
 .caramel-manual-row .caramel-manual-info {
     min-width: 0;
     flex: 1;
 }
 .caramel-manual-row .caramel-manual-code {
-    font-weight: bold;
-    color: #333;
-    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 700;
+    color: var(--cm-ink);
+    font-size: 13.5px;
+    letter-spacing: 0.03em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 .caramel-manual-row .caramel-manual-title {
-    font-size: 11px;
-    color: #888;
+    font-size: 11.5px;
+    color: var(--cm-ink-3);
+    margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 .caramel-manual-copy {
     flex: none;
-    background: #ea6925;
-    border: none;
-    color: #fff;
-    padding: 7px 14px;
-    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--cm-surface);
+    border: 1px solid var(--cm-brand);
+    color: var(--cm-brand);
+    padding: 7px 13px;
+    border-radius: 9px;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: var(--cm-font);
+    transition:
+        background 0.16s ease,
+        color 0.16s ease;
+}
+.caramel-manual-copy:hover {
+    background: var(--cm-brand);
+    color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #caramel-small-prompt,
+    #caramel-testing-modal,
+    #caramel-final-overlay .caramel-final-modal,
+    .caramel-spinner,
+    #caramel-progress-bar {
+        animation: none !important;
+        transition: none !important;
+    }
 }

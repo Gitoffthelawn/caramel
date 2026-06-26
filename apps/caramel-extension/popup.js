@@ -20,6 +20,47 @@ const escHtml = s =>
             })[ch],
     )
 
+// Inline icon set (Lucide-style strokes; no emoji). Sized via CSS (currentColor).
+const CM_ICONS = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/></svg>',
+}
+
+// Verification badge meta: label + class (color via CSS) + optional icon.
+const BADGE_META = {
+    valid: {
+        label: 'Verified',
+        cls: 'coupon-badge--valid',
+        icon: CM_ICONS.check,
+    },
+    valid_with_warning: {
+        label: 'Verified · varies',
+        cls: 'coupon-badge--warn',
+        icon: CM_ICONS.warn,
+    },
+    product_restriction: {
+        label: 'Restrictions',
+        cls: 'coupon-badge--warn',
+        icon: CM_ICONS.warn,
+    },
+    category_restricted: {
+        label: 'Category-limited',
+        cls: 'coupon-badge--warn',
+        icon: CM_ICONS.warn,
+    },
+    seller_specific: {
+        label: 'Seller-specific',
+        cls: 'coupon-badge--warn',
+        icon: CM_ICONS.warn,
+    },
+    pending: { label: 'Unverified', cls: 'coupon-badge--neutral', icon: '' },
+    retry: { label: 'Checking', cls: 'coupon-badge--neutral', icon: '' },
+    invalid: { label: 'Not valid', cls: 'coupon-badge--bad', icon: '' },
+    expired: { label: 'Expired', cls: 'coupon-badge--bad', icon: '' },
+}
+
 async function _detectDevMode() {
     return new Promise(resolve => {
         if (typeof chrome === 'undefined' || !chrome.management)
@@ -96,16 +137,13 @@ async function getActiveTabDomainRecord() {
 /* ------------------------------------------------------------ */
 function renderUnsupportedSite(user) {
     const container = document.getElementById('auth-container')
-    const avatar = user?.image?.length
-        ? user.image
-        : 'assets/default-profile.png'
 
     container.innerHTML = `
     <div class="no-coupons-view fade-in-up">
-      <img src="${avatar}" class="no-coupons-avatar" alt="User avatar"/>
+      <div class="no-coupons-illus">${CM_ICONS.tag}</div>
 
-      <h3>No coupons are available for this site.</h3>
-      <p>Click below to see which sites we support.</p>
+      <h3>No coupons for this site yet</h3>
+      <p>We don't have codes for this store right now. Browse the stores we support, or check back soon.</p>
 
       <div class="no-coupons-actions">
         <a
@@ -114,7 +152,7 @@ function renderUnsupportedSite(user) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          View Supported Stores
+          View supported stores
         </a>
 
         ${
@@ -122,16 +160,17 @@ function renderUnsupportedSite(user) {
                 ? '<button id="logoutBtn" class="toggle-login-btn">Logout</button>'
                 : '<button id="loginToggleBtn" class="toggle-login-btn">Login</button>'
         }
-
-        <a
-          href="https://github.com/DevinoSolutions/caramel"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="All extension code is 100% open-source."
-        >
-          <img src="assets/github.png" class="github-icon" alt="GitHub"/>
-        </a>
       </div>
+
+      <a
+        class="cm-gh-link"
+        href="https://github.com/DevinoSolutions/caramel"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="All extension code is 100% open-source."
+      >
+        <img src="assets/github.png" class="github-icon" alt="GitHub"/>
+      </a>
     </div>
   `
 
@@ -523,7 +562,7 @@ function renderCouponsView(coupons, user, domain) {
           class="coupons-profile-image"
           alt="avatar"
         />
-        <span class="coupons-user-label">@${user.username}</span>
+        <span class="coupons-user-label">@${escHtml(user.username)}</span>
       `
         : `
         <img src="assets/default-profile.png" class="coupons-profile-image" alt="avatar"/>
@@ -541,7 +580,7 @@ function renderCouponsView(coupons, user, domain) {
         ${headerRight}
       </div>
 
-      <h3 class="coupon-header">Coupons for ${domain}</h3>
+      <h3 class="coupon-header">${coupons.length} code${coupons.length === 1 ? '' : 's'} for <strong>${escHtml(domain)}</strong></h3>
 
       <div id="couponList" class="coupon-list">
         ${
@@ -574,52 +613,27 @@ function renderCouponsView(coupons, user, domain) {
                                   : ''
                               warning = `
               <div class="coupon-restriction" title="${escHtml(c.verificationMessage || baseMsg)}">
-                <span class="coupon-restriction-icon">⚠</span>
+                <span class="coupon-restriction-icon">${CM_ICONS.warn}</span>
                 <span class="coupon-restriction-text">${baseMsg}${cartHint}</span>
                 ${verifierMsg}
               </div>`
                           }
-                          // Verification badge: green=verified, amber=restricted,
-                          // grey=not yet verified (grace), red=known not valid.
-                          const BADGE = {
-                              valid: ['✓ Verified', '#15803d', '#dcfce7'],
-                              valid_with_warning: [
-                                  'Verified · may vary',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              product_restriction: [
-                                  'Restrictions apply',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              category_restricted: [
-                                  'Category-limited',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              seller_specific: [
-                                  'Seller-specific',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              pending: ['Unverified', '#4b5563', '#f3f4f6'],
-                              retry: ['Checking…', '#4b5563', '#f3f4f6'],
-                              invalid: ['Not valid', '#b91c1c', '#fee2e2'],
-                              expired: ['Expired', '#b91c1c', '#fee2e2'],
-                          }
-                          const bd = BADGE[c.status]
-                          const badge = bd
-                              ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="display:inline-block;margin-top:4px;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
+                          // Verification badge: class drives color (see CSS).
+                          const meta = BADGE_META[c.status]
+                          const badge = meta
+                              ? `<span class="coupon-badge ${meta.cls}" title="${escHtml(c.verificationMessage || '')}">${meta.icon}${meta.label}</span>`
                               : ''
                           return `
             <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
-              <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
-              <div class="coupon-desc">${escHtml(c.description || '')}</div>
-              ${badge}
+              <div class="coupon-row-top">
+                <span class="coupon-code">${escHtml(c.code)}</span>
+                ${badge}
+              </div>
+              ${c.title ? `<div class="coupon-title">${escHtml(c.title)}</div>` : ''}
+              ${c.description ? `<div class="coupon-desc">${escHtml(c.description)}</div>` : ''}
               ${warning}
               <div class="coupon-action">
-                <button class="copyBtn">Copy "${escHtml(c.code)}"</button>
+                <button class="copyBtn">${CM_ICONS.copy}Copy code</button>
               </div>
             </div>`
                       })
