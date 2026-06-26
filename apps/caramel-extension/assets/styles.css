@@ -516,27 +516,26 @@ body {
     transform: translateY(-1px);
 }
 
-/* "ticket notch" effect — circles punched out of opposite corners.
-   Fill matches the peach card backdrop and the edge is a faint hairline
-   (not a solid ring) so each notch reads as a bite taken out of the
-   ticket rather than a dot stuck on top of it. */
+/* Ticket "tear" notches — two clean semicircles bitten out of the left and
+   right edges at the vertical centre (the real ticket-stub cut), instead of
+   the stray dots that used to float at the rounded corners. They're filled
+   with the popup's page colour so they read as holes punched through the card,
+   and pinned to the middle of each edge regardless of card height. */
 .coupon-item:before,
 .coupon-item:after {
     content: '';
     position: absolute;
+    top: 50%;
     width: 14px;
     height: 14px;
-    background: #fdf1e8;
-    box-shadow: inset 0 0 0 1px rgba(234, 105, 37, 0.16);
+    background: #fbeee4;
     border-radius: 50%;
+    transform: translateY(-50%);
 }
-
 .coupon-item:before {
-    top: -7px;
     left: -7px;
 }
 .coupon-item:after {
-    bottom: -7px;
     right: -7px;
 }
 
