@@ -516,25 +516,45 @@ body {
     transform: translateY(-1px);
 }
 
-/* "ticket notch" effect — punched circles at opposite corners (as the original) */
+/* "ticket notch" effect — circles punched out of opposite corners.
+   Fill matches the peach card backdrop and the edge is a faint hairline
+   (not a solid ring) so each notch reads as a bite taken out of the
+   ticket rather than a dot stuck on top of it. */
 .coupon-item:before,
 .coupon-item:after {
     content: '';
     position: absolute;
-    width: 13px;
-    height: 13px;
-    background: #fff;
-    border: 1.5px solid #f0a874;
+    width: 14px;
+    height: 14px;
+    background: #fdf1e8;
+    box-shadow: inset 0 0 0 1px rgba(234, 105, 37, 0.16);
     border-radius: 50%;
 }
 
 .coupon-item:before {
-    top: -8px;
-    left: -8px;
+    top: -7px;
+    left: -7px;
 }
 .coupon-item:after {
-    bottom: -8px;
-    right: -8px;
+    bottom: -7px;
+    right: -7px;
+}
+
+/* Verification status tag — pinned to the ticket's top-right corner so it
+   reads as a stamp on the coupon. Colour/background come from popup.js per
+   status (green=verified, amber=restricted, grey=pending, red=invalid). */
+.coupon-badge {
+    position: absolute;
+    top: 12px;
+    right: 13px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.55;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(20, 14, 10, 0.06);
 }
 
 /* The coupon's title */
@@ -544,6 +564,7 @@ body {
     line-height: 1.35;
     margin-bottom: 4px;
     color: #1c1917;
+    padding-right: 96px; /* reserve room for the top-right status tag */
 }
 
 /* The coupon's description text */
@@ -564,11 +585,15 @@ body {
 
 /* -------------- The big, obvious Copy button -------------- */
 .copyBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
     background: #ea6925;
     color: #fff;
     border: none;
     border-radius: 9px;
-    padding: 11px 16px;
+    padding: 10px 14px;
     cursor: pointer;
     font-size: 13.5px;
     font-weight: 600;
@@ -587,6 +612,36 @@ body {
 
 .copyBtn:active {
     transform: scale(0.98);
+}
+
+.copyBtn-ico {
+    flex: none;
+    opacity: 0.92;
+}
+
+/* "Copy" label sits a touch lighter than the code it precedes */
+.copyBtn-txt {
+    flex: none;
+    font-weight: 600;
+    opacity: 0.92;
+}
+
+/* The actual code — monospaced on a faint chip, truncates if very long.
+   The full code is still copied (read from the item's data-code). */
+.copyBtn-code {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family:
+        'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.18);
 }
 
 /* -------------- Logout / Login Button -------------- */

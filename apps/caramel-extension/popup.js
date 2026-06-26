@@ -610,16 +610,23 @@ function renderCouponsView(coupons, user, domain) {
                           }
                           const bd = BADGE[c.status]
                           const badge = bd
-                              ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="display:inline-block;margin-top:4px;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
+                              ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''
                           return `
             <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
+              ${badge}
               <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
               <div class="coupon-desc">${escHtml(c.description || '')}</div>
-              ${badge}
               ${warning}
               <div class="coupon-action">
-                <button class="copyBtn">Copy "${escHtml(c.code)}"</button>
+                <button class="copyBtn" type="button">
+                  <svg class="copyBtn-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                    <path d="M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <span class="copyBtn-txt">Copy</span>
+                  <span class="copyBtn-code">${escHtml(c.code)}</span>
+                </button>
               </div>
             </div>`
                       })
