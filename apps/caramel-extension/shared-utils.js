@@ -284,9 +284,31 @@ async function getDomainRecord(domain) {
             }
         }
     }
-    return getDomainRecord.cache?.find(r => domain.includes(r.domain))
+    return getDomainRecord.cache?.find(r =>
+        _hostMatchesDomain(domain, r.domain),
+    )
 }
 getDomainRecord.cache = null
+
+// Match the active hostname to a supported-store domain. Accept an exact match,
+// a real dotted subdomain (www./checkout./secure.<domain>), or a hyphen-prefixed
+// checkout host (gapfactory-style `secure-<brand>.gapfactory.com`). Plain
+// substring matching (the old behavior) false-matched unrelated hosts —
+// `art.com` ⊂ `walmart.com`, `bestbuy.com` ⊂ `notbestbuy.com`, even
+// `target.com` ⊂ `evil-target.com.attacker.net` — which would apply the wrong
+// store's selectors to an unrelated site. Require a label boundary (start, '.'
+// or '-') so only genuine same-site hosts match.
+function _hostMatchesDomain(host, domain) {
+    if (!host || !domain) return false
+    host = String(host).toLowerCase()
+    domain = String(domain).toLowerCase()
+    if (host === domain) return true
+    const i = host.length - domain.length
+    if (i <= 0) return false
+    if (host.slice(i) !== domain) return false
+    const sep = host[i - 1]
+    return sep === '.' || sep === '-'
+}
 
 /* --------------------------------------------------  checkout detector */
 async function isCheckout() {
