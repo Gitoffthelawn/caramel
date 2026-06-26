@@ -3,6 +3,23 @@
 let CARAMEL_BASE_URL = 'https://grabcaramel.com'
 const caramelUrl = path => new URL(path, `${CARAMEL_BASE_URL}/`).toString()
 
+// Escape coupon/API data before interpolating into innerHTML. Codes, titles and
+// messages come from the API; without this a code containing a quote/angle
+// bracket would break its `data-code` attribute (corrupting the copied value)
+// or leak stray markup into the layout.
+const escHtml = s =>
+    String(s == null ? '' : s).replace(
+        /[&<>"']/g,
+        ch =>
+            ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            })[ch],
+    )
+
 async function _detectDevMode() {
     return new Promise(resolve => {
         if (typeof chrome === 'undefined' || !chrome.management)
@@ -550,13 +567,13 @@ function renderCouponsView(coupons, user, domain) {
                                           ? 'May have restrictions'
                                           : 'Limited to specific items'
                               const cartHint = c.cartCategory
-                                  ? ` — your cart looks like <b>${c.cartCategory}</b>${c.cartCategorySecondary ? ` / ${c.cartCategorySecondary}` : ''}`
+                                  ? ` — your cart looks like <b>${escHtml(c.cartCategory)}</b>${c.cartCategorySecondary ? ` / ${escHtml(c.cartCategorySecondary)}` : ''}`
                                   : ''
                               const verifierMsg = c.verificationMessage
-                                  ? `<div class="coupon-restriction-detail">${c.verificationMessage}</div>`
+                                  ? `<div class="coupon-restriction-detail">${escHtml(c.verificationMessage)}</div>`
                                   : ''
                               warning = `
-              <div class="coupon-restriction" title="${c.verificationMessage || baseMsg}">
+              <div class="coupon-restriction" title="${escHtml(c.verificationMessage || baseMsg)}">
                 <span class="coupon-restriction-icon">⚠</span>
                 <span class="coupon-restriction-text">${baseMsg}${cartHint}</span>
                 ${verifierMsg}
@@ -593,16 +610,16 @@ function renderCouponsView(coupons, user, domain) {
                           }
                           const bd = BADGE[c.status]
                           const badge = bd
-                              ? `<span class="coupon-badge" title="${c.verificationMessage || ''}" style="display:inline-block;margin-top:4px;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
+                              ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="display:inline-block;margin-top:4px;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''
                           return `
-            <div data-code="${c.code}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
-              <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
-              <div class="coupon-desc">${c.description || ''}</div>
+            <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}">
+              <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
+              <div class="coupon-desc">${escHtml(c.description || '')}</div>
               ${badge}
               ${warning}
               <div class="coupon-action">
-                <button class="copyBtn">Copy "${c.code}"</button>
+                <button class="copyBtn">Copy "${escHtml(c.code)}"</button>
               </div>
             </div>`
                       })
@@ -635,12 +652,19 @@ function renderCouponsView(coupons, user, domain) {
 
     /* copy-to-clipboard */
     container.querySelectorAll('.coupon-item').forEach(item => {
-        item.addEventListener('click', e => {
+        item.addEventListener('click', async e => {
             const code = e.currentTarget.getAttribute('data-code')
-            navigator.clipboard
-                .writeText(code)
-                .then(() => showCopyToast(`Copied "${code}" to clipboard!`))
-                .catch(() => {})
+            // Robust copy: async clipboard API with an execCommand fallback
+            // (shared caramelCopyText from UI-helpers.js, already loaded here).
+            // The bare navigator.clipboard path silently did nothing when the
+            // API was blocked — now the user always gets either the code on the
+            // clipboard or honest feedback instead of a dead click.
+            const ok = await caramelCopyText(code)
+            showCopyToast(
+                ok
+                    ? `Copied "${code}" to clipboard!`
+                    : `Couldn't copy — code is ${code}`,
+            )
         })
     })
 }
