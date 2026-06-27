@@ -536,29 +536,6 @@ body {
     transform: translateY(-1px);
 }
 
-/* Ticket "tear" notches — two clean semicircles bitten out of the left and
-   right edges at the vertical centre (the real ticket-stub cut), instead of
-   the stray dots that used to float at the rounded corners. They're filled
-   with the popup's page colour so they read as holes punched through the card,
-   and pinned to the middle of each edge regardless of card height. */
-.coupon-item:before,
-.coupon-item:after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    background: #fbeee4;
-    border-radius: 50%;
-    transform: translateY(-50%);
-}
-.coupon-item:before {
-    left: -7px;
-}
-.coupon-item:after {
-    right: -7px;
-}
-
 /* Title + status tag share a flex row: the title (flex:1) shrinks and wraps
    beside the badge, so a wide badge ("Verified · may vary") can never overlap
    the title text regardless of length. */
