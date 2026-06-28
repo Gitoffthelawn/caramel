@@ -629,17 +629,17 @@ function renderCouponsView(coupons, user, domain) {
                 <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
                 ${badge}
               </div>
-              <div class="coupon-desc">${escHtml(c.description || '')}</div>
+              ${c.description ? `<div class="coupon-desc">${escHtml(c.description)}</div>` : ''}
               ${warning}
-              <div class="coupon-action">
-                <button class="copyBtn" type="button">
-                  <svg class="copyBtn-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <div class="coupon-code-row">
+                <span class="coupon-code">${escHtml(c.code)}</span>
+                <span class="coupon-copy">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="2"/>
                     <path d="M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                   </svg>
-                  <span class="copyBtn-txt">Copy</span>
-                  <span class="copyBtn-code">${escHtml(c.code)}</span>
-                </button>
+                  Copy
+                </span>
               </div>
             </div>`
                       })
