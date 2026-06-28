@@ -1,6 +1,12 @@
 /* global currentBrowser, fetchCoupons */
 
-let CARAMEL_BASE_URL = 'https://grabcaramel.com'
+// Dev/prod base URL via the shared _isDevInstall() (defined in shared-utils.js,
+// loaded before this script). Packed Web Store builds have a manifest
+// update_url → prod; unpacked dev installs → localhost. No `management` perm.
+const CARAMEL_BASE_URL =
+    typeof _isDevInstall === 'function' && _isDevInstall()
+        ? 'http://localhost:58000'
+        : 'https://grabcaramel.com'
 const caramelUrl = path => new URL(path, `${CARAMEL_BASE_URL}/`).toString()
 
 // Escape coupon/API data before interpolating into innerHTML. Codes, titles and
@@ -20,20 +26,6 @@ const escHtml = s =>
             })[ch],
     )
 
-async function _detectDevMode() {
-    return new Promise(resolve => {
-        if (typeof chrome === 'undefined' || !chrome.management)
-            return resolve()
-        chrome.management.getSelf(info => {
-            if (info?.installType === 'development') {
-                CARAMEL_BASE_URL = 'http://localhost:58000'
-                console.log('[caramel] DEV MODE: API → localhost:58000')
-            }
-            resolve()
-        })
-    })
-}
-
 /* ------------------------------------------------------------ */
 /*  Globals                                                     */
 /* ------------------------------------------------------------ */
@@ -43,8 +35,6 @@ let returnView = null // callback for the “Back” button, set dynamically
 /*  Bootstrap                                                   */
 /* ------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', async () => {
-    await _detectDevMode()
-
     const loader = document.getElementById('loading-container')
     if (loader) setTimeout(() => (loader.style.display = 'none'), 400)
 
@@ -55,7 +45,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 /*  Init                                                        */
 /* ------------------------------------------------------------ */
 async function initPopup() {
-    const { url } = await getActiveTabDomainRecord()
+    // The service worker can reply undefined on a cold start / error; never let
+    // destructuring throw and leave the user staring at a blank popup.
+    let url = null
+    try {
+        const resp = await getActiveTabDomainRecord()
+        url = resp?.url ?? null
+    } catch (_) {
+        url = null
+    }
 
     currentBrowser.storage.sync.get(['token', 'user'], async res => {
         const token = res.token || null
@@ -63,7 +61,7 @@ async function initPopup() {
 
         if (url) {
             const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
-            const coupons = await fetchCoupons(domain, [])
+            const coupons = await fetchCoupons(domain, '')
 
             if (coupons?.length) {
                 await renderCouponsView(coupons, user, domain)
@@ -237,6 +235,10 @@ async function handleSocialSignIn(provider) {
             url: authorizationUrl,
             interactive: true,
         })
+
+        // User closed the OAuth window without finishing → undefined callback.
+        // Surface a clear "cancelled" message, not a cryptic `new URL(undefined)`.
+        if (!finalCallbackUrl) throw new Error('Sign-in was cancelled.')
 
         // Extract code and state from the callback URL
         // Google redirects to the extension's redirect URI: https://[extension-id].chromiumapp.org/?code=...&state=...
@@ -433,7 +435,7 @@ function renderSignInPrompt(backFn) {
     }
 
     const loginForm = document.getElementById('loginForm')
-    loginForm.addEventListener('submit', async e => {
+    loginForm?.addEventListener('submit', async e => {
         e.preventDefault()
 
         const errorBox = document.getElementById('loginErrorMessage')
@@ -493,9 +495,9 @@ function renderProfileCard(user) {
 
     container.innerHTML = `
     <div class="profile-card fade-in-up">
-      <img src="${avatar}" class="profile-image" alt="Profile"/>
-      <div class="welcome-message">Welcome back, ${user.username}!</div>
-      <div class="username">@${user.username}</div>
+      <img src="${escHtml(avatar)}" class="profile-image" alt="Profile"/>
+      <div class="welcome-message">Welcome back, ${escHtml(user.username)}!</div>
+      <div class="username">@${escHtml(user.username)}</div>
 
       <div class="profile-actions">
         <button id="logoutBtn" class="logout-button">Logout</button>
@@ -510,9 +512,11 @@ function renderProfileCard(user) {
             window.open(caramelUrl('profile'), '_blank')
     }
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        currentBrowser.storage.sync.remove(['token', 'user'], initPopup)
-    })
+    const logoutBtn = document.getElementById('logoutBtn')
+    if (logoutBtn)
+        logoutBtn.addEventListener('click', () => {
+            currentBrowser.storage.sync.remove(['token', 'user'], initPopup)
+        })
 }
 
 /* ------------------------------------------------------------ */
@@ -524,11 +528,11 @@ function renderCouponsView(coupons, user, domain) {
     const headerLeft = user
         ? `
         <img
-          src="${user.image?.length ? user.image : 'assets/default-profile.png'}"
+          src="${escHtml(user.image?.length ? user.image : 'assets/default-profile.png')}"
           class="coupons-profile-image"
           alt="avatar"
         />
-        <span class="coupons-user-label">@${user.username}</span>
+        <span class="coupons-user-label">@${escHtml(user.username)}</span>
       `
         : `
         <img src="assets/default-profile.png" class="coupons-profile-image" alt="avatar"/>
@@ -546,7 +550,7 @@ function renderCouponsView(coupons, user, domain) {
         ${headerRight}
       </div>
 
-      <h3 class="coupon-header">Coupons for ${domain}</h3>
+      <h3 class="coupon-header">Coupons for ${escHtml(domain)}</h3>
 
       <div id="couponList" class="coupon-list">
         ${
