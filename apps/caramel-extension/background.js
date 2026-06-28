@@ -4,7 +4,20 @@ const currentBrowser = (() => {
     throw new Error('Browser is not supported!')
 })()
 
-globalThis.CARAMEL_BASE_URL = 'https://grabcaramel.com'
+// Dev detection WITHOUT the `management` permission: packed Chrome Web Store
+// builds carry an `update_url` in the manifest; unpacked dev installs don't.
+// This is synchronous, so the base URL is correct before the first message is
+// handled (the old chrome.management.getSelf callback raced inbound messages).
+const _isDevInstall = () => {
+    try {
+        return !currentBrowser.runtime.getManifest().update_url
+    } catch (_) {
+        return false
+    }
+}
+globalThis.CARAMEL_BASE_URL = _isDevInstall()
+    ? 'http://localhost:58000'
+    : 'https://grabcaramel.com'
 const EXTENSION_API_KEY = 'WXqEpm2uOV5jjJXPpnQFyZiNdaPVUrtd2LIrf4kc1JA'
 const caramelUrl = path =>
     new URL(path, `${globalThis.CARAMEL_BASE_URL}/`).toString()
@@ -16,16 +29,6 @@ function fetchWithTimeout(url, opts = {}) {
     return fetch(url, { ...opts, signal: ctrl.signal }).finally(() =>
         clearTimeout(timer),
     )
-}
-
-// Auto-switch to localhost when loaded as unpacked dev extension
-if (typeof chrome !== 'undefined' && chrome.management) {
-    chrome.management.getSelf(info => {
-        if (info?.installType === 'development') {
-            globalThis.CARAMEL_BASE_URL = 'http://localhost:58000'
-            console.log('[caramel] DEV MODE: API → localhost:58000')
-        }
-    })
 }
 
 function isServiceWorkerContext() {
@@ -132,10 +135,12 @@ keepAlive()
 
 currentBrowser.runtime.onMessage.addListener(
     (message, sender, sendResponse) => {
+        if (!message || typeof message.action !== 'string') return
         if (message.action === 'openPopup') {
             currentBrowser.windows.create({
                 url: currentBrowser.runtime.getURL(
-                    'index.html?isPopup=true&callerId=' + sender.tab.id,
+                    'index.html?isPopup=true&callerId=' +
+                        (sender.tab?.id ?? ''),
                 ),
                 type: 'popup',
                 width: 400,
@@ -149,7 +154,6 @@ currentBrowser.runtime.onMessage.addListener(
             })
             sendResponse({ success: true })
         } else if (message.action === 'keepAlive') {
-            console.log('Received keep-alive message from content script')
             sendResponse({ status: 'alive' }) // Respond to the message
         } else if (message.action === 'classifyCart') {
             fetchWithTimeout(caramelUrl('api/classify-cart'), {
@@ -175,12 +179,13 @@ currentBrowser.runtime.onMessage.addListener(
             url.searchParams.set('key_words', kw || '')
             url.searchParams.set('limit', '20')
             if (category) url.searchParams.set('category', category)
-            console.log('BACKGROUND: fetchCoupons', {
-                site,
-                kw,
-                url: url.toString(),
-                t: Date.now(),
-            })
+            if (_isDevInstall())
+                console.log('BACKGROUND: fetchCoupons', {
+                    site,
+                    kw,
+                    url: url.toString(),
+                    t: Date.now(),
+                })
             fetchWithTimeout(url.toString())
                 .then(async r => {
                     if (!r.ok) return { coupons: [] }
@@ -260,6 +265,9 @@ currentBrowser.runtime.onMessage.addListener(
             )
 
             return true
+        } else {
+            // Unknown action — respond so the caller's promise never hangs.
+            sendResponse({ error: 'unknown_action' })
         }
     },
 )

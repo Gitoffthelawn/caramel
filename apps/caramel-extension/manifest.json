@@ -16,14 +16,7 @@
         "192": "/icons/192.png",
         "512": "/icons/512.png"
     },
-    "permissions": [
-        "tabs",
-        "activeTab",
-        "storage",
-        "scripting",
-        "identity",
-        "management"
-    ],
+    "permissions": ["tabs", "activeTab", "storage", "scripting", "identity"],
     "host_permissions": [
         "https://*/*",
         "http://localhost:58000/*",
@@ -36,6 +29,9 @@
             "matches": ["<all_urls>"]
         }
     ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'none'"
+    },
     "content_scripts": [
         {
             "matches": ["https://*/*"],
