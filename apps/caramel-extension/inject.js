@@ -1,4 +1,4 @@
-console.log('Caramel: Injected script')
+log('Injected script')
 window.addEventListener('load', async () => {
     await tryInitialize()
 })

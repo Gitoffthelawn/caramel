@@ -43,7 +43,11 @@ if (typeof sleep === 'undefined') {
     var sleep = ms => new Promise(r => setTimeout(r, ms))
 }
 if (typeof log === 'undefined') {
-    var log = (...a) => console.log('Caramel:', ...a)
+    // Verbose only on unpacked dev installs; silent in the packed Web Store
+    // build so we don't leak coupon/flow internals into every store's console.
+    var log = _isDevInstall()
+        ? (...a) => console.log('Caramel:', ...a)
+        : () => {}
 }
 if (typeof recordTiming === 'undefined') {
     var recordTiming = (event, meta = {}) => {
@@ -66,10 +70,15 @@ if (typeof recordTiming === 'undefined') {
     }
 }
 
+// Origins trusted to inject a login token via window.postMessage. The dev
+// origins are ONLY trusted on an unpacked dev install — in the packed Web Store
+// build a tab on dev.grabcaramel.com or a local server must NOT be able to write
+// credentials into a real user's extension storage.
 const CARAMEL_ALLOWED_ORIGINS = new Set([
-    'http://localhost:58300',
     'https://grabcaramel.com',
-    'https://dev.grabcaramel.com',
+    ...(_isDevInstall()
+        ? ['http://localhost:58300', 'https://dev.grabcaramel.com']
+        : []),
 ])
 
 /* ---------- DOM waiters ---------- */
@@ -315,10 +324,16 @@ async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return false
     if (qOne(rec.couponInput) || qOne(rec.showInput)) return true
-    try {
-        await waitForElement(`${rec.couponInput},${rec.showInput}`, 3000)
-    } catch (e) {
-        log(e)
+    // Only wait on the selectors the config actually provides — a bare
+    // `${null},${null}`/`,${x}` compound is a wasted 3s wait (or a thrown
+    // selector that waitForElement just swallows).
+    const waitSel = [rec.couponInput, rec.showInput].filter(Boolean).join(',')
+    if (waitSel) {
+        try {
+            await waitForElement(waitSel, 3000)
+        } catch (e) {
+            log(e)
+        }
     }
     return !!(qOne(rec.couponInput) || qOne(rec.showInput))
 }
@@ -366,7 +381,9 @@ function setInputValue(input, code) {
 async function removeAppliedCoupon(rec) {
     // Prefer per-config remove; fall back to generic.
     const sel = findRemoveSelector(rec)
-    const candidates = [...document.querySelectorAll(sel)].filter(
+    // qAll (not raw querySelectorAll) so an XPath couponRemove selector is
+    // evaluated correctly instead of throwing a SyntaxError that aborts removal.
+    const candidates = qAll(sel).filter(
         b => b.offsetParent !== null && !b.disabled,
     )
     if (candidates.length) {
@@ -775,8 +792,14 @@ async function classifyCartCategory() {
 
 async function getCoupons(rec) {
     let kw = ''
-    // Dev hook: deterministic coupons when using #caramel-test
-    if (location.hash && location.hash.includes('caramel-test')) {
+    // Dev hook: deterministic coupons when using #caramel-test. Gated to
+    // unpacked dev installs so a #caramel-test link can't make the packed
+    // production build fire mock codes against a real store's checkout.
+    if (
+        _isDevInstall() &&
+        location.hash &&
+        location.hash.includes('caramel-test')
+    ) {
         log('DEV MODE: returning mocked coupons')
         return [{ code: 'TEST10' }, { code: 'TEST20' }, { code: 'TEST30' }]
     }
@@ -825,7 +848,14 @@ if (typeof _caramelCancelled === 'undefined') {
 }
 async function startApplyingCoupons(rec) {
     log('=== Starting coupon flow ===')
-    log('AUTO_INSERT_START', { domain: rec?.domain, t: performance.now() })
+    if (!rec) {
+        // No store config (unsupported host / lookup failed). Degrade cleanly
+        // instead of throwing mid-flow behind the overlay.
+        log('AUTO_INSERT_STOP', { result: 'no-domain-record' })
+        showFinalModal(0, null, "We don't have codes for this store yet.")
+        return
+    }
+    log('AUTO_INSERT_START', { domain: rec.domain, t: performance.now() })
     _caramelCancelled = false
     await showTestingModal()
 
@@ -983,15 +1013,20 @@ if (!window.__caramel_listeners_bound) {
             )
         }
     })
-    currentBrowser.runtime.onMessage.addListener(async (req, _s, send) => {
+    currentBrowser.runtime.onMessage.addListener((req, _s, send) => {
         if (req.action === 'userLoggedIn') {
             log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })
-            const rec = await getDomainRecord(location.hostname)
-            await startApplyingCoupons(rec).catch(err => {
-                console.error('Caramel: apply flow error', err)
-                hideTestingModal()
-            })
+            // Fire-and-forget: an async listener returns a Promise (not `true`),
+            // so Chrome would close the channel before a post-await send(). Reply
+            // immediately and run the long apply flow detached.
+            getDomainRecord(location.hostname)
+                .then(rec => startApplyingCoupons(rec))
+                .catch(err => {
+                    console.error('Caramel: apply flow error', err)
+                    hideTestingModal()
+                })
             send({ success: true })
+            return false
         }
     })
 }
