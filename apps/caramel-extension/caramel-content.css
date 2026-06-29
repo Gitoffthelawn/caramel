@@ -253,6 +253,8 @@
    code pills) rather than an underlined hyperlink. */
 #caramel-final-overlay .caramel-final-code span {
     display: inline-block;
+    max-width: 100%;
+    box-sizing: border-box;
     margin-left: 6px;
     padding: 4px 12px;
     color: #ea6925;
@@ -265,6 +267,7 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-decoration: none;
+    overflow-wrap: anywhere;
 }
 #caramel-final-overlay .caramel-final-savings {
     font-size: 18px;
