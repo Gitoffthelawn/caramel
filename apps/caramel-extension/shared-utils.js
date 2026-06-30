@@ -346,6 +346,45 @@ async function tryInitialize() {
     }
 }
 
+/* Entry point. Beyond the one-shot load check, KEEP WATCHING: on SPA / drawer-
+   cart stores (allsaints and most SFCC/Shopify sites) the coupon field is
+   injected only when the user opens the bag/cart — with no page navigation, so
+   a load-time check finds nothing and the user sees nothing even though the
+   promo box is right there. Re-detect it: observe the DOM and show the prompt
+   the moment the coupon field appears. Debounced + self-disconnects after it
+   fires once, so it costs ~nothing and never nags. */
+async function startCheckoutDetection() {
+    await tryInitialize()
+    if (window.__caramel_checkout_observer) return
+    const rec = await getDomainRecord(location.hostname)
+    if (!rec) return // not a supported store — don't observe at all
+    let scheduled = false
+    const recheck = () => {
+        scheduled = false
+        // Don't re-prompt if the prompt is already up or we're mid-apply.
+        if (
+            document.getElementById('caramel-small-prompt') ||
+            document.getElementById('caramel-testing-overlay') ||
+            document.getElementById('caramel-final-overlay')
+        )
+            return
+        if (qOne(rec.couponInput) || qOne(rec.showInput)) {
+            insertCaramelPrompt(rec)
+            if (window.__caramel_checkout_observer) {
+                window.__caramel_checkout_observer.disconnect()
+                window.__caramel_checkout_observer = null
+            }
+        }
+    }
+    const mo = new MutationObserver(() => {
+        if (scheduled) return
+        scheduled = true
+        setTimeout(recheck, 400)
+    })
+    mo.observe(document.documentElement, { childList: true, subtree: true })
+    window.__caramel_checkout_observer = mo
+}
+
 // Generic selectors used when the per-store config doesn't specify them.
 // These cover the most common Honey-style cart UIs.
 const GENERIC_APPLIED_SELECTORS =
