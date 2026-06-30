@@ -54,6 +54,9 @@ async function showTestingModal(title = '', noLoading = false) {
 
     const modal = document.createElement('div')
     modal.id = 'caramel-testing-modal'
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    modal.setAttribute('aria-label', 'Applying coupons')
 
     const logoUrl = currentBrowser.runtime.getURL('assets/logo-light.png')
 
@@ -80,6 +83,21 @@ async function showTestingModal(title = '', noLoading = false) {
             _caramelCancelled = true
             hideTestingModal()
         })
+    // Esc cancels (keyboard parity with the × button); focus the Stop button so
+    // keyboard users land inside the dialog.
+    const onKey = e => {
+        if (e.key === 'Escape') {
+            _caramelCancelled = true
+            hideTestingModal()
+        }
+    }
+    overlay.__caramelOnKey = onKey
+    document.addEventListener('keydown', onKey)
+    try {
+        if (_close) _close.focus()
+    } catch (e) {
+        /* focus is best-effort */
+    }
 }
 
 /**
@@ -104,6 +122,8 @@ async function updateTestingModal(currentIndex, total, code) {
 function hideTestingModal() {
     const overlay = document.getElementById('caramel-testing-overlay')
     if (overlay) {
+        if (overlay.__caramelOnKey)
+            document.removeEventListener('keydown', overlay.__caramelOnKey)
         document.body.removeChild(overlay)
     }
 }
@@ -151,6 +171,9 @@ async function showFinalModal(
 
     const modal = document.createElement('div')
     modal.className = 'caramel-final-modal'
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    modal.setAttribute('aria-label', 'Caramel coupons')
 
     // Three terminal states the user might be in:
     //   savedMoney   = we computed a real price drop ($X off)
@@ -262,6 +285,14 @@ async function showFinalModal(
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
 
+    // Single close path — also detaches the Esc listener so we never leak a
+    // document keydown handler onto the store's page after the modal is gone.
+    const closeFinal = () => {
+        if (overlay.__caramelOnKey)
+            document.removeEventListener('keydown', overlay.__caramelOnKey)
+        if (overlay.parentNode) document.body.removeChild(overlay)
+    }
+
     // Wire manual-copy buttons — copies the EXACT code shown (data-code).
     modal.querySelectorAll('.caramel-manual-copy').forEach(btn => {
         btn.addEventListener('click', async ev => {
@@ -278,14 +309,25 @@ async function showFinalModal(
         })
     })
 
-    // Close the modal on button click
-    modal
-        .querySelector('#caramel-final-ok-btn')
-        .addEventListener('click', () => {
-            document.body.removeChild(overlay)
+    // Close on the primary button; Esc closes too (keyboard). Focus the button
+    // on open so keyboard/screen-reader users land on the main action.
+    const okBtn = modal.querySelector('#caramel-final-ok-btn')
+    if (okBtn)
+        okBtn.addEventListener('click', () => {
+            closeFinal()
             if (isSignIn) {
                 //show popup.html
                 currentBrowser.runtime.sendMessage({ action: 'openPopup' })
             }
         })
+    const onKey = e => {
+        if (e.key === 'Escape') closeFinal()
+    }
+    overlay.__caramelOnKey = onKey
+    document.addEventListener('keydown', onKey)
+    try {
+        if (okBtn) okBtn.focus()
+    } catch (e) {
+        /* focus is best-effort */
+    }
 }
