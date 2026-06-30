@@ -338,12 +338,38 @@ async function isCheckout() {
     return !!(qOne(rec.couponInput) || qOne(rec.showInput))
 }
 
+/* Coupon-availability cache — fetched once when a checkout is detected so we
+   can decide whether to even show the prompt, and reused by the apply flow
+   (no double fetch). Keyed by domain. Guarded var for re-injection safety. */
+if (typeof _caramelCodes === 'undefined') {
+    var _caramelCodes = null // { domain, list }
+}
+async function getCachedCodes(rec) {
+    if (_caramelCodes && _caramelCodes.domain === rec.domain)
+        return _caramelCodes.list
+    let list = []
+    try {
+        list = await fetchCoupons(rec.domain, '', '')
+    } catch (e) {
+        list = []
+    }
+    _caramelCodes = {
+        domain: rec.domain,
+        list: Array.isArray(list) ? list : [],
+    }
+    return _caramelCodes.list
+}
+
 /* --------------------------------------------------  init hook */
 async function tryInitialize() {
-    if (await isCheckout()) {
-        const rec = await getDomainRecord(location.hostname)
-        await insertCaramelPrompt(rec)
-    }
+    if (!(await isCheckout())) return
+    const rec = await getDomainRecord(location.hostname)
+    if (!rec) return
+    // Don't intercept a checkout we have no codes for — only show the prompt
+    // when there's actually something to apply ("checkout without code → why the
+    // intercept?"). The fetched list is cached for the apply step.
+    const codes = await getCachedCodes(rec)
+    if (codes.length) await insertCaramelPrompt(rec)
 }
 
 /* Entry point. Beyond the one-shot load check, KEEP WATCHING: on SPA / drawer-
@@ -373,11 +399,22 @@ async function startCheckoutDetection() {
         // present — so a hidden, pre-rendered cart drawer doesn't pop the prompt
         // before the user actually opens the cart.
         if (_vis(qOne(rec.couponInput)) || _vis(qOne(rec.showInput))) {
-            insertCaramelPrompt(rec)
-            if (window.__caramel_checkout_observer) {
-                window.__caramel_checkout_observer.disconnect()
-                window.__caramel_checkout_observer = null
-            }
+            // Only prompt if we actually have codes for this store (no empty
+            // intercept). getCachedCodes is cached, so this is cheap.
+            getCachedCodes(rec).then(codes => {
+                if (
+                    !codes.length ||
+                    document.getElementById('caramel-small-prompt') ||
+                    document.getElementById('caramel-testing-overlay') ||
+                    document.getElementById('caramel-final-overlay')
+                )
+                    return
+                insertCaramelPrompt(rec)
+                if (window.__caramel_checkout_observer) {
+                    window.__caramel_checkout_observer.disconnect()
+                    window.__caramel_checkout_observer = null
+                }
+            })
         }
     }
     const mo = new MutationObserver(() => {
@@ -847,8 +884,9 @@ async function getCoupons(rec) {
         return [{ code: 'TEST10' }, { code: 'TEST20' }, { code: 'TEST30' }]
     }
 
-    // 1) Fetch coupons FIRST — no LLM call yet.
-    const list = await fetchCoupons(rec.domain, kw, '')
+    // 1) Use the codes already fetched at detection time (cached) — falls back
+    //    to a fresh fetch if the cache is cold. Avoids a double network call.
+    const list = await getCachedCodes(rec)
 
     // 2) Only classify the cart if any returned coupon is flagged as restricted
     //    — that's when the category meaningfully helps the user decide.
