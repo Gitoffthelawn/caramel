@@ -11,7 +11,12 @@ body {
 }
 body {
     width: 420px;
-    height: 470px;
+    /* Size the popup to its content (Chrome grows/shrinks the popup to fit the
+       body) so short lists don't waste space and long lists get room — the
+       coupon list caps its own height and scrolls. min-height keeps empty/error
+       states from looking tiny; max-height stays within Chrome's popup ceiling. */
+    min-height: 320px;
+    max-height: 600px;
     display: flex;
     justify-content: center;
     position: relative;
@@ -22,9 +27,9 @@ body {
 .popup-bg {
     position: absolute;
     top: 0;
+    bottom: 0; /* stretch to the content-sized body height (no fixed 600) */
     left: 0;
-    width: 420px; /* Match body width */
-    height: 600px; /* Match body height */
+    width: 420px;
     overflow: hidden;
     z-index: 1;
 }
@@ -51,9 +56,9 @@ body {
 .loading-container {
     position: absolute;
     top: 0;
+    bottom: 0;
     left: 0;
     width: 420px;
-    height: 600px;
     background: rgba(0, 0, 0, 0.35);
     display: flex;
     justify-content: center;
@@ -469,8 +474,9 @@ body {
        470px body (overflow:hidden) and clips the header / list bottom — that
        overflow was what made the scroll feel stuck ("can't get back up").
        Adapts to the popup viewport; the list scrolls internally for long lists.
-       overscroll-behavior:contain stops macOS rubber-band scroll-chaining. */
-    max-height: calc(100vh - 240px);
+       overscroll-behavior:contain stops macOS rubber-band scroll-chaining.
+       Fixed cap (popup is content-sized now): ~3 cards, then scroll. */
+    max-height: 360px;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
