@@ -666,7 +666,7 @@ function renderCouponsView(coupons, user, domain) {
                               ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''
                           return `
-            <div data-code="${escHtml(c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}${isDead ? ' coupon-item-dead' : ''}">
+            <div data-code="${escHtml(c.code)}" role="button" tabindex="0" aria-label="${escHtml((c.title || 'Coupon') + ' — copy code ' + c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}${isDead ? ' coupon-item-dead' : ''}">
               <div class="coupon-head">
                 <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
                 ${badge}
@@ -712,21 +712,29 @@ function renderCouponsView(coupons, user, domain) {
             renderSignInPrompt(selfCallback),
         )
 
-    /* copy-to-clipboard */
+    /* copy-to-clipboard (mouse + keyboard). Robust copy: async clipboard API
+       with an execCommand fallback (shared caramelCopyText from UI-helpers.js).
+       The bare navigator.clipboard path silently did nothing when the API was
+       blocked — now the user always gets either the code on the clipboard or
+       honest feedback instead of a dead click. */
+    const copyFromItem = async item => {
+        const code = item.getAttribute('data-code')
+        const ok = await caramelCopyText(code)
+        showCopyToast(
+            ok
+                ? `Copied "${code}" to clipboard!`
+                : `Couldn't copy — code is ${code}`,
+        )
+    }
     container.querySelectorAll('.coupon-item').forEach(item => {
-        item.addEventListener('click', async e => {
-            const code = e.currentTarget.getAttribute('data-code')
-            // Robust copy: async clipboard API with an execCommand fallback
-            // (shared caramelCopyText from UI-helpers.js, already loaded here).
-            // The bare navigator.clipboard path silently did nothing when the
-            // API was blocked — now the user always gets either the code on the
-            // clipboard or honest feedback instead of a dead click.
-            const ok = await caramelCopyText(code)
-            showCopyToast(
-                ok
-                    ? `Copied "${code}" to clipboard!`
-                    : `Couldn't copy — code is ${code}`,
-            )
+        item.addEventListener('click', () => copyFromItem(item))
+        // Keyboard users / screen readers: the card is role="button", so
+        // Enter and Space must activate it like a real button.
+        item.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault()
+                copyFromItem(item)
+            }
         })
     })
 }

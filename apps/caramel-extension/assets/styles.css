@@ -535,6 +535,12 @@ body {
     transform: translateY(-1px);
 }
 
+/* Visible keyboard focus ring — cards are role="button" + tabindex="0". */
+.coupon-item:focus-visible {
+    outline: 2px solid #ea6925;
+    outline-offset: 2px;
+}
+
 /* Dead codes (invalid / expired) recede so live codes draw the eye first —
    the visual rhythm that was missing when every card shouted equally. */
 .coupon-item-dead {
