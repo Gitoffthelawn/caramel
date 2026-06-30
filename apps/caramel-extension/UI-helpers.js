@@ -217,7 +217,10 @@ async function showFinalModal(
     } else if (appliedCode) {
         finalMessage = `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
     } else if (hasManual) {
+        // Prefer an explicit caller message (e.g. "couldn't find the promo box")
+        // so we tell the user the REAL reason instead of a generic "didn't stick".
         finalMessage =
+            message ||
             "Auto-apply didn't stick this time. Copy a code and paste it in the store's promo box."
     } else {
         finalMessage =

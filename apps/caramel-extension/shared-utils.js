@@ -885,6 +885,39 @@ async function startApplyingCoupons(rec) {
         return
     }
 
+    // Before pretending to "try" codes, confirm the promo box is actually
+    // reachable on this page. If the config's selectors don't match (stale
+    // config, or the box lives on a later checkout step), say so honestly and
+    // hand over the codes to copy — instead of churning through 8 codes against
+    // nothing and then showing a misleading "didn't stick" message.
+    let _box = qOne(rec.couponInput)
+    if (!_box && rec.showInput) {
+        const _toggle = qOne(rec.showInput)
+        if (_toggle) {
+            _toggle.click()
+            try {
+                await waitForElement(rec.couponInput, 2500)
+            } catch (e) {
+                /* box still didn't appear */
+            }
+            _box = qOne(rec.couponInput)
+        }
+    }
+    if (!_box) {
+        log('AUTO_INSERT_STOP', {
+            result: 'no-coupon-box',
+            t: performance.now(),
+        })
+        showFinalModal(
+            0,
+            null,
+            "We couldn't find the promo box on this page — copy a code below and paste it where the store asks for a promo code.",
+            false,
+            coupons,
+        )
+        return
+    }
+
     // Cap attempts to a reasonable number to limit runtime
     const MAX_ATTEMPTS = 8
     if (coupons.length > MAX_ATTEMPTS) coupons = coupons.slice(0, MAX_ATTEMPTS)
