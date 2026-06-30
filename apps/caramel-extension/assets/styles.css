@@ -464,9 +464,15 @@ body {
 
 /* -------------- Coupon List + Items -------------- */
 .coupon-list {
-    max-height: 320px;
+    /* Fit the list inside the fixed-height popup so the card never overflows the
+       470px body (overflow:hidden) and clips the header / list bottom — that
+       overflow was what made the scroll feel stuck ("can't get back up").
+       Adapts to the popup viewport; the list scrolls internally for long lists.
+       overscroll-behavior:contain stops macOS rubber-band scroll-chaining. */
+    max-height: calc(100vh - 240px);
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     margin: 8px 0;
     padding: 4px 6px 4px 2px;
     scrollbar-width: thin;
