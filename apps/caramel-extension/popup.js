@@ -56,25 +56,67 @@ async function initPopup() {
     }
 
     currentBrowser.storage.sync.get(['token', 'user'], async res => {
-        const token = res.token || null
-        const user = res.user || null
+        const token = res?.token || null
+        const user = res?.user || null
 
-        if (url) {
-            const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
-            const coupons = await fetchCoupons(domain, '')
+        // Wrap the whole render: a fetch failure (backend down / offline) must
+        // show an honest error state with a retry, NEVER leave the popup blank.
+        try {
+            if (url) {
+                const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
+                let coupons = []
+                try {
+                    coupons = await fetchCoupons(domain, '')
+                } catch (_) {
+                    renderLoadError()
+                    return
+                }
 
-            if (coupons?.length) {
-                await renderCouponsView(coupons, user, domain)
-            } else {
-                renderUnsupportedSite(user)
+                if (coupons?.length) {
+                    await renderCouponsView(coupons, user, domain)
+                } else {
+                    renderUnsupportedSite(user)
+                }
+                return
             }
-            return
-        }
 
-        // no active tab info
-        if (token) renderProfileCard(user)
-        else renderUnsupportedSite(null)
+            // no active tab info
+            if (token) renderProfileCard(user)
+            else renderUnsupportedSite(null)
+        } catch (_) {
+            renderLoadError()
+        }
     })
+}
+
+/* Network/backend failure state — keeps the popup from rendering blank when the
+   coupon API is unreachable. Offers a retry that re-runs the whole init. */
+function renderLoadError() {
+    const container = document.getElementById('auth-container')
+    if (!container) return
+    container.innerHTML = `
+    <div class="no-coupons-view fade-in-up">
+      <div class="empty-illu" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea6925" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h.01"/>
+          <path d="M8.5 16.4a5 5 0 0 1 7 0"/>
+          <path d="M5 12.9a10 10 0 0 1 14 0"/>
+          <path d="M2 9.5a16 16 0 0 1 20 0"/>
+          <path d="M2 2l20 20"/>
+        </svg>
+      </div>
+      <h3>Couldn't load coupons</h3>
+      <p>Check your connection and try again.</p>
+      <div class="no-coupons-actions">
+        <button id="retryBtn" class="supported-sites-btn" type="button">Try again</button>
+      </div>
+    </div>`
+    const retry = document.getElementById('retryBtn')
+    if (retry)
+        retry.addEventListener('click', () => {
+            container.innerHTML = ''
+            initPopup()
+        })
 }
 
 /* background helper */
