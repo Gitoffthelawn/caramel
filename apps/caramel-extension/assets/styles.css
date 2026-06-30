@@ -928,3 +928,17 @@ body {
     opacity: 0.85;
     font-style: italic;
 }
+
+/* Respect the OS "reduce motion" setting (accessibility / vestibular sensitivity,
+   common on macOS/iOS): neutralize the logo bounce, fade-ins, and hover/scroll
+   transitions across the whole popup without touching static layout transforms. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
