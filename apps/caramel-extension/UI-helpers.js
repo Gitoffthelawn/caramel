@@ -86,7 +86,7 @@ async function showTestingModal(title = '', noLoading = false) {
 
     const logoUrl = currentBrowser.runtime.getURL('assets/logo-light.png')
 
-    const loadingHTML = `<p id="caramel-test-status">Loading...</p>
+    const loadingHTML = `<p id="caramel-test-status">Checking this store for codes…</p>
     <div id="caramel-progress-container">
       <div id="caramel-progress-bar"></div>
     </div>`
