@@ -359,6 +359,7 @@ async function startCheckoutDetection() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return // not a supported store — don't observe at all
     let scheduled = false
+    const _vis = el => !!el && el.offsetParent !== null
     const recheck = () => {
         scheduled = false
         // Don't re-prompt if the prompt is already up or we're mid-apply.
@@ -368,7 +369,10 @@ async function startCheckoutDetection() {
             document.getElementById('caramel-final-overlay')
         )
             return
-        if (qOne(rec.couponInput) || qOne(rec.showInput)) {
+        // Require the coupon box (or its reveal toggle) to be VISIBLE, not just
+        // present — so a hidden, pre-rendered cart drawer doesn't pop the prompt
+        // before the user actually opens the cart.
+        if (_vis(qOne(rec.couponInput)) || _vis(qOne(rec.showInput))) {
             insertCaramelPrompt(rec)
             if (window.__caramel_checkout_observer) {
                 window.__caramel_checkout_observer.disconnect()
