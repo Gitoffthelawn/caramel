@@ -6,6 +6,12 @@ async function insertCaramelPrompt(domainRecord) {
     if (document.getElementById('caramel-small-prompt')) return
     const container = document.createElement('div')
     container.id = 'caramel-small-prompt'
+    container.setAttribute('role', 'button')
+    container.setAttribute('tabindex', '0')
+    container.setAttribute(
+        'aria-label',
+        'Try Caramel Coupons — auto-apply the best code at checkout',
+    )
     const logoUrl = await currentBrowser.runtime.getURL('assets/logo-light.png')
     container.innerHTML = `
     <button id="caramel-close-btn" aria-label="Dismiss">×</button>
@@ -21,13 +27,10 @@ async function insertCaramelPrompt(domainRecord) {
     </div>
 `
 
-    container.addEventListener('click', event => {
-        if (event.target.id === 'caramel-close-btn') {
-            // If the close button is clicked, just remove the popup
-            document.body.removeChild(container)
-            return
-        }
-        // If the container itself is clicked, start applying coupons
+    const _dismiss = () => {
+        if (container.parentNode) document.body.removeChild(container)
+    }
+    const _activate = () => {
         try {
             if (typeof log !== 'undefined')
                 log('AUTO_INSERT_TRIGGERED_BY_UI', {
@@ -42,7 +45,30 @@ async function insertCaramelPrompt(domainRecord) {
             console.error('Caramel: apply flow error', err)
             hideTestingModal()
         })
-        document.body.removeChild(container)
+        _dismiss()
+    }
+
+    container.addEventListener('click', event => {
+        // Close button → just dismiss; anywhere else on the prompt → start.
+        if (event.target.id === 'caramel-close-btn') {
+            _dismiss()
+            return
+        }
+        _activate()
+    })
+    // Keyboard parity (the prompt is role="button"): Enter/Space on the prompt
+    // itself starts the flow. Guard target===container so Enter on the × button
+    // only closes.
+    container.addEventListener('keydown', event => {
+        if (
+            event.target === container &&
+            (event.key === 'Enter' ||
+                event.key === ' ' ||
+                event.key === 'Spacebar')
+        ) {
+            event.preventDefault()
+            _activate()
+        }
     })
 
     document.body.appendChild(container)
