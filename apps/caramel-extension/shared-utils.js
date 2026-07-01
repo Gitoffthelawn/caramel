@@ -715,7 +715,20 @@ async function applyCoupon(code, rec) {
         // still races so a faster site exits as soon as a signal lands.
         const APPLY_WAIT_MS = 10000
         const waiters = [waitForCartSignal(APPLY_WAIT_MS)]
-        if (priceEl) waiters.push(waitForTextChange(priceEl, APPLY_WAIT_MS))
+        // A price-watch timeout means "the total didn't change" — that's a
+        // no-signal outcome, NOT a coupon error. Let it RESOLVE (swallow the
+        // reject) so a failed apply falls through to the real committed / error-
+        // text detection below, instead of aborting into the catch with a
+        // synthetic "waitForTextChange timeout" errorMsg. That synthetic error
+        // was being misread by the loop as a cart "signal" (sawSignal=true),
+        // defeating the no-signal early-exit and making dead checkouts churn all
+        // 8 codes (~80-100s) instead of bailing after ~2 (~20s).
+        if (priceEl)
+            waiters.push(
+                waitForTextChange(priceEl, APPLY_WAIT_MS).catch(
+                    () => 'price-nochange',
+                ),
+            )
 
         const via = await Promise.race(waiters)
         log('Wait finished via', via)
@@ -1017,8 +1030,26 @@ async function startApplyingCoupons(rec) {
     const EARLY_PROBE = 2
     let sawSignal = false
 
+    // Wall-clock backstop. The no-signal early-exit above can't help a checkout
+    // that stays *responsive* — one that hands back a real "invalid code" error
+    // for every code (sawSignal=true) — so without this it would churn all 8
+    // codes at ~10s each and trap the user behind the "Applying…" overlay for
+    // 80-100s. Once this budget is spent with nothing applied, stop and hand the
+    // remaining codes over to copy. A VALID code still wins instantly (success
+    // breaks the loop below), so this only ever trims trailing *failing* tries.
+    // Time-based, never store-specific.
+    const FLOW_BUDGET_MS = 35000
+    const loopStart = performance.now()
+
     for (let i = 0; i < coupons.length; i++) {
         if (_caramelCancelled) break
+        if (!bestCode && performance.now() - loopStart > FLOW_BUDGET_MS) {
+            log('AUTO_INSERT_TIME_BUDGET', {
+                tried: i,
+                elapsed: performance.now() - loopStart,
+            })
+            break
+        }
         const { code } = coupons[i]
         triedCodes.push(code)
         await updateTestingModal(i + 1, coupons.length, code)
