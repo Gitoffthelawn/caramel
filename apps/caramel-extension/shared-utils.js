@@ -82,6 +82,78 @@ const CARAMEL_ALLOWED_ORIGINS = new Set([
 ])
 
 /* ---------- DOM waiters ---------- */
+/* ---------- visibility helpers ---------- */
+// "Can the user actually see this?" — checkVisibility() correctly handles
+// display:none ancestors (collapsed accordions), visibility:hidden and
+// content-visibility, and (unlike the old offsetParent test) doesn't
+// false-negative inside position:fixed/sticky containers, where order-summary
+// rails and their coupon UIs commonly live.
+function _isVisible(el) {
+    if (!el) return false
+    try {
+        if (typeof el.checkVisibility === 'function')
+            return el.checkVisibility()
+    } catch (e) {
+        /* fall through to the legacy heuristic */
+    }
+    return el.offsetParent !== null
+}
+// Wait until the selector matches a VISIBLE element. waitForElement only waits
+// for presence — useless for reveal-toggles that unhide pre-rendered markup
+// (the input already "exists" while still display:none). Checks ALL matches,
+// not just the first: generic selectors often also hit hidden templates.
+function waitForVisible(sel, timeout = 3000) {
+    return new Promise((res, rej) => {
+        const t0 = performance.now()
+        ;(function poll() {
+            if (qAll(sel).some(_isVisible)) return res('visible')
+            if (performance.now() - t0 > timeout)
+                return rej(`waitForVisible timeout (${sel})`)
+            setTimeout(poll, 120)
+        })()
+    })
+}
+// Pick the best element among ALL matches of a config selector. Config
+// selectors are often generic on purpose (Magento's `.title[data-role=title]`
+// matches EVERY accordion section — Estimate Shipping, Gift Cards, the promo
+// block…), and querySelector's "first match" can land on a hidden or wrong
+// section. Generic disambiguation, no store logic:
+//   1. if an anchor is given (usually the coupon input), prefer the match
+//      sharing the SMALLEST containing block with it — the promo toggle sits
+//      in the same block as the promo input; unrelated accordions don't;
+//   2. otherwise prefer a VISIBLE match;
+//   3. otherwise fall back to the first match.
+function pickBestMatch(sel, anchorEl) {
+    const all = qAll(sel)
+    if (!all.length) return null
+    if (anchorEl) {
+        let best = null
+        let bestDepth = Infinity
+        let bestVisible = false
+        for (const cand of all) {
+            let p = cand.parentElement
+            let d = 0
+            while (p && d < 8) {
+                if (p.contains(anchorEl)) {
+                    const v = _isVisible(cand)
+                    if (
+                        d < bestDepth ||
+                        (d === bestDepth && v && !bestVisible)
+                    ) {
+                        bestDepth = d
+                        best = cand
+                        bestVisible = v
+                    }
+                    break
+                }
+                p = p.parentElement
+                d++
+            }
+        }
+        if (best) return best
+    }
+    return all.find(_isVisible) || all[0]
+}
 function waitForElement(sel, timeout = 4000) {
     return new Promise((res, rej) => {
         if (qOne(sel)) return res('found-immediately')
@@ -385,7 +457,7 @@ async function startCheckoutDetection() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return // not a supported store — don't observe at all
     let scheduled = false
-    const _vis = el => !!el && el.offsetParent !== null
+    const _vis = _isVisible
     const recheck = () => {
         scheduled = false
         // Don't re-prompt if the prompt is already up or we're mid-apply.
@@ -463,9 +535,7 @@ async function removeAppliedCoupon(rec) {
     const sel = findRemoveSelector(rec)
     // qAll (not raw querySelectorAll) so an XPath couponRemove selector is
     // evaluated correctly instead of throwing a SyntaxError that aborts removal.
-    const candidates = qAll(sel).filter(
-        b => b.offsetParent !== null && !b.disabled,
-    )
+    const candidates = qAll(sel).filter(b => _isVisible(b) && !b.disabled)
     if (candidates.length) {
         // The newest applied coupon is usually rendered last → click last one.
         const btn = candidates[candidates.length - 1]
@@ -495,7 +565,7 @@ function _firstVisibleErrorEl(rec) {
     if (!rec.errorIndicator) return null
     const all = qAll(rec.errorIndicator)
     for (const el of all) {
-        if (!el || el.offsetParent === null) continue
+        if (!el || !_isVisible(el)) continue
         const t = (el.innerText || '').trim()
         if (t.length) return el
     }
@@ -516,7 +586,7 @@ function snapshotErrorState(rec) {
     if (!el) return { text: '', visible: false }
     return {
         text: (el.innerText || '').trim(),
-        visible: el.offsetParent !== null,
+        visible: _isVisible(el),
     }
 }
 
@@ -534,7 +604,7 @@ function detectCouponError(rec, baseline, code) {
     // forever and the loop never stops on a valid coupon.
     if (rec.errorIndicator) {
         const el = _firstVisibleErrorEl(rec)
-        if (el && el.offsetParent !== null) {
+        if (el && _isVisible(el)) {
             const t = (el.innerText || '').trim()
             if (t.length) {
                 const tl = t.toLowerCase()
@@ -545,7 +615,7 @@ function detectCouponError(rec, baseline, code) {
                 // Otherwise — ambiguous status text. Treat as new error
                 // only if the container first appeared (was hidden, now
                 // shown) — never on text-changed-but-still-vague.
-                if (baseline && !baseline.visible && el.offsetParent !== null) {
+                if (baseline && !baseline.visible && _isVisible(el)) {
                     return t
                 }
                 return null // generic / stale status copy → not our error
@@ -553,7 +623,7 @@ function detectCouponError(rec, baseline, code) {
         }
     }
     // Generic: look near the input for an inline error matching common phrases.
-    const input = qOne(rec.couponInput)
+    const input = pickBestMatch(rec.couponInput)
     if (!input) return null
     let scope = input.parentElement
     for (let d = 0; d < 5 && scope; d++) {
@@ -586,23 +656,39 @@ async function applyCoupon(code, rec) {
             }
         }
 
-        /* 2] ensure input visible */
-        let input = qOne(rec.couponInput)
-        if (!input && rec.showInput) {
-            const showBtn = qOne(rec.showInput)
+        /* 2] ensure input visible — "present" is NOT enough. Magento-class
+             carts pre-render the whole coupon form inside a collapsed
+             accordion (display:none content, visible "APPLY PROMO CODE"
+             toggle). Typing into the hidden input and clicking the hidden
+             apply button reaches NO form submission at all (proven live on
+             naturepedic: hidden click → zero submit; after clicking the
+             toggle, the identical sequence fires the real couponPost). So:
+             if the input is missing OR hidden, click showInput and wait for
+             the input to become VISIBLE, not merely attached. */
+        let input = pickBestMatch(rec.couponInput)
+        if ((!input || !_isVisible(input)) && rec.showInput) {
+            const showBtn = pickBestMatch(rec.showInput, input)
             if (showBtn) {
                 showBtn.click()
                 try {
-                    await waitForElement(rec.couponInput, 3000)
+                    await waitForVisible(rec.couponInput, 3000)
                 } catch (e) {
                     log(e)
+                    // Late-bound accordion widgets (RequireJS) can miss the
+                    // first click — one bounded retry.
+                    showBtn.click()
+                    try {
+                        await waitForVisible(rec.couponInput, 1500)
+                    } catch (e2) {
+                        log(e2)
+                    }
                 }
-                input = qOne(rec.couponInput)
+                input = pickBestMatch(rec.couponInput)
             }
         }
-        const applyBtn = qOne(rec.couponSubmit)
-        if (!input || !applyBtn) {
-            log('Input / apply button missing')
+        const applyBtn = pickBestMatch(rec.couponSubmit, input)
+        if (!input || !_isVisible(input) || !applyBtn) {
+            log('Input / apply button missing or hidden')
             log('AUTO_INSERT_ATTEMPT_END', code, {
                 success: false,
                 elapsed: performance.now() - attemptStart,
@@ -693,7 +779,7 @@ async function applyCoupon(code, rec) {
                 const nowSuccess = qAll(appliedSel).length
                 if (nowSuccess > baseSuccess) return 'committed'
                 const errEl = _firstVisibleErrorEl(rec)
-                if (errEl && errEl.offsetParent !== null) {
+                if (errEl && _isVisible(errEl)) {
                     const t = (errEl.innerText || '').trim()
                     if (t.length && t !== baseErr) return 'errored'
                 }
@@ -984,20 +1070,30 @@ async function startApplyingCoupons(rec) {
     // config, or the box lives on a later checkout step), say so honestly and
     // hand over the codes to copy — instead of churning through 8 codes against
     // nothing and then showing a misleading "didn't stick" message.
-    let _box = qOne(rec.couponInput)
-    if (!_box && rec.showInput) {
-        const _toggle = qOne(rec.showInput)
+    // Visibility-aware: a box that exists but sits inside a collapsed
+    // accordion (Magento-class carts) is as unusable as a missing one — reveal
+    // it via showInput up front so the whole loop runs against a box the user
+    // can actually SEE, and wait for visibility, not mere presence.
+    let _box = pickBestMatch(rec.couponInput)
+    if ((!_box || !_isVisible(_box)) && rec.showInput) {
+        const _toggle = pickBestMatch(rec.showInput, _box)
         if (_toggle) {
             _toggle.click()
             try {
-                await waitForElement(rec.couponInput, 2500)
+                await waitForVisible(rec.couponInput, 2500)
             } catch (e) {
-                /* box still didn't appear */
+                // late-bound accordion widgets can miss the first click
+                _toggle.click()
+                try {
+                    await waitForVisible(rec.couponInput, 1500)
+                } catch (e2) {
+                    /* box still didn't appear */
+                }
             }
-            _box = qOne(rec.couponInput)
+            _box = pickBestMatch(rec.couponInput)
         }
     }
-    if (!_box) {
+    if (!_box || !_isVisible(_box)) {
         log('AUTO_INSERT_STOP', {
             result: 'no-coupon-box',
             t: performance.now(),
@@ -1068,9 +1164,7 @@ async function startApplyingCoupons(rec) {
         // price config, so invalid codes (no row) add no time.
         if (!res.success && hasPriceCfg && !isNaN(original)) {
             const appliedNow = () =>
-                qAll(findAppliedSelector(rec)).some(
-                    el => el && el.offsetParent !== null,
-                )
+                qAll(findAppliedSelector(rec)).some(el => _isVisible(el))
             if (appliedNow()) {
                 for (let t = 0; t < 4; t++) {
                     await sleep(400)
@@ -1113,7 +1207,7 @@ async function startApplyingCoupons(rec) {
         if (res.committed) {
             await removeAppliedCoupon(rec)
         } else {
-            const inp = qOne(rec.couponInput)
+            const inp = pickBestMatch(rec.couponInput)
             if (inp && inp.value) {
                 setInputValue(inp, '')
             }
