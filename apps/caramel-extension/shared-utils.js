@@ -1056,6 +1056,37 @@ async function startApplyingCoupons(rec) {
 
         const res = await applyCoupon(code, rec)
 
+        // Late-total safety net: some checkouts (erincondren-class) flash their
+        // error region a beat BEFORE the order total re-renders, so applyCoupon
+        // can measure "no drop" and rule a code failed even though it actually
+        // stuck. Left uncaught, that applied-but-unrecognised coupon then
+        // poisons every later attempt (whose baseline is now the discounted
+        // price) and the run ends "nothing applied" while a discount sits on
+        // the cart. So: if a coupon row is now showing, poll briefly for the
+        // LIVE total to fall below the cart's ORIGINAL total; if it does, this
+        // code really worked — credit it and stop. Gated on an applied row +
+        // price config, so invalid codes (no row) add no time.
+        if (!res.success && hasPriceCfg && !isNaN(original)) {
+            const appliedNow = () =>
+                qAll(findAppliedSelector(rec)).some(
+                    el => el && el.offsetParent !== null,
+                )
+            if (appliedNow()) {
+                for (let t = 0; t < 4; t++) {
+                    await sleep(400)
+                    const cur = getPrice(rec.priceContainer, {
+                        returnLargest: true,
+                    })
+                    if (!isNaN(cur) && cur < original - 0.01) {
+                        res.success = true
+                        res.newTotal = cur
+                        res.committed = true
+                        break
+                    }
+                }
+            }
+        }
+
         if (res.success) {
             // Real success — keep this code applied, stop here.
             const diff =
