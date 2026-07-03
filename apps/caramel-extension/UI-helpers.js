@@ -254,6 +254,9 @@ async function showFinalModal(
         finalMessage =
             message ||
             "Auto-apply didn't stick this time. Copy a code and paste it in the store's promo box."
+    } else if (isSignIn) {
+        finalMessage =
+            message || 'Sign in to unlock member-only coupons for this store.'
     } else {
         finalMessage =
             message || "Looks like you're already getting the best deal."

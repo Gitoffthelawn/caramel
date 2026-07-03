@@ -942,3 +942,19 @@ body {
         scroll-behavior: auto !important;
     }
 }
+
+/* --- Consistent keyboard focus for ALL popup controls ---
+ * Buttons/links previously fell back to the browser's default (black) outline
+ * on Tab; give every interactive element the same branded orange ring the
+ * coupon cards use, and suppress the ring on pointer focus. */
+.popup-container a:focus-visible,
+.popup-container button:focus-visible,
+.login-form input:focus-visible {
+    outline: 2px solid #ea6925;
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+.popup-container a:focus:not(:focus-visible),
+.popup-container button:focus:not(:focus-visible) {
+    outline: none;
+}
