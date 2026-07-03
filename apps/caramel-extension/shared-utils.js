@@ -653,10 +653,17 @@ function detectCouponError(rec, baseline, code) {
                 if (code && tl.includes(code.toLowerCase())) return t
                 // Strong signal: classic rejection vocabulary.
                 if (ERROR_WORDS_RE.test(tl)) return t
-                // Otherwise — ambiguous status text. Treat as new error
-                // only if the container first appeared (was hidden, now
-                // shown) — never on text-changed-but-still-vague.
-                if (baseline && !baseline.visible && _isVisible(el)) {
+                // Otherwise — status text without classic vocabulary. Treat
+                // as OUR error when the container first appeared OR was
+                // EMPTY before this attempt (empty→text is attempt-caused —
+                // login-required / min-spend style messages). Pre-existing
+                // text that merely changed stays ambiguous (aria-live regions
+                // that rotate stale copy — the logos.com trap).
+                if (
+                    baseline &&
+                    (!baseline.visible || !baseline.text) &&
+                    _isVisible(el)
+                ) {
                     return t
                 }
                 return null // generic / stale status copy → not our error
