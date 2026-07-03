@@ -358,6 +358,57 @@
     background: #d65d1f;
 }
 
+/* ---- Host-page style hardening + focus rings ----
+ * Our controls live in the STORE's DOM, so the store's global `button {}`
+ * rules (fonts, uppercasing, borders, and — the usual culprit — a black
+ * :focus outline) bleed into them. ID/scoped selectors + !important beat even
+ * the host's own !important rules, so our UI looks the same everywhere. */
+#caramel-final-ok-btn,
+#caramel-final-overlay .caramel-manual-copy,
+#caramel-testing-close,
+#caramel-close-btn {
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif !important;
+    font-style: normal !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    text-decoration: none !important;
+    border: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+/* No outline on pointer/programmatic focus (this is the black ring users saw
+ * when a modal auto-focuses its primary button on open)… The dialog
+ * CONTAINERS are focused programmatically for screen-reader announcement and
+ * must never show a visual ring around the whole card. */
+#caramel-small-prompt:focus,
+#caramel-final-ok-btn:focus,
+#caramel-final-overlay .caramel-manual-copy:focus,
+#caramel-testing-close:focus,
+#caramel-close-btn:focus,
+#caramel-final-overlay .caramel-final-modal:focus,
+#caramel-testing-modal:focus {
+    outline: none !important;
+}
+/* …but a clear, on-brand ring for real KEYBOARD focus (accessibility). */
+#caramel-final-ok-btn:focus-visible,
+#caramel-final-overlay .caramel-manual-copy:focus-visible {
+    outline: 3px solid #9a3d0f !important;
+    outline-offset: 2px !important;
+}
+#caramel-testing-close:focus-visible,
+#caramel-close-btn:focus-visible {
+    outline: 2px solid #ea6925 !important;
+    outline-offset: 2px !important;
+}
+#caramel-small-prompt:focus-visible {
+    outline: 3px solid #fff !important;
+    outline-offset: 2px !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
     #caramel-small-prompt,
     #caramel-testing-modal,

@@ -109,8 +109,7 @@ async function showTestingModal(title = '', noLoading = false) {
             _caramelCancelled = true
             hideTestingModal()
         })
-    // Esc cancels (keyboard parity with the × button); focus the Stop button so
-    // keyboard users land inside the dialog.
+    // Esc cancels (keyboard parity with the × button).
     const onKey = e => {
         if (e.key === 'Escape') {
             _caramelCancelled = true
@@ -119,8 +118,11 @@ async function showTestingModal(title = '', noLoading = false) {
     }
     overlay.__caramelOnKey = onKey
     document.addEventListener('keydown', onKey)
+    // Focus the dialog itself (a11y) — not the × button, which would flash a
+    // focus ring on open.
     try {
-        if (_close) _close.focus()
+        modal.tabIndex = -1
+        modal.focus()
     } catch (e) {
         /* focus is best-effort */
     }
@@ -358,8 +360,13 @@ async function showFinalModal(
     }
     overlay.__caramelOnKey = onKey
     document.addEventListener('keydown', onKey)
+    // Move focus INTO the dialog (a11y) without lighting up a button's focus
+    // ring on open — focus the modal container, not the primary button. A
+    // keyboard user then Tabs to the button and gets the proper focus-visible
+    // ring; a mouse user sees a clean button.
     try {
-        if (okBtn) okBtn.focus()
+        modal.tabIndex = -1
+        modal.focus()
     } catch (e) {
         /* focus is best-effort */
     }
