@@ -452,6 +452,22 @@ async function tryInitialize() {
    the moment the coupon field appears. Debounced + self-disconnects after it
    fires once, so it costs ~nothing and never nags. */
 async function startCheckoutDetection() {
+    // A discount-link apply reloads the page so the store's own UI shows the
+    // applied code; finish that flow on the fresh document by showing the
+    // result modal instead of re-prompting.
+    try {
+        const raw = sessionStorage.getItem('caramel_applied')
+        if (raw) {
+            sessionStorage.removeItem('caramel_applied')
+            const st = JSON.parse(raw)
+            if (st && st.code && Date.now() - (st.t || 0) < 120000) {
+                showFinalModal(st.saved || 0, st.code, null)
+                return
+            }
+        }
+    } catch (e) {
+        /* sessionStorage unavailable — continue with normal detection */
+    }
     await tryInitialize()
     if (window.__caramel_checkout_observer) return
     const rec = await getDomainRecord(location.hostname)
@@ -887,6 +903,48 @@ async function applyCoupon(code, rec) {
     }
 }
 
+/* ----------------------------------------------  discount-link apply */
+// Runtime CAPABILITY detection — no store lists, no config inspection. Some
+// checkout stacks ignore ALL synthetic DOM interaction on their discount form
+// (isTrusted-gated Apply buttons — proven live on two independent stores), but
+// the same platform exposes, on the SAME origin the user is browsing:
+//   GET /cart.js            -> live cart JSON (totals in cents, token)
+//   GET /discount/{code}    -> attaches the code to the session server-side
+// Any site that isn't that platform simply fails the /cart.js shape probe and
+// the normal config-selector DOM flow below runs unchanged.
+async function probeCartJson() {
+    try {
+        const r = await fetch('/cart.js', { credentials: 'same-origin' })
+        if (!r.ok) return null
+        const j = await r.json()
+        if (
+            j &&
+            typeof j.token === 'string' &&
+            typeof j.total_price === 'number' &&
+            typeof j.item_count === 'number'
+        )
+            return j
+    } catch (e) {
+        /* not this platform — probe is expected to fail elsewhere */
+    }
+    return null
+}
+async function applyViaDiscountLink(code) {
+    // The discount endpoint 302s to the storefront; we only need the session
+    // cookie it sets, then re-read the live totals to see if the code took.
+    // A later code simply replaces the session's discount, so probing several
+    // codes leaves at most one (possibly ineffective) code attached — inert.
+    try {
+        await fetch('/discount/' + encodeURIComponent(code), {
+            credentials: 'same-origin',
+            redirect: 'follow',
+        })
+        return await probeCartJson()
+    } catch (e) {
+        return null
+    }
+}
+
 /* --------------------------------------------------  coupon list */
 async function fetchCoupons(site, kw, category) {
     // Delegate network fetch to background/service worker to avoid CORS failures
@@ -1062,6 +1120,66 @@ async function startApplyingCoupons(rec) {
             null,
             "No codes for this store just yet — we're working on it.",
         )
+        return
+    }
+
+    // Discount-link strategy first when the platform capability is present
+    // (see probeCartJson). On these checkouts the DOM form is deaf to
+    // synthetic events, while the link path is fast (~0.5s/code, no page
+    // freeze), measurable (live totals), and works even when the coupon UI
+    // lives behind an untrusted-click gate.
+    const _cart0 = await probeCartJson()
+    if (_cart0 && _cart0.item_count > 0) {
+        log('AUTO_INSERT_STRATEGY', {
+            via: 'discount-link',
+            total: _cart0.total_price,
+        })
+        const linkCodes = coupons.slice(0, 8)
+        for (let i = 0; i < linkCodes.length; i++) {
+            if (_caramelCancelled) {
+                log('AUTO_INSERT_STOP', {
+                    result: 'cancelled',
+                    t: performance.now(),
+                })
+                return
+            }
+            const { code } = linkCodes[i]
+            await updateTestingModal(i + 1, linkCodes.length, code)
+            const after = await applyViaDiscountLink(code)
+            if (after && after.total_price < _cart0.total_price) {
+                const saved = (_cart0.total_price - after.total_price) / 100
+                log('AUTO_INSERT_STOP', {
+                    result: 'applied',
+                    via: 'discount-link',
+                    bestCode: code,
+                    bestSave: saved,
+                    t: performance.now(),
+                })
+                // Reload so the page's own UI shows the applied discount
+                // (tag + new total), then re-show our result on the fresh
+                // document — sessionStorage survives same-tab reloads and is
+                // per-origin, so the handoff can't leak across sites.
+                try {
+                    sessionStorage.setItem(
+                        'caramel_applied',
+                        JSON.stringify({ code, saved, t: Date.now() }),
+                    )
+                } catch (e) {
+                    /* storage blocked — the discount is still applied */
+                }
+                location.reload()
+                return
+            }
+        }
+        log('AUTO_INSERT_STOP', {
+            result: 'none',
+            via: 'discount-link',
+            tried: linkCodes.map(c => c.code),
+            t: performance.now(),
+        })
+        // None of the codes moved the total — hand them over to copy instead
+        // of also grinding the (deaf) DOM form.
+        showFinalModal(0, null, null, false, coupons)
         return
     }
 
