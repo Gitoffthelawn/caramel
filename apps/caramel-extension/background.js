@@ -15,8 +15,10 @@ const _isDevInstall = () => {
         return false
     }
 }
+// Unpacked/dev installs hit the DEV deployment (dev.grabcaramel.com); the
+// packed Web Store build (has update_url) hits production.
 globalThis.CARAMEL_BASE_URL = _isDevInstall()
-    ? 'http://localhost:58000'
+    ? 'https://dev.grabcaramel.com'
     : 'https://grabcaramel.com'
 const EXTENSION_API_KEY = 'WXqEpm2uOV5jjJXPpnQFyZiNdaPVUrtd2LIrf4kc1JA'
 const caramelUrl = path =>
