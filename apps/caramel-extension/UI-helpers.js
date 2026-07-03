@@ -241,7 +241,11 @@ async function showFinalModal(
     if (savedMoney) {
         finalMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
     } else if (appliedCode) {
-        finalMessage = `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
+        // Prefer an explicit caller message (threshold hints, non-USD
+        // formatting) over the generic applied line.
+        finalMessage =
+            message ||
+            `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
     } else if (hasManual) {
         // Prefer an explicit caller message (e.g. "couldn't find the promo box")
         // so we tell the user the REAL reason instead of a generic "didn't stick".

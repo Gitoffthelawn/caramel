@@ -395,7 +395,15 @@ function _hostMatchesDomain(host, domain) {
 async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return false
-    if (qOne(rec.couponInput) || qOne(rec.showInput)) return true
+    // VISIBLE, not merely present: themes ship hidden coupon markup on
+    // non-checkout pages, and some configs point showInput at site-wide
+    // controls — the prompt belongs only where the user can actually see a
+    // way to enter a code. Same semantics as the re-detection observer.
+    const anyVisible = () =>
+        [rec.couponInput, rec.showInput]
+            .filter(Boolean)
+            .some(sel => qAll(sel).some(_isVisible))
+    if (anyVisible()) return true
     // Only wait on the selectors the config actually provides — a bare
     // `${null},${null}`/`,${x}` compound is a wasted 3s wait (or a thrown
     // selector that waitForElement just swallows).
@@ -407,7 +415,7 @@ async function isCheckout() {
             log(e)
         }
     }
-    return !!(qOne(rec.couponInput) || qOne(rec.showInput))
+    return anyVisible()
 }
 
 /* Coupon-availability cache — fetched once when a checkout is detected so we
@@ -461,7 +469,24 @@ async function startCheckoutDetection() {
             sessionStorage.removeItem('caramel_applied')
             const st = JSON.parse(raw)
             if (st && st.code && Date.now() - (st.t || 0) < 120000) {
-                showFinalModal(st.saved || 0, st.code, null)
+                let amount = st.saved || 0
+                let msg = null
+                if (st.currency && st.currency !== 'USD' && amount > 0) {
+                    // The built-in savings line renders "$X" — mislabels
+                    // non-USD stores. Present the correctly-formatted amount
+                    // through the applied-code presentation instead.
+                    try {
+                        const fmt = new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: st.currency,
+                        }).format(amount)
+                        msg = `Code ${st.code} saved you ${fmt} — it's applied to your order.`
+                        amount = 0
+                    } catch (e) {
+                        /* unknown currency code — fall back to $ */
+                    }
+                }
+                showFinalModal(amount, st.code, msg)
                 return
             }
         }
@@ -929,6 +954,36 @@ async function probeCartJson() {
     }
     return null
 }
+// Per-origin short-term memory of codes we already tried, so a navigation-type
+// apply (full-page POST → reload, Magento-class) doesn't make the next run
+// re-grind the same rejected codes from #1 — one wasted reload per code.
+// sessionStorage is per-origin and per-tab and dies with the tab; entries also
+// expire on their own after 15 minutes so fresh runs eventually retry.
+const CARAMEL_TRIED_KEY = 'caramel_tried_codes'
+const CARAMEL_TRIED_TTL = 15 * 60 * 1000
+function _getTriedCodes() {
+    try {
+        const m = JSON.parse(sessionStorage.getItem(CARAMEL_TRIED_KEY) || '{}')
+        const now = Date.now()
+        for (const k of Object.keys(m)) {
+            if (now - m[k] > CARAMEL_TRIED_TTL) delete m[k]
+        }
+        return m
+    } catch (e) {
+        return {}
+    }
+}
+function _markTriedCode(code) {
+    // Marked at attempt START, not at verdict — a full-page-POST apply can
+    // destroy this script before the verdict lands.
+    try {
+        const m = _getTriedCodes()
+        m[code] = Date.now()
+        sessionStorage.setItem(CARAMEL_TRIED_KEY, JSON.stringify(m))
+    } catch (e) {
+        /* storage unavailable — worst case a reload retries codes */
+    }
+}
 async function applyViaDiscountLink(code) {
     // The discount endpoint 302s to the storefront; we only need the session
     // cookie it sets, then re-read the live totals to see if the code took.
@@ -1123,6 +1178,28 @@ async function startApplyingCoupons(rec) {
         return
     }
 
+    // Skip codes this tab already tried recently (navigation-type applies
+    // reload the page mid-loop; without this a re-run restarts from code #1).
+    const _tried = _getTriedCodes()
+    const _untried = coupons.filter(c => !(c.code in _tried))
+    if (_untried.length < coupons.length) {
+        log('AUTO_INSERT_SKIP_TRIED', {
+            skipped: coupons.length - _untried.length,
+        })
+    }
+    if (!_untried.length) {
+        log('AUTO_INSERT_STOP', { result: 'all-tried', t: performance.now() })
+        showFinalModal(
+            0,
+            null,
+            'We already tried these codes on this page — copy one below to use manually, or check back later for fresh codes.',
+            false,
+            coupons,
+        )
+        return
+    }
+    coupons = _untried
+
     // Discount-link strategy first when the platform capability is present
     // (see probeCartJson). On these checkouts the DOM form is deaf to
     // synthetic events, while the link path is fast (~0.5s/code, no page
@@ -1145,6 +1222,7 @@ async function startApplyingCoupons(rec) {
             }
             const { code } = linkCodes[i]
             await updateTestingModal(i + 1, linkCodes.length, code)
+            _markTriedCode(code)
             const after = await applyViaDiscountLink(code)
             if (after && after.total_price < _cart0.total_price) {
                 const saved = (_cart0.total_price - after.total_price) / 100
@@ -1162,7 +1240,12 @@ async function startApplyingCoupons(rec) {
                 try {
                     sessionStorage.setItem(
                         'caramel_applied',
-                        JSON.stringify({ code, saved, t: Date.now() }),
+                        JSON.stringify({
+                            code,
+                            saved,
+                            currency: after.currency,
+                            t: Date.now(),
+                        }),
                     )
                 } catch (e) {
                     /* storage blocked — the discount is still applied */
@@ -1236,6 +1319,7 @@ async function startApplyingCoupons(rec) {
         : NaN
     let bestSave = 0
     let bestCode = null
+    let lastStoreReason = null // last real error text the store showed us
     const triedCodes = []
     // Pattern-based early-exit: if the checkout gives ZERO feedback (no applied
     // row, no error text) for the first couple of codes, it isn't accepting our
@@ -1268,6 +1352,7 @@ async function startApplyingCoupons(rec) {
         triedCodes.push(code)
         await updateTestingModal(i + 1, coupons.length, code)
 
+        _markTriedCode(code)
         const res = await applyCoupon(code, rec)
 
         // Late-total safety net: some checkouts (erincondren-class) flash their
@@ -1322,6 +1407,15 @@ async function startApplyingCoupons(rec) {
             committed: res.committed,
             errorMsg: res.errorMsg,
         })
+        // Keep the store's own words (login-required, min-spend, expired…) so
+        // the final modal can say the REAL reason instead of a generic line.
+        if (
+            res.errorMsg &&
+            typeof res.errorMsg === 'string' &&
+            !/timeout/i.test(res.errorMsg)
+        ) {
+            lastStoreReason = res.errorMsg
+        }
         if (res.committed) {
             await removeAppliedCoupon(rec)
         } else {
@@ -1360,11 +1454,16 @@ async function startApplyingCoupons(rec) {
             tried: triedCodes,
             t: performance.now(),
         })
-        const headline =
-            hasPriceCfg && bestSave > 0
-                ? 'We found a coupon that saves you money!'
-                : `Applied ${bestCode}`
-        showFinalModal(bestSave, bestCode, headline)
+        // A committed code that didn't move a READABLE total is usually a
+        // threshold promo (min-spend) — say so instead of a bare "applied".
+        const zeroEffect = hasPriceCfg && !isNaN(original) && !(bestSave > 0)
+        showFinalModal(
+            bestSave,
+            bestCode,
+            zeroEffect
+                ? `Code ${bestCode} is on your cart but hasn't changed the total yet — it may need a minimum spend to kick in.`
+                : null,
+        )
     } else {
         log('AUTO_INSERT_STOP', {
             result: 'none',
@@ -1376,7 +1475,17 @@ async function startApplyingCoupons(rec) {
         // Nothing auto-applied. Hand the tried codes to the modal so the user
         // gets a manual copy/paste fallback (covers valid codes the store's
         // checkout rejected only because our synthetic click isn't trusted).
-        showFinalModal(0, null, null, false, coupons)
+        // When the store told us WHY (login required, min spend, expired…),
+        // repeat its own words — that's the honest, transparent version.
+        showFinalModal(
+            0,
+            null,
+            lastStoreReason
+                ? `The store said: “${String(lastStoreReason).slice(0, 140)}” — copy a code below to try it manually.`
+                : null,
+            false,
+            coupons,
+        )
     }
 }
 
