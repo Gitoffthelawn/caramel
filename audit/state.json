@@ -1,0 +1,131 @@
+{
+    "run_id": "caramel-audit-2026-07-10",
+    "started": "2026-07-10",
+    "rules_version": "v5 2026-07-10",
+    "baseline": {
+        "branch": "dev",
+        "sha": "537547b3081aa3a0ec817cdc5f6dac4f0d328dbb",
+        "tree_clean": true
+    },
+    "branches": {
+        "target": "audit/dev-2026-07-10",
+        "target_pushed": true,
+        "fixes": "audit/fixes-2026-07-10 (to be created in Stage 3)"
+    },
+    "gate_mode": {
+        "mode": "pre-authorized: gates collapse into PR review",
+        "rationale": "User args directed: branch off dev as the PR target and 'work do pr to that branch basically just follow the audit'. Self-triage + self-approved plans recorded here; PRs to audit/dev-2026-07-10 are the human review surface. No merges by agents, ever.",
+        "decisions": []
+    },
+    "stage": "0+1 parallel",
+    "stage0": {
+        "test_suite": "NONE — turbo run test matches zero package scripts; app has Playwright test:e2e, extension has scripts/test-extension.mjs",
+        "test_runs": [
+            "delegated to tooling agent (x2), see audit/tooling-report.md"
+        ],
+        "tooling_inventory": "in-flight (sonnet)",
+        "exclusions_file": "audit/exclusions.md"
+    },
+    "stage1": {
+        "hotspots": {
+            "a": "21 nominations (audit/hotspots-a.json)",
+            "b": "20 nominations (audit/hotspots-b.json)",
+            "intersection_ruling": [
+                "BOTH→dive: classify-cart LLM surface (DD-1); extension fire-and-forget/silent-failure cluster (DD-2); API req.json swallow convention + validation drift (DD-3); any-typed lib surfaces (DD-4); nested lockfile + missing env validation = direct finding candidates (mechanical, verification gate confirms)",
+                "ONE-FOUND Crit/High→dive: hardcoded EXTENSION_API_KEY in background.js:23 → server-side gating question folded into DD-3 item 4; decryptJsonData plaintext-fallback → DD-4 item 4",
+                "KILLED: hotspot-A '.env with secrets' — git ls-files proves .env untracked + gitignored (only local-dev/.env.ports deliberately tracked via !.env.ports); local machine state, not repo defect",
+                "KILLED: hotspot-A 'no ESLint config' — eslint.config.mjs exists at root and both apps; contradicted by direct observation",
+                "A-only Medium/Low (oauth-redirect logging, coupons GET catch, sentry ctx, recordTiming ignore) → covered by DD-2/DD-3 scopes, else Unverified appendix",
+                "A-only Medium duplication (extension vs app coupon/store logic) → DD-2 item 2 + change-trace corroboration"
+            ]
+        },
+        "stage1_complete": [
+            "tooling",
+            "change-trace",
+            "3am",
+            "onboarding",
+            "navigation",
+            "premortem",
+            "DD-1",
+            "DD-2",
+            "DD-3",
+            "DD-4"
+        ],
+        "candidate_total": 82,
+        "synthesis": {
+            "collapsed_to": 15,
+            "findings_json": "audit/findings.json",
+            "criticals": [
+                "F-001 external coupons DB / blind health check",
+                "F-002 swallowed errors (2 facets)",
+                "F-003 public EXTENSION_API_KEY gates mutation+exempts throttle"
+            ],
+            "cap_compliant": true,
+            "killed_at_intersection": [
+                ".env-with-secrets (untracked+gitignored)",
+                "no-eslint-config (exists)"
+            ]
+        },
+        "verification": {
+            "absent": 0,
+            "deletion_counter": 0,
+            "sub_0.9": [
+                "F-007 0.88",
+                "F-009 0.88",
+                "F-011 0.85",
+                "F-013 0.80",
+                "F-014 0.75 (all tool-sourced/absence sub-claims, not hallucinations — text marked tool-sourced)"
+            ]
+        },
+        "adversarial": {
+            "attacked": 8,
+            "killed": 0,
+            "strengthened": ["F-006", "F-008"],
+            "corrected": ["F-009 apiResponseNext struck (live)"],
+            "narrowed": ["F-002 telemetry facet — onRequestError IS wired"]
+        },
+        "rules_checklist": {
+            "pass": 4,
+            "violation": 29,
+            "na": 5,
+            "gap_rows": 10,
+            "gaps_folded": "STR-2->F-016, CIB-1/2/3+PIECE-1/7/8->F-009, ERR-2->F-011, AIH-1/2->appendix"
+        },
+        "final_findings": 16,
+        "cap_deviation": "16 not 15 — F-016 (one-root-compose) promoted from GAP row; v5 §Structure forbids punch-listing it. Documented in AUDIT.md + findings.json.cap_note.",
+        "artifacts_written": [
+            "AUDIT.md",
+            "findings.json",
+            "triage.md",
+            "rules-checklist.md",
+            "STAGE2-ONLOAD-PROMPT.md",
+            "tooling-report.md",
+            "4 deep-dives",
+            "4 empiricals",
+            "2 hotspots",
+            "3 verify",
+            "adversarial",
+            "premortem"
+        ]
+    },
+    "stage1_done": true,
+    "triage_mode": "self-triaged under gate collapse; recommendations in audit/triage.md; all 16 FIX (none defer/reject); PRs to audit/dev-2026-07-10 are the human review surface",
+    "next": "Human launches a fresh Opus lead session with audit/STAGE2-ONLOAD-PROMPT.md for Stages 2-3. Fable returns for end-review + Stage-4 CLAUDE.md.",
+    "tooling_headline": {
+        "tests": "NONE — pnpm test false-green x2 (turbo 0 tasks)",
+        "typecheck": "PASS 0 errors",
+        "lint": "0 err / 191 warn (all extension: CRLF+no-console)",
+        "knip": "1 unused type — green by ignore-list blindness",
+        "prettier": "13 unformatted + invalid tailwindConfigPath key (dead)",
+        "audit": "83 vulns (2 crit / 45 high / 30 mod / 6 low)",
+        "outdated": "50/51; react-awesome-button DEPRECATED",
+        "branch_protection": "NONE on main or dev — CI advisory only",
+        "ci_secrets": "16 refs, 0 phantom, 2 orphaned",
+        "env_validation": "NO; 19 documented vs 38 read",
+        "ai_surface": "1 (OpenRouter cart classifier), 0 evals",
+        "duplication": "jscpd 65 clones 5.55%; real signal in .tsx marketing/auth components",
+        "top_churn_and_loc": "shared-utils.js is #1 in BOTH (4529 churn / 1536 loc)"
+    },
+    "deletion_counter": 0,
+    "notes": []
+}
