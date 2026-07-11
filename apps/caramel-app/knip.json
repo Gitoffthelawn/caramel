@@ -28,7 +28,6 @@
         "prettier-plugin-tailwindcss",
         "@use-gesture/react",
         "gsap",
-        "react-awesome-button",
         "react-fast-marquee",
         "react-lottie-player",
         "react-type-animation"
