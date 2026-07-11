@@ -71,6 +71,8 @@ See `caramel-extension/scripts/README.md` for more details.
 
 The project uses GitHub Actions for CI/CD. The workflow is defined in `.github/workflows/`.
 
+For deploys, health checks, rollback, and known failure modes, see [RUNBOOK.md](RUNBOOK.md).
+
 ## License
 
 See [LICENSE](LICENSE) file for details.

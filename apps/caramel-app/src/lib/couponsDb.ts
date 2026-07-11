@@ -22,6 +22,15 @@ export const couponsSql =
         idle_timeout: 20,
         connect_timeout: 10,
         prepare: false,
+        // F-011 — coarse cross-hop trace correlation. This hop has no
+        // header channel (raw SQL, not an instrumented HTTP call), so a
+        // real trace/request ID can't cross it; application_name is the
+        // closest attribution available, surfacing "caramel-app" in
+        // pg_stat_activity / DB logs instead of the porsager default
+        // ('postgres.js') so a slow/blocking query can be traced back to
+        // this process. See RUNBOOK.md "Trace correlation" for the
+        // documented limitation (not per-request, known debt).
+        connection: { application_name: 'caramel-app' },
     })
 
 if (process.env.NODE_ENV !== 'production') {

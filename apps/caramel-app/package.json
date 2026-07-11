@@ -23,7 +23,8 @@
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "setup:ci-env": "tsx scripts/ci-env.ts",
-        "check:coupons-schema": "tsx scripts/check-coupons-schema.ts"
+        "check:coupons-schema": "tsx scripts/check-coupons-schema.ts",
+        "smoke": "tsx scripts/smoke.ts"
     },
     "dependencies": {
         "@better-auth/prisma-adapter": "^1.5.3",
@@ -67,6 +68,7 @@
         "@argos-ci/playwright": "^6.3.1",
         "@playwright/test": "^1.56.1",
         "@tailwindcss/forms": "^0.5.10",
+        "@testing-library/react": "16.3.2",
         "@types/gtag.js": "^0.0.20",
         "@types/lodash.debounce": "^4.0.9",
         "@types/node": "^24.3.0",
@@ -76,6 +78,7 @@
         "autoprefixer": "^10.4.21",
         "dotenv-cli": "^11.0.0",
         "eslint-config-next": "16.0.3",
+        "jsdom": "29.1.1",
         "knip": "^5.56.0",
         "postcss": "^8.5.6",
         "prettier": "^3.6.2",

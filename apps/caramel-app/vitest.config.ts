@@ -8,7 +8,11 @@ export default defineConfig({
     plugins: [tsconfigPaths()],
     test: {
         environment: 'node',
-        include: ['tests/unit/**/*.test.ts'],
+        // F-011 — .tsx added alongside .ts: error.test.tsx/global-error.test.tsx
+        // are the first tests to render JSX (RTL). Per-file environment stays
+        // node by default; jsdom-needing files opt in via a
+        // `// @vitest-environment jsdom` pragma (see tests/unit/error.test.tsx).
+        include: ['tests/unit/**/*.test.{ts,tsx}'],
         exclude: [...configDefaults.exclude, 'e2e/**', '**/*.eval.*'],
         setupFiles: ['./tests/setup.ts'],
         // F-005: src/lib/env.ts eager-parses process.env at import time.
