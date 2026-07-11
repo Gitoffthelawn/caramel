@@ -1,46 +1,50 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
+import { withRoute } from '@/lib/api/withRoute'
 import {
     StatsRowSchema,
     couponsSql,
     parseCouponRows,
     verifiedCensusSql,
 } from '@/lib/couponsDb'
-import { checkRateLimit } from '@/lib/rateLimit'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
-    const limited = await checkRateLimit(req, 'read')
-    if (limited) return limited
-
-    try {
-        const rawRows = await couponsSql`
+export const GET = withRoute(
+    { method: 'GET', routeName: 'coupons/stats', rateLimit: 'read' },
+    async ({ req }) => {
+        try {
+            const rawRows = await couponsSql`
             SELECT
                 COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE expired = TRUE)::int AS expired
             FROM coupons
             WHERE ${verifiedCensusSql()}
         `
-        const rows = parseCouponRows(StatsRowSchema, rawRows, 'coupons.stats')
-        const row = rows[0] ?? { total: 0, expired: 0 }
+            const rows = parseCouponRows(
+                StatsRowSchema,
+                rawRows,
+                'coupons.stats',
+            )
+            const row = rows[0] ?? { total: 0, expired: 0 }
 
-        return NextResponse.json(
-            {
-                total: row.total,
-                expired: row.expired,
-                active: row.total - row.expired,
-            },
-            {
-                headers: {
-                    'Cache-Control':
-                        'public, s-maxage=300, stale-while-revalidate=300',
+            return NextResponse.json(
+                {
+                    total: row.total,
+                    expired: row.expired,
+                    active: row.total - row.expired,
                 },
-            },
-        )
-    } catch (error) {
-        console.error('Failed to fetch coupon stats:', error)
-        return handleRouteError(error, {
-            req,
-            message: 'Failed to fetch stats',
-        })
-    }
-}
+                {
+                    headers: {
+                        'Cache-Control':
+                            'public, s-maxage=300, stale-while-revalidate=300',
+                    },
+                },
+            )
+        } catch (error) {
+            console.error('Failed to fetch coupon stats:', error)
+            return handleRouteError(error, {
+                req,
+                message: 'Failed to fetch stats',
+            })
+        }
+    },
+)

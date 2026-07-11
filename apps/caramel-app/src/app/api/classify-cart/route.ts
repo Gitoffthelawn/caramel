@@ -1,12 +1,8 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
+import { withRoute } from '@/lib/api/withRoute'
 import { classifyCart, type CartSignals } from '@/lib/cartClassifier'
 import { OpenRouterError } from '@/lib/openrouter'
-import {
-    checkRateLimit,
-    forbiddenOrigin,
-    isOriginAllowed,
-} from '@/lib/rateLimit'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 // Cap payload size to protect the route from noisy senders.
 const MAX_BODY_BYTES = 8 * 1024
@@ -52,41 +48,52 @@ function sanitize(body: unknown): CartSignals | null {
     }
 }
 
-export async function POST(req: NextRequest) {
-    if (!isOriginAllowed(req)) return forbiddenOrigin()
-    const limited = await checkRateLimit(req, 'mutation')
-    if (limited) return limited
+export const POST = withRoute(
+    {
+        method: 'POST',
+        routeName: 'classify-cart',
+        rateLimit: 'mutation',
+        origin: true,
+        // Keeps its own sanitize() below (already validated-or-400, not a
+        // swallow) rather than a wrapper zod schema — see PLAN-F-007.md
+        // §Scope.
+        body: null,
+    },
+    async ({ req }) => {
+        const contentLength = Number(req.headers.get('content-length') || 0)
+        if (contentLength > MAX_BODY_BYTES) {
+            return NextResponse.json(
+                { error: 'payload too large' },
+                { status: 413 },
+            )
+        }
 
-    const contentLength = Number(req.headers.get('content-length') || 0)
-    if (contentLength > MAX_BODY_BYTES) {
-        return NextResponse.json(
-            { error: 'payload too large' },
-            { status: 413 },
-        )
-    }
+        const raw = await req.json().catch(() => null)
+        const signals = sanitize(raw)
+        if (!signals) {
+            return NextResponse.json(
+                { error: 'invalid payload' },
+                { status: 400 },
+            )
+        }
 
-    const raw = await req.json().catch(() => null)
-    const signals = sanitize(raw)
-    if (!signals) {
-        return NextResponse.json({ error: 'invalid payload' }, { status: 400 })
-    }
-
-    try {
-        const result = await classifyCart(signals)
-        return NextResponse.json(result, {
-            headers: {
-                'Cache-Control': 'private, no-store',
-            },
-        })
-    } catch (error) {
-        console.error('[classify-cart] failed', error)
-        return handleRouteError(error, {
-            req,
-            message:
-                error instanceof Error
-                    ? error.message
-                    : 'classification failed',
-            status: error instanceof OpenRouterError ? 502 : 500,
-        })
-    }
-}
+        try {
+            const result = await classifyCart(signals)
+            return NextResponse.json(result, {
+                headers: {
+                    'Cache-Control': 'private, no-store',
+                },
+            })
+        } catch (error) {
+            console.error('[classify-cart] failed', error)
+            return handleRouteError(error, {
+                req,
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'classification failed',
+                status: error instanceof OpenRouterError ? 502 : 500,
+            })
+        }
+    },
+)
