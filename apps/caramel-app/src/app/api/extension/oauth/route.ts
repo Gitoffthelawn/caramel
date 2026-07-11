@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { env } from '@/lib/env'
 import { BASE_URL } from '@/lib/env.client'
 import prisma from '@/lib/prisma'
@@ -583,9 +584,10 @@ export async function POST(req: NextRequest) {
         }
     } catch (error) {
         console.error('OAuth error:', error)
-        return NextResponse.json(
-            { error: 'Internal server error during OAuth authentication' },
-            { status: 500, headers: corsHeaders },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Internal server error during OAuth authentication',
+            headers: corsHeaders,
+        })
     }
 }

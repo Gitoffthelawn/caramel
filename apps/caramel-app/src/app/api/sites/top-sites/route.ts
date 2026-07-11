@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -27,9 +28,9 @@ export async function GET(req: NextRequest) {
         )
     } catch (err) {
         console.error('Failed to fetch top sites:', err)
-        return NextResponse.json(
-            { error: 'Failed to fetch top sites' },
-            { status: 500 },
-        )
+        return handleRouteError(err, {
+            req,
+            message: 'Failed to fetch top sites',
+        })
     }
 }

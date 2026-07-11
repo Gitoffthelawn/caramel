@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -40,9 +41,9 @@ export async function GET(req: NextRequest) {
         )
     } catch (error) {
         console.error('Failed to load store options:', error)
-        return NextResponse.json(
-            { error: 'Failed to load store options' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Failed to load store options',
+        })
     }
 }

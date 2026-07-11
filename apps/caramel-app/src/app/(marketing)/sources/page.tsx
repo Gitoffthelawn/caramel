@@ -28,6 +28,7 @@ interface Source {
 export default function SourcesPage() {
     const [sources, setSources] = useState<Source[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState(false)
     const [websitesInput, setWebsitesInput] = useState('')
     const [showModal, setShowModal] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
@@ -35,13 +36,17 @@ export default function SourcesPage() {
 
     const fetchSources = async () => {
         setLoading(true)
+        setLoadError(false)
         try {
             const res = await fetch('/api/sources')
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
-            const plainObj = await decryptJsonData(data)
-            setSources(plainObj.data)
+            const plainObj = await decryptJsonData<{ data?: Source[] }>(data)
+            setSources(Array.isArray(plainObj?.data) ? plainObj.data : [])
         } catch (error) {
             console.error('Error fetching sources:', error)
+            setLoadError(true)
+            toast.error('Could not load sources')
         } finally {
             setLoading(false)
         }
@@ -207,6 +212,15 @@ export default function SourcesPage() {
                                             className="py-4 text-center text-gray-500 dark:text-gray-300"
                                         >
                                             Loading...
+                                        </td>
+                                    </tr>
+                                ) : loadError ? (
+                                    <tr>
+                                        <td
+                                            colSpan={5}
+                                            className="py-4 text-center text-gray-500"
+                                        >
+                                            Couldn&apos;t load sources.
                                         </td>
                                     </tr>
                                 ) : filteredSources.length > 0 ? (

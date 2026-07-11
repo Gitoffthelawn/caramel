@@ -123,7 +123,7 @@ currentBrowser.runtime.onMessage.addListener(
                 })
             fetchWithTimeout(url.toString())
                 .then(async r => {
-                    if (!r.ok) return { coupons: [] }
+                    if (!r.ok) return { error: `HTTP ${r.status}` }
                     const json = await r.json()
                     return {
                         coupons: Array.isArray(json)
@@ -139,7 +139,7 @@ currentBrowser.runtime.onMessage.addListener(
             const url = caramelUrl('api/extension/supported-stores')
             fetchWithTimeout(url)
                 .then(async r => {
-                    if (!r.ok) return { supported: [] }
+                    if (!r.ok) return { error: `HTTP ${r.status}` }
                     return r.json()
                 })
                 .then(resp => sendResponse(resp))

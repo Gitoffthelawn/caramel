@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { sendEmail } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -15,10 +16,10 @@ export async function POST(req: NextRequest) {
             text: `A user suggested a new site: ${cleaned}`,
         })
         return NextResponse.json({ ok: true })
-    } catch {
-        return NextResponse.json(
-            { error: 'Could not save suggestion' },
-            { status: 500 },
-        )
+    } catch (error) {
+        return handleRouteError(error, {
+            req,
+            message: 'Could not save suggestion',
+        })
     }
 }

@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -119,9 +120,9 @@ export async function GET(req: NextRequest) {
         )
     } catch (error) {
         console.error('Error fetching coupons:', error)
-        return NextResponse.json(
-            { error: 'Error fetching coupons.' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Error fetching coupons.',
+        })
     }
 }

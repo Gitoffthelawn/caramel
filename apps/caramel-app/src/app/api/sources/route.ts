@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { nextApiResponse } from '@/lib/apiResponseNext'
 import { couponsSql } from '@/lib/couponsDb'
 import {
@@ -65,7 +66,10 @@ export async function GET(req: NextRequest) {
         return nextApiResponse(req, 200, 'sources', sourcesWithMetrics)
     } catch (error) {
         console.error('Error fetching sources:', error)
-        return nextApiResponse(req, 500, 'Error fetching sources.', null)
+        return handleRouteError(error, {
+            req,
+            message: 'Error fetching sources.',
+        })
     }
 }
 
@@ -114,6 +118,9 @@ export async function POST(req: NextRequest) {
         )
     } catch (error) {
         console.error('Error creating source:', error)
-        return nextApiResponse(req, 500, 'Error creating source.', null)
+        return handleRouteError(error, {
+            req,
+            message: 'Error creating source.',
+        })
     }
 }

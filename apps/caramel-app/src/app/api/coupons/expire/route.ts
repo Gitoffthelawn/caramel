@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import {
     checkRateLimit,
@@ -57,9 +58,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ count: rows.length })
     } catch (error) {
         console.error('Error expiring coupons:', error)
-        return NextResponse.json(
-            { error: 'Error marking coupons as expired.' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Error marking coupons as expired.',
+        })
     }
 }

@@ -1,11 +1,15 @@
 import { decryptJsonClient } from '@/lib/securityHelpers/cryptoHelpers'
-import { decryptJsonData } from '@/lib/securityHelpers/decryptJsonData'
+import {
+    DecryptError,
+    decryptJsonData,
+} from '@/lib/securityHelpers/decryptJsonData'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Characterization pins (F-004) — lock CURRENT behavior of decryptJsonData
-// (src/lib/securityHelpers/decryptJsonData.ts:20-22), warts included.
-// F-002 will intentionally change pin (c): today a decrypt failure silently
-// hands back the still-encrypted payload instead of surfacing an error.
+// (src/lib/securityHelpers/decryptJsonData.ts), warts included.
+// F-002 flips pin (c): a decrypt failure now THROWS instead of silently
+// handing back the still-encrypted payload — callers can no longer mistake
+// ciphertext for plaintext.
 vi.mock('@/lib/securityHelpers/cryptoHelpers')
 
 beforeEach(() => {
@@ -35,14 +39,22 @@ describe('decryptJsonData', () => {
         expect(decryptJsonClient).not.toHaveBeenCalled()
     })
 
-    it('(c) WART: encryption enabled + decryptJsonClient throws -> silently returns the raw (still-encrypted) payload', () => {
+    it('(c) encryption enabled + decryptJsonClient throws -> throws DecryptError instead of returning ciphertext as if it were plaintext', () => {
         vi.stubEnv('NEXT_PUBLIC_API_ENCRYPTION_ENABLED', 'true')
+        const cause = new Error('bad ciphertext')
         vi.mocked(decryptJsonClient).mockImplementation(() => {
-            throw new Error('bad ciphertext')
+            throw cause
         })
 
         const raw = { response: 'STILL-ENCRYPTED-BLOB' }
-        expect(decryptJsonData(raw)).toBe(raw)
+        let thrown: unknown
+        try {
+            decryptJsonData(raw)
+        } catch (e) {
+            thrown = e
+        }
+        expect(thrown).toBeInstanceOf(DecryptError)
+        expect((thrown as DecryptError).cause).toBe(cause)
         expect(decryptJsonClient).toHaveBeenCalledWith('STILL-ENCRYPTED-BLOB')
     })
 })

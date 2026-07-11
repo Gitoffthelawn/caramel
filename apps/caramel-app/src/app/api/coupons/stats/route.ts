@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -34,9 +35,9 @@ export async function GET(req: NextRequest) {
         )
     } catch (error) {
         console.error('Failed to fetch coupon stats:', error)
-        return NextResponse.json(
-            { error: 'Failed to fetch stats' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Failed to fetch stats',
+        })
     }
 }

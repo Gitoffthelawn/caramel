@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import {
     checkRateLimit,
@@ -48,9 +49,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(rows[0])
     } catch (error) {
         console.error('Error incrementing coupon usage:', error)
-        return NextResponse.json(
-            { error: 'Error updating coupon usage.' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Error updating coupon usage.',
+        })
     }
 }

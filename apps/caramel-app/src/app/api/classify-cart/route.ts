@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { classifyCart, type CartSignals } from '@/lib/cartClassifier'
 import { OpenRouterError } from '@/lib/openrouter'
 import {
@@ -78,16 +79,14 @@ export async function POST(req: NextRequest) {
             },
         })
     } catch (error) {
-        const status = error instanceof OpenRouterError ? 502 : 500
         console.error('[classify-cart] failed', error)
-        return NextResponse.json(
-            {
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'classification failed',
-            },
-            { status },
-        )
+        return handleRouteError(error, {
+            req,
+            message:
+                error instanceof Error
+                    ? error.message
+                    : 'classification failed',
+            status: error instanceof OpenRouterError ? 502 : 500,
+        })
     }
 }

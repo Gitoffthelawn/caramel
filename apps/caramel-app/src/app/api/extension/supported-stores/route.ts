@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { couponsSql } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -81,9 +82,9 @@ export async function GET(req: NextRequest) {
         )
     } catch (error) {
         console.error('[API][extension/supported-stores] error', error)
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 },
-        )
+        return handleRouteError(error, {
+            req,
+            message: 'Internal server error',
+        })
     }
 }
