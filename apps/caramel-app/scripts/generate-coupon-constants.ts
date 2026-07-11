@@ -20,6 +20,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import prettier from 'prettier'
 import {
     COUPON_STATUSES,
     RESTRICTED_COUPON_STATUSES,
@@ -27,8 +28,26 @@ import {
     VISIBLE_COUPON_STATUSES,
 } from '../src/lib/coupons'
 
-/** Pure render — no filesystem access — so it's directly testable (regenerate in-memory, diff against the committed bytes). */
-export function renderCouponConstants(): string {
+const OUTPUT_PATH = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../caramel-extension/coupon-constants.generated.js',
+)
+
+/**
+ * Pure render — no filesystem writes — so it's directly testable
+ * (regenerate in-memory, diff against the committed bytes).
+ *
+ * The output is prettier-FORMATTED (via prettier's API, with the repo's
+ * own resolved config for the output path) so it is byte-stable under any
+ * subsequent prettier pass. This matters because husky's lint-staged runs
+ * `prettier --write` from the REPO ROOT at commit time — a root-invoked
+ * run that apps/caramel-extension-scoped ignore files don't govern — and
+ * the first committed version of this file (raw JSON.stringify output) got
+ * reformatted mid-commit, permanently breaking the byte-equality sync test
+ * (coupon-constants.generated.test.ts). Emitting the fixed point of
+ * prettier's own formatting makes the hook a no-op on this file.
+ */
+export async function renderCouponConstants(): Promise<string> {
     const payload = {
         STATUSES: [...COUPON_STATUSES],
         VISIBLE_STATUSES: [...VISIBLE_COUPON_STATUSES],
@@ -36,7 +55,7 @@ export function renderCouponConstants(): string {
         STATUS_META,
     }
 
-    return `// GENERATED FILE — DO NOT EDIT BY HAND.
+    const raw = `// GENERATED FILE — DO NOT EDIT BY HAND.
 // Source: apps/caramel-app/src/lib/coupons.ts
 // Regenerate: pnpm --filter caramel-landing generate:coupon-constants
 // (apps/caramel-app/scripts/generate-coupon-constants.ts)
@@ -47,15 +66,17 @@ export function renderCouponConstants(): string {
 // and popup.js — see manifest.json, manifest-firefox.json, and index.html.
 window.CaramelCoupons = ${JSON.stringify(payload, null, 4)}
 `
+
+    // resolveConfig walks up from the OUTPUT path — the same resolution the
+    // commit hook's root prettier run performs (the repo-root
+    // .prettierrc.json is the only prettier config in that walk), so
+    // generator output and hook output cannot disagree.
+    const config = await prettier.resolveConfig(OUTPUT_PATH)
+    return prettier.format(raw, { ...config, filepath: OUTPUT_PATH })
 }
 
-const OUTPUT_PATH = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '../../caramel-extension/coupon-constants.generated.js',
-)
-
-function main() {
-    fs.writeFileSync(OUTPUT_PATH, renderCouponConstants(), 'utf8')
+async function main() {
+    fs.writeFileSync(OUTPUT_PATH, await renderCouponConstants(), 'utf8')
     console.log(
         `[generate-coupon-constants] wrote ${path.relative(process.cwd(), OUTPUT_PATH)}`,
     )
@@ -67,5 +88,8 @@ const isDirectExecution =
         path.resolve(fileURLToPath(import.meta.url))
 
 if (isDirectExecution) {
-    main()
+    main().catch(err => {
+        console.error('[generate-coupon-constants] failed:', err)
+        process.exit(1)
+    })
 }

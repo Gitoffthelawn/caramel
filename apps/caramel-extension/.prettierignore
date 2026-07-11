@@ -1,4 +1,0 @@
-# GENERATED — not hand-maintained, so not subject to prettier reformatting.
-# Regenerate via `pnpm --filter caramel-landing generate:coupon-constants`
-# (apps/caramel-app/scripts/generate-coupon-constants.ts). F-006.
-coupon-constants.generated.js
