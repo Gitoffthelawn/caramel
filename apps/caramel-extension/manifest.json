@@ -37,6 +37,7 @@
             "matches": ["https://*/*"],
             "css": ["caramel-content.css"],
             "js": [
+                "coupon-constants.generated.js",
                 "cart-signals.js",
                 "shared-utils.js",
                 "UI-helpers.js",

@@ -4,6 +4,8 @@ import {
     TotalCountRowSchema,
     couponsSql,
     parseCouponRows,
+    rankingOrderSql,
+    visibleCouponsWhere,
 } from '@/lib/couponsDb'
 import { BASE_URL } from '@/lib/env.client'
 import type { Coupon } from '@/types/coupon'
@@ -46,11 +48,10 @@ async function fetchStoreCoupons(storeParam: string) {
         return { coupons: [] as Coupon[], total: 0, base: storeParam }
     }
 
-    // Match /api/coupons: surface verified, restricted, AND not-yet-verified
-    // (pending/retry) coupons so SSR HTML and the client fetch agree (no
-    // hydration flash). Known-dead (invalid/expired) stay excluded. The
-    // status field drives the per-coupon verification badge.
-    const VISIBLE_STATUSES = couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE`
+    // Match /api/coupons: same visibility predicate, so SSR HTML and the
+    // client fetch agree (no hydration flash) — see lib/coupons.ts's
+    // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
+    const VISIBLE_STATUSES = visibleCouponsWhere()
     const [rawCoupons, rawTotalRow] = await Promise.all([
         couponsSql`
             SELECT id, code, site, title, description, rating,
@@ -60,7 +61,7 @@ async function fetchStoreCoupons(storeParam: string) {
             FROM coupons
             WHERE ${VISIBLE_STATUSES}
               AND (site = ${base} OR site LIKE ${'%.' + base})
-            ORDER BY rating DESC, created_at DESC
+            ORDER BY ${rankingOrderSql()}
             LIMIT ${PAGE_SIZE}
         `,
         couponsSql`

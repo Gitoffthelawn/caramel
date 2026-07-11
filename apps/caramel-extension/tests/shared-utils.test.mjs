@@ -10,6 +10,12 @@ let _isXPath
 let getPrice
 
 beforeAll(() => {
+    // F-006 — coupon-constants.generated.js sets window.CaramelCoupons,
+    // which shared-utils.js now reads unconditionally at module-eval time
+    // (RESTRICTED_STATUSES's rebind). Real load order (manifest.json,
+    // manifest-firefox.json, index.html) always puts it first; mirror that
+    // here or shared-utils.js throws on load.
+    loadExtensionSource('coupon-constants.generated.js', [])
     ;({ getPrice, _isXPath } = loadExtensionSource('shared-utils.js', [
         'getPrice',
         '_isXPath',

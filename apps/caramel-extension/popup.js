@@ -601,12 +601,14 @@ function renderCouponsView(coupons, user, domain) {
                 ? '<p>No coupons available for this store right now.</p>'
                 : coupons
                       .map(c => {
-                          const restrictedSet = new Set([
-                              'product_restriction',
-                              'category_restricted',
-                              'seller_specific',
-                              'valid_with_warning',
-                          ])
+                          // Sourced from window.CaramelCoupons
+                          // (coupon-constants.generated.js, loaded before
+                          // this file — F-006) instead of a hard-coded
+                          // literal, so this can't re-drift from the app's
+                          // src/lib/coupons.ts.
+                          const restrictedSet = new Set(
+                              window.CaramelCoupons.RESTRICTED_STATUSES,
+                          )
                           const isRestricted = restrictedSet.has(c.status)
                           const isDead =
                               c.status === 'invalid' || c.status === 'expired'
@@ -635,34 +637,24 @@ function renderCouponsView(coupons, user, domain) {
                           }
                           // Verification badge: green=verified, amber=restricted,
                           // grey=not yet verified (grace), red=known not valid.
-                          const BADGE = {
-                              valid: ['✓ Verified', '#15803d', '#dcfce7'],
-                              valid_with_warning: [
-                                  'Verified · may vary',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              product_restriction: [
-                                  'Restrictions apply',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              category_restricted: [
-                                  'Category-limited',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              seller_specific: [
-                                  'Seller-specific',
-                                  '#b45309',
-                                  '#fef3c7',
-                              ],
-                              pending: ['Unverified', '#4b5563', '#f3f4f6'],
-                              retry: ['Checking…', '#4b5563', '#f3f4f6'],
-                              invalid: ['Not valid', '#b91c1c', '#fee2e2'],
-                              expired: ['Expired', '#b91c1c', '#fee2e2'],
+                          // Labels + which status maps to which tier come from
+                          // window.CaramelCoupons.STATUS_META
+                          // (coupon-constants.generated.js, F-006); this hex
+                          // palette is the popup-local half (the app's
+                          // coupon-card.tsx keeps its own Tailwind equivalent —
+                          // the 4-tier axis can't drift the way the 9-status
+                          // axis did).
+                          const TIER_HEX = {
+                              green: ['#15803d', '#dcfce7'],
+                              amber: ['#b45309', '#fef3c7'],
+                              grey: ['#4b5563', '#f3f4f6'],
+                              red: ['#b91c1c', '#fee2e2'],
                           }
-                          const bd = BADGE[c.status]
+                          const meta =
+                              window.CaramelCoupons.STATUS_META[c.status]
+                          const bd = meta
+                              ? [meta.label, ...TIER_HEX[meta.tier]]
+                              : undefined
                           const badge = bd
                               ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''

@@ -1,5 +1,10 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { SiteRowSchema, couponsSql, parseCouponRows } from '@/lib/couponsDb'
+import {
+    SiteRowSchema,
+    couponsSql,
+    parseCouponRows,
+    visibleCouponsWhere,
+} from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -22,8 +27,7 @@ export async function POST(req: NextRequest) {
     try {
         const rawRows = await couponsSql`
             SELECT DISTINCT site FROM coupons
-            WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry')
-              AND expired = FALSE
+            WHERE ${visibleCouponsWhere()}
               AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
             ORDER BY site ASC
             LIMIT 20

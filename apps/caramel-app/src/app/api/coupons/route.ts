@@ -4,6 +4,8 @@ import {
     TotalCountRowSchema,
     couponsSql,
     parseCouponRows,
+    rankingOrderSql,
+    visibleCouponsWhere,
 } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -44,15 +46,10 @@ export async function GET(req: NextRequest) {
         (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
     try {
-        // Surface verified, restriction-tagged, AND not-yet-verified coupons.
-        // The bulk of the catalog sits at status='pending' (scraped, not yet
-        // run through the verification module); those must still show to users
-        // with a neutral "Unverified" badge. 'retry' = mid-verification. We
-        // exclude 'invalid'/'expired' so known-dead codes are never surfaced.
-        // The status field drives the verified/unverified/not-valid badge.
-        const conditions = [
-            couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE`,
-        ]
+        // Visible-status predicate (verified, restriction-tagged, and
+        // not-yet-verified coupons) — see lib/coupons.ts's
+        // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
+        const conditions = [visibleCouponsWhere()]
 
         if (site) {
             const base = getBaseDomain(site)
@@ -102,7 +99,7 @@ export async function GET(req: NextRequest) {
                        status, verification_message AS "verificationMessage"
                 FROM coupons
                 WHERE ${whereClause}
-                ORDER BY rating DESC, created_at DESC
+                ORDER BY ${rankingOrderSql()}
                 LIMIT ${limit} OFFSET ${skip}
             `,
             couponsSql`SELECT COUNT(*)::int AS total FROM coupons WHERE ${whereClause}`,

@@ -1,6 +1,8 @@
 'use client'
 
-import type { Coupon, CouponStatus } from '@/types/coupon'
+import type { CouponStatusTier } from '@/lib/coupons'
+import { STATUS_META } from '@/lib/coupons'
+import type { Coupon } from '@/types/coupon'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -11,26 +13,16 @@ interface CouponCardProps {
 }
 
 // Verification badge: green = machine-verified, amber = verified-but-restricted,
-// grey = not yet verified (grace), red = known not valid.
-const AMBER =
-    'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-900/50'
-const GREY =
-    'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
-const RED =
-    'bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-900/50'
-const STATUS_BADGE: Record<CouponStatus, { label: string; cls: string }> = {
-    valid: {
-        label: '✓ Verified',
-        cls: 'bg-green-100 text-green-700 ring-green-200 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-900/50',
-    },
-    valid_with_warning: { label: 'Verified · may vary', cls: AMBER },
-    product_restriction: { label: 'Restrictions apply', cls: AMBER },
-    category_restricted: { label: 'Category-limited', cls: AMBER },
-    seller_specific: { label: 'Seller-specific', cls: AMBER },
-    pending: { label: 'Unverified', cls: GREY },
-    retry: { label: 'Checking…', cls: GREY },
-    invalid: { label: 'Not valid', cls: RED },
-    expired: { label: 'Expired', cls: RED },
+// grey = not yet verified (grace), red = known not valid. Labels + which
+// status maps to which tier live in lib/coupons.ts's STATUS_META (F-006) —
+// this Tailwind palette is the app-local half (the extension's popup badge
+// keeps its own hex equivalent; the 4-tier axis can't drift the way the
+// 9-status axis did).
+const TIER_CLS: Record<CouponStatusTier, string> = {
+    green: 'bg-green-100 text-green-700 ring-green-200 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-900/50',
+    amber: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-900/50',
+    grey: 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700',
+    red: 'bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-900/50',
 }
 
 export default function CouponCard({ coupon, index }: CouponCardProps) {
@@ -87,12 +79,12 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                             {coupon.timesUsed} used today
                         </p>
                     )}
-                    {coupon.status && STATUS_BADGE[coupon.status] && (
+                    {coupon.status && STATUS_META[coupon.status] && (
                         <span
                             title={coupon.verificationMessage ?? undefined}
-                            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${STATUS_BADGE[coupon.status].cls}`}
+                            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${TIER_CLS[STATUS_META[coupon.status].tier]}`}
                         >
-                            {STATUS_BADGE[coupon.status].label}
+                            {STATUS_META[coupon.status].label}
                         </span>
                     )}
                 </div>

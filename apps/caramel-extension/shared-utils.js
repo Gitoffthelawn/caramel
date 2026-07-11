@@ -1053,13 +1053,11 @@ async function fetchCoupons(site, kw, category) {
 }
 // Statuses that signal a coupon has restrictions the user might trip over.
 // When ANY returned coupon carries one of these, we classify the cart so the
-// UI can warn the user "your cart is X, this code is for Y."
-const RESTRICTED_STATUSES = new Set([
-    'product_restriction',
-    'category_restricted',
-    'seller_specific',
-    'valid_with_warning',
-])
+// UI can warn the user "your cart is X, this code is for Y." Sourced from
+// window.CaramelCoupons (coupon-constants.generated.js, loaded before this
+// file — F-006) instead of a hard-coded literal, so this can't re-drift
+// from the app's src/lib/coupons.ts.
+const RESTRICTED_STATUSES = new Set(window.CaramelCoupons.RESTRICTED_STATUSES)
 
 async function classifyCartCategory() {
     try {

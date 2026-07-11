@@ -4,6 +4,7 @@
 // Python verification service. All mutations to the coupon catalog flow
 // through that service — Next.js only reads (plus two narrow mutations:
 // usage-increment and expire, both exposed to the extension).
+import { VISIBLE_COUPON_STATUSES } from '@/lib/coupons'
 import { env } from '@/lib/env'
 import postgres from 'postgres'
 import { z } from 'zod'
@@ -35,6 +36,49 @@ export const couponsSql =
 
 if (process.env.NODE_ENV !== 'production') {
     globalForSql.couponsSql = couponsSql
+}
+
+// ---------------------------------------------------------------------------
+// Coupon-domain SQL fragments (F-006).
+//
+// Factories, not module-level consts: each call builds a fresh postgres.js
+// query fragment. A const would work too (fragments are stateless data,
+// and this codebase already reuses one across 2 queries — see the
+// marketing store page), but a factory sidesteps any doubt about safe
+// fragment reuse across concurrent requests.
+//
+// visibleCouponsWhere() replaces the WHERE predicate that used to be
+// hand-copied — with silent drift — across coupons/route.ts, the marketing
+// store page, sites/top-sites, sites/search-supported, coupons/stores
+// (x2), and coupons/filters (which had drifted to a narrower 'valid'-only
+// predicate; F-006 unifies it — see PLAN-F-006.md's "per-site drift
+// ruling" table for that one deliberate, flagged behavior change).
+// `couponsSql([...VISIBLE_COUPON_STATUSES])` is postgres.js's documented
+// "dynamic values" helper: it expands to a properly parameterized
+// `IN ($1,$2,...)` list rather than baking the statuses into literal SQL
+// text — behavior-identical to the inline literals it replaces, since the
+// values are our own constants, never user input.
+export function visibleCouponsWhere() {
+    return couponsSql`status IN ${couponsSql([...VISIBLE_COUPON_STATUSES])} AND expired = FALSE`
+}
+
+/** Shared ranking order — coupons/route.ts's list query and the marketing store page both sorted by this identical (previously hand-copied) order. */
+export function rankingOrderSql() {
+    return couponsSql`rating DESC, created_at DESC`
+}
+
+/**
+ * coupons/stats/route.ts's census predicate. Deliberately NOT
+ * visibleCouponsWhere(): stats reports a trust census (total vs. expired)
+ * among *verified* ('valid') coupons specifically, so it must INCLUDE
+ * expired ones (to count them) and EXCLUDE pending/restricted ones (not
+ * yet a verified fact) — the opposite shape from the visibility
+ * predicate. The name states that intent so a future editor doesn't "fix"
+ * this into visibleCouponsWhere() by mistake. Behavior unchanged from
+ * pre-F-006 (still the bare `status = 'valid'` this route always used).
+ */
+export function verifiedCensusSql() {
+    return couponsSql`status = 'valid'`
 }
 
 // ---------------------------------------------------------------------------

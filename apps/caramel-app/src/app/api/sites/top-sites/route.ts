@@ -3,6 +3,7 @@ import {
     SiteCountRowSchema,
     couponsSql,
     parseCouponRows,
+    visibleCouponsWhere,
 } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
         const rawRows = await couponsSql`
             SELECT site, COUNT(*)::int AS coupon_count
             FROM coupons
-            WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE
+            WHERE ${visibleCouponsWhere()}
             GROUP BY site
             ORDER BY coupon_count DESC
             LIMIT 4

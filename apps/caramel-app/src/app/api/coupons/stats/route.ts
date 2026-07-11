@@ -1,5 +1,10 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { StatsRowSchema, couponsSql, parseCouponRows } from '@/lib/couponsDb'
+import {
+    StatsRowSchema,
+    couponsSql,
+    parseCouponRows,
+    verifiedCensusSql,
+} from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -13,7 +18,7 @@ export async function GET(req: NextRequest) {
                 COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE expired = TRUE)::int AS expired
             FROM coupons
-            WHERE status = 'valid'
+            WHERE ${verifiedCensusSql()}
         `
         const rows = parseCouponRows(StatsRowSchema, rawRows, 'coupons.stats')
         const row = rows[0] ?? { total: 0, expired: 0 }

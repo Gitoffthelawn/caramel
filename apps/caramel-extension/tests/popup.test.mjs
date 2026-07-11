@@ -19,7 +19,14 @@ beforeAll(() => {
     document.body.innerHTML =
         '<div id="loading-container"></div><div id="auth-container"></div>'
 
-    // Load shared-utils.js FIRST: it establishes window/globalThis
+    // F-006 — coupon-constants.generated.js sets window.CaramelCoupons,
+    // which shared-utils.js now reads unconditionally at module-eval time
+    // (RESTRICTED_STATUSES's rebind) and popup.js reads when rendering a
+    // coupon list. Real load order (manifest.json, manifest-firefox.json,
+    // index.html) always puts it first; mirror that here.
+    loadExtensionSource('coupon-constants.generated.js', [])
+
+    // Load shared-utils.js next: it establishes window/globalThis
     // .currentBrowser (via the chrome stub installed for THIS call) and
     // defines the real fetchCoupons(). popup.js references both as free
     // globals (see its `/* global currentBrowser, fetchCoupons */` header)

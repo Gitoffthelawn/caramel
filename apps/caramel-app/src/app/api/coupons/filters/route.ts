@@ -4,6 +4,7 @@ import {
     SiteRowSchema,
     couponsSql,
     parseCouponRows,
+    visibleCouponsWhere,
 } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,11 +20,21 @@ export async function GET(req: NextRequest) {
     const sitesLimit = Math.min(Math.max(rawLimit, 0), 100)
 
     try {
+        // F-006 — unified to the same visibleCouponsWhere() predicate every
+        // other coupon read route uses. Previously this route alone used a
+        // narrower 'valid'-only + expired=FALSE filter, an accidental drift
+        // that made these dropdowns under-represent sites/types whose
+        // coupons are pending/restricted-but-real (visible in /api/coupons
+        // and the store page, but absent from these filter options).
+        // Deliberate, flagged behavior change: broadens the site/type
+        // filter lists to match the listing they filter. Rollback (if ever
+        // needed): swap visibleCouponsWhere() back to `status = 'valid'`
+        // (+ `AND expired = FALSE`) in both queries below.
         const sitesPromise =
             includeSites && sitesLimit > 0
                 ? couponsSql`
                       SELECT DISTINCT site FROM coupons
-                      WHERE status = 'valid' AND expired = FALSE AND site IS NOT NULL
+                      WHERE ${visibleCouponsWhere()} AND site IS NOT NULL
                       ORDER BY site ASC
                       LIMIT ${sitesLimit}
                   `
@@ -31,7 +42,7 @@ export async function GET(req: NextRequest) {
 
         const typesPromise = couponsSql`
             SELECT DISTINCT discount_type FROM coupons
-            WHERE status = 'valid' AND expired = FALSE AND discount_type IS NOT NULL
+            WHERE ${visibleCouponsWhere()} AND discount_type IS NOT NULL
         `
 
         const [rawSites, rawDiscountTypes] = await Promise.all([
