@@ -20,10 +20,80 @@
                 "at": "2026-07-11",
                 "by": "human",
                 "decision": "Accepted all Fable recommendations verbatim ('ill take ur recommendations'): all 16 findings FIX in wave order; F-016 one-root-compose parked as a SEPARATE initiative (not in the fix-branch train); Stages 2-3 run in a fresh Opus lead session. This is the go-signal for Stage 2."
+            },
+            {
+                "at": "2026-07-11",
+                "by": "opus-lead",
+                "id": "JC-1",
+                "decision": "PR structure: ONE branch audit/fixes-2026-07-10, ONE cumulative PR into audit/dev-2026-07-10 opened after Wave 1 lands, pushed per-fix, body organized by wave with per-finding commit links. Rationale: fixes are serially dependent (F-007 needs F-009's deletions, etc.) so per-wave/per-finding PRs would show overlapping diffs unless the human merges mid-run, and merge timing/style is unknowable; triage explicitly blesses either granularity — the F-ID-per-commit trace is the requirement and is preserved. If the human merges the PR mid-run, a fresh PR continues the remainder."
+            },
+            {
+                "at": "2026-07-11",
+                "by": "opus-lead",
+                "id": "JC-2",
+                "decision": "F-009 branch protection: agents will NOT mutate GitHub repo settings on real main/dev (spirit of 'never touch dev/main'; also disruptive to the human's push workflow if misconfigured). Deliverable instead: exact gh api commands + recommended required-checks config in the PR body and RUNBOOK as a human-handoff step."
+            },
+            {
+                "at": "2026-07-11",
+                "by": "opus-lead",
+                "id": "JC-3",
+                "decision": "Execution order fixed: W1 F-004,F-005,F-009 | W2 F-003,F-002,F-001,F-011 (small-independent first; error helper before its consumers; runbook documents what W2 created) | W3 F-006,F-007,F-008 | W4 F-013,F-015,F-014,F-012,F-010 (rename before lockfile-consolidation so F-014's regen captures it; docs dead-last). F-016 excluded (separate initiative, /one-root-compose)."
+            },
+            {
+                "at": "2026-07-11",
+                "by": "opus-lead",
+                "id": "JC-4",
+                "decision": "Empirical re-runs batched where one test covers several fixes: 3am re-run after Wave 2 (covers F-001/F-002/F-011), change-trace after F-006/F-007, name-only navigation after F-008, onboarding partial after F-005 and full after F-010; per-fix targeted checks otherwise. Upstream says per-fix; batching avoids redundant Haiku passes over unchanged dimensions."
+            },
+            {
+                "at": "2026-07-11",
+                "by": "opus-lead",
+                "id": "JC-5",
+                "decision": "Stage-2 planning parallelized across 14 Opus subagents (read-only + one plan file each; no repo mutations), common brief at audit/plans/PLANNER-BRIEF.md; F-013+F-015 batched into one planner (both mechanical Wave-4). Cross-review and sequencing remain the lead's own pass."
             }
         ]
     },
-    "stage": "0+1 parallel",
+    "stage": "3 fixing (stage 2 complete: 15/15 plans approved)",
+    "stage2": {
+        "planners": 14,
+        "plans_written": 15,
+        "plans_approved": "ALL 15 (self-approved under gate collapse; PR review is the human surface)",
+        "approval_rulings": [
+            "F-001 APPROVED: extend existing health route (monitor flips red with zero ops change); 8 zod row schemas; drift script dispatch-only.",
+            "F-002 APPROVED incl. premise correction (decryptJsonData sole caller is client-side sources/page.tsx; handled at the client seam).",
+            "F-003 APPROVED: expire->server-only COUPONS_ADMIN_SECRET bearer (zero callers verified); exemption keys off bearer; supported-stores keyless public read = the graceful old-client path. Satisfies the store-lag caveat with no hard cutover.",
+            "F-004 APPROVED: vitest 4, per-package configs, tests/unit/** convention, zero-tests-fails proven, pins scoped to what later fixes flip.",
+            "F-005 APPROVED: 3-var minimal required set; ci-env.ts co-change mandatory (CI has NO next build job — verified); zod enters pinned.",
+            "F-006 APPROVED incl. the ONE deliberate behavior change (filters dropdown broadens to visible set — flagged breaking, 1-line rollback) and stats ruled deliberate (verifiedCensusSql).",
+            "F-007 APPROVED incl. premise correction (mint lives in extension/oauth/route.ts) and STOP-DESIGN ruling: centralize raw-Prisma mint into extensionOAuthSession.ts (better-auth 1.5.3 has no public external-code-exchange API — context7-verified); internalAdapter adoption only behind char-test equivalence trigger; better-auth routing parked as new finding.",
+            "F-008 APPROVED: 6-file banner-boundary split, cat-diff byte-identity invariant, no renames of cart-signals/inject (honest already), modal-UI premise corrected (lives in UI-helpers.js).",
+            "F-009 APPROVED: fossil set +errorMiddleware.ts (in-glob), +jsonwebtoken orphan removal (truthful-green requires it), oxlint 1.73/size-limit 12.1 (npm-verified), summed-group size budgets, TEMP audit-branch CI trigger, branch protection = human handoff per JC-2.",
+            "F-010 APPROVED: docs written from OBSERVED landed tree (step-0 verification table), README/LOCAL-DEV split rule, cold-Haiku validation gate.",
+            "F-011 APPROVED incl. premise corrections (porsager postgres client not pg Pool; Sentry prod-only -> optional-chained span writes).",
+            "F-012 APPROVED: evals import production classifyCart, deterministic scorers, gate >=0.85 primary-match, separate vitest.eval.config, OPENROUTER_API_KEY secret verified ABSENT -> CI leg red-by-design with loud named error (flag in PR body).",
+            "F-013 APPROVED incl. premise correction (apiResponseNext anys are data/error not metadata/viewport); unknown-widening; eslint no-explicit-any=error via existing next plugin (no new dep).",
+            "F-014 APPROVED: react-awesome-button fully dead -> delete not replace; TWO nested fossil lockfiles deleted; CI cache repoint mandatory; majors OUT (named known debt); resolution-neutral pin proof via packages-block byte-identity.",
+            "F-015 APPROVED: amazon.js entry removed (history shows deliberate deletion); nul gitignore-only (untracked — finding sub-claim corrected); rename ref set re-grepped at exec (CR-6); prettier tailwindConfig activation churn accepted (Argos guard); integrity check RED-then-GREEN proof."
+        ],
+        "cross_review_overrides": "CR-1..CR-9 in audit/plans/EXECUTOR-BRIEF.md + stage2_cross_review_notes",
+        "execution_order": [
+            "F-004",
+            "F-005",
+            "F-009",
+            "F-003",
+            "F-002",
+            "F-001",
+            "F-011",
+            "F-006",
+            "F-007",
+            "F-008",
+            "F-013",
+            "F-015",
+            "F-014",
+            "F-012",
+            "F-010"
+        ]
+    },
     "stage0": {
         "test_suite": "NONE — turbo run test matches zero package scripts; app has Playwright test:e2e, extension has scripts/test-extension.mjs",
         "test_runs": [
@@ -133,5 +203,14 @@
         "top_churn_and_loc": "shared-utils.js is #1 in BOTH (4529 churn / 1536 loc)"
     },
     "deletion_counter": 0,
+    "stage2_cross_review_notes": [
+        "CR-1: All app unit tests live in apps/caramel-app/tests/unit/** per F-004's landed vitest include glob — F-002/F-005/F-011/F-014/F-006 plans that mention co-located test paths are overridden on location only.",
+        "CR-2: size-limit stays on F-009's summed-group budget scheme (92KB content-scripts). F-008 step 9's per-file ~18KB budgets are overridden — F-008 only updates the path array (drop shared-utils.js, add the 6 split files).",
+        "CR-3: F-005 introduces zod (pinned exact) — first pinned dep; F-001's schemas and F-007's body validation consume it.",
+        "CR-4: F-009 adds a TEMPORARY checks-app.yml trigger for audit/dev-2026-07-10 PRs (app CI otherwise only fires on PRs to main/dev); revert-when-merged comment required.",
+        "CR-5: Premise corrections accepted from planners (to fold into updated findings.json at stage end): F-002 decryptJsonData sole caller is a client component; F-007 session-mint lives in extension/oauth/route.ts (NOT oauth/redirect), better-auth 1.5.3 lacks a public external-code-exchange API (STOP-DESIGN: centralize mint into one module, park better-auth adoption as new finding); F-008 modal UI lives in UI-helpers.js not shared-utils.js, no renames of cart-signals/inject needed; F-014 react-awesome-button is fully dead (delete not replace), THREE lockfiles not two; F-011 coupons client is porsager postgres not pg Pool, Sentry initialized production-only; F-015 nul file is untracked (working-tree artifact only).",
+        "CR-6: New-finding candidates parked for next cycle (from planning): firefox manifest missing cart-signals.js (Firefox parity); background.js duplicate _isDevInstall/CARAMEL_BASE_URL; oauth mint /api/auth/session path bug + missing emailVerified gate (pinned as-is); StoreButtons.tsx + capitalizeFirst.ts likely dead; possibly-dead UI deps (react-fast-marquee, react-lottie-player); popup script-list minimization; lint-ban of empty-success pattern once oxlint infra matures.",
+        "CR-7: E2E-phase constraint: dev.grabcaramel.com runs the deployed OLD code — E2E validation of fixes runs against the LOCAL boot (HTTP-level route checks + extension harness); full extension-in-browser flows against local require a clearly-temporary base-URL override (removed after), since 537547b pointed dev installs at dev.grabcaramel.com."
+    ],
     "notes": []
 }
