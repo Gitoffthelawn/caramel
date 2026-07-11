@@ -50,7 +50,7 @@ jobs:
       # Prisma client only for typecheck
       - if: matrix.task == 'typecheck'
         name: Generate Prisma Client
-        run: pnpm --filter caramel-landing exec prisma generate
+        run: pnpm --filter caramel-app exec prisma generate
 
       # oxlint runs from the repo root (both apps), not per-app like the rest
       # of this matrix — kept in the same matrix so it reports as its own
@@ -193,13 +193,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+        run: pnpm --filter caramel-app exec playwright install --with-deps chromium
 
       - name: Write minimal CI env
-        run: pnpm --filter caramel-landing run setup:ci-env
+        run: pnpm --filter caramel-app run setup:ci-env
 
       - name: Generate Prisma Client
-        run: pnpm --filter caramel-landing exec prisma generate
+        run: pnpm --filter caramel-app exec prisma generate
 
       - name: Apply Prisma migrations
         working-directory: ./apps/caramel-app
@@ -251,7 +251,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+        run: pnpm --filter caramel-app exec playwright install --with-deps chromium
 
       - name: Run E2E tests
         working-directory: ./apps/caramel-app

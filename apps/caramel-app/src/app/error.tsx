@@ -24,7 +24,7 @@ export default function Error({
     }, [error])
 
     return (
-        <main className="dark:bg-darkBg flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center dark:bg-darkBg">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Something went wrong
             </h2>
@@ -35,7 +35,7 @@ export default function Error({
             <div className="flex gap-3">
                 <button
                     onClick={() => reset()}
-                    className="bg-caramel hover:bg-caramelLight rounded-full px-6 py-2 font-semibold text-white transition-colors"
+                    className="rounded-full bg-caramel px-6 py-2 font-semibold text-white transition-colors hover:bg-caramelLight"
                 >
                     Try again
                 </button>

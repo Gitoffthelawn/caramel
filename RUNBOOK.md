@@ -154,7 +154,7 @@ audit, this returned `404 Branch not protected`).
   Python service's DB actually returns, instead of silently serving
   malformed/zeroed data. These throws reach Sentry via `handleRouteError`
   (API routes) or `onRequestError`/`error.tsx` (the SSR store page). The
-  proactive half — `pnpm --filter caramel-landing check:coupons-schema` —
+  proactive half — `pnpm --filter caramel-app check:coupons-schema` —
   introspects `information_schema.columns` and catches a rename/drop
   before a request ever hits it, but **only runs via manual
   `workflow_dispatch`** on `.github/workflows/coupons-schema-drift.yml`,
@@ -214,7 +214,7 @@ given a real `COUPONS_DATABASE_URL` (staging/prod, ideally a read
 replica):
 
 ```bash
-COUPONS_DATABASE_URL=<real-url> pnpm --filter caramel-landing check:coupons-schema
+COUPONS_DATABASE_URL=<real-url> pnpm --filter caramel-app check:coupons-schema
 ```
 
 ## Post-deploy smoke check
@@ -226,7 +226,7 @@ Prints `PASS`/`FAIL` per check and exits non-zero on the first failure.
 
 ```bash
 BASE_URL=https://grabcaramel.com UPKUMA_HEALTH_SECRET=*** \
-  pnpm --filter caramel-landing run smoke
+  pnpm --filter caramel-app run smoke
 ```
 
 `BASE_URL` defaults to `http://localhost:58000` (the local dev port) if

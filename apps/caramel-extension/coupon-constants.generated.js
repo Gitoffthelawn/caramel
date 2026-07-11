@@ -1,6 +1,6 @@
 // GENERATED FILE — DO NOT EDIT BY HAND.
 // Source: apps/caramel-app/src/lib/coupons.ts
-// Regenerate: pnpm --filter caramel-landing generate:coupon-constants
+// Regenerate: pnpm --filter caramel-app generate:coupon-constants
 // (apps/caramel-app/scripts/generate-coupon-constants.ts)
 //
 // Sets window.CaramelCoupons — the coupon status vocabulary shared with the

@@ -11,7 +11,7 @@
 //
 // Not wired into the Dokploy deploy pipeline itself (ops/human handoff —
 // see RUNBOOK.md "Post-deploy smoke"). Run manually:
-//   BASE_URL=https://grabcaramel.com UPKUMA_HEALTH_SECRET=*** pnpm --filter caramel-landing run smoke
+//   BASE_URL=https://grabcaramel.com UPKUMA_HEALTH_SECRET=*** pnpm --filter caramel-app run smoke
 //
 // Assertion helpers (assert*Ok) are pure — they take an already-fetched
 // status/body, not a URL — so tests/unit/smoke.test.ts can pin PASS and FAIL

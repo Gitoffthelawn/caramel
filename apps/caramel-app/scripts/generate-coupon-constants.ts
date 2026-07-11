@@ -14,7 +14,7 @@
 // "build" is an rsync copy (see its package.json `build` script), not a
 // bundler, so there is no build-time hook to run this against automatically.
 // Regenerate after any src/lib/coupons.ts change:
-//   pnpm --filter caramel-landing generate:coupon-constants
+//   pnpm --filter caramel-app generate:coupon-constants
 // tests/unit/coupon-constants.generated.test.ts fails the moment the
 // committed file drifts from what this script would currently emit.
 import fs from 'node:fs'
@@ -57,7 +57,7 @@ export async function renderCouponConstants(): Promise<string> {
 
     const raw = `// GENERATED FILE — DO NOT EDIT BY HAND.
 // Source: apps/caramel-app/src/lib/coupons.ts
-// Regenerate: pnpm --filter caramel-landing generate:coupon-constants
+// Regenerate: pnpm --filter caramel-app generate:coupon-constants
 // (apps/caramel-app/scripts/generate-coupon-constants.ts)
 //
 // Sets window.CaramelCoupons — the coupon status vocabulary shared with the

@@ -7,7 +7,7 @@ const eslintPluginHTML = require('eslint-plugin-html')
 module.exports = [
     {
         // GENERATED — not hand-maintained (F-006). Regenerate via
-        // `pnpm --filter caramel-landing generate:coupon-constants`.
+        // `pnpm --filter caramel-app generate:coupon-constants`.
         ignores: ['coupon-constants.generated.js'],
     },
     {

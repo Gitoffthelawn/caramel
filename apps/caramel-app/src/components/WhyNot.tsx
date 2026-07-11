@@ -69,7 +69,7 @@ export default function WhyNotHoneySection() {
             {/* Background Elements */}
             <div className="absolute inset-0">
                 <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-red-500/20 to-transparent"></div>
-                <div className="via-caramel/20 absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent to-transparent"></div>
+                <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-caramel/20 to-transparent"></div>
                 {/* Floating warning elements */}
                 <motion.div
                     className="left-1/6 absolute top-1/4 h-24 w-24 rounded-full bg-red-500/5 blur-xl"
@@ -107,17 +107,17 @@ export default function WhyNotHoneySection() {
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="mb-20 text-center"
                 >
-                    <h2 className="text-caramel mb-8 text-5xl font-extrabold leading-[80px] tracking-tight lg:text-4xl">
+                    <h2 className="mb-8 text-5xl font-extrabold leading-[80px] tracking-tight text-caramel lg:text-4xl">
                         Why Not Just Use Honey?
                     </h2>
-                    <p className="mx-auto mb-8 max-w-4xl text-xl leading-relaxed text-gray-600 lg:text-lg dark:text-gray-300">
+                    <p className="mx-auto mb-8 max-w-4xl text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
                         Reports show{' '}
                         <span className="font-semibold text-red-600">
                             Honey and many other extensions override affiliate
                             links
                         </span>{' '}
                         — cutting creatorsʼ revenue and your savings.{' '}
-                        <span className="text-caramel font-semibold">
+                        <span className="font-semibold text-caramel">
                             Caramel is the transparent, open-source fix.
                         </span>{' '}
                         <span className="font-semibold">Watch why →</span>
@@ -159,7 +159,7 @@ export default function WhyNotHoneySection() {
                             href="https://www.youtube.com/watch?v=vc4yL3YTwWk"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:text-caramel mt-4 inline-flex items-center gap-2 text-sm text-gray-600 transition-colors duration-200 dark:text-gray-400"
+                            className="mt-4 inline-flex items-center gap-2 text-sm text-gray-600 transition-colors duration-200 hover:text-caramel dark:text-gray-400"
                             whileHover={{ scale: 1.02 }}
                         >
                             <FaExternalLinkAlt />
@@ -174,7 +174,7 @@ export default function WhyNotHoneySection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.8, ease: 'easeOut' }}
-                    className="from-caramel rounded-3xl bg-gradient-to-r to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
+                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
                         Make the Switch to Caramel
@@ -188,7 +188,7 @@ export default function WhyNotHoneySection() {
                     <div className="flex justify-center gap-6 lg:flex-col lg:items-center lg:gap-4">
                         <motion.a
                             href="#install-extension"
-                            className="text-caramel inline-flex items-center rounded-full bg-white px-8 py-4 font-semibold shadow-md transition-all duration-200 hover:bg-orange-50 hover:shadow-xl"
+                            className="inline-flex items-center rounded-full bg-white px-8 py-4 font-semibold text-caramel shadow-md transition-all duration-200 hover:bg-orange-50 hover:shadow-xl"
                             whileHover={{
                                 scale: 1.05,
                                 transition: { duration: 0.2 },
@@ -199,7 +199,7 @@ export default function WhyNotHoneySection() {
                         </motion.a>
                         <motion.a
                             href="#features"
-                            className="hover:text-caramel inline-flex items-center rounded-full border-2 border-white bg-transparent px-8 py-4 font-semibold text-white transition-all duration-200 hover:bg-white"
+                            className="inline-flex items-center rounded-full border-2 border-white bg-transparent px-8 py-4 font-semibold text-white transition-all duration-200 hover:bg-white hover:text-caramel"
                             whileHover={{
                                 scale: 1.05,
                                 transition: { duration: 0.2 },

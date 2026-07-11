@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 
 export default function CouponsPage() {
     return (
-        <main className="dark:bg-darkBg relative min-h-screen px-6 pt-32 lg:px-8">
+        <main className="relative min-h-screen px-6 pt-32 dark:bg-darkBg lg:px-8">
             <CouponsSection />
         </main>
     )

@@ -1,4 +1,4 @@
 pnpm lint-staged
 pnpm -r run type-check
-pnpm --filter caramel-landing knip
-pnpm --filter caramel-landing exec prisma validate
+pnpm --filter caramel-app knip
+pnpm --filter caramel-app exec prisma validate

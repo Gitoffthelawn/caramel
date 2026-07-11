@@ -55,8 +55,7 @@
                 "coupon-fetch.js",
                 "coupon-runner.js",
                 "UI-helpers.js",
-                "inject.js",
-                "amazon.js"
+                "inject.js"
             ]
         }
     ],
