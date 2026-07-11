@@ -56,7 +56,7 @@ export default function VerifyPageClient() {
                 'Verification email sent! Please check your inbox and spam folder.',
                 { duration: 5000 },
             )
-        } catch (error) {
+        } catch {
             toast.error('Failed to send verification email. Please try again.')
         } finally {
             setResendingEmail(false)

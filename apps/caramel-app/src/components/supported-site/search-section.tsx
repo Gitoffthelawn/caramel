@@ -108,7 +108,7 @@ export default function SearchSection() {
                     >
                         {sites.length ? (
                             <div className="grid grid-cols-2 gap-6 pb-10 md:grid-cols-1">
-                                {sites.map((s, index) => (
+                                {sites.map(s => (
                                     <motion.div
                                         key={s}
                                         initial={{ opacity: 0, y: 20 }}
@@ -145,7 +145,7 @@ export default function SearchSection() {
                                             🏆 Top Supported Websites
                                         </motion.h2>
                                         <div className="grid grid-cols-2 gap-6 pb-10 md:grid-cols-1">
-                                            {topSites.map((s, index) => (
+                                            {topSites.map(s => (
                                                 <motion.div
                                                     key={s}
                                                     initial={{

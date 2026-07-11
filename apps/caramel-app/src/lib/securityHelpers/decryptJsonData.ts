@@ -25,7 +25,7 @@ export function decryptJsonData(resData: any): any {
         } else {
             return decryptJsonClient(resData.response)
         }
-    } catch (err) {
+    } catch {
         return resData
     }
 }

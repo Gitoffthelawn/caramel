@@ -287,7 +287,7 @@ export async function POST(req: NextRequest) {
             const expiresAt = new Date()
             expiresAt.setDate(expiresAt.getDate() + 7) // 7 days
 
-            const session = await prisma.session.create({
+            await prisma.session.create({
                 data: {
                     token: sessionToken,
                     userId: user.id,
@@ -531,7 +531,7 @@ export async function POST(req: NextRequest) {
             const expiresAt = new Date()
             expiresAt.setDate(expiresAt.getDate() + 7) // 7 days
 
-            const session = await prisma.session.create({
+            await prisma.session.create({
                 data: {
                     token: sessionToken,
                     userId: user.id,

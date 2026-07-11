@@ -1,8 +1,6 @@
 'use client'
 
-import { ThemeContext } from '@/lib/contexts'
 import { motion } from 'framer-motion'
-import { useContext } from 'react'
 import {
     FaBan,
     FaBug,
@@ -96,8 +94,6 @@ const securityFeatures = [
 ]
 
 export default function OpenSourceSection() {
-    const { isDarkMode } = useContext(ThemeContext)
-
     return (
         <section id="opensource" className="relative overflow-hidden py-32">
             {/* Background Elements */}

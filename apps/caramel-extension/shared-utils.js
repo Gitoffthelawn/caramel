@@ -64,7 +64,7 @@ if (typeof recordTiming === 'undefined') {
                     currentBrowser.storage.local.set({ caramel_timings: arr })
                 })
             }
-        } catch (e) {
+        } catch {
             // ignore storage errors
         }
     }
@@ -93,7 +93,7 @@ function _isVisible(el) {
     try {
         if (typeof el.checkVisibility === 'function')
             return el.checkVisibility()
-    } catch (e) {
+    } catch {
         /* fall through to the legacy heuristic */
     }
     return el.offsetParent !== null
@@ -250,7 +250,7 @@ function qOne(sel, root) {
             return res.singleNodeValue
         }
         return root.querySelector(sel)
-    } catch (e) {
+    } catch {
         return null
     }
 }
@@ -272,7 +272,7 @@ function qAll(sel, root) {
             return out
         }
         return Array.from(root.querySelectorAll(sel))
-    } catch (e) {
+    } catch {
         return []
     }
 }
@@ -293,7 +293,7 @@ function _isDevInstall() {
             return false
         const m = chrome.runtime.getManifest()
         return !m.update_url
-    } catch (_) {
+    } catch {
         return false
     }
 }
@@ -321,7 +321,7 @@ async function getDomainRecord(domain) {
                 getDomainRecord.cache = entry.data
                 log('Loaded supported domains from local cache')
             }
-        } catch (_) {
+        } catch {
             /* storage read failed, proceed to API */
         }
 
@@ -360,7 +360,7 @@ async function getDomainRecord(domain) {
                     getDomainRecord.cache = entry.data
                     log('Loaded supported domains from expired cache')
                 }
-            } catch (_) {
+            } catch {
                 /* nothing we can do */
             }
         }
@@ -430,7 +430,7 @@ async function getCachedCodes(rec) {
     let list = []
     try {
         list = await fetchCoupons(rec.domain, '', '')
-    } catch (e) {
+    } catch {
         list = []
     }
     _caramelCodes = {
@@ -459,6 +459,9 @@ async function tryInitialize() {
    promo box is right there. Re-detect it: observe the DOM and show the prompt
    the moment the coupon field appears. Debounced + self-disconnects after it
    fires once, so it costs ~nothing and never nags. */
+// Called from inject.js (see UI-helpers.js's insertCaramelPrompt for why
+// per-file analysis misses cross-file content-script calls).
+// oxlint-disable-next-line no-unused-vars
 async function startCheckoutDetection() {
     // A discount-link apply reloads the page so the store's own UI shows the
     // applied code; finish that flow on the fresh document by showing the
@@ -482,7 +485,7 @@ async function startCheckoutDetection() {
                         }).format(amount)
                         msg = `Code ${st.code} saved you ${fmt} — it's applied to your order.`
                         amount = 0
-                    } catch (e) {
+                    } catch {
                         /* unknown currency code — fall back to $ */
                     }
                 }
@@ -490,7 +493,7 @@ async function startCheckoutDetection() {
                 return
             }
         }
-    } catch (e) {
+    } catch {
         /* sessionStorage unavailable — continue with normal detection */
     }
     await tryInitialize()
@@ -793,7 +796,7 @@ async function applyCoupon(code, rec) {
                 applyBtn.dispatchEvent(new MouseEvent('mousedown', evtInit))
                 applyBtn.dispatchEvent(new PointerEvent('pointerup', evtInit))
                 applyBtn.dispatchEvent(new MouseEvent('mouseup', evtInit))
-            } catch (_) {
+            } catch {
                 // Older browsers without PointerEvent constructor — fall through
                 // to plain click which still works on most sites.
             }
@@ -956,7 +959,7 @@ async function probeCartJson() {
             typeof j.item_count === 'number'
         )
             return j
-    } catch (e) {
+    } catch {
         /* not this platform — probe is expected to fail elsewhere */
     }
     return null
@@ -976,7 +979,7 @@ function _getTriedCodes() {
             if (now - m[k] > CARAMEL_TRIED_TTL) delete m[k]
         }
         return m
-    } catch (e) {
+    } catch {
         return {}
     }
 }
@@ -987,7 +990,7 @@ function _markTriedCode(code) {
         const m = _getTriedCodes()
         m[code] = Date.now()
         sessionStorage.setItem(CARAMEL_TRIED_KEY, JSON.stringify(m))
-    } catch (e) {
+    } catch {
         /* storage unavailable — worst case a reload retries codes */
     }
 }
@@ -1002,7 +1005,7 @@ async function applyViaDiscountLink(code) {
             redirect: 'follow',
         })
         return await probeCartJson()
-    } catch (e) {
+    } catch {
         return null
     }
 }
@@ -1090,7 +1093,6 @@ async function classifyCartCategory() {
 }
 
 async function getCoupons(rec) {
-    let kw = ''
     // Dev hook: deterministic coupons when using #caramel-test. Gated to
     // unpacked dev installs so a #caramel-test link can't make the packed
     // production build fire mock codes against a real store's checkout.
@@ -1254,7 +1256,7 @@ async function startApplyingCoupons(rec) {
                             t: Date.now(),
                         }),
                     )
-                } catch (e) {
+                } catch {
                     /* storage blocked — the discount is still applied */
                 }
                 location.reload()
@@ -1289,12 +1291,12 @@ async function startApplyingCoupons(rec) {
             _toggle.click()
             try {
                 await waitForVisible(rec.couponInput, 2500)
-            } catch (e) {
+            } catch {
                 // late-bound accordion widgets can miss the first click
                 _toggle.click()
                 try {
                     await waitForVisible(rec.couponInput, 1500)
-                } catch (e2) {
+                } catch {
                     /* box still didn't appear */
                 }
             }

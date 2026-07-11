@@ -13,7 +13,7 @@ function xorWithBase64(text: string, key: string) {
     const base64Key = base64Encode(key)
     const keyBytes = Array.from(base64Key, c => c.charCodeAt(0))
     const textBytes = Array.from(text, c => c.charCodeAt(0))
-    const out: number[] = new Array(textBytes.length)
+    const out: number[] = Array.from({ length: textBytes.length })
     for (let i = 0; i < textBytes.length; i++)
         out[i] = textBytes[i] ^ keyBytes[i % keyBytes.length]
     return String.fromCharCode(...out)

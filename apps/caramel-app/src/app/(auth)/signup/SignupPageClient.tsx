@@ -23,7 +23,7 @@ const validationSchema = object().shape({
         .min(5)
         .matches(/[A-Z]/)
         .matches(/[0-9]/)
-        .matches(/[!@#$%^&*+\-]/)
+        .matches(/[!@#$%^&*+-]/)
         .required(
             'Password must contain at least 5 characters, 1 uppercase, 1 number and 1 special character',
         ),
@@ -94,7 +94,7 @@ export default function SignupPageClient() {
 
             // signIn.social automatically redirects to OAuth provider
             // The callback will handle redirecting back to callbackURL
-        } catch (error) {
+        } catch {
             toast.error('Something went wrong. Please try again later.')
             setOauthLoading(null)
         }

@@ -11,9 +11,11 @@
         "package": "zip -r extension.zip ./dist",
         "dev": "web-ext run --target=chromium --source-dir=. --watch-file=./**/*",
         "test": "vitest run",
-        "test:e2e": "node scripts/test-extension.mjs"
+        "test:e2e": "node scripts/test-extension.mjs",
+        "size": "size-limit"
     },
     "devDependencies": {
+        "@size-limit/file": "^12.1.0",
         "eslint-config-prettier": "^10.1.2",
         "eslint-plugin-html": "^8.1.2",
         "eslint-plugin-import": "^2.31.0",
@@ -21,6 +23,7 @@
         "jsdom": "^29.0.2",
         "prettier": "^3.5.3",
         "prettier-plugin-organize-imports": "^4.1.0",
+        "size-limit": "^12.1.0",
         "vitest": "^4.1"
     },
     "dependencies": {

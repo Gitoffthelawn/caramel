@@ -1,8 +1,7 @@
 'use client'
 
-import { ThemeContext } from '@/lib/contexts'
 import { motion } from 'framer-motion'
-import { useContext, useState } from 'react'
+import { useState } from 'react'
 import {
     FaExternalLinkAlt,
     FaEye,
@@ -12,6 +11,11 @@ import {
     FaTimesCircle,
 } from 'react-icons/fa'
 
+// This copy isn't rendered by the JSX below yet (F-009 oxlint sweep found
+// it while adding the gate — flagged as a new-finding candidate: either
+// wire up a comparison grid or delete the dead copy; not this finding's
+// call to make).
+// oxlint-disable-next-line no-unused-vars
 const problemsWithHoney = [
     {
         title: 'Affiliate Link Hijacking',
@@ -35,6 +39,9 @@ const problemsWithHoney = [
     },
 ]
 
+// Same as problemsWithHoney above: unrendered, flagged as a new-finding
+// candidate rather than deleted here.
+// oxlint-disable-next-line no-unused-vars
 const caramelSolutions = [
     {
         title: 'Respects Creator Links',
@@ -55,7 +62,6 @@ const caramelSolutions = [
 ]
 
 export default function WhyNotHoneySection() {
-    const { isDarkMode } = useContext(ThemeContext)
     const [videoLoaded, setVideoLoaded] = useState(false)
 
     return (

@@ -21,6 +21,11 @@ const calls: string[] = []
 vi.mock('@/lib/couponsDb', () => ({
     couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
         calls.push(strings.join('?'))
+        // Deliberate thenable mock — replicates the shape `postgres` tagged
+        // templates return so `await couponsSql\`...\`` resolves in the
+        // routes under test. The property MUST be named `then` for that to
+        // work.
+        // oxlint-disable-next-line no-thenable
         return { then: (resolve: (rows: unknown[]) => void) => resolve([]) }
     },
 }))

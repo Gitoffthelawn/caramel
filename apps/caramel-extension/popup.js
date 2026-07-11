@@ -52,7 +52,7 @@ async function initPopup() {
     try {
         const resp = await getActiveTabDomainRecord()
         url = resp?.url ?? null
-    } catch (_) {
+    } catch {
         url = null
     }
 
@@ -68,7 +68,7 @@ async function initPopup() {
                 let coupons = []
                 try {
                     coupons = await fetchCoupons(domain, '')
-                } catch (_) {
+                } catch {
                     renderLoadError()
                     return
                 }
@@ -84,7 +84,7 @@ async function initPopup() {
             // no active tab info
             if (token) renderProfileCard(user)
             else renderUnsupportedSite(null)
-        } catch (_) {
+        } catch {
             renderLoadError()
         }
     })

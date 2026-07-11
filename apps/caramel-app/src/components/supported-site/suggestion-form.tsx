@@ -12,6 +12,11 @@ export default function SuggestionForm({
     initialValue: string
     resetValue: () => void
 }) {
+    // `setUrl` is never called — this form has no input to edit `url`, so it
+    // always submits `initialValue` verbatim. Flagged as a new-finding
+    // candidate (looks like a missing editable-input bug, not dead code);
+    // not this finding's call to redesign the form.
+    // oxlint-disable-next-line no-unused-vars
     const [url, setUrl] = useState(initialValue)
     const [loading, setLoading] = useState(false)
 

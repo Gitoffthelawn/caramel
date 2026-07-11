@@ -26,20 +26,3 @@ export const couponsSql =
 if (process.env.NODE_ENV !== 'production') {
     globalForSql.couponsSql = couponsSql
 }
-
-export type DiscountType = 'PERCENTAGE' | 'CASH' | 'SAVE'
-
-export type CouponRow = {
-    id: string
-    code: string
-    site: string
-    title: string
-    description: string
-    rating: number
-    discount_type: DiscountType
-    discount_amount: number | null
-    expiry: string
-    expired: boolean
-    times_used: number
-    last_time_used: Date | null
-}

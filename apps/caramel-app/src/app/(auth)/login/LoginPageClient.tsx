@@ -90,7 +90,7 @@ export default function LoginPageClient() {
 
             // signIn.social automatically redirects to OAuth provider
             // The callback will handle redirecting back to callbackURL
-        } catch (error) {
+        } catch {
             toast.error('Something went wrong. Please try again later.')
             setOauthLoading(null)
         }

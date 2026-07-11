@@ -34,3 +34,5 @@ jobs:
         run: pnpm run prettier-check
       - name: Run unit tests
         run: pnpm run test
+      - name: Check bundle size
+        run: pnpm run size

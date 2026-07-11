@@ -1,0 +1,25 @@
+[
+    {
+        "name": "content-scripts (injected)",
+        "path": [
+            "cart-signals.js",
+            "shared-utils.js",
+            "UI-helpers.js",
+            "inject.js"
+        ],
+        "limit": "92 KB",
+        "brotli": false
+    },
+    {
+        "name": "popup.js",
+        "path": "popup.js",
+        "limit": "34 KB",
+        "brotli": false
+    },
+    {
+        "name": "background.js (sw)",
+        "path": "background.js",
+        "limit": "12 KB",
+        "brotli": false
+    }
+]

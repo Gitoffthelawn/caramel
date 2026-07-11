@@ -11,7 +11,7 @@ const currentBrowser = (() => {
 const _isDevInstall = () => {
     try {
         return !currentBrowser.runtime.getManifest().update_url
-    } catch (_) {
+    } catch {
         return false
     }
 }
@@ -43,72 +43,6 @@ function isServiceWorkerContext() {
 // Detect if we're in a service worker context or traditional background script
 // This is needed to support Firefox (MV2) and Chromium/Safari browsers (MV3)
 const isServiceWorker = isServiceWorkerContext()
-const hasTabsExecute = !!(
-    currentBrowser.tabs && currentBrowser.tabs.executeScript
-)
-
-function execScript(details) {
-    if (isServiceWorker || !hasTabsExecute) {
-        return currentBrowser.scripting.executeScript(details)
-    }
-    const {
-        target: { tabId },
-        files,
-        func,
-    } = details // MV2 fallback (For Firefox)
-    if (files && files.length) {
-        return files.reduce(
-            (p, f) =>
-                p.then(() =>
-                    currentBrowser.tabs.executeScript(tabId, { file: f }),
-                ),
-            Promise.resolve(),
-        )
-    }
-    return currentBrowser.tabs.executeScript(tabId, { code: `(${func})();` })
-}
-
-// NOTE: Do not use `execScript` to inject full content-script bundles
-// that are declared in `manifest.json` (e.g. `shared-utils.js`).
-// Injecting the same bundle twice into the same isolated world can
-// cause redeclaration errors for top-level `const`/`let`/`class`.
-// Prefer `tabs.query` for URL-only needs, or `tabs.sendMessage` to
-// message an already-loaded content script for DOM reads.
-
-function waitForTabComplete(tabId, timeoutMs = 15000) {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-            currentBrowser.tabs.onUpdated.removeListener(onUpdated)
-            reject(new Error('Timed out waiting for tab to load'))
-        }, timeoutMs)
-
-        function onUpdated(updatedTabId, changeInfo) {
-            if (updatedTabId === tabId && changeInfo.status === 'complete') {
-                clearTimeout(timer)
-                currentBrowser.tabs.onUpdated.removeListener(onUpdated)
-                resolve()
-            }
-        }
-
-        currentBrowser.tabs.onUpdated.addListener(onUpdated)
-    })
-}
-
-function sendMessageToTab(tabId, msg, timeoutMs = 5000) {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(
-            () => reject(new Error('sendMessage timeout')),
-            timeoutMs,
-        )
-
-        currentBrowser.tabs.sendMessage(tabId, msg, resp => {
-            clearTimeout(timer)
-            const err = currentBrowser.runtime.lastError
-            if (err) return reject(err)
-            resolve(resp)
-        })
-    })
-}
 
 // Keep-Alive Mechanism
 function keepAlive() {
@@ -122,7 +56,7 @@ function keepAlive() {
                     // Service worker is alive - periodic check
                 }
             })
-        } catch (error) {
+        } catch {
             // Fallback if alarms API is not available
         }
     } else {
