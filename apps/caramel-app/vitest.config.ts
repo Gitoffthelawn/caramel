@@ -10,5 +10,18 @@ export default defineConfig({
         environment: 'node',
         include: ['tests/unit/**/*.test.ts'],
         exclude: [...configDefaults.exclude, 'e2e/**', '**/*.eval.*'],
+        setupFiles: ['./tests/setup.ts'],
+        // F-005: src/lib/env.ts eager-parses process.env at import time.
+        // These are the 3 vars its schema requires — without them, any test
+        // that transitively imports env.ts (most do, via rateLimit/auth/etc)
+        // would throw before a single assertion runs. Values are dummies;
+        // no test relies on them being reachable/real.
+        env: {
+            DATABASE_URL:
+                'postgresql://postgres:postgres@localhost:58005/caramel?schema=public',
+            COUPONS_DATABASE_URL:
+                'postgresql://postgres:postgres@localhost:58005/caramel_coupons?schema=public',
+            BETTER_AUTH_SECRET: 'vitest-fixture-better-auth-secret',
+        },
     },
 })

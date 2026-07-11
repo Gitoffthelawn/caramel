@@ -1,5 +1,7 @@
+import { env } from '@/lib/env'
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const DEFAULT_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5-mini'
+const DEFAULT_MODEL = env.OPENROUTER_MODEL
 
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant'
@@ -27,7 +29,7 @@ export async function chat(
     messages: ChatMessage[],
     opts: ChatOptions = {},
 ): Promise<string> {
-    const key = process.env.OPENROUTER_API_KEY
+    const key = env.OPENROUTER_API_KEY
     if (!key) throw new OpenRouterError('OPENROUTER_API_KEY not set')
 
     const controller = new AbortController()

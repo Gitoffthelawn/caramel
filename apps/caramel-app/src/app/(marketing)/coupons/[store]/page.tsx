@@ -1,11 +1,12 @@
 import CouponsSection from '@/components/coupons/coupons-section'
 import { couponsSql } from '@/lib/couponsDb'
+import { BASE_URL } from '@/lib/env.client'
 import type { Coupon } from '@/types/coupon'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 const PAGE_SIZE = 5
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const baseUrl = BASE_URL
 
 function safeDecode(value: string): string {
     try {

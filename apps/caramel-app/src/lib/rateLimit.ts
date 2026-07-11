@@ -58,6 +58,12 @@ function isExtensionClient(req: NextRequest): boolean {
     // supported-stores route validates); `x-extension-api-key` kept for back-compat.
     const key =
         req.headers.get('x-api-key') || req.headers.get('x-extension-api-key')
+    // Raw process.env read (not the `env` singleton in src/lib/env.ts):
+    // tests/unit/rateLimit.test.ts exercises this per-call via vi.stubEnv,
+    // which mutates process.env live; env.ts's singleton is parsed once at
+    // import time and wouldn't observe per-test stubs. EXTENSION_API_KEY is
+    // still declared in that schema (documented in .env.example / covered
+    // by the drift check) — only this call site's read stays dynamic.
     const expected = process.env.EXTENSION_API_KEY
     return Boolean(key && expected && key === expected)
 }
@@ -177,6 +183,7 @@ export function isOriginAllowed(req: NextRequest): boolean {
         const host = req.headers.get('host')
         if (host && originUrl.host === host) return true
 
+        // Raw process.env read — see isExtensionClient() above for why.
         const allowed = (process.env.ALLOWED_ORIGINS || '')
             .split(',')
             .map(s => s.trim())

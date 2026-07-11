@@ -1,7 +1,8 @@
 import { couponsSql } from '@/lib/couponsDb'
+import { env } from '@/lib/env'
 import { NextRequest, NextResponse } from 'next/server'
 
-const EXTENSION_API_KEY = process.env.EXTENSION_API_KEY
+const EXTENSION_API_KEY = env.EXTENSION_API_KEY
 
 function unauthorized() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

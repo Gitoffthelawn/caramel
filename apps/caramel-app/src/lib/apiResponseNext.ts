@@ -1,3 +1,4 @@
+import { env } from '@/lib/env'
 import { NextRequest, NextResponse } from 'next/server'
 
 function base64Encode(str: string) {
@@ -43,7 +44,7 @@ export function nextApiResponse(
         ...(error && { error }),
     }
 
-    if (process.env.API_ENCRYPTION_ENABLED !== 'true') {
+    if (env.API_ENCRYPTION_ENABLED !== 'true') {
         return NextResponse.json(payload, { status: statusCode })
     }
 

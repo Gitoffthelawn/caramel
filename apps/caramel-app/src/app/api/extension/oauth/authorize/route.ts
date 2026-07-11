@@ -1,13 +1,15 @@
+import { env } from '@/lib/env'
+import { BASE_URL } from '@/lib/env.client'
 import { createHmac } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 const KNOWN_EXTENSION_ORIGINS = [
-    process.env.CHROME_EXTENSION_ORIGIN,
-    process.env.FIREFOX_EXTENSION_ORIGIN,
-    process.env.SAFARI_EXTENSION_ORIGIN,
+    env.CHROME_EXTENSION_ORIGIN,
+    env.FIREFOX_EXTENSION_ORIGIN,
+    env.SAFARI_EXTENSION_ORIGIN,
 ].filter((o): o is string => Boolean(o))
 
-const OAUTH_STATE_SECRET = process.env.EXTENSION_OAUTH_STATE_SECRET
+const OAUTH_STATE_SECRET = env.EXTENSION_OAUTH_STATE_SECRET
 
 const createSignedState = (payload: {
     provider: 'google' | 'apple'
@@ -90,10 +92,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const baseURL =
-            process.env.BETTER_AUTH_URL ||
-            process.env.NEXT_PUBLIC_BASE_URL ||
-            'http://localhost:3000'
+        const baseURL = env.BETTER_AUTH_URL || BASE_URL
 
         // Construct OAuth URLs directly using OAuth provider endpoints
         // This bypasses better-auth's redirect handling which doesn't work well for extensions
@@ -105,7 +104,7 @@ export async function GET(req: NextRequest) {
 
         if (provider === 'google') {
             // Google OAuth 2.0 authorization endpoint
-            const googleClientId = process.env.GOOGLE_CLIENT_ID
+            const googleClientId = env.GOOGLE_CLIENT_ID
             if (!googleClientId) {
                 return NextResponse.json(
                     { error: 'Google OAuth not configured' },
@@ -140,7 +139,7 @@ export async function GET(req: NextRequest) {
             )
         } else if (provider === 'apple') {
             // Apple OAuth 2.0 authorization endpoint
-            const appleClientId = process.env.APPLE_CLIENT_ID
+            const appleClientId = env.APPLE_CLIENT_ID
             if (!appleClientId) {
                 return NextResponse.json(
                     { error: 'Apple OAuth not configured' },

@@ -1,8 +1,10 @@
+import { env } from '@/lib/env'
+import { BASE_URL } from '@/lib/env.client'
 import prisma from '@/lib/prisma'
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
-const OAUTH_STATE_SECRET = process.env.EXTENSION_OAUTH_STATE_SECRET
+const OAUTH_STATE_SECRET = env.EXTENSION_OAUTH_STATE_SECRET
 
 function verifySignedState(
     state: string,
@@ -115,15 +117,12 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const baseURL =
-            process.env.BETTER_AUTH_URL ||
-            process.env.NEXT_PUBLIC_BASE_URL ||
-            'http://localhost:3000'
+        const baseURL = env.BETTER_AUTH_URL || BASE_URL
 
         if (provider === 'google') {
             // Exchange authorization code for tokens directly with Google
-            const googleClientId = process.env.GOOGLE_CLIENT_ID
-            const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
+            const googleClientId = env.GOOGLE_CLIENT_ID
+            const googleClientSecret = env.GOOGLE_CLIENT_SECRET
 
             if (!googleClientId || !googleClientSecret) {
                 return NextResponse.json(
@@ -338,8 +337,8 @@ export async function POST(req: NextRequest) {
             )
         } else if (provider === 'apple') {
             // Apple OAuth flow
-            const appleClientId = process.env.APPLE_CLIENT_ID
-            const appleClientSecret = process.env.APPLE_CLIENT_SECRET
+            const appleClientId = env.APPLE_CLIENT_ID
+            const appleClientSecret = env.APPLE_CLIENT_SECRET
 
             if (!appleClientId || !appleClientSecret) {
                 return NextResponse.json(
@@ -359,10 +358,7 @@ export async function POST(req: NextRequest) {
             // For Apple OAuth, we MUST use the intermediate redirect URI in the token exchange
             // because that's what was used in the authorization request
             // The extension redirect URI is only used for the final redirect to the extension
-            const baseURL =
-                process.env.BETTER_AUTH_URL ||
-                process.env.NEXT_PUBLIC_BASE_URL ||
-                'http://localhost:3000'
+            const baseURL = env.BETTER_AUTH_URL || BASE_URL
             const intermediateRedirectUri = `${baseURL}/api/extension/oauth/redirect`
 
             // Exchange code for tokens with Apple

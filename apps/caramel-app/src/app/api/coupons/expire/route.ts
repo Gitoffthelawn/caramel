@@ -1,4 +1,5 @@
 import { couponsSql } from '@/lib/couponsDb'
+import { env } from '@/lib/env'
 import {
     checkRateLimit,
     forbiddenOrigin,
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
     if (!isOriginAllowed(req)) return forbiddenOrigin()
 
     const key = req.headers.get('x-api-key')
-    const expected = process.env.EXTENSION_API_KEY
+    const expected = env.EXTENSION_API_KEY
     if (!expected || !key || key !== expected) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
