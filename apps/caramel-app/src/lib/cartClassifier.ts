@@ -1,5 +1,6 @@
 import { chat, OpenRouterError } from '@/lib/openrouter'
 import crypto from 'node:crypto'
+import { z } from 'zod'
 
 export const CATEGORY_ENUM = [
     'apparel',
@@ -107,6 +108,69 @@ function buildMessages(s: CartSignals) {
     ]
 }
 
+// F-012 — output schema for the LLM's classification JSON, exported so the
+// eval harness (apps/caramel-app/evals/) validates live results against the
+// SAME contract production uses (never a re-implemented/copied check).
+//
+// The .transform() body is a byte-exact port of the hand-rolled validation
+// it replaces (see PLAN-F-012.md — verified via a characterization-test
+// pin, tests/unit/cartClassifier.parse.test.ts, that stayed green across
+// the refactor): an unrecognized primary is the ONLY hard failure; unknown
+// secondary / secondary===primary / out-of-range|non-numeric|missing
+// confidence all self-heal (drop / coerce to 0.5) exactly as before,
+// because prod is designed to degrade gracefully on those two fields.
+//
+// Every field is `.optional()` even though the system prompt always asks
+// for all three keys — zod v4 treats a wholly ABSENT object key as a
+// validation failure for a bare `z.unknown()` field (only an explicit
+// `undefined` value passes), and a real LLM response can omit a key
+// (e.g. no `secondary`) rather than sending it as `null`/`undefined`.
+//
+// `ctx.addIssue(string)` + `return z.NEVER` marks the parse as failed with
+// a custom message — but a raw ZodError's `.message` is a JSON-stringified
+// issues array, not that message string, so parseResponse below must catch
+// it and re-throw a plain Error carrying `issues[0].message` verbatim; a
+// bare `classificationSchema.parse(...)` would leak the JSON blob into
+// Sentry/the 500 response body instead of `unknown primary category: X`.
+export const classificationSchema = z
+    .object({
+        primary: z.unknown().optional(),
+        secondary: z.unknown().optional(),
+        confidence: z.unknown().optional(),
+    })
+    .transform((parsed, ctx) => {
+        const obj = parsed as {
+            primary?: string
+            secondary?: string | null
+            confidence?: number
+        }
+        const primary = (obj.primary || '').trim()
+        if (!(CATEGORY_ENUM as readonly string[]).includes(primary)) {
+            ctx.addIssue(`unknown primary category: ${primary}`)
+            return z.NEVER
+        }
+        const secondary = obj.secondary
+            ? String(obj.secondary).trim()
+            : undefined
+        const validSecondary =
+            secondary &&
+            secondary !== primary &&
+            (CATEGORY_ENUM as readonly string[]).includes(secondary)
+                ? (secondary as Category)
+                : undefined
+        const confidence =
+            typeof obj.confidence === 'number' &&
+            obj.confidence >= 0 &&
+            obj.confidence <= 1
+                ? obj.confidence
+                : 0.5
+        return {
+            primary: primary as Category,
+            secondary: validSecondary,
+            confidence,
+        }
+    })
+
 function parseResponse(raw: string): Omit<Classification, 'cached'> {
     let parsed: unknown
     try {
@@ -116,33 +180,14 @@ function parseResponse(raw: string): Omit<Classification, 'cached'> {
         if (!m) throw new Error('llm returned non-json')
         parsed = JSON.parse(m[0])
     }
-    const obj = parsed as {
-        primary?: string
-        secondary?: string | null
-        confidence?: number
+    const result = classificationSchema.safeParse(parsed)
+    if (!result.success) {
+        throw new Error(
+            result.error.issues[0]?.message ??
+                'invalid classification response',
+        )
     }
-    const primary = (obj.primary || '').trim()
-    if (!(CATEGORY_ENUM as readonly string[]).includes(primary)) {
-        throw new Error(`unknown primary category: ${primary}`)
-    }
-    const secondary = obj.secondary ? String(obj.secondary).trim() : undefined
-    const validSecondary =
-        secondary &&
-        secondary !== primary &&
-        (CATEGORY_ENUM as readonly string[]).includes(secondary)
-            ? (secondary as Category)
-            : undefined
-    const confidence =
-        typeof obj.confidence === 'number' &&
-        obj.confidence >= 0 &&
-        obj.confidence <= 1
-            ? obj.confidence
-            : 0.5
-    return {
-        primary: primary as Category,
-        secondary: validSecondary,
-        confidence,
-    }
+    return result.data
 }
 
 export async function classifyCart(
