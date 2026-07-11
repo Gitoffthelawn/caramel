@@ -20,7 +20,7 @@ export default defineConfig({
             DATABASE_URL:
                 'postgresql://postgres:postgres@localhost:58005/caramel?schema=public',
             COUPONS_DATABASE_URL:
-                'postgresql://postgres:postgres@localhost:58005/caramel_coupons?schema=public',
+                'postgresql://postgres:postgres@localhost:58005/caramel_coupons',
             BETTER_AUTH_SECRET: 'vitest-fixture-better-auth-secret',
         },
     },
