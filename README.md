@@ -98,11 +98,11 @@ Prerequisites: [Node.js](https://nodejs.org) 20+ (CI runs Node 20), [pnpm](https
 postgresql://caramel:caramel_password@localhost:58005/caramel?schema=public
 ```
 
-Use the value above, **not** the placeholder shipped in `.env.example` (`postgres:postgres`) — `pnpm dev:compose`'s Postgres only creates a `caramel` role (see `local-dev/docker-compose.yml`), so the shipped placeholder fails with `P1000: Authentication failed`.
+This matches what `.env.example` ships — `pnpm dev:compose`'s Postgres creates exactly this `caramel` role (see `local-dev/docker-compose.yml`).
 
 **`COUPONS_DATABASE_URL` — external, not available in local dev:**
 
-Owned by the external Python verification service. `pnpm dev:compose` never provisions a `caramel_coupons` database, so any non-empty value satisfies boot — the app only fails at _query_ time, not startup. Use `postgresql://caramel:caramel_password@localhost:58005/caramel_coupons` (same role-fix as `DATABASE_URL` above — the `.env.example` placeholder has the same wrong credentials) so the only failure you see is the real one: the database not existing. See [`local-dev/LOCAL-DEV.md`](local-dev/LOCAL-DEV.md)'s two-database topology section for the resulting (expected) degraded mode.
+Owned by the external Python verification service. `pnpm dev:compose` never provisions a `caramel_coupons` database, so any non-empty value satisfies boot — the app only fails at _query_ time, not startup. The `.env.example` value (`postgresql://caramel:caramel_password@localhost:58005/caramel_coupons`) is correct as shipped, so the only failure you see is the real one: the database not existing. See [`local-dev/LOCAL-DEV.md`](local-dev/LOCAL-DEV.md)'s two-database topology section for the resulting (expected) degraded mode.
 
 **Generate locally (any random string) — at least one of the first two is required:**
 
