@@ -1,32 +1,51 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { loadExtensionSource } from './_load.mjs'
+import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
 
-// Characterization pins (F-004) — lock CURRENT behavior of two pure/near-
-// pure helpers in shared-utils.js (the repo's #1-churn, #1-LOC file, F-008)
-// before it gets split. Loaded ONCE for the whole file: the source has
-// top-level guards against double-loading (window.__caramel_shared_utils_loaded)
-// so re-evaluating per-test would silently no-op the second time.
+// Characterization pins (F-004) — lock behavior of two pure/near-pure
+// helpers that used to live in shared-utils.js (the repo's former #1-churn,
+// #1-LOC file). F-008 split that file along its section banners into 6
+// cohesive files, source order preserved, behavior unchanged (proven by a
+// cat-diff of the 6 files against the pre-split file — see PLAN-F-008.md);
+// getPrice/_isXPath now live in dom-utils.js. These pins were written
+// BEFORE the split and passed unchanged AFTER it — that is the proof this
+// characterization was meant to provide.
+// Loaded ONCE for the whole file: the source has top-level guards against
+// double-loading (window.__caramel_shared_utils_loaded, still that literal
+// name post-split — it's a "move only" cut, no renames inside the moved
+// code — now defined in caramel-base.js) so re-evaluating per-test would
+// silently no-op the second time.
 let _isXPath
 let getPrice
 
 beforeAll(() => {
     // F-006 — coupon-constants.generated.js sets window.CaramelCoupons,
-    // which shared-utils.js now reads unconditionally at module-eval time
-    // (RESTRICTED_STATUSES's rebind). Real load order (manifest.json,
-    // manifest-firefox.json, index.html) always puts it first; mirror that
-    // here or shared-utils.js throws on load.
+    // which coupon-fetch.js (post-F-008) reads unconditionally at
+    // module-eval time (RESTRICTED_STATUSES's rebind). Real load order
+    // (manifest.json, manifest-firefox.json, index.html) always puts it
+    // first; mirror that here or the content-script files throw on load.
     loadExtensionSource('coupon-constants.generated.js', [])
-    ;({ getPrice, _isXPath } = loadExtensionSource('shared-utils.js', [
-        'getPrice',
-        '_isXPath',
-    ]))
+    // Load the 6 F-008 split files in real manifest load order, sharing ONE
+    // chrome stub across all of them (loadExtensionSources, not 6 separate
+    // loadExtensionSource calls) — matching how a real content-script realm
+    // shares one `chrome` global across every file in the list.
+    ;({ getPrice, _isXPath } = loadExtensionSources(
+        [
+            'caramel-base.js',
+            'dom-utils.js',
+            'store-detect.js',
+            'coupon-apply.js',
+            'coupon-fetch.js',
+            'coupon-runner.js',
+        ],
+        ['getPrice', '_isXPath'],
+    ))
 })
 
 beforeEach(() => {
     document.body.innerHTML = ''
 })
 
-describe('_isXPath (shared-utils.js:233, pure)', () => {
+describe('_isXPath (dom-utils.js:153, pure)', () => {
     it('recognizes XPath expressions by leading token', () => {
         expect(_isXPath('//input')).toBe(true)
         expect(_isXPath('(//div)[2]')).toBe(true)
@@ -42,7 +61,7 @@ describe('_isXPath (shared-utils.js:233, pure)', () => {
     })
 })
 
-describe('getPrice (shared-utils.js:203)', () => {
+describe('getPrice (dom-utils.js:123)', () => {
     // getPrice reads el.innerText, which jsdom does not compute from
     // textContent/layout — set BOTH explicitly. Object.defineProperty
     // guarantees the assignment sticks even if jsdom ever defines

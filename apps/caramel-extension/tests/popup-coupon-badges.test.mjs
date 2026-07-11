@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { loadExtensionSource } from './_load.mjs'
+import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
 
 // F-006 — proves popup.js's badge label + restriction-warning rendering
 // derives from window.CaramelCoupons.STATUS_META / RESTRICTED_STATUSES
@@ -12,10 +12,21 @@ let renderCouponsView
 beforeAll(() => {
     document.body.innerHTML = '<div id="auth-container"></div>'
     // Real load order (manifest.json / manifest-firefox.json / index.html):
-    // constants first, then shared-utils.js (whose RESTRICTED_STATUSES
-    // rebind consumes them eagerly at module-eval time), then popup.js.
+    // constants first, then the 6 F-008 split files (formerly
+    // shared-utils.js; coupon-fetch.js's RESTRICTED_STATUSES rebind
+    // consumes them eagerly at module-eval time), then popup.js.
     loadExtensionSource('coupon-constants.generated.js', [])
-    loadExtensionSource('shared-utils.js', [])
+    loadExtensionSources(
+        [
+            'caramel-base.js',
+            'dom-utils.js',
+            'store-detect.js',
+            'coupon-apply.js',
+            'coupon-fetch.js',
+            'coupon-runner.js',
+        ],
+        [],
+    )
     ;({ renderCouponsView } = loadExtensionSource('popup.js', [
         'renderCouponsView',
     ]))

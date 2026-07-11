@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { loadExtensionSource } from './_load.mjs'
+import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
 
 // F-006 — proves the extension's app<->shared coupon-domain wiring works,
 // not just that the generated file has the right JSON shape (that's
@@ -20,19 +20,27 @@ describe('coupon-constants.generated.js -> window.CaramelCoupons', () => {
     })
 })
 
-describe("shared-utils.js RESTRICTED_STATUSES — genuinely SOURCED FROM window.CaramelCoupons (F-006's 1-line rebind), not a coincidentally-matching hard-coded literal", () => {
-    it('reflects a deliberately different fixture set before shared-utils.js loads', () => {
+describe("coupon-fetch.js RESTRICTED_STATUSES (formerly shared-utils.js, split by F-008) — genuinely SOURCED FROM window.CaramelCoupons (F-006's 1-line rebind), not a coincidentally-matching hard-coded literal", () => {
+    it('reflects a deliberately different fixture set before coupon-fetch.js loads', () => {
         loadExtensionSource('coupon-constants.generated.js', [])
-        // Overwrite with an obviously-fake fixture BEFORE shared-utils.js
-        // loads. If RESTRICTED_STATUSES were still hard-coded (the pre-F-006
-        // state), it would ignore this entirely and keep the real 4-status
-        // set — this is what would fail if the rebind ever regressed back
-        // to a literal.
+        // Overwrite with an obviously-fake fixture BEFORE the F-008 split
+        // files load. If RESTRICTED_STATUSES were still hard-coded (the
+        // pre-F-006 state), it would ignore this entirely and keep the real
+        // 4-status set — this is what would fail if the rebind ever
+        // regressed back to a literal.
         window.CaramelCoupons.RESTRICTED_STATUSES = ['totally_fake_status']
 
-        const { RESTRICTED_STATUSES } = loadExtensionSource('shared-utils.js', [
-            'RESTRICTED_STATUSES',
-        ])
+        const { RESTRICTED_STATUSES } = loadExtensionSources(
+            [
+                'caramel-base.js',
+                'dom-utils.js',
+                'store-detect.js',
+                'coupon-apply.js',
+                'coupon-fetch.js',
+                'coupon-runner.js',
+            ],
+            ['RESTRICTED_STATUSES'],
+        )
 
         expect(RESTRICTED_STATUSES instanceof Set).toBe(true)
         expect(RESTRICTED_STATUSES.has('totally_fake_status')).toBe(true)

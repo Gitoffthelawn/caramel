@@ -1,9 +1,9 @@
 /* global currentBrowser, fetchCoupons */
 
-// Dev/prod base URL via the shared _isDevInstall() (defined in shared-utils.js,
-// loaded before this script). Packed Web Store builds have a manifest
-// update_url → prod; unpacked dev installs → the DEV deployment. No
-// `management` perm.
+// Dev/prod base URL via the shared _isDevInstall() (defined in
+// caramel-base.js, loaded before this script — formerly shared-utils.js,
+// split by F-008). Packed Web Store builds have a manifest update_url →
+// prod; unpacked dev installs → the DEV deployment. No `management` perm.
 const CARAMEL_BASE_URL =
     typeof _isDevInstall === 'function' && _isDevInstall()
         ? 'https://dev.grabcaramel.com'
