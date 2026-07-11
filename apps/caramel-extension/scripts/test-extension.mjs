@@ -29,7 +29,6 @@ const EXT_PATH = path.resolve(__dirname, '..')
 const API_BASE = 'http://localhost:58000'
 const TEST_EMAIL = 'test@caramel.dev'
 const TEST_PASSWORD = 'test1234'
-const EXTENSION_API_KEY = 'WXqEpm2uOV5jjJXPpnQFyZiNdaPVUrtd2LIrf4kc1JA'
 
 const results = []
 function log(step, ok, detail = '') {
@@ -109,19 +108,13 @@ async function main() {
         )
 
         // 4. Supported stores
-        const storesRes = await sw.evaluate(
-            async ({ url, key }) => {
-                const r = await fetch(url, { headers: { 'x-api-key': key } })
-                return {
-                    status: r.status,
-                    body: await r.json().catch(() => null),
-                }
-            },
-            {
-                url: `${API_BASE}/api/extension/supported-stores`,
-                key: EXTENSION_API_KEY,
-            },
-        )
+        const storesRes = await sw.evaluate(async url => {
+            const r = await fetch(url)
+            return {
+                status: r.status,
+                body: await r.json().catch(() => null),
+            }
+        }, `${API_BASE}/api/extension/supported-stores`)
         const storeCount = storesRes.body?.supported?.length ?? 0
         log(
             'supported-stores endpoint',
@@ -139,17 +132,14 @@ async function main() {
 
         // 6. Coupons endpoint
         const couponsRes = await sw.evaluate(
-            async ({ url, key }) => {
-                const r = await fetch(url, { headers: { 'x-api-key': key } })
+            async url => {
+                const r = await fetch(url)
                 return {
                     status: r.status,
                     body: await r.json().catch(() => null),
                 }
             },
-            {
-                url: `${API_BASE}/api/coupons?site=${encodeURIComponent(sample?.domain || 'allbirds.com')}`,
-                key: EXTENSION_API_KEY,
-            },
+            `${API_BASE}/api/coupons?site=${encodeURIComponent(sample?.domain || 'allbirds.com')}`,
         )
         log(
             'coupons endpoint',

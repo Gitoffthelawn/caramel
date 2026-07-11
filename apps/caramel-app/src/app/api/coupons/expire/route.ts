@@ -1,21 +1,20 @@
 import { couponsSql } from '@/lib/couponsDb'
-import { env } from '@/lib/env'
 import {
     checkRateLimit,
     forbiddenOrigin,
     isOriginAllowed,
+    isTrustedServer,
 } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Bulk-expire coupons. Privileged: this permanently flips `expired=TRUE`, so
-// it requires the extension/server API key (x-api-key) — not just an origin
-// check. Bounded to 50 integer ids per call.
+// it requires the server-only COUPONS_ADMIN_SECRET bearer (never shipped to
+// the extension or any client) — not just an origin check. Bounded to 50
+// integer ids per call.
 export async function POST(req: NextRequest) {
     if (!isOriginAllowed(req)) return forbiddenOrigin()
 
-    const key = req.headers.get('x-api-key')
-    const expected = env.EXTENSION_API_KEY
-    if (!expected || !key || key !== expected) {
+    if (!isTrustedServer(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

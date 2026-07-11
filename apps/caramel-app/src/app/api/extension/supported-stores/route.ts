@@ -1,24 +1,6 @@
 import { couponsSql } from '@/lib/couponsDb'
-import { env } from '@/lib/env'
+import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
-
-const EXTENSION_API_KEY = env.EXTENSION_API_KEY
-
-function unauthorized() {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-}
-
-function validateApiKey(req: NextRequest): boolean {
-    if (!EXTENSION_API_KEY) return false
-    const header = req.headers.get('x-api-key')
-    if (!header || header.length !== EXTENSION_API_KEY.length) return false
-    // Constant-time comparison to avoid timing-based key probing
-    let mismatch = 0
-    for (let i = 0; i < header.length; i++) {
-        mismatch |= header.charCodeAt(i) ^ EXTENSION_API_KEY.charCodeAt(i)
-    }
-    return mismatch === 0
-}
 
 type Row = {
     store_name: string
@@ -32,8 +14,14 @@ type Row = {
     coupon_remove_xpath: string | null
 }
 
+// Public read: the payload is xpath selectors already shipped to every
+// extension install (background.js), so gating it behind a key has no
+// secrecy value (F-003). Rate-limited like any other public read route. A
+// stale x-api-key header from a pre-F-003 extension build is simply
+// ignored — no cutover required, see PLAN-F-003.md §Breaking.
 export async function GET(req: NextRequest) {
-    if (!validateApiKey(req)) return unauthorized()
+    const limited = await checkRateLimit(req, 'read')
+    if (limited) return limited
 
     try {
         // One row per store, highest-priority active config that has xpath

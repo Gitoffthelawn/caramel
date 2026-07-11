@@ -12,6 +12,7 @@
 //
 // Limits are intentionally per-IP, not per-route, so a scraper pivoting
 // between endpoints doesn't get a fresh budget on each one.
+import { env } from '@/lib/env'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { RateLimiterMemory, type RateLimiterRes } from 'rate-limiter-flexible'
@@ -53,19 +54,20 @@ function getClientIp(req: NextRequest): string {
     return 'unknown'
 }
 
-function isExtensionClient(req: NextRequest): boolean {
-    // Accept both header names: the extension sends `x-api-key` (same name the
-    // supported-stores route validates); `x-extension-api-key` kept for back-compat.
-    const key =
-        req.headers.get('x-api-key') || req.headers.get('x-extension-api-key')
-    // Raw process.env read (not the `env` singleton in src/lib/env.ts):
-    // tests/unit/rateLimit.test.ts exercises this per-call via vi.stubEnv,
-    // which mutates process.env live; env.ts's singleton is parsed once at
-    // import time and wouldn't observe per-test stubs. EXTENSION_API_KEY is
-    // still declared in that schema (documented in .env.example / covered
-    // by the drift check) — only this call site's read stays dynamic.
-    const expected = process.env.EXTENSION_API_KEY
-    return Boolean(key && expected && key === expected)
+/**
+ * True for requests carrying the server-only COUPONS_ADMIN_SECRET bearer
+ * (mirrors src/lib/health.ts's authorize()). This is the single trust
+ * signal for both (a) the rate-limit exemption below and (b) the auth gate
+ * on POST /api/coupons/expire (src/app/api/coupons/expire/route.ts) — one
+ * checker, not two independently-written comparisons (F-003). The secret
+ * never ships to the extension or any other client, unlike the retired
+ * publicly-shipped extension key this replaces.
+ */
+export function isTrustedServer(req: NextRequest): boolean {
+    const secret = env.COUPONS_ADMIN_SECRET
+    if (!secret) return false
+    const auth = req.headers.get('authorization') || ''
+    return auth === `Bearer ${secret}`
 }
 
 function buildHeaders(kind: LimitKind, res: RateLimiterRes | null): Headers {
@@ -94,7 +96,7 @@ export async function checkRateLimit(
     req: NextRequest,
     kind: LimitKind = 'read',
 ): Promise<NextResponse | null> {
-    if (isExtensionClient(req)) return null
+    if (isTrustedServer(req)) return null
 
     const ip = getClientIp(req)
 
@@ -183,7 +185,11 @@ export function isOriginAllowed(req: NextRequest): boolean {
         const host = req.headers.get('host')
         if (host && originUrl.host === host) return true
 
-        // Raw process.env read — see isExtensionClient() above for why.
+        // Raw process.env read (not the `env` singleton in src/lib/env.ts) —
+        // pre-existing behavior, left as-is: out of scope for F-003 (see
+        // PLAN-F-003.md), which only touches the retired extension-key
+        // call sites (isTrustedServer above, and the routes that used to
+        // check it directly).
         const allowed = (process.env.ALLOWED_ORIGINS || '')
             .split(',')
             .map(s => s.trim())

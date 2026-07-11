@@ -20,7 +20,6 @@ const _isDevInstall = () => {
 globalThis.CARAMEL_BASE_URL = _isDevInstall()
     ? 'https://dev.grabcaramel.com'
     : 'https://grabcaramel.com'
-const EXTENSION_API_KEY = 'WXqEpm2uOV5jjJXPpnQFyZiNdaPVUrtd2LIrf4kc1JA'
 const caramelUrl = path =>
     new URL(path, `${globalThis.CARAMEL_BASE_URL}/`).toString()
 
@@ -138,9 +137,7 @@ currentBrowser.runtime.onMessage.addListener(
             return true
         } else if (message.action === 'fetchSupportedStores') {
             const url = caramelUrl('api/extension/supported-stores')
-            fetchWithTimeout(url, {
-                headers: { 'x-api-key': EXTENSION_API_KEY },
-            })
+            fetchWithTimeout(url)
                 .then(async r => {
                     if (!r.ok) return { supported: [] }
                     return r.json()
