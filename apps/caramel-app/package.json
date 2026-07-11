@@ -18,6 +18,8 @@
         "prettier-check": "prettier --check '**/*.{ts,tsx,js,jsx,html,css,json,md}'",
         "prettier-write": "prettier --write '**/*.{ts,tsx,js,jsx,html,css,json,md}'",
         "knip": "knip",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "setup:ci-env": "tsx scripts/ci-env.ts"
@@ -82,6 +84,8 @@
         "prettier-plugin-tailwindcss": "^0.6.14",
         "tailwindcss": "^3.4.17",
         "tsx": "^4.19.2",
-        "typescript": "^5.9.2"
+        "typescript": "^5.9.2",
+        "vite-tsconfig-paths": "^5",
+        "vitest": "^4.1"
     }
 }

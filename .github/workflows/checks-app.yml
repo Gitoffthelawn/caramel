@@ -24,7 +24,7 @@ jobs:
     name: ${{ matrix.task }}
     strategy:
       matrix:
-        task: ["lint", "prettier", "typecheck", "knip"]
+        task: ["lint", "prettier", "typecheck", "knip", "unit"]
     runs-on: ubuntu-latest
 
     steps:
@@ -58,6 +58,7 @@ jobs:
             prettier)  pnpm prettier-check ;;
             typecheck) pnpm tsc --noEmit ;;
             knip)      pnpm knip ;;
+            unit)      pnpm test ;;
           esac
 
   # ─────────────────────────────────────────────────────────────
