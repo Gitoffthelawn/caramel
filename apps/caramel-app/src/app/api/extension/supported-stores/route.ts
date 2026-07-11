@@ -1,19 +1,11 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { couponsSql } from '@/lib/couponsDb'
+import {
+    StoreConfigRowSchema,
+    couponsSql,
+    parseCouponRows,
+} from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
-
-type Row = {
-    store_name: string
-    show_input_xpath: string | null
-    dismiss_button_xpath: string | null
-    coupon_input_xpath: string | null
-    apply_button_xpath: string | null
-    price_container_xpath: string | null
-    success_indicator_xpath: string | null
-    error_indicator_xpath: string | null
-    coupon_remove_xpath: string | null
-}
 
 // Public read: the payload is xpath selectors already shipped to every
 // extension install (background.js), so gating it behind a key has no
@@ -27,7 +19,7 @@ export async function GET(req: NextRequest) {
     try {
         // One row per store, highest-priority active config that has xpath
         // selectors (excludes API-only configs which the extension can't use).
-        const rows = (await couponsSql`
+        const rawRows = await couponsSql`
             SELECT DISTINCT ON (s.store_name)
                 s.store_name,
                 cfg.show_input_xpath,
@@ -57,7 +49,12 @@ export async function GET(req: NextRequest) {
               -- when it observes that selectors don't render at entry_url.
               AND COALESCE(cfg.metadata->>'extension_compatible', 'true') <> 'false'
             ORDER BY s.store_name, cfg.priority DESC, cfg.updated_at DESC
-        `) as Row[]
+        `
+        const rows = parseCouponRows(
+            StoreConfigRowSchema,
+            rawRows,
+            'extension.supported-stores',
+        )
 
         const supported = rows.map(r => ({
             domain: r.store_name,

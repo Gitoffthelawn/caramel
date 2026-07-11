@@ -1,6 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { nextApiResponse } from '@/lib/apiResponseNext'
-import { couponsSql } from '@/lib/couponsDb'
+import { SourceRowSchema, couponsSql, parseCouponRows } from '@/lib/couponsDb'
 import {
     checkRateLimit,
     forbiddenOrigin,
@@ -22,17 +22,7 @@ export async function GET(req: NextRequest) {
     if (limited) return limited
 
     try {
-        const rows = await couponsSql<
-            Array<{
-                id: string
-                source: string
-                websites: string[]
-                status: string
-                total_coupons: number
-                total_used: number
-                total_expired: number
-            }>
-        >`
+        const rawRows = await couponsSql`
             SELECT
                 s.id,
                 s.source,
@@ -46,6 +36,7 @@ export async function GET(req: NextRequest) {
             WHERE s.status = 'ACTIVE'
             GROUP BY s.id, s.source, s.websites, s.status
         `
+        const rows = parseCouponRows(SourceRowSchema, rawRows, 'sources.list')
 
         const sourcesWithMetrics: SourceMetrics[] = rows
             .map(r => {

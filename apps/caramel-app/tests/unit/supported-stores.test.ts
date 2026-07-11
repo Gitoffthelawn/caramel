@@ -8,12 +8,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // public read route. A stale x-api-key header from a pre-F-003 extension
 // build is simply ignored — no cutover required (see PLAN-F-003.md §Breaking).
 
-vi.mock('@/lib/couponsDb', () => ({
-    couponsSql: (_strings: TemplateStringsArray, ..._values: unknown[]) => ({
-        // oxlint-disable-next-line no-thenable
-        then: (resolve: (rows: unknown[]) => void) => resolve([]),
-    }),
-}))
+// F-001 — re-export the REAL schemas/parseCouponRows via importActual and
+// only replace couponsSql itself: the route now imports parseCouponRows +
+// StoreConfigRowSchema from this module too, and a factory that provided
+// just `{ couponsSql }` would leave those undefined (TypeError before the
+// SQL mock is ever reached). An empty-array result parses through the real
+// schema trivially, so this stays a true characterization of unchanged
+// behavior.
+vi.mock('@/lib/couponsDb', async () => {
+    const actual =
+        await vi.importActual<typeof import('@/lib/couponsDb')>(
+            '@/lib/couponsDb',
+        )
+    return {
+        ...actual,
+        couponsSql: (
+            _strings: TemplateStringsArray,
+            ..._values: unknown[]
+        ) => ({
+            // oxlint-disable-next-line no-thenable
+            then: (resolve: (rows: unknown[]) => void) => resolve([]),
+        }),
+    }
+})
 
 const { checkRateLimitMock } = vi.hoisted(() => ({
     checkRateLimitMock: vi.fn(async () => null as NextResponse | null),

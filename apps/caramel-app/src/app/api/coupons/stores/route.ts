@@ -1,5 +1,5 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { couponsSql } from '@/lib/couponsDb'
+import { SiteRowSchema, couponsSql, parseCouponRows } from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -13,20 +13,21 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Math.max(rawLimit, 1), 50)
 
     try {
-        const rows = q
-            ? await couponsSql<Array<{ site: string }>>`
+        const rawRows = q
+            ? await couponsSql`
                   SELECT DISTINCT site FROM coupons
                   WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE
                     AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
                   ORDER BY site ASC
                   LIMIT ${limit}
               `
-            : await couponsSql<Array<{ site: string }>>`
+            : await couponsSql`
                   SELECT DISTINCT site FROM coupons
                   WHERE status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE
                   ORDER BY site ASC
                   LIMIT ${limit}
               `
+        const rows = parseCouponRows(SiteRowSchema, rawRows, 'coupons.stores')
 
         const sites = rows.map(s => s.site).filter(Boolean)
 

@@ -1,5 +1,10 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { couponsSql } from '@/lib/couponsDb'
+import {
+    CouponListRowSchema,
+    TotalCountRowSchema,
+    couponsSql,
+    parseCouponRows,
+} from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -89,7 +94,7 @@ export async function GET(req: NextRequest) {
 
         const skip = Math.max(0, (page - 1) * limit)
 
-        const [coupons, totalRow] = await Promise.all([
+        const [rawCoupons, rawTotalRow] = await Promise.all([
             couponsSql`
                 SELECT id, code, site, title, description, rating,
                        discount_type, discount_amount, expiry, expired,
@@ -102,8 +107,18 @@ export async function GET(req: NextRequest) {
             `,
             couponsSql`SELECT COUNT(*)::int AS total FROM coupons WHERE ${whereClause}`,
         ])
+        const coupons = parseCouponRows(
+            CouponListRowSchema,
+            rawCoupons,
+            'coupons.list',
+        )
+        const totalRow = parseCouponRows(
+            TotalCountRowSchema,
+            rawTotalRow,
+            'coupons.count',
+        )
 
-        const total = (totalRow[0] as { total: number } | undefined)?.total ?? 0
+        const total = totalRow[0]?.total ?? 0
         const hasMore = skip + coupons.length < total
 
         // 60s edge cache with a 60s grace window. Coupons change on a

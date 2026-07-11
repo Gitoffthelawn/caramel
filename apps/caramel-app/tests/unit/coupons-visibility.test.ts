@@ -18,17 +18,32 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // (`whereClause`) as a value inside later calls.
 const calls: string[] = []
 
-vi.mock('@/lib/couponsDb', () => ({
-    couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-        calls.push(strings.join('?'))
-        // Deliberate thenable mock — replicates the shape `postgres` tagged
-        // templates return so `await couponsSql\`...\`` resolves in the
-        // routes under test. The property MUST be named `then` for that to
-        // work.
-        // oxlint-disable-next-line no-thenable
-        return { then: (resolve: (rows: unknown[]) => void) => resolve([]) }
-    },
-}))
+// F-001 — re-export the REAL schemas/parseCouponRows via importActual and
+// only replace couponsSql itself: the routes under test now import
+// parseCouponRows + the row schemas from this module too, and a factory
+// that provided just `{ couponsSql }` would leave those undefined,
+// breaking every route with a TypeError before it ever reaches its SQL
+// mock (parseCouponRows is not a function). An empty-array result parses
+// through any of the real schemas trivially, so this stays a true
+// characterization of unchanged behavior.
+vi.mock('@/lib/couponsDb', async () => {
+    const actual =
+        await vi.importActual<typeof import('@/lib/couponsDb')>(
+            '@/lib/couponsDb',
+        )
+    return {
+        ...actual,
+        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
+            calls.push(strings.join('?'))
+            // Deliberate thenable mock — replicates the shape `postgres`
+            // tagged templates return so `await couponsSql\`...\`` resolves
+            // in the routes under test. The property MUST be named `then`
+            // for that to work.
+            // oxlint-disable-next-line no-thenable
+            return { then: (resolve: (rows: unknown[]) => void) => resolve([]) }
+        },
+    }
+})
 
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,

@@ -1,5 +1,10 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
-import { couponsSql } from '@/lib/couponsDb'
+import {
+    DiscountTypeRowSchema,
+    SiteRowSchema,
+    couponsSql,
+    parseCouponRows,
+} from '@/lib/couponsDb'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -14,9 +19,9 @@ export async function GET(req: NextRequest) {
     const sitesLimit = Math.min(Math.max(rawLimit, 0), 100)
 
     try {
-        const sitesPromise: Promise<Array<{ site: string }>> =
+        const sitesPromise =
             includeSites && sitesLimit > 0
-                ? couponsSql<Array<{ site: string }>>`
+                ? couponsSql`
                       SELECT DISTINCT site FROM coupons
                       WHERE status = 'valid' AND expired = FALSE AND site IS NOT NULL
                       ORDER BY site ASC
@@ -24,19 +29,29 @@ export async function GET(req: NextRequest) {
                   `
                 : Promise.resolve([])
 
-        const typesPromise = couponsSql<Array<{ discount_type: string }>>`
+        const typesPromise = couponsSql`
             SELECT DISTINCT discount_type FROM coupons
             WHERE status = 'valid' AND expired = FALSE AND discount_type IS NOT NULL
         `
 
-        const [sitesRaw, discountTypesRaw] = await Promise.all([
+        const [rawSites, rawDiscountTypes] = await Promise.all([
             sitesPromise,
             typesPromise,
         ])
+        const sitesRaw = parseCouponRows(
+            SiteRowSchema,
+            rawSites,
+            'coupons.filters.sites',
+        )
+        const discountTypesRaw = parseCouponRows(
+            DiscountTypeRowSchema,
+            rawDiscountTypes,
+            'coupons.filters.types',
+        )
 
         const sites = sitesRaw
             .map(s => s.site)
-            .filter(Boolean)
+            .filter((site): site is string => Boolean(site))
             .sort((a, b) => a.localeCompare(b))
         const discountTypes = Array.from(
             new Set(discountTypesRaw.map(d => d.discount_type).filter(Boolean)),

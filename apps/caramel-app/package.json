@@ -22,7 +22,8 @@
         "test:watch": "vitest",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
-        "setup:ci-env": "tsx scripts/ci-env.ts"
+        "setup:ci-env": "tsx scripts/ci-env.ts",
+        "check:coupons-schema": "tsx scripts/check-coupons-schema.ts"
     },
     "dependencies": {
         "@better-auth/prisma-adapter": "^1.5.3",
