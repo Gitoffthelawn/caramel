@@ -68,7 +68,7 @@ This isn't a boot failure: `COUPONS_DATABASE_URL` only has to be a non-empty str
 
 Container-internal hostnames: `postgres`, `redis`.
 
-**Note:** `caramel` is the role Docker Compose actually creates (`POSTGRES_USER: caramel` in `docker-compose.yml`). The `DATABASE_URL`/`COUPONS_DATABASE_URL` placeholders shipped in `apps/caramel-app/.env.example` use `postgres:postgres` instead, which isn't a role that exists here and fails authentication (`P1000`) — see the root README's secrets table for the corrected value.
+**Note:** `caramel` is the role Docker Compose actually creates (`POSTGRES_USER: caramel` in `docker-compose.yml`), and it is exactly what `apps/caramel-app/.env.example` ships in `DATABASE_URL`/`COUPONS_DATABASE_URL` — copy them as-is.
 
 ## Migrations
 
