@@ -6,7 +6,7 @@ import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import debounce from 'lodash.debounce'
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { FaFilter } from 'react-icons/fa'
-import Select from 'react-select'
+import Select, { type StylesConfig } from 'react-select'
 import AsyncSelect from 'react-select/async'
 
 interface CouponFiltersProps {
@@ -87,9 +87,9 @@ export default function CouponFilters({
             ? normalizeOptions([filters.type])[0]
             : null
 
-    const selectStyles = useMemo(
+    const selectStyles: StylesConfig<Option, false> = useMemo(
         () => ({
-            control: (base: any, state: any) => ({
+            control: (base, state) => ({
                 ...base,
                 borderColor: state.isFocused
                     ? isDarkMode
@@ -103,12 +103,12 @@ export default function CouponFilters({
                 backgroundColor: isDarkMode ? '#111827' : '#ffffff',
                 width: '100%',
             }),
-            menu: (base: any) => ({
+            menu: base => ({
                 ...base,
                 zIndex: 20,
                 backgroundColor: isDarkMode ? '#111827' : '#ffffff',
             }),
-            option: (base: any, state: any) => ({
+            option: (base, state) => ({
                 ...base,
                 backgroundColor: state.isFocused
                     ? isDarkMode
@@ -120,15 +120,15 @@ export default function CouponFilters({
                 color: isDarkMode ? '#ffffff' : '#111827',
                 cursor: 'pointer',
             }),
-            singleValue: (base: any) => ({
+            singleValue: base => ({
                 ...base,
                 color: isDarkMode ? '#ffffff' : '#111827',
             }),
-            input: (base: any) => ({
+            input: base => ({
                 ...base,
                 color: isDarkMode ? '#ffffff' : '#111827',
             }),
-            placeholder: (base: any) => ({
+            placeholder: base => ({
                 ...base,
                 color: isDarkMode ? '#6b7280' : '#9ca3af',
             }),

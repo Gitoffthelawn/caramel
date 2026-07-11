@@ -12,6 +12,12 @@ import { z } from 'zod'
 
 const OAUTH_STATE_SECRET = env.EXTENSION_OAUTH_STATE_SECRET
 
+interface OAuthStatePayload {
+    provider: string
+    redirectUri: string
+    iat: number
+}
+
 function verifySignedState(
     state: string,
     expected: { provider: 'google' | 'apple'; redirectUri: string },
@@ -46,7 +52,7 @@ function verifySignedState(
         return false
     }
 
-    let payload: any
+    let payload: OAuthStatePayload
     try {
         payload = JSON.parse(payloadJson)
     } catch {

@@ -35,4 +35,17 @@ export default [
             '@next/next/no-html-link-for-pages': 'off',
         },
     },
+    {
+        // F-013 — `any` erases types at exported boundaries for every
+        // caller; ban it repo-wide now that the census is clean. Scoped to
+        // `**/*.ts`/`**/*.tsx` (not global) to match the `files` glob
+        // `eslint-config-next` itself uses to register the
+        // `@typescript-eslint` plugin — a global (unscoped) rule entry
+        // would make ESLint look for that plugin on `.js`/`.mjs` files too,
+        // where nothing registers it.
+        files: ['**/*.ts', '**/*.tsx'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'error',
+        },
+    },
 ]

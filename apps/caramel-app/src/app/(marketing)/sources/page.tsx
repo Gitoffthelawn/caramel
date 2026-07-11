@@ -17,12 +17,18 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
+// numberOfCoupons/successRate are `number` — matches SourceMetrics in
+// app/api/sources/route.ts (the only producer of this shape). Previously
+// declared `string` here despite the server always sending numbers; the
+// mismatch was masked by `parseInt/parseFloat(x as any)`, which round-trips
+// an already-numeric value unchanged (String() then re-parse). Correcting
+// the type here removes the dead casts below with no behavior change.
 interface Source {
     id: string
     source: string
     websites: string[]
-    numberOfCoupons: string
-    successRate: string
+    numberOfCoupons: number
+    successRate: number
 }
 
 export default function SourcesPage() {
@@ -103,8 +109,8 @@ export default function SourcesPage() {
 
     const chartData = filteredSources.map(src => ({
         name: src.source,
-        coupons: parseInt(src.numberOfCoupons as any, 10),
-        successRate: parseFloat(src.successRate as any),
+        coupons: src.numberOfCoupons,
+        successRate: src.successRate,
     }))
 
     return (
@@ -236,10 +242,7 @@ export default function SourcesPage() {
                                                 {src.websites.join(', ')}
                                             </td>
                                             <td className="px-4 py-2">
-                                                {parseInt(
-                                                    src.numberOfCoupons as any,
-                                                    10,
-                                                )}
+                                                {src.numberOfCoupons}
                                             </td>
                                             <td className="px-4 py-2">
                                                 {src.successRate}%

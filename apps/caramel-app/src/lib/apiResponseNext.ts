@@ -34,14 +34,21 @@ export function nextApiResponse(
     req: NextRequest,
     statusCode: number,
     message?: string,
-    data: any = null,
-    error: any = null,
+    data: unknown = null,
+    error: unknown = null,
 ) {
     const payload = {
         status: statusCode >= 400 ? 'error' : 'success',
         ...(message && { message }),
-        ...(data && { data }),
-        ...(error && { error }),
+        // `data ? {data} : {}` (not `data && {data}`) — spreading a
+        // possibly-`unknown` value fails tsc (TS2698 "Spread types may
+        // only be created from object types"); the ternary keeps every
+        // branch an object type while staying runtime-identical to the
+        // old truthy-spread idiom (object spread of any falsy primitive
+        // — 0, '', false, null, undefined, NaN — contributes zero
+        // properties either way; pinned in apiResponseNext.test.ts).
+        ...(data ? { data } : {}),
+        ...(error ? { error } : {}),
     }
 
     if (env.API_ENCRYPTION_ENABLED !== 'true') {
