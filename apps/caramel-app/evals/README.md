@@ -12,16 +12,17 @@ See `audit/plans/PLAN-F-012.md` for the full plan and
 
 ## Current status (read this first)
 
-The eval infrastructure (this suite, the scorers, the CI workflow) is
-complete and green on everything it controls. The **live baseline is
-currently RED** (5.0% primary-match, threshold is 85%) — root-caused to a
-pre-existing bug in `cartClassifier.ts` (`maxTokens: 120` starves
-`openai/gpt-5-mini`'s reasoning tokens, so most calls return an empty
-response) that is out of scope for F-012 to fix
-(`PLAN-F-012.md` §Scope: "Prompt/enum/cache/classifyCart UNCHANGED"). Full
-evidence and the fix recommendation are in `SCOREBOARD.md`. This is the
-gate doing its job — it caught a real, previously-undetected production
-bug on its first run.
+**Live baseline: GREEN** — 97.5% primary-match (39/40), schema-valid
+100%, p95 latency 5965ms, green ×2 on the shipped configuration.
+
+The suite's very first run (F-012) came back RED at 5.0% — it caught a
+real, previously-invisible production bug on day one: `classifyCart()`'s
+`maxTokens: 120` starved `openai/gpt-5-mini`'s hidden reasoning tokens,
+so ~95% of live calls returned an empty response. That finding was
+promoted to **F-017** and fixed by empirically resizing the budget to
+`maxTokens: 600`, using this suite as the measurement harness. Both the
+red baseline row and the candidate-sizing table live in `SCOREBOARD.md`
+as the permanent before/after record.
 
 ## What's here
 

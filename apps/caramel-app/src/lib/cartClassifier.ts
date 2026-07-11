@@ -202,7 +202,20 @@ export async function classifyCart(
     try {
         raw = await chat(messages, {
             responseFormat: 'json_object',
-            maxTokens: 120,
+            // F-017: 600, not the original 120 — the default model
+            // (openai/gpt-5-mini) is a REASONING model whose hidden
+            // reasoning tokens count against max_tokens; at 120 nearly
+            // every call spent the whole budget reasoning and truncated
+            // (finish_reason "length") with content:null before emitting
+            // any visible JSON -> "empty response" on ~95% of live calls.
+            // Sized empirically against the eval suite (see
+            // evals/SCOREBOARD.md, 2026-07-11): observed completion max
+            // 316 tokens (256 reasoning + the JSON answer), so 600 is ~2x
+            // headroom; measured cost is identical to a 400 cap (the
+            // model stops naturally under both) and p95 latency 5965ms
+            // fits timeoutMs below with margin. Change this only through
+            // another eval-gated run (evals/README.md §Codify).
+            maxTokens: 600,
             temperature: 0,
             timeoutMs: 7000,
         })
