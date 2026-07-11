@@ -53,7 +53,41 @@
             }
         ]
     },
-    "stage": "3 fixing (stage 2 complete: 15/15 plans approved)",
+    "stage": "3 COMPLETE — awaiting Fable end-review + Stage 4",
+    "stage3": {
+        "status": "complete",
+        "fix_branch_head": "145fb10",
+        "pr": "https://github.com/DevinoSolutions/caramel/pull/111 (final body published; never merged by agents)",
+        "findings_fixed": 16,
+        "commits": 19,
+        "commit_map": "audit/findings-post-fix.json (per-finding commits, corrections, statuses)",
+        "new_finding_fixed_in_train": "F-017 (eval-caught maxTokens starvation; micro-plan PLAN-F-017.md; self-approved under gate collapse — rationale logged in stage3-results)",
+        "amendments": {
+            "by_lead": [
+                "19b91ef (F-005 template ?schema=)",
+                "0a806fd (F-005 credentials)",
+                "12d675f (F-008 e2e inventory)",
+                "145fb10 (F-010 LOCAL-DEV consistency)"
+            ],
+            "by_resumed_executor": [
+                "e947a1d (F-006 generator prettier fixed-point)"
+            ]
+        },
+        "suite": "0 -> 305 unit tests green + 40-case eval suite (97.5%) + Playwright e2e 88/1-pre-existing",
+        "empirical_after": {
+            "3am": "11/14 closed, 3 partial, 0 open (audit/empirical-3am-after.md, lead-corrected AM-11)",
+            "onboarding": "PASS - 0 tribal, 12/12 checked gaps covered (audit/empirical-onboarding-after.md, lead-corrected 4 rows)",
+            "navigation": "behaviors 2/5 -> 3/5, functions 10/10 (audit/empirical-navigation-after.md)",
+            "change_trace": "9/3/1 -> 9/4/3 (audit/empirical-change-trace-after.md)"
+        },
+        "e2e_validation": "7/7 PASS (audit/e2e-validation.md) — pages, honest-failure UX, 8 API behaviors, extension in real Chromium, prod read-only disambiguation (coupons DB fine; OPENROUTER_API_KEY genuinely missing in prod)",
+        "ci": "all quality legs green; only reds = pre-existing extension-smoke drift (NF-03) + by-design ai-evals missing-secret leg",
+        "human_handoffs": "PR #111 body §Human handoffs (secrets x3, branch protection, extension release, CORS pre-ship gate, RUNBOOK TODOs, TEMP trigger revert)",
+        "haiku_corrections_by_lead": [
+            "3am AM-11 (restated before-state)",
+            "onboarding OB-3/OB-5/OB-11/OB-14 (line-evidence corrections inline)"
+        ]
+    },
     "stage2": {
         "planners": 14,
         "plans_written": 15,
