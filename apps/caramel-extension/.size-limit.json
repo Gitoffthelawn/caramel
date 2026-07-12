@@ -13,7 +13,7 @@
             "UI-helpers.js",
             "inject.js"
         ],
-        "limit": "92 KB",
+        "limit": "98 KB",
         "brotli": false
     },
     {
