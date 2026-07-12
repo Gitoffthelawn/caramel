@@ -28,6 +28,18 @@ export const GET = withRoute(
     { method: 'GET', routeName: 'sources', rateLimit: 'read' },
     async ({ req }) => {
         try {
+            // coupons has no source_id column — never did (verified against
+            // the live coupons DB schema: `\d coupons`). This route 500'd on
+            // every call. sources doesn't own its own coupon-aggregate
+            // columns either (only id/source/websites/status/created_at/
+            // updated_at — verified via `\d sources`), and there is no FK
+            // between the two tables. The one real, schema-grounded
+            // relationship is sources.websites[] (the domains a source
+            // covers, populated out-of-band once a REQUESTED source is
+            // approved — POST below inserts it empty) against coupons.site
+            // (each coupon's own domain) — an array-membership join, not a
+            // scalar FK. A source with an empty/no-match websites[] simply,
+            // correctly, aggregates to zero.
             const rawRows = await couponsSql`
             SELECT
                 s.id,
@@ -38,7 +50,7 @@ export const GET = withRoute(
                 COALESCE(SUM(c.times_used), 0)::int AS total_used,
                 COALESCE(SUM(CASE WHEN c.expired THEN 1 ELSE 0 END), 0)::int AS total_expired
             FROM sources s
-            LEFT JOIN coupons c ON c.source_id = s.id
+            LEFT JOIN coupons c ON c.site = ANY(s.websites)
             WHERE s.status = 'ACTIVE'
             GROUP BY s.id, s.source, s.websites, s.status
         `

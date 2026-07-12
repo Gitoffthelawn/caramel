@@ -28,6 +28,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // embedded as values inside a later real query, never awaited directly.
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
+// Raw SQL text of every couponsSql call this test run made, in order —
+// lets a test assert on the QUERY SHAPE itself (e.g. "does this route still
+// reference a column that doesn't exist"), which the rule-based row mocking
+// above can't: rules only ever match `sql`, never expose it to the test.
+let capturedQueries: string[] = []
 
 function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
@@ -42,6 +47,7 @@ vi.mock('@/lib/couponsDb', async () => {
         ...actual,
         couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
             const sql = strings.join('?')
+            capturedQueries.push(sql)
             const rows = rules.find(r => r.match(sql))?.rows ?? []
             return {
                 // oxlint-disable-next-line no-thenable
@@ -70,6 +76,7 @@ vi.mock('@sentry/nextjs', () => ({
 
 beforeEach(() => {
     rules = []
+    capturedQueries = []
     captureExceptionMock.mockClear()
 })
 
@@ -264,6 +271,29 @@ describe('GET /api/sources (SourceRow)', () => {
                 status: 'ACTIVE',
             },
         ])
+    })
+
+    // Regression pin: coupons.source_id has never existed in the real
+    // coupons DB (verified against the live schema — `\d coupons` has no
+    // such column), so this route 500'd on every call in production. The
+    // rule-based row mock above can't catch a bad JOIN column by itself
+    // (it never runs real SQL), so this test inspects the literal query
+    // text instead. The real, schema-verified relationship is
+    // sources.websites[] (the domains a source covers) against
+    // coupons.site (each coupon's own domain) — sources owns no
+    // source_id/coupon-count columns of its own either (only
+    // id/source/websites/status/created_at/updated_at).
+    it('joins coupons via the real schema (site ∈ websites[]) — never the phantom coupons.source_id column', async () => {
+        mockRows(sql => sql.includes('FROM sources'), [])
+
+        await sourcesGET(new NextRequest('http://localhost/api/sources'))
+
+        const sourcesQuery = capturedQueries.find(q =>
+            q.includes('FROM sources'),
+        )
+        expect(sourcesQuery).toBeDefined()
+        expect(sourcesQuery).not.toMatch(/source_id/)
+        expect(sourcesQuery).toMatch(/ANY\(s\.websites\)/)
     })
 })
 

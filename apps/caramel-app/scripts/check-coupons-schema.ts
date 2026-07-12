@@ -39,8 +39,11 @@ export const EXPECTED_COLUMNS: Record<string, string[]> = {
         'status',
         'verification_message',
         'created_at',
-        'source_id',
     ],
+    // websites is load-bearing: sources/route.ts's GET joins
+    // `coupons c ON c.site = ANY(s.websites)` — the real relationship
+    // (sources has no source_id/coupon-count columns of its own; coupons
+    // has no source_id at all).
     sources: ['id', 'source', 'websites', 'status'],
     store_verification_configs: [
         'store_id',
