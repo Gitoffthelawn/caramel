@@ -2,8 +2,19 @@
 //
 // Read-only connection to the `caramel_coupons` database owned by the
 // Python verification service. All mutations to the coupon catalog flow
-// through that service — Next.js only reads (plus two narrow mutations:
-// usage-increment and expire, both exposed to the extension).
+// through that service — Next.js only reads (plus three narrow mutations,
+// all in src/lib/couponsRepo.ts: usage-increment and expire, both exposed
+// to the extension, and inserting a REQUESTED `sources` row from the
+// public "request a store" form). The Python service owns everything else
+// and must treat those specific columns as co-written — never clobber
+// `times_used`/`last_time_used`, honor `expired`/`expiry` once set. See
+// DESIGN.md §2 "Write-ownership" for the full coordination contract.
+//
+// This file owns the boundary primitives only: the connection, the SQL
+// fragment factories below, and the zod row schemas + parseCouponRows().
+// The actual query text (13 read/write fns) and the structural drift-gate
+// registry live in src/lib/couponsRepo.ts, built on these primitives —
+// routes import from couponsRepo, never call couponsSql directly.
 import { VISIBLE_COUPON_STATUSES } from '@/lib/coupons'
 import { env } from '@/lib/env'
 import postgres from 'postgres'
@@ -141,6 +152,8 @@ export const CouponListRowSchema = z.object({
     status: z.string(),
     verificationMessage: z.string().nullable(),
 })
+export type CouponListRow = z.infer<typeof CouponListRowSchema>
+
 /** `SELECT COUNT(*)::int AS total` — coupons/route.ts + [store]/page.tsx. */
 export const TotalCountRowSchema = z.object({
     total: z.number(),
@@ -151,22 +164,26 @@ export const StatsRowSchema = z.object({
     total: z.number(),
     expired: z.number(),
 })
+export type StatsRow = z.infer<typeof StatsRowSchema>
 
 /** Bare `{site}` rows — stores/, filters/ (sites half), search-supported/. */
 export const SiteRowSchema = z.object({
     site: z.string().nullable(),
 })
+export type SiteRow = z.infer<typeof SiteRowSchema>
 
 /** top-sites/route.ts — site grouped with its `::int`-cast coupon count. */
 export const SiteCountRowSchema = z.object({
     site: z.string().nullable(),
     coupon_count: z.number(),
 })
+export type SiteCountRow = z.infer<typeof SiteCountRowSchema>
 
 /** filters/route.ts's types half (`discount_type IS NOT NULL` in the WHERE). */
 export const DiscountTypeRowSchema = z.object({
     discount_type: z.string(),
 })
+export type DiscountTypeRow = z.infer<typeof DiscountTypeRowSchema>
 
 /** sources/route.ts GET — sources LEFT JOIN coupons, aggregated per source. */
 export const SourceRowSchema = z.object({
@@ -178,6 +195,7 @@ export const SourceRowSchema = z.object({
     total_used: z.number(),
     total_expired: z.number(),
 })
+export type SourceRow = z.infer<typeof SourceRowSchema>
 
 /** extension/supported-stores/route.ts — all 8 xpath fields are nullable at
  * the schema level even though that query's WHERE requires 5 of them
@@ -195,6 +213,7 @@ export const StoreConfigRowSchema = z.object({
     error_indicator_xpath: z.string().nullable(),
     coupon_remove_xpath: z.string().nullable(),
 })
+export type StoreConfigRow = z.infer<typeof StoreConfigRowSchema>
 
 /**
  * Parse raw couponsSql rows through `schema`, throwing loudly on the first

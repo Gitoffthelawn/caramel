@@ -51,7 +51,13 @@ See the root [README.md](../README.md)'s **Getting Started** for how to create `
 | `caramel` (auth_db)            | This repo                            | Yes                            | `prisma migrate` (`apps/caramel-app/prisma/migrations`)                                 |
 | `caramel_coupons` (coupons_db) | External Python verification service | **No**                         | Not this repo's concern — read-only from here (`apps/caramel-app/src/lib/couponsDb.ts`) |
 
-**`caramel_coupons` does not exist in local dev.** Nothing in this repo creates it — that's a real gap for anyone running fully offline, not a bug to paper over here (seeding a fake one would be a behavior change, out of this doc's scope). If you need real coupon data locally, ask whoever runs the Python verification service for a dump or a tunnel to a shared instance.
+**`caramel_coupons` does not exist in local dev by default.** Nothing the public `pnpm compose` provisions creates it — that's the expected, honest state for anyone without coupons-DB access, not a bug to paper over here (seeding a fake one would be a behavior change, out of this doc's scope). If you have real access (a reachable read replica or tunnel — never prod's primary directly), set `COUPONS_SOURCE_URL` in your gitignored `apps/caramel-app/.env` and run:
+
+```bash
+pnpm --filter caramel-app coupons:clone-local
+```
+
+This `pg_dump`s `COUPONS_SOURCE_URL` into a local `caramel_coupons` on the same compose Postgres (`scripts/internal/clone-coupons-local.sh`, itself gitignored and env-driven — no schema/DDL/secret hardcoded in it, per DESIGN.md's secrecy forward-rule). Re-run it any time to refresh. Without `COUPONS_SOURCE_URL` access, stay in the degraded mode below — that's the correct state, not something to work around.
 
 Following the documented setup verbatim, expect this **honest degraded mode**, not an error in your setup:
 

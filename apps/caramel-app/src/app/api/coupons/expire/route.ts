@@ -1,6 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import { couponsSql } from '@/lib/couponsDb'
+import { expireCoupons } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -51,15 +51,8 @@ export const POST = withRoute(
         }
 
         try {
-            const rows = await couponsSql`
-            UPDATE coupons
-            SET expired = TRUE,
-                expiry = NOW()::text,
-                updated_at = NOW()
-            WHERE id = ANY(${clean}) AND expired = FALSE
-            RETURNING id
-        `
-            return NextResponse.json({ count: rows.length })
+            const count = await expireCoupons(clean)
+            return NextResponse.json({ count })
         } catch (error) {
             console.error('Error expiring coupons:', error)
             return handleRouteError(error, {

@@ -1,36 +1,19 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import {
-    StatsRowSchema,
-    couponsSql,
-    parseCouponRows,
-    verifiedCensusSql,
-} from '@/lib/couponsDb'
+import { getCouponStats } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 
 export const GET = withRoute(
     { method: 'GET', routeName: 'coupons/stats', rateLimit: 'read' },
     async ({ req }) => {
         try {
-            const rawRows = await couponsSql`
-            SELECT
-                COUNT(*)::int AS total,
-                COUNT(*) FILTER (WHERE expired = TRUE)::int AS expired
-            FROM coupons
-            WHERE ${verifiedCensusSql()}
-        `
-            const rows = parseCouponRows(
-                StatsRowSchema,
-                rawRows,
-                'coupons.stats',
-            )
-            const row = rows[0] ?? { total: 0, expired: 0 }
+            const { total, expired } = await getCouponStats()
 
             return NextResponse.json(
                 {
-                    total: row.total,
-                    expired: row.expired,
-                    active: row.total - row.expired,
+                    total,
+                    expired,
+                    active: total - expired,
                 },
                 {
                     headers: {

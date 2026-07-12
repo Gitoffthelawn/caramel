@@ -1,12 +1,5 @@
 import CouponsSection from '@/components/coupons/coupons-section'
-import {
-    CouponListRowSchema,
-    TotalCountRowSchema,
-    couponsSql,
-    parseCouponRows,
-    rankingOrderSql,
-    visibleCouponsWhere,
-} from '@/lib/couponsDb'
+import { listStoreCoupons } from '@/lib/couponsRepo'
 import { BASE_URL } from '@/lib/env.client'
 import type { Coupon } from '@/types/coupon'
 import type { Metadata } from 'next'
@@ -48,28 +41,6 @@ async function fetchStoreCoupons(storeParam: string) {
         return { coupons: [] as Coupon[], total: 0, base: storeParam }
     }
 
-    // Match /api/coupons: same visibility predicate, so SSR HTML and the
-    // client fetch agree (no hydration flash) — see lib/coupons.ts's
-    // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
-    const VISIBLE_STATUSES = visibleCouponsWhere()
-    const [rawCoupons, rawTotalRow] = await Promise.all([
-        couponsSql`
-            SELECT id, code, site, title, description, rating,
-                   discount_type, discount_amount, expiry, expired,
-                   times_used AS "timesUsed",
-                   status, verification_message AS "verificationMessage"
-            FROM coupons
-            WHERE ${VISIBLE_STATUSES}
-              AND (site = ${base} OR site LIKE ${'%.' + base})
-            ORDER BY ${rankingOrderSql()}
-            LIMIT ${PAGE_SIZE}
-        `,
-        couponsSql`
-            SELECT COUNT(*)::int AS total FROM coupons
-            WHERE ${VISIBLE_STATUSES}
-              AND (site = ${base} OR site LIKE ${'%.' + base})
-        `,
-    ])
     // parseCouponRows's output (CouponListRow) is a strict superset of
     // Coupon's shape except status/verificationMessage, which it types
     // wider (plain string / string|null vs. Coupon's optional narrower
@@ -77,19 +48,8 @@ async function fetchStoreCoupons(storeParam: string) {
     // boundary doesn't need updating every time the Python producer adds a
     // status value. The data is already runtime-validated at this point;
     // the cast just reconciles the two independently-declared TS shapes.
-    const coupons = parseCouponRows(
-        CouponListRowSchema,
-        rawCoupons,
-        'store-page.coupons',
-    ) as Coupon[]
-    const totalRow = parseCouponRows(
-        TotalCountRowSchema,
-        rawTotalRow,
-        'store-page.count',
-    )
-
-    const total = totalRow[0]?.total ?? 0
-    return { coupons, total, base }
+    const { coupons, total } = await listStoreCoupons(base, PAGE_SIZE)
+    return { coupons: coupons as Coupon[], total, base }
 }
 
 export async function generateMetadata({

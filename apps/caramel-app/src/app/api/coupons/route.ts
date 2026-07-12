@@ -1,13 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import {
-    CouponListRowSchema,
-    TotalCountRowSchema,
-    couponsSql,
-    parseCouponRows,
-    rankingOrderSql,
-    visibleCouponsWhere,
-} from '@/lib/couponsDb'
+import { listCoupons } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 
 function getBaseDomain(raw: string): string | null {
@@ -46,79 +39,30 @@ export const GET = withRoute(
         const keyWords =
             (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
+        let baseSite: string | undefined
+        if (site) {
+            const base = getBaseDomain(site)
+            if (!base) {
+                return NextResponse.json(
+                    { error: 'Invalid site parameter' },
+                    { status: 400 },
+                )
+            }
+            baseSite = base
+        }
+
         try {
-            // Visible-status predicate (verified, restriction-tagged, and
-            // not-yet-verified coupons) — see lib/coupons.ts's
-            // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
-            const conditions = [visibleCouponsWhere()]
-
-            if (site) {
-                const base = getBaseDomain(site)
-                if (!base) {
-                    return NextResponse.json(
-                        { error: 'Invalid site parameter' },
-                        { status: 400 },
-                    )
-                }
-                conditions.push(
-                    couponsSql`(site = ${base} OR site LIKE ${'%.' + base})`,
-                )
-            }
-
-            if (search) {
-                const s = `%${search}%`
-                conditions.push(
-                    couponsSql`(site ILIKE ${s} OR title ILIKE ${s} OR description ILIKE ${s} OR code ILIKE ${s})`,
-                )
-            }
-
-            if (keyWords) {
-                const patterns = keyWords
-                    .split(',')
-                    .map(k => `%${k.trim()}%`)
-                    .filter(k => k.length > 2)
-                if (patterns.length > 0) {
-                    conditions.push(
-                        couponsSql`description ILIKE ANY(${patterns})`,
-                    )
-                }
-            }
-
-            if (type && type !== 'all') {
-                conditions.push(couponsSql`discount_type = ${type}`)
-            }
-
-            const whereClause = conditions.reduce(
-                (acc, cond) => couponsSql`${acc} AND ${cond}`,
-            )
-
             const skip = Math.max(0, (page - 1) * limit)
 
-            const [rawCoupons, rawTotalRow] = await Promise.all([
-                couponsSql`
-                SELECT id, code, site, title, description, rating,
-                       discount_type, discount_amount, expiry, expired,
-                       times_used AS "timesUsed",
-                       status, verification_message AS "verificationMessage"
-                FROM coupons
-                WHERE ${whereClause}
-                ORDER BY ${rankingOrderSql()}
-                LIMIT ${limit} OFFSET ${skip}
-            `,
-                couponsSql`SELECT COUNT(*)::int AS total FROM coupons WHERE ${whereClause}`,
-            ])
-            const coupons = parseCouponRows(
-                CouponListRowSchema,
-                rawCoupons,
-                'coupons.list',
-            )
-            const totalRow = parseCouponRows(
-                TotalCountRowSchema,
-                rawTotalRow,
-                'coupons.count',
-            )
+            const { coupons, total } = await listCoupons({
+                baseSite,
+                search,
+                type,
+                keyWords,
+                limit,
+                skip,
+            })
 
-            const total = totalRow[0]?.total ?? 0
             const hasMore = skip + coupons.length < total
 
             // 60s edge cache with a 60s grace window. Coupons change on a

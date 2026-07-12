@@ -1,6 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import { couponsSql } from '@/lib/couponsDb'
+import { incrementCouponUsage } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -39,23 +39,14 @@ export const POST = withRoute(
         const id = Number(idRaw)
 
         try {
-            const rows = await couponsSql`
-            UPDATE coupons
-            SET times_used = times_used + 1,
-                last_time_used = NOW(),
-                updated_at = NOW()
-            WHERE id = ${id}
-            RETURNING id, code, site,
-                      times_used AS "timesUsed",
-                      last_time_used AS "last_time_used"
-        `
-            if (rows.length === 0) {
+            const row = await incrementCouponUsage(id)
+            if (!row) {
                 return NextResponse.json(
                     { error: 'Coupon not found' },
                     { status: 404 },
                 )
             }
-            return NextResponse.json(rows[0])
+            return NextResponse.json(row)
         } catch (error) {
             console.error('Error incrementing coupon usage:', error)
             return handleRouteError(error, {

@@ -10,17 +10,17 @@ with `ls` or a repo search without knowing the doc structure first.
 
 ## System map
 
-| Component                                | What it is                                                                                                                                                                                                                                                                         | Where it lives                                           |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| **caramel-app**                          | Next.js 16 app — marketing site, web app, and the API (`grabcaramel.com`)                                                                                                                                                                                                          | `apps/caramel-app`, deployed on Dokploy                  |
-| **caramel-extension**                    | Browser extension (Chrome/Edge/Firefox/Safari) — the client that calls caramel-app's API                                                                                                                                                                                           | `apps/caramel-extension`, distributed via store review   |
-| **auth_db** (Postgres)                   | Users, sessions, Better Auth — owned and migrated by this repo (Prisma)                                                                                                                                                                                                            | `apps/caramel-app/prisma/schema.prisma`                  |
-| **coupons_db** (Postgres)                | The entire coupon catalog (`coupons`, `sources`, `verification_stores`, …) — **owned by an external Python verification service**, not this repo. caramel-app only reads it (+2 narrow mutations: usage-increment, expire) via a raw `postgres` client, never Prisma-migrated here | `apps/caramel-app/src/lib/couponsDb.ts`                  |
-| **Redis**                                | Provisioned in local-dev infra (`local-dev/docker-compose.yml`) but **not yet wired into application code** — rate limiting today is in-memory (`RateLimiterMemory`), documented as a swap-to-`RateLimiterRedis` TODO for multi-instance scale                                     | `apps/caramel-app/src/lib/rateLimit.ts`                  |
-| **Sentry** (self-hosted)                 | Error + APM tracing. `org: devino`, `project: caramel`, instance `https://sentry.devino.ca`. Production-only (`sentry.common.config.ts` — no-ops in dev/test)                                                                                                                      | `apps/caramel-app/sentry.*.config.ts`, `next.config.mjs` |
-| **OpenRouter**                           | LLM hop for the extension's cart classifier (`/api/classify-cart`)                                                                                                                                                                                                                 | `apps/caramel-app/src/lib/openrouter.ts`                 |
-| **usesend**                              | Transactional email (`usesend.devino.ca`)                                                                                                                                                                                                                                          | env: `USESEND_*`                                         |
-| **External Python verification service** | Scrapes/verifies coupons, owns `coupons_db`. **Not in this repo** — TODO(human): link its repo/runbook here.                                                                                                                                                                       | n/a                                                      |
+| Component                                | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Where it lives                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **caramel-app**                          | Next.js 16 app — marketing site, web app, and the API (`grabcaramel.com`)                                                                                                                                                                                                                                                                                                                                                                                                                               | `apps/caramel-app`, deployed on Dokploy                                                  |
+| **caramel-extension**                    | Browser extension (Chrome/Edge/Firefox/Safari) — the client that calls caramel-app's API                                                                                                                                                                                                                                                                                                                                                                                                                | `apps/caramel-extension`, distributed via store review                                   |
+| **auth_db** (Postgres)                   | Users, sessions, Better Auth — owned and migrated by this repo (Prisma)                                                                                                                                                                                                                                                                                                                                                                                                                                 | `apps/caramel-app/prisma/schema.prisma`                                                  |
+| **coupons_db** (Postgres)                | The entire coupon catalog (`coupons`, `sources`, `verification_stores`, …) — **owned by an external Python verification service**, not this repo. caramel-app only reads it (+3 narrow mutations: usage-increment, expire, inserting a REQUESTED `sources` row) via a raw `postgres` client, never Prisma-migrated here. The Python service must treat those 3 columns/table as co-written — never clobber `times_used`/`last_time_used`, honor `expired`/`expiry` (see DESIGN.md §2 "Write-ownership") | `apps/caramel-app/src/lib/couponsDb.ts` (connection/schemas), `couponsRepo.ts` (queries) |
+| **Redis**                                | Provisioned in local-dev infra (`local-dev/docker-compose.yml`) but **not yet wired into application code** — rate limiting today is in-memory (`RateLimiterMemory`), documented as a swap-to-`RateLimiterRedis` TODO for multi-instance scale                                                                                                                                                                                                                                                          | `apps/caramel-app/src/lib/rateLimit.ts`                                                  |
+| **Sentry** (self-hosted)                 | Error + APM tracing. `org: devino`, `project: caramel`, instance `https://sentry.devino.ca`. Production-only (`sentry.common.config.ts` — no-ops in dev/test)                                                                                                                                                                                                                                                                                                                                           | `apps/caramel-app/sentry.*.config.ts`, `next.config.mjs`                                 |
+| **OpenRouter**                           | LLM hop for the extension's cart classifier (`/api/classify-cart`)                                                                                                                                                                                                                                                                                                                                                                                                                                      | `apps/caramel-app/src/lib/openrouter.ts`                                                 |
+| **usesend**                              | Transactional email (`usesend.devino.ca`)                                                                                                                                                                                                                                                                                                                                                                                                                                                               | env: `USESEND_*`                                                                         |
+| **External Python verification service** | Scrapes/verifies coupons, owns `coupons_db`. **Not in this repo** — TODO(human): link its repo/runbook here.                                                                                                                                                                                                                                                                                                                                                                                            | n/a                                                                                      |
 
 ## Where to look
 
@@ -155,10 +155,20 @@ audit, this returned `404 Branch not protected`).
   malformed/zeroed data. These throws reach Sentry via `handleRouteError`
   (API routes) or `onRequestError`/`error.tsx` (the SSR store page). The
   proactive half — `pnpm --filter caramel-app check:coupons-schema` —
-  introspects `information_schema.columns` and catches a rename/drop
-  before a request ever hits it, but **only runs via manual
-  `workflow_dispatch`** on `.github/workflows/coupons-schema-drift.yml`,
-  and **that workflow's `COUPONS_DATABASE_URL` repo secret has not been
+  runs every query registered in `src/lib/couponsRepo.ts`'s
+  `couponsQueryProbes` for real (inside one transaction, always rolled
+  back) and catches a rename/drop before a request ever hits it: Postgres
+  plans every column/table/predicate before returning rows, so a
+  missing/renamed column throws regardless of row count — a run-the-real-
+  queries gate, not a hand-maintained column-list mirror (the old
+  `scripts/check-coupons-schema.ts` `EXPECTED_COLUMNS` approach, which
+  missed JOIN/WHERE columns absent from every zod _output_, e.g. the
+  `sources.websites`/`c.site` relationship — deleted). Still **only runs
+  via manual `workflow_dispatch`** on
+  `.github/workflows/coupons-schema-drift.yml` (a writable private
+  coupons DB reachable from GitHub Actions is an infra/security call
+  outside this repo's own scope — TODO(human): Aladdin to decide), and
+  **that workflow's `COUPONS_DATABASE_URL` repo secret has not been
   added yet** — dispatching it today fails fast with a named error
   pointing at this gap, it does not silently no-op.
 - **coupons_db unreachable entirely.** Distinct from drift — the DB itself
@@ -209,13 +219,22 @@ audit, this returned `404 Branch not protected`).
 (`workflow_dispatch`), by design: no coupons DB exists in CI. Run it from
 the Actions tab; it fails fast with a named error if the
 `COUPONS_DATABASE_URL` repo secret isn't configured (**not yet added as of
-this writing**) rather than silently skipping. Equivalent local command,
-given a real `COUPONS_DATABASE_URL` (staging/prod, ideally a read
-replica):
+this writing**) rather than silently skipping. Locally, `pnpm --filter
+caramel-app check:coupons-schema` runs `vitest run --config
+vitest.drift.config.ts`, which reads `COUPONS_DATABASE_URL` from
+`apps/caramel-app/.env` if present — no env-var prefix needed when that
+file already has the real value (it does, by convention — see the root
+README's Getting Started). To point it at a DIFFERENT DB one-off (e.g. a
+throwaway clone for a red/green proof), override on the command line —
+an already-exported shell var wins over `.env`:
 
 ```bash
 COUPONS_DATABASE_URL=<real-url> pnpm --filter caramel-app check:coupons-schema
 ```
+
+The gate's red output names the failing query label (e.g. `coupons_db
+schema drift [sources.list]: column s.websites does not exist`) — see
+`src/lib/couponsRepo.ts`'s `couponsQueryProbes` for the full label list.
 
 ## Post-deploy smoke check
 

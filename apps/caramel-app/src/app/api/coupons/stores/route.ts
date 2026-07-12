@@ -1,11 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import {
-    SiteRowSchema,
-    couponsSql,
-    parseCouponRows,
-    visibleCouponsWhere,
-} from '@/lib/couponsDb'
+import { listStoreOptions } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 
 export const GET = withRoute(
@@ -17,25 +12,7 @@ export const GET = withRoute(
         const limit = Math.min(Math.max(rawLimit, 1), 50)
 
         try {
-            const rawRows = q
-                ? await couponsSql`
-                  SELECT DISTINCT site FROM coupons
-                  WHERE ${visibleCouponsWhere()}
-                    AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
-                  ORDER BY site ASC
-                  LIMIT ${limit}
-              `
-                : await couponsSql`
-                  SELECT DISTINCT site FROM coupons
-                  WHERE ${visibleCouponsWhere()}
-                  ORDER BY site ASC
-                  LIMIT ${limit}
-              `
-            const rows = parseCouponRows(
-                SiteRowSchema,
-                rawRows,
-                'coupons.stores',
-            )
+            const rows = await listStoreOptions(q, limit)
 
             const sites = rows.map(s => s.site).filter(Boolean)
 

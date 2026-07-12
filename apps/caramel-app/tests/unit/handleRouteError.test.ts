@@ -15,12 +15,27 @@ vi.mock('@sentry/nextjs', () => ({
 }))
 
 // Used only by the coupons/route.ts integration pin below — always-throws
-// so the route's try block reliably reaches its catch site.
-vi.mock('@/lib/couponsDb', () => ({
-    couponsSql: () => {
-        throw new Error('db exploded')
-    },
-}))
+// so the route's try block reliably reaches its catch site. importActual
+// keeps visibleCouponsWhere/rankingOrderSql (real, unmocked — safe, they
+// only ever build a lazy fragment, never execute it standalone — see
+// coupons-visibility.test.ts's closure-timing note) wired: couponsRepo.ts's
+// listCoupons() calls visibleCouponsWhere() BEFORE ever touching couponsSql,
+// so without importActual that call itself throws first (a real, different
+// error than "db exploded") — the route's try/catch still reaches the
+// same 500 either way, but importActual keeps this pin testing the thing
+// its name says it tests.
+vi.mock('@/lib/couponsDb', async () => {
+    const actual =
+        await vi.importActual<typeof import('@/lib/couponsDb')>(
+            '@/lib/couponsDb',
+        )
+    return {
+        ...actual,
+        couponsSql: () => {
+            throw new Error('db exploded')
+        },
+    }
+})
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,
 }))

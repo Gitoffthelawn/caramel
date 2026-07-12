@@ -1,30 +1,13 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import {
-    SiteCountRowSchema,
-    couponsSql,
-    parseCouponRows,
-    visibleCouponsWhere,
-} from '@/lib/couponsDb'
+import { listTopSites } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 
 export const GET = withRoute(
     { method: 'GET', routeName: 'sites/top-sites', rateLimit: 'read' },
     async ({ req }) => {
         try {
-            const rawRows = await couponsSql`
-            SELECT site, COUNT(*)::int AS coupon_count
-            FROM coupons
-            WHERE ${visibleCouponsWhere()}
-            GROUP BY site
-            ORDER BY coupon_count DESC
-            LIMIT 4
-        `
-            const rows = parseCouponRows(
-                SiteCountRowSchema,
-                rawRows,
-                'sites.top-sites',
-            )
+            const rows = await listTopSites()
             // No .filter(Boolean) here — unlike stores/route.ts and
             // search-supported/route.ts, this pre-existing behavior is
             // preserved as-is (out of scope for F-001; a null GROUP BY site

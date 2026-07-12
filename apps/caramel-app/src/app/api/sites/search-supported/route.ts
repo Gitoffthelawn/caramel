@@ -1,11 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
-import {
-    SiteRowSchema,
-    couponsSql,
-    parseCouponRows,
-    visibleCouponsWhere,
-} from '@/lib/couponsDb'
+import { searchSupportedSites } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -19,7 +14,7 @@ const SearchSupportedBodySchema = z.object({
 })
 
 // Store-name autocomplete. Post-DB-split this must read the coupons catalog
-// via couponsSql (the old Prisma "Coupon" model was dropped). Surfaces any
+// via couponsRepo (the old Prisma "Coupon" model was dropped). Surfaces any
 // store that has visible coupons (verified, restricted, or not-yet-verified).
 export const POST = withRoute(
     {
@@ -35,18 +30,7 @@ export const POST = withRoute(
         if (!q) return NextResponse.json({ sites: [] })
 
         try {
-            const rawRows = await couponsSql`
-            SELECT DISTINCT site FROM coupons
-            WHERE ${visibleCouponsWhere()}
-              AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
-            ORDER BY site ASC
-            LIMIT 20
-        `
-            const rows = parseCouponRows(
-                SiteRowSchema,
-                rawRows,
-                'sites.search-supported',
-            )
+            const rows = await searchSupportedSites(q)
             return NextResponse.json({
                 sites: rows.map(r => r.site).filter(Boolean),
             })
