@@ -74,11 +74,57 @@ describe('CouponListRowSchema', () => {
         ).toThrow(/coupons-db schema drift/)
     })
 
-    it('rejects an unknown discount_type value (drift, not a new legitimate business value)', () => {
+    // Real producer vocabulary (verified against the live oracle —
+    // 23,167-row snapshot): 34 visible rows carry lowercase 'percentage',
+    // 44 carry a 4th value ('fixed'), 8 carry null — 86 rows total the old
+    // z.enum(['PERCENTAGE','CASH','SAVE']) rejected outright, 500ing the
+    // main /api/coupons listing (its default `ORDER BY rating DESC` sorts
+    // NULLS FIRST, so these rows sit at the top of page 1). coupon-card.tsx
+    // only ever checks `=== 'PERCENTAGE'` — everything else renders
+    // `$amount` — so normalizing casing is enough; no need to constrain
+    // the vocabulary itself (matches DiscountTypeRowSchema's existing
+    // philosophy for the same producer field, one describe block below).
+    it('normalizes a lowercase discount_type to uppercase instead of rejecting it', () => {
+        const [row] = parseCouponRows(
+            CouponListRowSchema,
+            [{ ...validRow, discount_type: 'percentage' }],
+            'test',
+        )
+        expect(row.discount_type).toBe('PERCENTAGE')
+    })
+
+    it('accepts the 4th real producer value ("fixed"), uppercased — no longer a closed 3-value enum', () => {
+        const [row] = parseCouponRows(
+            CouponListRowSchema,
+            [{ ...validRow, discount_type: 'fixed' }],
+            'test',
+        )
+        expect(row.discount_type).toBe('FIXED')
+    })
+
+    it('accepts a null discount_type (genuinely unrated/pending coupons) and leaves it null', () => {
+        const [row] = parseCouponRows(
+            CouponListRowSchema,
+            [{ ...validRow, discount_type: null }],
+            'test',
+        )
+        expect(row.discount_type).toBeNull()
+    })
+
+    it('accepts a null expiry (same unrated/pending coupons have no expiry yet)', () => {
+        const [row] = parseCouponRows(
+            CouponListRowSchema,
+            [{ ...validRow, expiry: null }],
+            'test',
+        )
+        expect(row.expiry).toBeNull()
+    })
+
+    it('still rejects a genuinely non-string discount_type (e.g. a number) — structural drift, not producer vocabulary', () => {
         expect(() =>
             parseCouponRows(
                 CouponListRowSchema,
-                [{ ...validRow, discount_type: 'BOGO' }],
+                [{ ...validRow, discount_type: 42 }],
                 'test',
             ),
         ).toThrow(/coupons-db schema drift/)

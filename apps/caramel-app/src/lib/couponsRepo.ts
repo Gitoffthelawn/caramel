@@ -437,28 +437,22 @@ export const couponsQueryProbes: ReadonlyArray<{
     write?: boolean
     run: (sql: Sql) => Promise<unknown>
 }> = [
-    // type:'PERCENTAGE' (not the plan's original bare {limit:1,skip:0}) —
-    // executor deviation, verified against the real oracle: with NO filter,
-    // `ORDER BY rating DESC` sorts Postgres's default NULLS-FIRST-on-DESC,
-    // so an unfiltered limit:1 deterministically hits the catalog's
-    // never-rated, most-recently-scraped rows — a narrow (~86-row, 0.47%)
-    // real data-quality slice where the Python producer has emitted
-    // lowercase discount_type ('percentage'/'fixed') and/or a NULL expiry,
-    // which CouponListRowSchema correctly (by original F-001 design intent
-    // — discount_type's 3 known values "already drive UI logic") flags as
-    // drift. That's real, reproducible, unrelated to any column/schema
-    // rename, and would make this probe permanently red against live prod
-    // data — flagged as a new-finding candidate (the bare/no-filter
-    // /api/coupons path risks a live 500 on this exact slice), not fixed
-    // here (out of this refactor's scope). `type:'PERCENTAGE'` is an exact
-    // match, so it structurally excludes every casing/null-expiry offender
-    // by construction (verified: 0 of 13,794 PERCENTAGE-typed visible rows
-    // have a NULL expiry) while still hitting a REAL row and exercising
-    // the full zod numeric/id coercion path, preserving the plan's "limit
-    // 1 → real row → full zod type-check" intent.
+    // Bare {limit:1,skip:0} — the plan's original probe, exercising the
+    // real default /api/coupons path (no site/search/type/keyword filter).
+    // An earlier executor had temporarily pinned `type:'PERCENTAGE'` here
+    // instead, to dodge a real ~86-row data-quality slice (lowercase/4th-
+    // value/null discount_type, null expiry — see couponsDb.ts's
+    // CouponListRowSchema comment) that the old, over-strict enum schema
+    // flagged as drift; since that slice sorts to the very top of the
+    // unfiltered listing (`ORDER BY rating DESC` puts NULLS FIRST), the
+    // dodge was actually masking a live 500 on page 1 of the real
+    // production listing. Now that CouponListRowSchema itself tolerates
+    // that vocabulary, the dodge is no longer needed — reverted to bare so
+    // this probe exercises the same query real users hit, still getting a
+    // real row and the full zod numeric/id coercion path.
     {
         label: 'coupons.list',
-        run: s => listCoupons({ type: 'PERCENTAGE', limit: 1, skip: 0 }, s),
+        run: s => listCoupons({ limit: 1, skip: 0 }, s),
     },
     {
         label: 'store-page.coupons',

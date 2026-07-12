@@ -13,9 +13,16 @@ export interface Coupon {
     title: string
     description: string
     rating: number
-    discount_type: 'PERCENTAGE' | 'CASH' | 'SAVE'
+    // Not a closed union — the read boundary (couponsDb.ts's
+    // CouponListRowSchema) uppercase-normalizes whatever string the
+    // Python producer emits (and allows null) rather than rejecting
+    // anything outside PERCENTAGE/CASH/SAVE; see that schema's comment.
+    // Consumers that care about the discount shape (coupon-card.tsx)
+    // narrow with `=== 'PERCENTAGE'` and treat everything else uniformly.
+    discount_type: string | null
     discount_amount: number | null
-    expiry: string
+    // Nullable — genuinely unrated/pending coupons have no expiry yet.
+    expiry: string | null
     expired: boolean
     timesUsed: number
     status?: CouponStatus

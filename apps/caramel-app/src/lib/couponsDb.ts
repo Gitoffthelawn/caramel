@@ -129,10 +129,12 @@ export function verifiedCensusSql() {
 //     on site signals the consuming code already treats it as
 //     possibly-nullish, so `site` stays nullable here too — a legitimate
 //     null is never mistaken for drift. `status` and `discount_type` on
-//     DiscountTypeRow are deliberately loose (z.string()) rather than
-//     enum-constrained: they're business data the Python producer can
-//     extend without that being schema "drift" (unlike CouponListRow's
-//     discount_type, which 3 known values already drive UI logic).
+//     DiscountTypeRow, and (as of the CouponListRowSchema fix below)
+//     `discount_type` on CouponListRow too, are deliberately loose
+//     (z.string(), normalized rather than enum-constrained): they're
+//     business data the Python producer can extend without that being
+//     schema "drift" — see CouponListRowSchema's own field comment for why
+//     the enum had to go.
 const couponIdSchema = z
     .union([z.string(), z.number()])
     .transform(value => String(value))
@@ -144,9 +146,37 @@ export const CouponListRowSchema = z.object({
     title: z.string(),
     description: z.string(),
     rating: z.coerce.number(),
-    discount_type: z.enum(['PERCENTAGE', 'CASH', 'SAVE']),
+    // Tolerant + normalized, NOT enum-constrained. Was
+    // `z.enum(['PERCENTAGE','CASH','SAVE'])`, which 500'd the main
+    // /api/coupons listing against real data: verified against the oracle
+    // (23,167-row snapshot), 86 VISIBLE rows carry a discount_type the
+    // enum rejects outright — 34 lowercase ('percentage'), 44 a 4th
+    // producer value ('fixed'), 8 null (genuinely unrated 'pending'
+    // coupons) — and because the default listing's `ORDER BY rating DESC`
+    // sorts NULLS FIRST, those rows sit at the very top of the unfiltered
+    // catalog, so a bare, no-filter `/api/coupons` call throws on page 1,
+    // every time. coupon-card.tsx only ever checks
+    // `discount_type === 'PERCENTAGE'` (everything else renders
+    // `$amount`) and no consumer needs a closed vocabulary, so
+    // uppercase-normalizing (so lowercase producer values still satisfy
+    // that one comparison) and allowing null is enough — this now matches
+    // DiscountTypeRowSchema's existing "business data the Python producer
+    // can extend" philosophy (see the doc comment above), just applied to
+    // CouponListRow too. STRUCTURAL drift is still caught: a
+    // missing/renamed column or a genuinely non-string value (e.g. a
+    // number) still throws — only the closed vocabulary is gone. See
+    // tests/unit/couponsDb-schemas.test.ts for the accept/reject pins.
+    discount_type: z
+        .string()
+        .nullable()
+        .transform(value => (value == null ? null : value.toUpperCase())),
     discount_amount: z.coerce.number().nullable(),
-    expiry: z.string(),
+    // Nullable — was `z.string()`. Same real-data slice as discount_type
+    // above: the 86 genuinely-unrated 'pending' visible rows have no
+    // expiry yet either (100% overlap with the bad-discount_type rows).
+    // coupon-card.tsx never reads `expiry` at all, so there's no UI reason
+    // to require it.
+    expiry: z.string().nullable(),
     expired: z.boolean(),
     timesUsed: z.coerce.number(),
     status: z.string(),
