@@ -255,6 +255,15 @@ async function startCheckoutDetection() {
         scheduled = true
         setTimeout(recheck, 400)
     })
-    mo.observe(document.documentElement, { childList: true, subtree: true })
+    // childList catches a freshly-inserted coupon box; attributes catches the
+    // equally common SPA case of a pre-rendered box merely revealed via a
+    // class/style/hidden toggle (no new node, so childList alone misses it).
+    // Both feed the same debounced recheck above — no separate mechanism.
+    mo.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'style', 'hidden'],
+    })
     window.__caramel_checkout_observer = mo
 }
