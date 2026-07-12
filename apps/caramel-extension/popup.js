@@ -37,9 +37,16 @@ let returnView = null // callback for the “Back” button, set dynamically
 /* ------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loading-container')
-    if (loader) setTimeout(() => (loader.style.display = 'none'), 400)
+    // Anti-flicker floor, not a fetch-duration ceiling: a near-instant
+    // response still shows the spinner for a beat, but initPopup() (below)
+    // now actually awaits the fetch+render — so on a slow/degraded
+    // connection the spinner correctly outlives 400ms instead of leaving a
+    // blank auth-container gap while the real request is still in flight.
+    const minDisplay = new Promise(resolve => setTimeout(resolve, 400))
 
-    await initPopup()
+    await Promise.all([initPopup(), minDisplay])
+
+    if (loader) loader.style.display = 'none'
 })
 
 /* ------------------------------------------------------------ */
@@ -56,37 +63,48 @@ async function initPopup() {
         url = null
     }
 
-    currentBrowser.storage.sync.get(['token', 'user'], async res => {
-        const token = res?.token || null
-        const user = res?.user || null
+    // Wrapped in a Promise so initPopup() itself doesn't resolve until the
+    // chosen render state has actually been painted (storage.sync.get is a
+    // chrome-callback API, not natively awaitable) — the DOMContentLoaded
+    // bootstrap above depends on that to know when the loader can come down.
+    await new Promise(resolve => {
+        currentBrowser.storage.sync.get(['token', 'user'], async res => {
+            const token = res?.token || null
+            const user = res?.user || null
 
-        // Wrap the whole render: a fetch failure (backend down / offline) must
-        // show an honest error state with a retry, NEVER leave the popup blank.
-        try {
-            if (url) {
-                const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
-                let coupons = []
-                try {
-                    coupons = await fetchCoupons(domain, '')
-                } catch {
-                    renderLoadError()
+            // Wrap the whole render: a fetch failure (backend down / offline) must
+            // show an honest error state with a retry, NEVER leave the popup blank.
+            try {
+                if (url) {
+                    const domain = url.replace(
+                        /^(?:https?:\/\/)?(?:www\.)?/,
+                        '',
+                    )
+                    let coupons = []
+                    try {
+                        coupons = await fetchCoupons(domain, '')
+                    } catch {
+                        renderLoadError()
+                        return
+                    }
+
+                    if (coupons?.length) {
+                        await renderCouponsView(coupons, user, domain)
+                    } else {
+                        renderUnsupportedSite(user)
+                    }
                     return
                 }
 
-                if (coupons?.length) {
-                    await renderCouponsView(coupons, user, domain)
-                } else {
-                    renderUnsupportedSite(user)
-                }
-                return
+                // no active tab info
+                if (token) renderProfileCard(user)
+                else renderUnsupportedSite(null)
+            } catch {
+                renderLoadError()
+            } finally {
+                resolve()
             }
-
-            // no active tab info
-            if (token) renderProfileCard(user)
-            else renderUnsupportedSite(null)
-        } catch {
-            renderLoadError()
-        }
+        })
     })
 }
 
