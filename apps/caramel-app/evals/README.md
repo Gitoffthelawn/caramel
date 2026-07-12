@@ -156,6 +156,6 @@ model id ends up pinned.
 > cases (in `fixtures/cart-cases.ts`) before or with the fix that
 > addresses them.
 
-This belongs in the repo's `CLAUDE.md` — there isn't one yet (see F-010,
-the onboarding-docs fix). Move it there once F-010 lands; until then this
-is the canonical copy.
+The canonical copy of this rule lives in the repo root `CLAUDE.md`
+(§Conventions in force → eval gate); this section stays as the local
+how-to. If the two ever disagree, `CLAUDE.md` wins.
