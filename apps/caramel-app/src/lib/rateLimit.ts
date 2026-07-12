@@ -204,3 +204,36 @@ export function isOriginAllowed(req: NextRequest): boolean {
 export function forbiddenOrigin(): NextResponse {
     return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 })
 }
+
+/**
+ * Stricter than isOriginAllowed(): requires the Origin header to be
+ * PRESENT and to be an actual browser-extension origin (chrome-extension:
+ * / moz-extension: / safari-web-extension:) — no same-origin exemption, no
+ * ALLOWED_ORIGINS allowlist, and critically no missing-Origin bypass.
+ *
+ * isOriginAllowed()'s `if (!origin) return true` is deliberate for routes
+ * that legitimately serve server-to-server/curl callers, but it left a
+ * paid, extension-only, LLM-backed route (classify-cart) reachable with no
+ * Origin at all (E2E report D5). Use this for routes that must only ever
+ * be reachable from the extension itself. Deliberately NOT tied to the
+ * KNOWN_EXTENSION_ORIGINS env allowlist (src/lib/api/withRoute.ts's `cors:
+ * 'extension'` mode) — those vars are optional/unset in some deploys, and
+ * a real extension's background-page fetch always carries an
+ * `Origin: <protocol>://<id>` for ANY installed id regardless of server
+ * config, so gating on protocol alone closes the D5 hole without adding a
+ * dependency on that allowlist being exhaustively correct.
+ */
+export function isExtensionOrigin(req: NextRequest): boolean {
+    const origin = req.headers.get('origin')
+    if (!origin) return false
+    try {
+        const protocol = new URL(origin).protocol
+        return (
+            protocol === 'chrome-extension:' ||
+            protocol === 'moz-extension:' ||
+            protocol === 'safari-web-extension:'
+        )
+    } catch {
+        return false
+    }
+}

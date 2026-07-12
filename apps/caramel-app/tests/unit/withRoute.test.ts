@@ -239,6 +239,55 @@ describe('withRoute — origin gate', () => {
         )
         expect(res.status).toBe(200)
     })
+
+    // D5 (E2E report) — origin: true's isOriginAllowed() intentionally lets
+    // a request with NO Origin header through (server-to-server/curl), which
+    // is correct for most mutation routes but left classify-cart (a paid
+    // LLM-backed endpoint meant to be extension-only) reachable origin-less.
+    // origin: 'extension' is the stricter mode: Origin must be PRESENT and
+    // be an actual browser-extension protocol — no missing-Origin bypass,
+    // no same-origin exemption.
+    describe('origin: "extension" — strict, no missing-Origin bypass (D5 fix)', () => {
+        it('missing Origin -> 403 (exactly the hole origin: true leaves open)', async () => {
+            const handler = withRoute(
+                { method: 'POST', routeName: 'test', origin: 'extension' },
+                ok,
+            )
+            const res = await handler(
+                makeReq('http://localhost/api/test', { method: 'POST' }),
+            )
+            expect(res.status).toBe(403)
+            expect(await res.json()).toEqual({ error: 'Forbidden origin' })
+        })
+
+        it('a same-origin request -> still 403 (stricter than origin: true — must be an extension)', async () => {
+            const handler = withRoute(
+                { method: 'POST', routeName: 'test', origin: 'extension' },
+                ok,
+            )
+            const res = await handler(
+                makeReq('http://localhost/api/test', {
+                    method: 'POST',
+                    headers: { host: 'localhost' },
+                }),
+            )
+            expect(res.status).toBe(403)
+        })
+
+        it('a chrome-extension:// Origin (any id) -> passes through to the handler', async () => {
+            const handler = withRoute(
+                { method: 'POST', routeName: 'test', origin: 'extension' },
+                ok,
+            )
+            const res = await handler(
+                makeReq('http://localhost/api/test', {
+                    method: 'POST',
+                    headers: { origin: 'chrome-extension://some-id' },
+                }),
+            )
+            expect(res.status).toBe(200)
+        })
+    })
 })
 
 describe('withRoute — apiKey', () => {

@@ -22,8 +22,11 @@
 // export const OPTIONS = preflight({ cors: 'extension', methods: 'POST, OPTIONS' })
 // ```
 //
-// Concern order (each an early return): compute CORS → origin-gate 403 →
-// apiKey 401 → auth 401 → rateLimit 429 → body safeParse 422 → handler
+// Concern order (each an early return): compute CORS → origin-gate 403
+// (origin: true = isOriginAllowed's permissive allowlist; origin:
+// 'extension' = isExtensionOrigin's strict extension-protocol-only check,
+// no missing-Origin bypass — D5) → apiKey 401 → auth 401 → rateLimit 429 →
+// body safeParse 422 → handler
 // (try/catch → F-002's handleRouteError). CORS headers are merged onto
 // EVERY exit point (incl. 4xx/429/500) — matches the pre-F-007
 // authorize/oauth-exchange behavior of attaching corsHeaders to their
@@ -34,6 +37,7 @@ import { env } from '@/lib/env'
 import {
     checkRateLimit,
     forbiddenOrigin,
+    isExtensionOrigin,
     isOriginAllowed,
     isTrustedServer,
     type LimitKind,
@@ -122,8 +126,12 @@ export interface RouteConfig<TBody> {
      * provider-server callback). */
     rateLimit?: LimitKind
     /** Reject cross-origin browser requests via rateLimit.ts's
-     * isOriginAllowed() allowlist. */
-    origin?: boolean
+     * isOriginAllowed() allowlist (`true`), OR — for routes that must be
+     * reachable ONLY from the extension itself (e.g. a paid LLM-backed
+     * endpoint) — require a strict extension-protocol Origin via
+     * isExtensionOrigin() (`'extension'`), which unlike isOriginAllowed()
+     * does NOT let a missing Origin through (D5). */
+    origin?: boolean | 'extension'
     /** Server-only COUPONS_ADMIN_SECRET bearer gate (rateLimit.ts's
      * isTrustedServer) — the ONE api-key checker (CR-8: models
      * coupons/expire's Authorization: Bearer gate; not a second,
@@ -167,7 +175,10 @@ export function withRoute<TBody = undefined>(
     ): Promise<NextResponse> {
         const cors = computeCorsHeaders(req, config.cors ?? 'none', methods)
 
-        if (config.origin && !isOriginAllowed(req)) {
+        if (config.origin === 'extension') {
+            if (!isExtensionOrigin(req))
+                return withCors(forbiddenOrigin(), cors)
+        } else if (config.origin && !isOriginAllowed(req)) {
             return withCors(forbiddenOrigin(), cors)
         }
 

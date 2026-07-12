@@ -1,3 +1,4 @@
+import { POST as classifyCartPOST } from '@/app/api/classify-cart/route'
 import { POST as incrementPOST } from '@/app/api/coupons/increment/route'
 import { POST as loginPOST } from '@/app/api/extension/login/route'
 import { GET as authorizeGET } from '@/app/api/extension/oauth/authorize/route'
@@ -608,5 +609,44 @@ describe('sources POST — strict website presence (F-007 NEW 422), plausibility
         })
         const res = await sourcesPOST(req)
         expect(res.status).toBe(422)
+    })
+})
+
+// D5 (E2E report) — classify-cart is a paid LLM-backed endpoint meant to be
+// reachable ONLY from the extension's background service worker (confirmed:
+// background.js's classifyCart handler is the sole caller — a repo-wide
+// grep of apps/caramel-app/src finds classify-cart referenced nowhere
+// outside this route + withRoute.ts's own doc comment, i.e. no web-app page
+// calls it). A request with NO Origin header used to return 200
+// (isOriginAllowed's deliberate server-to-server bypass) — this route now
+// uses origin: 'extension', which requires the Origin to be present and be
+// an actual browser-extension protocol. Real extension calls are
+// unaffected: they originate from background.js's service-worker fetch,
+// and per Fetch/extension semantics the browser stamps those with
+// `Origin: chrome-extension://<id>` automatically — verified no-mock in
+// withRoute.test.ts's "extension" origin-gate suite.
+describe('classify-cart — strict extension-origin gate (D5 fix)', () => {
+    it('no Origin header -> 403 Forbidden origin (was 200 — the paid endpoint was reachable origin-less)', async () => {
+        const req = new NextRequest('http://localhost/api/classify-cart', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ domain: 'example.com' }),
+        })
+        const res = await classifyCartPOST(req)
+        expect(res.status).toBe(403)
+        expect(await res.json()).toEqual({ error: 'Forbidden origin' })
+    })
+
+    it('a same-origin (non-extension) request -> also 403', async () => {
+        const req = new NextRequest('http://localhost/api/classify-cart', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                host: 'localhost',
+            },
+            body: JSON.stringify({ domain: 'example.com' }),
+        })
+        const res = await classifyCartPOST(req)
+        expect(res.status).toBe(403)
     })
 })

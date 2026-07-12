@@ -1,4 +1,4 @@
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimit, isExtensionOrigin } from '@/lib/rateLimit'
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -97,5 +97,56 @@ describe('checkRateLimit', () => {
             )
             expect(result).toBeNull()
         }
+    })
+})
+
+// D5 (E2E report) — isOriginAllowed()'s `if (!origin) return true` bypass is
+// deliberate for routes that legitimately accept server-to-server/curl
+// calls (comment above it says so), but classify-cart is a paid LLM-backed
+// endpoint that should ONLY ever be reachable from the extension — a
+// missing Origin let it through as a 200. isExtensionOrigin() is the
+// stricter, purpose-built check for that route: present AND an actual
+// browser-extension protocol, no missing-Origin bypass, no same-origin/
+// ALLOWED_ORIGINS exemption (those don't apply to "must be the extension").
+describe('isExtensionOrigin', () => {
+    function makeOriginRequest(origin?: string) {
+        return new NextRequest('http://localhost/api/classify-cart', {
+            method: 'POST',
+            headers: origin ? { origin } : {},
+        })
+    }
+
+    it('true for a chrome-extension:// Origin — ANY extension id, no allowlist match required', () => {
+        expect(
+            isExtensionOrigin(
+                makeOriginRequest('chrome-extension://some-random-id'),
+            ),
+        ).toBe(true)
+    })
+
+    it('true for moz-extension:// and safari-web-extension:// Origins too', () => {
+        expect(
+            isExtensionOrigin(makeOriginRequest('moz-extension://abc')),
+        ).toBe(true)
+        expect(
+            isExtensionOrigin(makeOriginRequest('safari-web-extension://abc')),
+        ).toBe(true)
+    })
+
+    it('false when the Origin header is absent — the exact D5 hole isOriginAllowed leaves open', () => {
+        expect(isExtensionOrigin(makeOriginRequest())).toBe(false)
+    })
+
+    it('false for a same-origin or arbitrary website Origin (not just "any non-empty origin")', () => {
+        expect(isExtensionOrigin(makeOriginRequest('http://localhost'))).toBe(
+            false,
+        )
+        expect(
+            isExtensionOrigin(makeOriginRequest('https://evil.example.com')),
+        ).toBe(false)
+    })
+
+    it('false for a malformed Origin header (caught, not thrown)', () => {
+        expect(isExtensionOrigin(makeOriginRequest('not-a-url'))).toBe(false)
     })
 })
