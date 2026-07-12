@@ -29,10 +29,13 @@ const EXTENSION_DIR = path.resolve(
 // see .gitignore) never trip this in a dev's working copy; only what
 // actually ships in the repo counts.
 const ROOT_FILE_ALLOWLIST = new Set([
+    '.gitattributes',
     '.gitignore',
     '.oxlintrc.json',
     '.prettierignore',
     '.prettierrc.json',
+    'CLAUDE.md',
+    'DESIGN.md',
     'LICENSE',
     'README.md',
     'RUNBOOK.md',
