@@ -2,7 +2,7 @@
     "audit": "caramel",
     "baseline_sha": "537547b3081aa3a0ec817cdc5f6dac4f0d328dbb",
     "fix_branch": "audit/fixes-2026-07-10",
-    "fix_train_head": "145fb10",
+    "fix_train_head": "ce30875 (21 fix commits: 16 findings + 5 amendments; +1 stage-4 docs commit)",
     "pr": "https://github.com/DevinoSolutions/caramel/pull/111",
     "generated_stage": "3-final (post-fix state; companion to the audit-time findings.json — diff future audits against BOTH)",
     "findings": [
@@ -204,6 +204,12 @@
             "sev": "Low",
             "title": "mintExtensionSession returning-user response omits freshly-updated name/image (pre-existing, preserved byte-identical)",
             "source": "F-007 executor"
+        },
+        {
+            "id": "NF-13",
+            "sev": "Low",
+            "title": "Redis provisioned in local-dev compose but never wired into app code — rate limiting is in-memory/per-process (resets on every deploy/instance)",
+            "source": "DESIGN.md verification pass (Stage 4)"
         }
     ],
     "next_audit_focus": [

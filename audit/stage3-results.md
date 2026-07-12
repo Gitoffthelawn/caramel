@@ -2,9 +2,10 @@
 
 Branch: `audit/fixes-2026-07-10` (cut from `audit/dev-2026-07-10` @ 9cac6fd). One commit per finding. Updated after each fix by the Opus lead.
 
-## ★ FINAL SUMMARY (train complete @ 145fb10 — PR #111)
+## ★ FINAL SUMMARY (train complete; Stage 4 codified @ ce30875 — PR #111)
 
-- **16 findings fixed in 19 commits** (15 planned F-001…F-015 excl. F-016, + F-017 discovered in-train by the new eval gate). F-016 = separate /one-root-compose initiative, untouched by design.
+- **16 findings fixed in 21 commits** (16 finding commits + 5 amendments; count corrected from an earlier "19" by the independent end-review), plus the Stage-4 docs commit `ce30875` (CLAUDE.md + DESIGN.md) = 22 on the branch. F-016 = separate /one-root-compose initiative, untouched by design.
+- **Stage-4 verdicts:** independent adversarial end-review = **SHIP, zero REDO** (11 PASS / 5 PASS-WITH-NOTES; `audit/end-review.md`); cold-agent doc validation = **PASS 18/18, zero doc defects** (`audit/stage4-doc-validation.md`).
 - **Suite: 0 → 305 tests** (290 app + 15 extension), all green; plus 40-case live eval suite (97.5% gate-green) and Playwright e2e (88 passed / 1 pre-existing known failure).
 - **CI:** unit + oxlint + knip(truthful) + audit(high) + size-limit + ai-evals(armed pending secret) gates added; all quality legs green; the ONLY red anywhere = the pre-existing extension-smoke manifest-drift test (NF-03) + the by-design ai-evals missing-secret leg.
 - **Empirical deltas (all measured, all lead-verified):** 3am blind spots 14 → 3-partial/0-open · onboarding tribal steps 5 → 0 (cold docs-only boot passes first try) · navigation behaviors 2/5 → 3/5 (functions 10/10 held) · change-trace 9/3/1 → 9/4/3 · raw status predicates 8 → 0 · any tokens 16 → 0 · vulns 89 (2C/47H) → 5 moderate · lockfiles 3 → 1 · false-green gates 3 (test/knip/prettier-tailwind) → 0.

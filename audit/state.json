@@ -53,7 +53,15 @@
             }
         ]
     },
-    "stage": "3 COMPLETE — awaiting Fable end-review + Stage 4",
+    "stage": "4 COMPLETE — audit cycle 1 closed; PR #111 awaits human review/merge",
+    "stage4": {
+        "status": "complete (2026-07-12, CTO session with full decision authority per user)",
+        "end_review": "independent adversarial Opus review of all 21 fix commits: SHIP — 11 PASS / 5 PASS-WITH-NOTES / 0 REDO; amendments ruled legitimate; both follow-up notes already parked (NF-04, NF-07). audit/end-review.md",
+        "docs_commit": "ce30875 on the fix branch: CLAUDE.md (shared rules v5 embedded verbatim + commands/architecture/conventions-to-checks map/gotchas/boundaries, 146 lines) + DESIGN.md (module boundaries, 10 standoffs, known debt NF-01..13 reconciled to canonical numbering, change guide, testing map) + evals/README codify-block relocation",
+        "doc_validation": "cold zero-context agent, docs-only: 18/18 quiz items correct (commands, where-would-X-live incl. the former navigation misses, gotchas, boundaries), 13/13 factual claims verified, ZERO doc defects. audit/stage4-doc-validation.md",
+        "corrections_this_stage": "commit count 19->21+1 (end-review catch); DESIGN draft reconciled (NF numbering collision with canonical resolved, NF-13 net-new added, gtag/cryptoHelpers mislabeled-dead corrected to proven-live, route count 15/17->16/18, majors list completed to F-014's 13)",
+        "followup_ask_to_human": "mark each of NF-01..NF-13 agree/disagree/unsure for the next cycle; the disputed ones get re-audited with objections injected"
+    },
     "stage3": {
         "status": "complete",
         "fix_branch_head": "145fb10",
