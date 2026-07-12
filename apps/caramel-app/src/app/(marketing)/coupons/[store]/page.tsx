@@ -1,11 +1,19 @@
 import CouponsSection from '@/components/coupons/coupons-section'
-import { couponsSql } from '@/lib/couponsDb'
+import {
+    CouponListRowSchema,
+    TotalCountRowSchema,
+    couponsSql,
+    parseCouponRows,
+    rankingOrderSql,
+    visibleCouponsWhere,
+} from '@/lib/couponsDb'
+import { BASE_URL } from '@/lib/env.client'
 import type { Coupon } from '@/types/coupon'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 const PAGE_SIZE = 5
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://grabcaramel.com'
+const baseUrl = BASE_URL
 
 function safeDecode(value: string): string {
     try {
@@ -40,13 +48,12 @@ async function fetchStoreCoupons(storeParam: string) {
         return { coupons: [] as Coupon[], total: 0, base: storeParam }
     }
 
-    // Match /api/coupons: surface verified, restricted, AND not-yet-verified
-    // (pending/retry) coupons so SSR HTML and the client fetch agree (no
-    // hydration flash). Known-dead (invalid/expired) stay excluded. The
-    // status field drives the per-coupon verification badge.
-    const VISIBLE_STATUSES = couponsSql`status IN ('valid','valid_with_warning','product_restriction','category_restricted','seller_specific','pending','retry') AND expired = FALSE`
-    const [coupons, totalRow] = await Promise.all([
-        couponsSql<Coupon[]>`
+    // Match /api/coupons: same visibility predicate, so SSR HTML and the
+    // client fetch agree (no hydration flash) — see lib/coupons.ts's
+    // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
+    const VISIBLE_STATUSES = visibleCouponsWhere()
+    const [rawCoupons, rawTotalRow] = await Promise.all([
+        couponsSql`
             SELECT id, code, site, title, description, rating,
                    discount_type, discount_amount, expiry, expired,
                    times_used AS "timesUsed",
@@ -54,7 +61,7 @@ async function fetchStoreCoupons(storeParam: string) {
             FROM coupons
             WHERE ${VISIBLE_STATUSES}
               AND (site = ${base} OR site LIKE ${'%.' + base})
-            ORDER BY rating DESC, created_at DESC
+            ORDER BY ${rankingOrderSql()}
             LIMIT ${PAGE_SIZE}
         `,
         couponsSql`
@@ -63,8 +70,25 @@ async function fetchStoreCoupons(storeParam: string) {
               AND (site = ${base} OR site LIKE ${'%.' + base})
         `,
     ])
+    // parseCouponRows's output (CouponListRow) is a strict superset of
+    // Coupon's shape except status/verificationMessage, which it types
+    // wider (plain string / string|null vs. Coupon's optional narrower
+    // union) — deliberately, per couponsDb.ts's schema comments, so this
+    // boundary doesn't need updating every time the Python producer adds a
+    // status value. The data is already runtime-validated at this point;
+    // the cast just reconciles the two independently-declared TS shapes.
+    const coupons = parseCouponRows(
+        CouponListRowSchema,
+        rawCoupons,
+        'store-page.coupons',
+    ) as Coupon[]
+    const totalRow = parseCouponRows(
+        TotalCountRowSchema,
+        rawTotalRow,
+        'store-page.count',
+    )
 
-    const total = (totalRow[0] as { total: number } | undefined)?.total ?? 0
+    const total = totalRow[0]?.total ?? 0
     return { coupons, total, base }
 }
 
@@ -133,7 +157,7 @@ export default async function StoreCouponsPage({
     }
 
     return (
-        <main className="dark:bg-darkBg relative min-h-screen px-6 pt-32 lg:px-8">
+        <main className="relative min-h-screen px-6 pt-32 dark:bg-darkBg lg:px-8">
             <CouponsSection
                 defaultFilters={{ site: base }}
                 initialCoupons={coupons}

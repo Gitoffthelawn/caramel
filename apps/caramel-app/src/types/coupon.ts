@@ -1,13 +1,10 @@
-export type CouponStatus =
-    | 'valid'
-    | 'valid_with_warning'
-    | 'product_restriction'
-    | 'category_restricted'
-    | 'seller_specific'
-    | 'pending'
-    | 'retry'
-    | 'invalid'
-    | 'expired'
+// F-006 — the status vocabulary's single source of truth moved to
+// lib/coupons.ts (imported by both this 'use client'-safe type module and
+// server-only couponsDb.ts). Re-exported here so existing importers
+// (`import type { CouponStatus } from '@/types/coupon'`) keep resolving.
+import type { CouponStatus } from '@/lib/coupons'
+
+export type { CouponStatus }
 
 export interface Coupon {
     id: string

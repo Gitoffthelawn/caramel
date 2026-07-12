@@ -1,0 +1,45 @@
+name: Coupons DB – Schema Drift Check
+
+# Manual only (F-001). No coupons DB is provisioned in CI — this introspects
+# information_schema.columns on a REAL COUPONS_DATABASE_URL (staging/prod or
+# a read replica), so it only ever runs on-demand via workflow_dispatch, and
+# fails loudly up front if the secret isn't configured rather than silently
+# skipping. See apps/caramel-app/scripts/check-coupons-schema.ts.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-drift:
+    name: Check coupons DB schema drift
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify COUPONS_DATABASE_URL secret is configured
+        run: |
+          if [ -z "${{ secrets.COUPONS_DATABASE_URL }}" ]; then
+            echo "::error::COUPONS_DATABASE_URL secret is not set on this repository. Add it under Settings -> Secrets and variables -> Actions (pointing at a real coupons DB, ideally a read replica) before dispatching this workflow. See PLAN-F-001.md."
+            exit 1
+          fi
+
+      - name: Run schema drift check
+        working-directory: ./apps/caramel-app
+        env:
+          COUPONS_DATABASE_URL: ${{ secrets.COUPONS_DATABASE_URL }}
+        run: pnpm check:coupons-schema
