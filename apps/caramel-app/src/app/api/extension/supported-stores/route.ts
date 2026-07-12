@@ -37,15 +37,20 @@ export const GET = withRoute(
             FROM store_verification_configs cfg
             JOIN verification_stores s ON s.id = cfg.store_id
             WHERE cfg.is_active = TRUE
-              -- Require the FULL 5-field extension contract. Partial configs
-              -- (missing success/error/remove) cause the try-loop to either
-              -- false-success on rejected codes or stack invalid coupons —
-              -- the exact UX failures observed on logos.com pre-2026-05-02.
+              -- Require only the 2 fields the extension's apply engine
+              -- (coupon-apply.js) genuinely cannot work without: it fills
+              -- coupon_input then clicks apply_button, and bails early with
+              -- no fallback if either is missing/hidden. The other 3 xpaths
+              -- this predicate used to require ALL have generic fallbacks in
+              -- the apply engine (findAppliedSelector/detectCouponError/
+              -- findRemoveSelector -> GENERIC_APPLIED_SELECTORS /
+              -- GENERIC_ERROR_TEXT_RE / GENERIC_REMOVE_SELECTORS), so
+              -- requiring them here was over-strict: it silently excluded
+              -- ~25% of active configs — including the 3 demo stores
+              -- (ebay.com/amazon.com/codecademy.com) — that the generic
+              -- engine can actually drive fine (E2E report D1).
               AND cfg.coupon_input_xpath      IS NOT NULL
               AND cfg.apply_button_xpath      IS NOT NULL
-              AND cfg.success_indicator_xpath IS NOT NULL
-              AND cfg.error_indicator_xpath   IS NOT NULL
-              AND cfg.coupon_remove_xpath     IS NOT NULL
               -- Honor the agent's extension_compatible verdict. Stores like
               -- christianbook.com have full xpaths but they live on the
               -- checkout page, not the entry_url cart page — the extension

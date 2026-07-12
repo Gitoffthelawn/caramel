@@ -15,6 +15,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // SQL mock is ever reached). An empty-array result parses through the real
 // schema trivially, so this stays a true characterization of unchanged
 // behavior.
+// Captures the literal SQL text of the most recent couponsSql call so a
+// test can assert on the QUERY SHAPE (which xpath columns the WHERE
+// actually requires) — the row-mock below always resolves to [], so it
+// can't otherwise prove anything about the predicate itself.
+const { queryCapture } = vi.hoisted(() => ({
+    queryCapture: { sql: '' },
+}))
+
 vi.mock('@/lib/couponsDb', async () => {
     const actual =
         await vi.importActual<typeof import('@/lib/couponsDb')>(
@@ -22,13 +30,13 @@ vi.mock('@/lib/couponsDb', async () => {
         )
     return {
         ...actual,
-        couponsSql: (
-            _strings: TemplateStringsArray,
-            ..._values: unknown[]
-        ) => ({
-            // oxlint-disable-next-line no-thenable
-            then: (resolve: (rows: unknown[]) => void) => resolve([]),
-        }),
+        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
+            queryCapture.sql = strings.join('?')
+            return {
+                // oxlint-disable-next-line no-thenable
+                then: (resolve: (rows: unknown[]) => void) => resolve([]),
+            }
+        },
     }
 })
 
@@ -77,5 +85,46 @@ describe('GET /api/extension/supported-stores — public read (F-003)', () => {
             expect.anything(),
             'read',
         )
+    })
+})
+
+// D1 (E2E report) — the old predicate required ALL of coupon_input,
+// apply_button, success_indicator, error_indicator AND coupon_remove to be
+// non-null, excluding ~25% of active configs (incl. the 3 hardcoded demo
+// stores: ebay.com/amazon.com/codecademy.com) even though the extension's
+// apply engine has generic fallbacks for everything except the input+button
+// pair:
+//   - successIndicator: coupon-apply.js findAppliedSelector() falls back to
+//     GENERIC_APPLIED_SELECTORS
+//   - errorIndicator: coupon-apply.js detectCouponError() falls back to a
+//     GENERIC_ERROR_TEXT_RE scan near the input
+//   - couponRemove: coupon-apply.js findRemoveSelector() falls back to
+//     GENERIC_REMOVE_SELECTORS, and removeAppliedCoupon() has a further
+//     clear-the-input fallback
+// couponInput/couponSubmit have NO such fallback — coupon-apply.js's
+// applyCoupon() and coupon-runner.js's startApplyingCoupons() both bail
+// early (`if (!input || ... || !applyBtn) return`) when either is missing,
+// so those two remain hard requirements.
+describe('GET /api/extension/supported-stores — qualification predicate (D1 fix)', () => {
+    it('requires coupon_input_xpath + apply_button_xpath — NOT success/error/remove indicators', async () => {
+        queryCapture.sql = ''
+
+        await GET(makeRequest())
+
+        expect(queryCapture.sql).toMatch(/coupon_input_xpath\s+IS NOT NULL/)
+        expect(queryCapture.sql).toMatch(/apply_button_xpath\s+IS NOT NULL/)
+        expect(queryCapture.sql).not.toMatch(
+            /success_indicator_xpath\s+IS NOT NULL/,
+        )
+        expect(queryCapture.sql).not.toMatch(
+            /error_indicator_xpath\s+IS NOT NULL/,
+        )
+        expect(queryCapture.sql).not.toMatch(
+            /coupon_remove_xpath\s+IS NOT NULL/,
+        )
+        // The extension_compatible escape hatch (agent/manual "this store
+        // genuinely doesn't work" verdict) is unrelated to xpath
+        // nullability and must survive the relaxation unchanged.
+        expect(queryCapture.sql).toMatch(/extension_compatible/)
     })
 })
