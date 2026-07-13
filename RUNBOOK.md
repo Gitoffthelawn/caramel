@@ -1,7 +1,8 @@
 # Caramel — Operations Runbook
 
 Start here at 3am. This is the repo-provided starting point that didn't
-exist before F-011 (audit 2026-07-10, `audit/empirical-3am.md` AM-1/AM-9):
+exist before F-011 (audit 2026-07-10, `empirical-3am.md` AM-1/AM-9 in the
+maintainers' internal audit archive):
 where things run, where to look, how to check health, how to roll back, and
 the failure signatures worth recognizing on sight.
 

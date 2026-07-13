@@ -64,7 +64,7 @@
 
 <!-- End shared block — project-specific commands, architecture, conventions, and gotchas follow. -->
 
-# caramel — project specifics (audit cycle 1, 2026-07-11; sources: audit/stage3-results.md, DESIGN.md)
+# caramel — project specifics (audit cycle 1, 2026-07-11; sources: DESIGN.md + `audit/` internal archive, gitignored — present only on maintainer machines)
 
 ## Commands
 

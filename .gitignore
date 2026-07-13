@@ -17,3 +17,7 @@ nul
 # Internal-only coupons-DB dev tooling (real-schema-adjacent, never
 # committed to the public repo — see DESIGN.md's secrecy forward-rule).
 apps/caramel-app/scripts/internal/
+
+# Internal audit archive (cycle artifacts, findings, onload prompts) — kept
+# locally by maintainers, never published (same policy as scripts/internal).
+/audit/
