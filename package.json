@@ -16,11 +16,9 @@
         }
     },
     "scripts": {
-        "compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d",
-        "compose:down": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml down",
-        "dev:compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d --remove-orphans",
-        "dev": "pnpm run dev:compose && pnpm -r --parallel dev",
-        "dev:workspace": "pnpm -r --parallel dev",
+        "dev": "docker compose up --build",
+        "dev:next": "pnpm --filter caramel-app dev",
+        "dev:extension": "pnpm --filter caramel-extension dev",
         "build": "turbo run build",
         "lint": "turbo run lint",
         "lint:oxlint": "oxlint",

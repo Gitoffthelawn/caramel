@@ -11,7 +11,6 @@ coverage
 .DS_Store
 *.log
 *.env.*
-!.env.ports
 nul
 
 # Internal-only coupons-DB dev tooling (real-schema-adjacent, never

@@ -1,0 +1,80 @@
+# One-root-compose (F-016). THE dev command is `docker compose up --build`
+# (root `pnpm dev`) — local, CI and prod run this same graph in prod-mode
+# builds, so behaviour is identical everywhere. Services are web + postgres
+# ONLY: no redis (rate limiting is in-memory single-instance by design, NF-13)
+# and no coupons DB (its schema is externally owned and deliberately absent
+# locally — see the COUPONS_DATABASE_URL note on the web service).
+name: caramel
+
+services:
+  postgres:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caramel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caramel_password}
+      POSTGRES_DB: ${POSTGRES_DB:-caramel}
+    ports:
+      # Loopback-only by default. Host port matches .env.example's
+      # localhost:58005 so the `pnpm dev:next` escape hatch + host-side prisma /
+      # drift commands reach the same database.
+      - '${BIND_HOST:-127.0.0.1}:${PG_PORT:-58005}:5432'
+    volumes:
+      # Postgres 18+ stores data in a versioned subdir and declares its VOLUME
+      # at /var/lib/postgresql — mounting the classic /var/lib/postgresql/data
+      # path breaks first-boot initialisation on this image.
+      - caramel-auth-db-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-caramel} -d ${POSTGRES_DB:-caramel}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${NEXT_PUBLIC_GOOGLE_ANALYTICS_ID:-}
+        NEXT_PUBLIC_API_ENCRYPTION_ENABLED: ${NEXT_PUBLIC_API_ENCRYPTION_ENABLED:-}
+    # App secrets (auth, email, OpenRouter, extension OAuth, …) come from the
+    # app env file. Copy apps/caramel-app/.env.example to apps/caramel-app/.env
+    # first (see README). Optional so a clean checkout / CI can `up` without
+    # one; env.ts still fail-fasts loudly at boot if no BETTER_AUTH_SECRET /
+    # JWT_SECRET is provided.
+    env_file:
+      - path: ./apps/caramel-app/.env
+        required: false
+    environment:
+      # Topology only — the in-container app talks to the postgres SERVICE, so
+      # this overrides whatever localhost value the app .env ships.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-caramel}:${POSTGRES_PASSWORD:-caramel_password}@postgres:5432/${POSTGRES_DB:-caramel}
+      # DELIBERATELY names a database that does NOT exist: zod boot-validation
+      # passes (valid URL shape) but every coupons query fails loudly at request
+      # time — the documented local degraded mode (DESIGN.md §2(j)). This
+      # compose never creates the coupons DB; its schema is externally owned and
+      # must never be modelled here (secrecy forward-rule, DESIGN.md §2(k)).
+      COUPONS_DATABASE_URL: ${COUPONS_DATABASE_URL:-postgresql://caramel:caramel_password@postgres:5432/caramel_coupons}
+    ports:
+      - '${BIND_HOST:-127.0.0.1}:${WEB_PORT:-58000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget (node:22-alpine) — a plain GET on the homepage, which
+      # serves 200 in the local degraded mode. NOT /api/health/db (bearer-gated
+      # and 503 when coupons is down, so unusable as a liveness probe here).
+      test:
+        ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  caramel-auth-db-data:
