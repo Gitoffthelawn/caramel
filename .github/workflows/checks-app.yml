@@ -310,3 +310,78 @@ jobs:
           name: playwright-report-push
           path: apps/caramel-app/playwright-report/
           retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # One-root-compose build (F-016) — clean-volume build + boot + migrate proof
+  # ─────────────────────────────────────────────────────────────
+  compose-build:
+    name: One-root-compose build
+    # PR-only + heavy, like e2e-pr. checks-app.yml is a shared workflow, so it
+    # can't use on.push.paths without gating every other job — a first `git
+    # diff` step path-filters this job instead (mirrors the intent of
+    # ai-evals.yml's path filter). A clean runner gives clean volumes.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect compose-relevant changes
+        id: filter
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}" || true
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" || git diff --name-only "origin/${{ github.base_ref }}" HEAD)"
+          echo "changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -Eq '^(Dockerfile|\.dockerignore|docker-compose\.yml|docker-entrypoint\.sh|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|apps/caramel-app/package\.json|apps/caramel-app/next\.config\.mjs|apps/caramel-app/prisma/|apps/caramel-app/\.env\.example)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No compose-relevant paths changed — skipping the heavy build."
+          fi
+
+      - name: Provide a throwaway app env (auth secret only; compose env overrides the DB URLs)
+        if: steps.filter.outputs.run == 'true'
+        run: printf 'BETTER_AUTH_SECRET=ci_compose_build_throwaway_secret\n' > apps/caramel-app/.env
+
+      - name: Build and boot the stack
+        if: steps.filter.outputs.run == 'true'
+        run: docker compose up -d --build
+
+      - name: Wait for web to become healthy
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          cid="$(docker compose ps -q web)"
+          for i in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo starting)"
+            echo "attempt $i: web=$status"
+            case "$status" in
+              healthy) exit 0 ;;
+              unhealthy)
+                echo '::error::web became unhealthy'
+                docker compose logs web
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+          echo '::error::web did not become healthy in time'
+          docker compose logs web
+          exit 1
+
+      - name: Assert the entrypoint ran prisma migrate deploy
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          docker compose logs web | grep -F '[entrypoint] applying prisma migrate deploy'
+          docker compose logs web | grep -F '[entrypoint] migrations applied'
+
+      - name: Assert the homepage serves 200
+        if: steps.filter.outputs.run == 'true'
+        run: curl -fsS -o /dev/null -w 'homepage HTTP %{http_code}\n' http://127.0.0.1:58000/
+
+      - name: Tear down (clean volumes)
+        if: ${{ always() && steps.filter.outputs.run == 'true' }}
+        run: docker compose down -v
