@@ -48,6 +48,17 @@ ENV NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=$NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
 ENV NEXT_PUBLIC_API_ENCRYPTION_ENABLED=$NEXT_PUBLIC_API_ENCRYPTION_ENABLED
 # Prod build: next.config.mjs only wraps Sentry when NODE_ENV=production.
 ENV NODE_ENV=production
+# Build-time-only placeholders: next build's page-data collection imports
+# route modules, and env.ts eagerly zod-parses at import. These THREE keys are
+# the schema's required set; the values are never read by the running
+# container (the runner stage inherits no builder env — runtime env comes from
+# compose environment/env_file, and instrumentation.ts re-validates the REAL
+# env at boot, so fail-fast is intact). The .invalid TLD is reserved and
+# unresolvable, so any accidental build-time DB connection fails loudly
+# instead of silently reaching a real database.
+ENV DATABASE_URL=postgresql://build-placeholder:build-placeholder@db.build-placeholder.invalid:5432/build_placeholder
+ENV COUPONS_DATABASE_URL=postgresql://build-placeholder:build-placeholder@db.build-placeholder.invalid:5432/build_placeholder
+ENV BETTER_AUTH_SECRET=build-placeholder-not-a-secret
 # caramel-app's `build` script is `npx prisma generate && next build`, so the
 # Prisma client is generated here explicitly (musl engine, same platform as the
 # runner) before the standalone trace.
