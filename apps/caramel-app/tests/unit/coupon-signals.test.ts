@@ -1,4 +1,5 @@
 import { attachSignals } from '@/lib/couponSignals'
+import * as Sentry from '@sentry/nextjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // attachSignals unit pins — the "merge, not SQL join" boundary. Mocks
@@ -23,6 +24,7 @@ const { prismaMock, signalState } = vi.hoisted(() => {
     }
 })
 vi.mock('@/lib/prisma', () => ({ default: prismaMock }))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 
 beforeEach(() => {
     signalState.rows = []
@@ -66,5 +68,26 @@ describe('attachSignals (app-owned lastWorkedAt merge)', () => {
         expect(prismaMock.couponSignal.findMany).toHaveBeenCalledTimes(1)
         const arg = prismaMock.couponSignal.findMany.mock.calls[0]![0]
         expect(arg.where).toEqual({ couponId: { in: ['7', '9'] } })
+    })
+
+    it('a findMany failure (e.g. unmigrated env) degrades to lastWorkedAt:null and reports to Sentry — never throws', async () => {
+        prismaMock.couponSignal.findMany.mockRejectedValueOnce(
+            new Error('relation "coupon_signals" does not exist'),
+        )
+        vi.mocked(Sentry.captureException).mockClear()
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        const out = await attachSignals([
+            { id: '1', code: 'A' },
+            { id: '2', code: 'B' },
+        ])
+
+        expect(out).toEqual([
+            { id: '1', code: 'A', lastWorkedAt: null },
+            { id: '2', code: 'B', lastWorkedAt: null },
+        ])
+        expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+
+        warnSpy.mockRestore()
     })
 })

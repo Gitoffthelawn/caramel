@@ -12,6 +12,7 @@
 // (or mutate) the externally-owned catalog. Signals are keyed by the catalog
 // coupon id as a string, matching the app's Coupon.id: string.
 import prisma from '@/lib/prisma'
+import * as Sentry from '@sentry/nextjs'
 
 /** Extension reported this coupon worked at checkout — bump the work counter and stamp the time. */
 export async function recordWorked(couponId: string): Promise<void> {
@@ -53,23 +54,42 @@ export async function recordFailed(
  * unchanged); the signal comes from OUR Postgres; the two are joined here in
  * application code, never across the DB boundary. Empty-in → empty-out, so a
  * page with no coupons issues no query.
+ *
+ * NON-FATAL: the trust overlay is non-critical. A signal-store failure — or an
+ * environment whose `coupon_signals` migration hasn't run yet — degrades to
+ * no-signal (every coupon's `lastWorkedAt: null`) and is reported to Sentry; it
+ * must NEVER 500 the core coupon listing this result merges into.
  */
 export async function attachSignals<T extends { id: string }>(
     coupons: T[],
 ): Promise<(T & { lastWorkedAt: string | null })[]> {
     if (coupons.length === 0) return []
 
-    const ids = coupons.map(coupon => coupon.id)
-    const signals = await prisma.couponSignal.findMany({
-        where: { couponId: { in: ids } },
-        select: { couponId: true, lastWorkedAt: true },
-    })
-    const workedAtById = new Map(
-        signals.map(signal => [signal.couponId, signal.lastWorkedAt] as const),
-    )
+    try {
+        const ids = coupons.map(coupon => coupon.id)
+        const signals = await prisma.couponSignal.findMany({
+            where: { couponId: { in: ids } },
+            select: { couponId: true, lastWorkedAt: true },
+        })
+        const workedAtById = new Map(
+            signals.map(
+                signal => [signal.couponId, signal.lastWorkedAt] as const,
+            ),
+        )
 
-    return coupons.map(coupon => ({
-        ...coupon,
-        lastWorkedAt: workedAtById.get(coupon.id)?.toISOString() ?? null,
-    }))
+        return coupons.map(coupon => ({
+            ...coupon,
+            lastWorkedAt: workedAtById.get(coupon.id)?.toISOString() ?? null,
+        }))
+    } catch (error) {
+        // Trust overlay is non-critical — degrade LOUDLY (Sentry), never throw.
+        Sentry.captureException(error, {
+            tags: { area: 'couponSignals.attachSignals' },
+        })
+        console.warn(
+            '[couponSignals] attachSignals failed — serving coupons without the trust overlay:',
+            error,
+        )
+        return coupons.map(coupon => ({ ...coupon, lastWorkedAt: null }))
+    }
 }
