@@ -8,5 +8,13 @@
         "prettier-plugin-organize-imports",
         "prettier-plugin-tailwindcss"
     ],
-    "tailwindConfig": "./apps/caramel-app/tailwind.config.ts"
+    "tailwindConfig": "./apps/caramel-app/tailwind.config.ts",
+    "overrides": [
+        {
+            "files": ["*.yml", "*.yaml"],
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
 }

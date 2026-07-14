@@ -42,5 +42,3 @@ next-env.d.ts
 .react-email
 
 **/data/*.json
-
-*.yml

@@ -27,7 +27,16 @@ jobs:
     if: github.event_name != 'schedule'
     strategy:
       matrix:
-        task: ["lint", "prettier", "typecheck", "knip", "unit", "oxlint"]
+        task:
+          [
+            'lint',
+            'prettier',
+            'typecheck',
+            'knip',
+            'unit',
+            'oxlint',
+            'prettier-root',
+          ]
     runs-on: ubuntu-latest
 
     steps:
@@ -60,7 +69,14 @@ jobs:
         name: Run oxlint
         run: pnpm lint:oxlint
 
-      - if: matrix.task != 'oxlint'
+      # prettier-root checks repo-root + .github files (workflows YAML, root
+      # package.json, README, issue templates) that the per-app prettier task
+      # doesn't cover — runs from the repo root, like oxlint.
+      - if: matrix.task == 'prettier-root'
+        name: Run root prettier-check
+        run: pnpm prettier-check:root
+
+      - if: matrix.task != 'oxlint' && matrix.task != 'prettier-root'
         name: Run ${{ matrix.task }}
         working-directory: ./apps/caramel-app
         run: |

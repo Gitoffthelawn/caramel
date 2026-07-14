@@ -8,12 +8,12 @@ on:
 env:
   SAFARI_BUNDLE_ID: ${{ vars.SAFARI_BUNDLE_ID }}
   WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
-  APP_NAME:      ${{ vars.APP_NAME }}
-  MAC_CATEGORY:  ${{ vars.MAC_CATEGORY }}
+  APP_NAME: ${{ vars.APP_NAME }}
+  MAC_CATEGORY: ${{ vars.MAC_CATEGORY }}
 
 jobs:
   package:
-    name: "📦 Package Extension"
+    name: '📦 Package Extension'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,7 +51,7 @@ jobs:
           path: ${{ env.WORKING_DIRECTORY }}/extension.zip
 
   publish_chrome:
-    name: "🚀 Publish to Chrome Web Store"
+    name: '🚀 Publish to Chrome Web Store'
     needs: package
     if: ${{ !contains(github.event.pull_request.title, 'skip=chrome') }}
     runs-on: ubuntu-latest
@@ -67,13 +67,13 @@ jobs:
         with:
           file-path: extension.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id:    ${{ secrets.CHROME_CLIENT_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: false
 
   publish_safari:
-    name: "🚀 Publish to Apple App Store (Safari & iOS)"
+    name: '🚀 Publish to Apple App Store (Safari & iOS)'
     needs: package
     if: ${{ !contains(github.event.pull_request.title, 'skip=apple') }}
     runs-on: macos-latest
@@ -117,7 +117,7 @@ jobs:
           ls -l "/tmp/AuthKey_${ASC_KEY_ID}.p8"
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-          ASC_KEY_ID:        ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
@@ -125,11 +125,11 @@ jobs:
       - name: Get latest versions for macOS and iOS and bump
         id: get_versions
         env:
-          ASC_KEY_ID:         ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID:      ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-          SAFARI_BUNDLE_ID:   ${{ env.SAFARI_BUNDLE_ID }}
-          PR_TITLE:           ${{ github.event.pull_request.title }}
+          SAFARI_BUNDLE_ID: ${{ env.SAFARI_BUNDLE_ID }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           bump="patch"
           title=$(echo "$PR_TITLE" | tr '[:upper:]' '[:lower:]')
@@ -205,17 +205,17 @@ jobs:
         uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
-          p12-password:    ${{ secrets.APPLE_CERT_PASSWORD }}
-          keychain:        signing_temp
+          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          keychain: signing_temp
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Import development cert
         uses: apple-actions/import-codesign-certs@v2
         with:
           create-keychain: false
-          keychain:        signing_temp
+          keychain: signing_temp
           p12-file-base64: ${{ secrets.APPLE_DEV_CERT_P12 }}
-          p12-password:    ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          p12-password: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
       - name: Convert to Safari app (macOS & iOS)
@@ -331,7 +331,7 @@ jobs:
 
       - name: Upload macOS pkg to App Store Connect
         env:
-          ALTOOL_USER:     ${{ secrets.APPLE_ID }}
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
@@ -340,7 +340,7 @@ jobs:
 
       - name: Upload iOS ipa to App Store Connect
         env:
-          ALTOOL_USER:     ${{ secrets.APPLE_ID }}
+          ALTOOL_USER: ${{ secrets.APPLE_ID }}
           ALTOOL_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           xcrun altool --upload-app \
