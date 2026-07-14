@@ -38,7 +38,11 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-}
+        # An empty build.arg would clobber the Dockerfile's ARG default and
+        # trip env.client.ts's min(1) at build time, so the local default
+        # lives here too (platforms override via their env tab beside this
+        # file). The other three are optional strings — "" passes harmlessly.
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:58000}
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
         NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${NEXT_PUBLIC_GOOGLE_ANALYTICS_ID:-}
         NEXT_PUBLIC_API_ENCRYPTION_ENABLED: ${NEXT_PUBLIC_API_ENCRYPTION_ENABLED:-}
