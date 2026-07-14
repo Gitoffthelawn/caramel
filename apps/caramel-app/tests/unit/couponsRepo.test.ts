@@ -25,6 +25,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // schemas/fragment factories wired (couponsRepo imports them too).
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
+// Raw SQL text of every couponsSql call, in order — lets a test assert on
+// the generated QUERY SHAPE itself (mirrors coupons-read-boundary.test.ts).
+let capturedQueries: string[] = []
 function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
 }
@@ -38,6 +41,7 @@ vi.mock('@/lib/couponsDb', async () => {
         ...actual,
         couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
             const sql = strings.join('?')
+            capturedQueries.push(sql)
             const rows = rules.find(r => r.match(sql))?.rows ?? []
             return {
                 // oxlint-disable-next-line no-thenable
@@ -49,6 +53,7 @@ vi.mock('@/lib/couponsDb', async () => {
 
 beforeEach(() => {
     rules = []
+    capturedQueries = []
 })
 
 const couponFixture = {
@@ -134,6 +139,51 @@ describe('listCoupons', () => {
 
         const result = await listCoupons({ limit: 10, skip: 0 })
         expect(result).toEqual({ coupons: [], total: 0 })
+    })
+})
+
+describe('listCoupons discount_type filter (case-insensitive)', () => {
+    it('generates a casing-tolerant predicate so lowercase producer rows are not dropped', async () => {
+        mockRows(
+            sql => sql.includes('FROM coupons') && sql.includes('LIMIT'),
+            [],
+        )
+        mockRows(sql => sql.includes('COUNT(*)'), [{ total: 0 }])
+
+        await listCoupons({ type: 'PERCENTAGE', limit: 10, skip: 0 })
+
+        // Target the discount_type PREDICATE fragment (built by calling the
+        // mocked couponsSql tagged template, so it lands in capturedQueries
+        // verbatim) — matched by shape, not the bare column name, since the
+        // SELECT column list also contains `discount_type`.
+        const predicate = capturedQueries.find(q =>
+            /discount_type\)?\s*=/i.test(q),
+        )
+        expect(predicate).toBeDefined()
+        expect(predicate).toMatch(/UPPER\(discount_type\)\s*=\s*UPPER\(/i)
+        // Guard against a regression to the bare, case-sensitive equality.
+        expect(
+            capturedQueries.some(q => /discount_type\s*=\s*\?/.test(q)),
+        ).toBe(false)
+    })
+
+    it('adds no discount_type filter predicate when type is "all"', async () => {
+        mockRows(
+            sql => sql.includes('FROM coupons') && sql.includes('LIMIT'),
+            [],
+        )
+        mockRows(sql => sql.includes('COUNT(*)'), [{ total: 0 }])
+
+        await listCoupons({ type: 'all', limit: 10, skip: 0 })
+
+        // The SELECT column list names `discount_type`, so assert on the
+        // PREDICATE shape (a `discount_type =` comparison), not the column.
+        const hasTypePredicate = capturedQueries.some(
+            q =>
+                /UPPER\(discount_type\)\s*=/i.test(q) ||
+                /discount_type\s*=\s*\?/.test(q),
+        )
+        expect(hasTypePredicate).toBe(false)
     })
 })
 

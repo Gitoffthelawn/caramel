@@ -100,7 +100,12 @@ export async function listCoupons(
     }
 
     if (type && type !== 'all') {
-        conditions.push(sql`discount_type = ${type}`)
+        // Case-insensitive match: the external producer writes discount_type
+        // in varying casing (the read boundary uppercase-normalizes it — see
+        // couponsDb.ts's CouponListRowSchema), so a case-sensitive `=`
+        // silently dropped lowercase rows (e.g. 'percentage') from filtered
+        // listings. Normalize both sides.
+        conditions.push(sql`UPPER(discount_type) = UPPER(${type})`)
     }
 
     const whereClause = conditions.reduce(
