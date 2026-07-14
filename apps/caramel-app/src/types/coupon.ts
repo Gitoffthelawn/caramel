@@ -27,6 +27,12 @@ export interface Coupon {
     timesUsed: number
     status?: CouponStatus
     verificationMessage?: string | null
+    // App-owned trust signal (W1): ISO timestamp of the last extension-reported
+    // "worked" outcome, attached in app code by couponSignals.ts's
+    // attachSignals() from the coupon_signals table — NOT a column on the
+    // external catalog. Absent/null until the extension starts reporting (W2);
+    // the card/popup render "worked Xh ago" only when it's present and recent.
+    lastWorkedAt?: string | null
 }
 
 export interface CouponFilters {
