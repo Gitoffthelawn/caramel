@@ -79,6 +79,24 @@ export function isTrustedServer(req: NextRequest): boolean {
     return timingSafeEqual(provided, expected)
 }
 
+/**
+ * True for requests carrying the server-only INGEST_API_KEY bearer — the coupons
+ * pipeline supplier's auth for POST /api/ingest/catalog (withRoute's
+ * apiKey:'ingest' gate). Modeled exactly on isTrustedServer: fail-closed on an
+ * unset key, and a constant-time SHA-256 + timingSafeEqual comparison so neither
+ * the match result nor the secret length leaks through timing. A DISTINCT secret
+ * from COUPONS_ADMIN_SECRET (the ingest supplier and the admin/expire caller are
+ * different principals) with its own one checker — never shipped to any client.
+ */
+export function isIngestAuthorized(req: NextRequest): boolean {
+    const secret = env.INGEST_API_KEY
+    if (!secret) return false
+    const auth = req.headers.get('authorization') || ''
+    const provided = createHash('sha256').update(auth).digest()
+    const expected = createHash('sha256').update(`Bearer ${secret}`).digest()
+    return timingSafeEqual(provided, expected)
+}
+
 function buildHeaders(kind: LimitKind, res: RateLimiterRes | null): Headers {
     const h = new Headers()
     h.set('X-RateLimit-Limit', String(LIMITS[kind].points))

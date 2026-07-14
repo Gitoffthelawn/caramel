@@ -38,6 +38,7 @@ import {
     checkRateLimit,
     forbiddenOrigin,
     isExtensionOrigin,
+    isIngestAuthorized,
     isOriginAllowed,
     isTrustedServer,
     type LimitKind,
@@ -132,11 +133,13 @@ export interface RouteConfig<TBody> {
      * isExtensionOrigin() (`'extension'`), which unlike isOriginAllowed()
      * does NOT let a missing Origin through (D5). */
     origin?: boolean | 'extension'
-    /** Server-only COUPONS_ADMIN_SECRET bearer gate (rateLimit.ts's
-     * isTrustedServer) — the ONE api-key checker (CR-8: models
-     * coupons/expire's Authorization: Bearer gate; not a second,
-     * independently-written checker). */
-    apiKey?: 'trustedServer'
+    /** Server-only bearer gate. `'trustedServer'` = COUPONS_ADMIN_SECRET
+     * (rateLimit.ts's isTrustedServer — coupons/expire's Authorization: Bearer
+     * gate + the rate-limit trust exemption). `'ingest'` = INGEST_API_KEY
+     * (rateLimit.ts's isIngestAuthorized — the coupons pipeline supplier's push
+     * to POST /api/ingest/catalog). Distinct secrets, one checker each; never a
+     * second, independently-written comparison. */
+    apiKey?: 'trustedServer' | 'ingest'
     /** better-auth session gate. */
     auth?: 'session'
     /** zod schema the JSON body must satisfy — 422 on mismatch. Omit (or
@@ -183,6 +186,9 @@ export function withRoute<TBody = undefined>(
         }
 
         if (config.apiKey === 'trustedServer' && !isTrustedServer(req)) {
+            return unauthorized(cors)
+        }
+        if (config.apiKey === 'ingest' && !isIngestAuthorized(req)) {
             return unauthorized(cors)
         }
 

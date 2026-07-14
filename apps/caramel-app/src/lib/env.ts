@@ -43,6 +43,12 @@ const serverObjectSchema = z.object({
     // (F-003 retires the old publicly-shipped extension key, which used to
     // do both jobs from a string baked into the shipped extension).
     COUPONS_ADMIN_SECRET: z.string().optional(),
+    // Server-to-server bearer for the coupons pipeline supplier — gates POST
+    // /api/ingest/catalog (src/lib/rateLimit.ts's isIngestAuthorized). New in the
+    // ownership inversion (the pipeline pushes catalog rows to the app). Optional
+    // so a deploy that isn't an ingest target still boots; the route fail-closes
+    // (401) when it's unset. Never shipped to any client.
+    INGEST_API_KEY: z.string().optional(),
     UPKUMA_HEALTH_SECRET: z.string().optional(),
     // Read directly by the usesend-js SDK — not by our own code — but still
     // part of the validated contract so it's documented and drift-checked.
