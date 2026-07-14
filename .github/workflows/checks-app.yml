@@ -2,11 +2,9 @@ name: CI Checks – App
 
 on:
   push:
-    # audit/dev-2026-07-10 is TEMPORARY — remove when the audit branch merges
-    branches: [main, dev, audit/dev-2026-07-10]
+    branches: [main, dev]
   pull_request:
-    # audit/dev-2026-07-10 is TEMPORARY — remove when the audit branch merges
-    branches: [main, dev, audit/dev-2026-07-10]
+    branches: [main, dev]
 
 permissions:
   contents: read
