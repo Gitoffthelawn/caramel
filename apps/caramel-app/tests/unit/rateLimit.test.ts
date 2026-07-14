@@ -1,4 +1,8 @@
-import { checkRateLimit, isExtensionOrigin } from '@/lib/rateLimit'
+import {
+    checkRateLimit,
+    isExtensionOrigin,
+    isTrustedServer,
+} from '@/lib/rateLimit'
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -97,6 +101,64 @@ describe('checkRateLimit', () => {
             )
             expect(result).toBeNull()
         }
+    })
+})
+
+// isTrustedServer now compares in constant time (hash both sides to
+// fixed-length digests, then timingSafeEqual). These pins characterize the
+// functional contract that the timing-safe refactor must preserve exactly:
+// the right secret still grants trust; a wrong secret (whether the same
+// length OR a different length — the latter would make a naive timingSafeEqual
+// throw) is rejected; and it stays fail-closed when the secret is unset or the
+// header is absent.
+describe('isTrustedServer (constant-time admin-secret compare)', () => {
+    it('true for the exact Bearer $COUPONS_ADMIN_SECRET', () => {
+        envMock.COUPONS_ADMIN_SECRET = ADMIN_SECRET
+        expect(
+            isTrustedServer(
+                makeRequest('198.51.100.1', {
+                    authorization: `Bearer ${ADMIN_SECRET}`,
+                }),
+            ),
+        ).toBe(true)
+    })
+
+    it('false for a wrong secret of the SAME length (not merely a length check)', () => {
+        envMock.COUPONS_ADMIN_SECRET = ADMIN_SECRET
+        const sameLengthWrong = 'x'.repeat(ADMIN_SECRET.length)
+        expect(sameLengthWrong.length).toBe(ADMIN_SECRET.length)
+        expect(
+            isTrustedServer(
+                makeRequest('198.51.100.2', {
+                    authorization: `Bearer ${sameLengthWrong}`,
+                }),
+            ),
+        ).toBe(false)
+    })
+
+    it('false for a wrong secret of a DIFFERENT length (timingSafeEqual must not throw)', () => {
+        envMock.COUPONS_ADMIN_SECRET = ADMIN_SECRET
+        expect(
+            isTrustedServer(
+                makeRequest('198.51.100.3', { authorization: 'Bearer short' }),
+            ),
+        ).toBe(false)
+    })
+
+    it('false when COUPONS_ADMIN_SECRET is unset (fail-closed)', () => {
+        envMock.COUPONS_ADMIN_SECRET = undefined
+        expect(
+            isTrustedServer(
+                makeRequest('198.51.100.4', {
+                    authorization: `Bearer ${ADMIN_SECRET}`,
+                }),
+            ),
+        ).toBe(false)
+    })
+
+    it('false when no Authorization header is present', () => {
+        envMock.COUPONS_ADMIN_SECRET = ADMIN_SECRET
+        expect(isTrustedServer(makeRequest('198.51.100.5'))).toBe(false)
     })
 })
 

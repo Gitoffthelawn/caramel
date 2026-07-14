@@ -15,6 +15,7 @@
 import { env } from '@/lib/env'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { RateLimiterMemory, type RateLimiterRes } from 'rate-limiter-flexible'
 
 export type LimitKind = 'read' | 'mutation'
@@ -67,7 +68,15 @@ export function isTrustedServer(req: NextRequest): boolean {
     const secret = env.COUPONS_ADMIN_SECRET
     if (!secret) return false
     const auth = req.headers.get('authorization') || ''
-    return auth === `Bearer ${secret}`
+    // Constant-time comparison: hash both sides to fixed-length 32-byte
+    // SHA-256 digests before timingSafeEqual (which THROWS on length-
+    // mismatched inputs), so neither the match result nor the secret's
+    // length leaks through a timing side-channel. Fail-closed semantics are
+    // unchanged: an unset secret (handled above), a missing header, and a
+    // malformed/wrong header all return false.
+    const provided = createHash('sha256').update(auth).digest()
+    const expected = createHash('sha256').update(`Bearer ${secret}`).digest()
+    return timingSafeEqual(provided, expected)
 }
 
 function buildHeaders(kind: LimitKind, res: RateLimiterRes | null): Headers {
