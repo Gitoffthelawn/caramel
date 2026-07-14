@@ -5,12 +5,16 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  schedule:
+    # Nightly re-audit of prod deps so a new CVE on an unchanged pin surfaces
+    # even with no push. Only the `audit` job runs on this trigger.
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-checks-${{ github.workflow }}-${{ github.ref }}
+  group: ci-checks-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,6 +23,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   test-matrix:
     name: ${{ matrix.task }}
+    # Schedule runs the nightly dependency audit only — skip the quality matrix.
+    if: github.event_name != 'schedule'
     strategy:
       matrix:
         task: ["lint", "prettier", "typecheck", "knip", "unit", "oxlint"]
