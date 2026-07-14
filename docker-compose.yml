@@ -43,11 +43,19 @@ services:
         NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${NEXT_PUBLIC_GOOGLE_ANALYTICS_ID:-}
         NEXT_PUBLIC_API_ENCRYPTION_ENABLED: ${NEXT_PUBLIC_API_ENCRYPTION_ENABLED:-}
     # App secrets (auth, email, OpenRouter, extension OAuth, …) come from the
-    # app env file. Copy apps/caramel-app/.env.example to apps/caramel-app/.env
-    # first (see README). Optional so a clean checkout / CI can `up` without
-    # one; env.ts still fail-fasts loudly at boot if no BETTER_AUTH_SECRET /
-    # JWT_SECRET is provided.
+    # env files below — later file wins on collision, so a local app .env
+    # overrides a stray root one. Both optional so a clean checkout / CI can
+    # `up` without either; env.ts still fail-fasts loudly at boot if no
+    # BETTER_AUTH_SECRET / JWT_SECRET is provided.
     env_file:
+      # Deploy platforms write their Environment tab to a .env file BESIDE
+      # this compose file — this entry is how real secrets reach the container
+      # there. Root .env stays gitignored/untracked (compose-parity gate).
+      - path: ./.env
+        required: false
+      # Local dev's file — the same one `pnpm dev:next` and host-side prisma
+      # read. Copy apps/caramel-app/.env.example to apps/caramel-app/.env
+      # first (see README).
       - path: ./apps/caramel-app/.env
         required: false
     environment:

@@ -7,10 +7,11 @@ import { describe, expect, it } from 'vitest'
 // F-016 one-root-compose parity gate. The migration's durable invariants: ONE
 // root compose runs the real prod service graph (web + postgres, nothing
 // else), pinned (never :latest), the in-container app reaches postgres by
-// service DNS, the root `dev` command IS `docker compose up --build`, and the
-// old local-dev/ Postgres+Redis stack is gone. Each assertion reads the real
-// tracked files, so it fails again the moment any of them drifts — not just
-// today.
+// service DNS, the root `dev` command IS `docker compose up --build`, the
+// old local-dev/ Postgres+Redis stack is gone, and both env_file channels
+// (root .env for deploy platforms, app .env for local dev) stay untracked.
+// Each assertion reads the real tracked files, so it fails again the moment
+// any of them drifts — not just today.
 //
 // The compose file is parsed with small, purpose-built readers rather than a
 // YAML dependency: `yaml` is only a transitive package here (not resolvable
@@ -107,6 +108,14 @@ describe('one-root-compose parity (F-016)', () => {
     it('apps/caramel-app/.env is gitignored and .env.example is tracked', () => {
         expect(gitIsIgnored('apps/caramel-app/.env')).toBe(true)
         expect(gitIsTracked('apps/caramel-app/.env.example')).toBe(true)
+    })
+
+    it('root .env (the deploy-platform env_file) is gitignored and untracked', () => {
+        // Deploy platforms write their Environment tab to a .env beside the
+        // compose file — the env_file entry that carries real secrets into
+        // web there. It must never be commit-able.
+        expect(gitIsIgnored('.env')).toBe(true)
+        expect(gitIsTracked('.env')).toBe(false)
     })
 
     it('the old local-dev/ stack no longer exists', () => {
