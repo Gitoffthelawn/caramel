@@ -62,7 +62,16 @@ ENV BETTER_AUTH_SECRET=build-placeholder-not-a-secret
 # caramel-app's `build` script is `npx prisma generate && next build`, so the
 # Prisma client is generated here explicitly (musl engine, same platform as the
 # runner) before the standalone trace.
-RUN pnpm exec turbo run build --filter=caramel-app
+# pnpm-direct, NOT `turbo run build`: turbo 2's strict env mode passes child
+# tasks only turbo.json-declared vars (this repo declares none) plus
+# framework-inferred NEXT_PUBLIC_*, which strips the build-time placeholders
+# above — and the platform build args — before `next build` sees them.
+# Declaring them in turbo.json would duplicate env.ts's vocabulary into a
+# second drift-prone file. Turbo still earns its keep in the prune stage; in
+# this pruned single-app image the build is one task with no cache anyway
+# (caramel-app has no workspace deps, so `dependsOn: ^build` is empty in
+# practice).
+RUN pnpm --filter caramel-app run build
 
 # Stage a self-contained Prisma CLI + engines for the runner's boot-time
 # `migrate deploy`. prisma is a caramel-app devDependency, so pnpm links it
