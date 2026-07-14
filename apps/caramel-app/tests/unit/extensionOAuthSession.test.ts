@@ -258,7 +258,7 @@ describe('mintExtensionSession — returns the raw session token directly (NF-07
     })
 })
 
-describe('mintExtensionSession — returning user gets a FRESH profile in the response (R-12)', () => {
+describe('mintExtensionSession — returning user gets a FRESH profile in the response (NF-12)', () => {
     it('reassigns user to the update result so name/image reflect the provider, not the stale pre-update row', async () => {
         prismaState.existingUser = {
             id: 'existing-user-id',
@@ -283,7 +283,7 @@ describe('mintExtensionSession — returning user gets a FRESH profile in the re
 
         expect(prismaMock.user.create).not.toHaveBeenCalled()
         expect(prismaMock.user.update).toHaveBeenCalledTimes(1)
-        // Pre-R-12 this returned the stale 'Old Name' / old.png (the update
+        // Pre-NF-12 this returned the stale 'Old Name' / old.png (the update
         // result was discarded). Now the response carries the fresh values.
         expect(result.username).toBe('New Name')
         expect(result.image).toBe('https://example.com/new.png')

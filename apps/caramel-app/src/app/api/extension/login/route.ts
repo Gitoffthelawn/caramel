@@ -25,7 +25,7 @@ export const POST = withRoute(
         // No inner try/catch: an unexpected throw (e.g. better-auth or a
         // malformed upstream response) flows to withRoute's pipeline catch →
         // handleRouteError (Sentry + x-request-id), instead of the old silent
-        // `catch {}` that swallowed it into a bare 500 (R-08).
+        // `catch {}` that swallowed it into a bare 500.
         const response = await auth.api.signInEmail({
             body: { email, password },
             asResponse: true,

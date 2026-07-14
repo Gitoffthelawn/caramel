@@ -3,7 +3,7 @@ import { GET as authorizeGET } from '@/app/api/extension/oauth/authorize/route'
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// R-08 / R-09 — the two extension auth routes used to hide handler errors:
+// The two extension auth routes used to hide handler errors:
 // login/route.ts had a fully silent `catch {}` (no log, no Sentry) and
 // authorize/route.ts had a `console.error`-only 500 that bypassed Sentry and
 // leaked error.message into the body. Both now route every uncaught handler
@@ -53,7 +53,7 @@ beforeEach(() => {
     signInEmailMock.mockReset()
 })
 
-describe('extension/login — a handler throw now reaches Sentry (R-08)', () => {
+describe('extension/login — a handler throw now reaches Sentry', () => {
     it('signInEmail rejecting -> 500 {error:"Internal server error"} + Sentry.captureException + x-request-id (was a silent catch {})', async () => {
         const boom = new Error('better-auth exploded')
         signInEmailMock.mockRejectedValue(boom)
@@ -76,7 +76,7 @@ describe('extension/login — a handler throw now reaches Sentry (R-08)', () => 
     })
 })
 
-describe('extension/oauth/authorize — a handler throw now reaches Sentry (R-09)', () => {
+describe('extension/oauth/authorize — a handler throw now reaches Sentry', () => {
     it('createSignedState throwing -> 500 {error:"Internal server error while getting OAuth URL"} + Sentry.captureException + x-request-id (was console.error only)', async () => {
         const url = new URL('http://localhost/api/extension/oauth/authorize')
         url.searchParams.set('provider', 'google')

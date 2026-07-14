@@ -9,7 +9,7 @@ const extensionDir = resolve(__dirname, '../../caramel-extension')
 // Ref: developer.chrome.com/docs/extensions/develop/concepts/match-patterns
 // Replaces an earlier substring check that could never pass: the manifest
 // deliberately ships one broad 'https://*/*' host pattern, and
-// 'https://*/*'.includes('amazon.com') is always false (R-03 / NF-03).
+// 'https://*/*'.includes('amazon.com') is always false (NF-03).
 function matchPatternMatchesUrl(pattern: string, url: string): boolean {
     if (pattern === '<all_urls>') return true
 
@@ -171,7 +171,7 @@ test.describe('Extension — Supported Sites Validation', () => {
 
         // Guard: the evaluator must discriminate, not rubber-stamp — a helper
         // that returned true for everything would make the loop above vacuous
-        // (R-03 was precisely a check that could never fail correctly).
+        // (NF-03 was precisely a check that could never fail correctly).
         const httpRejectedByHttpsPattern = matchPatternMatchesUrl(
             'https://*/*',
             'http://amazon.com/',

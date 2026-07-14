@@ -133,7 +133,7 @@ export async function mintExtensionSession({
         })
     } else {
         // Reassign `user` so the minted response below reflects the
-        // freshly-updated name/image (R-12 / NF-12). Previously the update ran
+        // freshly-updated name/image (NF-12). Previously the update ran
         // but its result was discarded, so the response was built from the
         // stale pre-update findFirst() row (DB correct, response stale).
         // include:{accounts:true} keeps `user`'s type identical to the create

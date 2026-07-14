@@ -218,7 +218,7 @@ const RAW_SESSION_TOKEN = Buffer.alloc(32, 7).toString('base64url')
 beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
     // mockReset (not mockClear) — a prior test's mockImplementation()
-    // override (e.g. the R-11 gate tests' provider-claim variants) persists
+    // override (e.g. the NF-07 gate tests' provider-claim variants) persists
     // across tests otherwise, since mockClear only wipes call history, not
     // the implementation. Re-arming the default here every time is what
     // makes per-test overrides properly test-local.
@@ -312,7 +312,7 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
         )
 
         expect(res.status).toBe(200)
-        // R-12 / NF-12 fixed: the mint now reassigns `user` to the
+        // NF-12 fixed: the mint now reassigns `user` to the
         // prisma.user.update() result, so the response carries Google's FRESH
         // picture rather than the stale pre-update `null`. username still
         // resolves to the existing `username` (Google carries none), so only
@@ -363,7 +363,7 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
                 return jsonResponse({
                     access_token: 'apple-access-token',
                     // email_verified: true so this still exercises the
-                    // email-required (400) path — R-11's verified-email gate
+                    // email-required (400) path — NF-07's verified-email gate
                     // (403) now runs FIRST and would otherwise intercept a
                     // false claim (that ordering is pinned separately below).
                     id_token: buildAppleIdToken({
@@ -446,12 +446,12 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
     })
 })
 
-// R-11 — the mint is gated on the PROVIDER's verified-email claim (Google
+// NF-07 — the mint is gated on the PROVIDER's verified-email claim (Google
 // userinfo `verified_email`; Apple ID-token `email_verified`, boolean OR the
 // string "true"/"false"), mirroring better-auth's social-login semantics.
 // Absent/false -> 403 with a named error, no user/session write. Present+true
 // -> mint proceeds even when the local User row is emailVerified:false.
-describe('extension/oauth (exchange) — emailVerified gate (R-11)', () => {
+describe('extension/oauth (exchange) — emailVerified gate (NF-07)', () => {
     const redirectUri = 'https://abc123.chromiumapp.org/'
 
     function googleFetch(verifiedEmail: unknown, hasVerifiedKey = true) {

@@ -190,7 +190,7 @@ export const POST = withRoute(
                     )
                 }
 
-                // R-11 — gate the mint on the PROVIDER's verified-email claim,
+                // NF-07 — gate the mint on the PROVIDER's verified-email claim,
                 // mirroring better-auth's own social-login semantics. Google's
                 // userinfo returns a real boolean `verified_email`; anything
                 // other than an explicit `true` (absent or false) refuses the
@@ -315,7 +315,7 @@ export const POST = withRoute(
                     name: null, // Name is not available in ID token when using email-only scope
                 }
 
-                // R-11 — gate the mint on the PROVIDER's verified-email claim,
+                // NF-07 — gate the mint on the PROVIDER's verified-email claim,
                 // mirroring better-auth's own social-login semantics. Absent or
                 // false refuses the mint (403) before any user/session write —
                 // and before the email-required check below.

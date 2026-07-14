@@ -175,7 +175,7 @@ export const GET = withRoute(
             console.error('OAuth authorization URL error:', error)
             // Route through the one error exit (Sentry + x-request-id) rather
             // than the old console.error-only 500 that bypassed Sentry and
-            // leaked error.message into the response body (R-09).
+            // leaked error.message into the response body.
             return handleRouteError(error, {
                 req,
                 message: 'Internal server error while getting OAuth URL',
