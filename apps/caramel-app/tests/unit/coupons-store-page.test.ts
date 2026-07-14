@@ -40,6 +40,14 @@ vi.mock('@/components/coupons/coupons-section', () => ({
     default: () => null,
 }))
 
+// The store page now calls attachSignals(), which reads the app-owned
+// coupon_signals table via @/lib/prisma. Mock it so no real PrismaClient is
+// constructed (the unit CI job doesn't run `prisma generate`) and the merge
+// sees no signals → each coupon gets lastWorkedAt:null (asserted below).
+vi.mock('@/lib/prisma', () => ({
+    default: { couponSignal: { findMany: vi.fn(async () => []) } },
+}))
+
 beforeEach(() => {
     rules = []
 })
@@ -91,7 +99,14 @@ describe('StoreCouponsPage — CouponListRow + TotalCountRow', () => {
         // int4-number id all normalized correctly, flowing all the way into
         // the props the client component receives.
         expect(couponsSectionEl.props.initialCoupons).toEqual([
-            { ...couponFixture, id: '42', rating: 4.5, discount_amount: 10 },
+            {
+                ...couponFixture,
+                id: '42',
+                rating: 4.5,
+                discount_amount: 10,
+                // attachSignals merges this on; no seeded signal → null.
+                lastWorkedAt: null,
+            },
         ])
         expect(couponsSectionEl.props.initialTotal).toBe(1)
 

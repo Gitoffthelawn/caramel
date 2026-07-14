@@ -27,6 +27,26 @@ const escHtml = s =>
             })[ch],
     )
 
+// Twin of the app's src/lib/relativeTime.ts formatWorkedAgo() — the app-owned
+// "worked Xh ago" trust signal (W1). The two live across the app/extension
+// runtime boundary and can't share a module, so this small formatter is a
+// deliberate duplicate kept in step with its app-side twin by hand. Returns
+// "worked Xh ago" / "worked Xd ago" for a recent lastWorkedAt ISO string
+// (whole hours under a day, whole days otherwise), or '' when it's absent,
+// unparseable, in the future, or older than 7 days (render nothing).
+const formatWorkedAgo = iso => {
+    if (!iso) return ''
+    const then = Date.parse(iso)
+    if (Number.isNaN(then)) return ''
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    const diffMs = Date.now() - then
+    if (diffMs < 0 || diffMs > 7 * DAY_MS) return ''
+    return diffMs < DAY_MS
+        ? `worked ${Math.floor(diffMs / HOUR_MS)}h ago`
+        : `worked ${Math.floor(diffMs / DAY_MS)}d ago`
+}
+
 /* ------------------------------------------------------------ */
 /*  Globals                                                     */
 /* ------------------------------------------------------------ */
@@ -676,11 +696,16 @@ function renderCouponsView(coupons, user, domain) {
                           const badge = bd
                               ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
                               : ''
+                          // App-owned trust signal (W1): "worked Xh ago" when
+                          // the extension last reported this coupon working
+                          // (<7 days). '' (unshown) until W2 wires the report.
+                          const workedAgo = formatWorkedAgo(c.lastWorkedAt)
                           return `
             <div data-code="${escHtml(c.code)}" role="button" tabindex="0" aria-label="${escHtml((c.title || 'Coupon') + ' — copy code ' + c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}${isDead ? ' coupon-item-dead' : ''}">
               <div class="coupon-head">
                 <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
                 ${badge}
+                ${workedAgo ? `<span class="coupon-worked-ago" style="color:#15803d;font-size:11px;font-weight:600">${escHtml(workedAgo)}</span>` : ''}
               </div>
               ${c.description ? `<div class="coupon-desc">${escHtml(c.description)}</div>` : ''}
               ${warning}

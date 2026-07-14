@@ -1,5 +1,6 @@
 import { handleRouteError } from '@/lib/api/handleRouteError'
 import { withRoute } from '@/lib/api/withRoute'
+import { attachSignals } from '@/lib/couponSignals'
 import { listCoupons } from '@/lib/couponsRepo'
 import { NextResponse } from 'next/server'
 
@@ -65,11 +66,27 @@ export const GET = withRoute(
 
             const hasMore = skip + coupons.length < total
 
+            // Attach the app-owned trust signal (lastWorkedAt) from
+            // coupon_signals — a keyed lookup in OUR Postgres merged in app
+            // code, NOT a join into the external read-only catalog (which has
+            // no such column). Empty signals → each coupon gets
+            // lastWorkedAt:null, which the card simply doesn't render; that's
+            // the normal state until the extension starts reporting (W2). The
+            // 60s edge cache below is kept as-is — this signal is low-stakes,
+            // so 60s of staleness is fine.
+            const couponsWithSignals = await attachSignals(coupons)
+
             // 60s edge cache with a 60s grace window. Coupons change on a
             // scrape cycle (minutes-hours), so 60s staleness is invisible
             // to users and offloads almost all scraping traffic to CDN.
             return NextResponse.json(
-                { coupons, page, limit, total, hasMore },
+                {
+                    coupons: couponsWithSignals,
+                    page,
+                    limit,
+                    total,
+                    hasMore,
+                },
                 {
                     headers: {
                         'Cache-Control':

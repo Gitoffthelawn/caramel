@@ -1,4 +1,5 @@
 import CouponsSection from '@/components/coupons/coupons-section'
+import { attachSignals } from '@/lib/couponSignals'
 import { listStoreCoupons } from '@/lib/couponsRepo'
 import { BASE_URL } from '@/lib/env.client'
 import type { Coupon } from '@/types/coupon'
@@ -48,8 +49,14 @@ async function fetchStoreCoupons(storeParam: string) {
     // boundary doesn't need updating every time the Python producer adds a
     // status value. The data is already runtime-validated at this point;
     // the cast just reconciles the two independently-declared TS shapes.
+    //
+    // attachSignals merges the app-owned lastWorkedAt (from coupon_signals in
+    // OUR Postgres) onto each row so the SSR HTML and the client fetch agree —
+    // the store page must attach it too, or its server-rendered cards would
+    // never show "worked Xh ago". Empty signals → lastWorkedAt:null (unshown).
     const { coupons, total } = await listStoreCoupons(base, PAGE_SIZE)
-    return { coupons: coupons as Coupon[], total, base }
+    const couponsWithSignals = await attachSignals(coupons)
+    return { coupons: couponsWithSignals as Coupon[], total, base }
 }
 
 export async function generateMetadata({

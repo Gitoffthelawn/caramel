@@ -71,6 +71,16 @@ vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,
 }))
 
+// coupons/route.ts now imports attachSignals → @/lib/prisma; mock it so
+// importing the route never constructs a real PrismaClient (the unit CI job
+// doesn't run `prisma generate`). These pins drive the route with an empty
+// coupon list (couponsSql resolves to []), so attachSignals short-circuits
+// before any findMany — this mock is purely to keep the import graph off the
+// real client.
+vi.mock('@/lib/prisma', () => ({
+    default: { couponSignal: { findMany: vi.fn(async () => []) } },
+}))
+
 beforeEach(() => {
     calls.length = 0
     callValues.length = 0

@@ -40,6 +40,15 @@ vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,
 }))
 
+// coupons/route.ts now imports attachSignals → @/lib/prisma; mock it so
+// importing the route never constructs a real PrismaClient (the unit CI job
+// doesn't run `prisma generate`). The couponsSql mock above throws inside
+// listCoupons, so the route hits its catch BEFORE attachSignals ever runs —
+// this mock exists only to keep the import graph off the real client.
+vi.mock('@/lib/prisma', () => ({
+    default: { couponSignal: { findMany: vi.fn(async () => []) } },
+}))
+
 beforeEach(() => {
     captureExceptionMock.mockClear()
 })

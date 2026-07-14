@@ -2,6 +2,7 @@
 
 import type { CouponStatusTier } from '@/lib/coupons'
 import { STATUS_META } from '@/lib/coupons'
+import { formatWorkedAgo } from '@/lib/relativeTime'
 import type { Coupon } from '@/types/coupon'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
@@ -43,6 +44,11 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             : `$${coupon.discount_amount}`
         : '20%'
 
+    // App-owned trust signal (W1) — "worked Xh ago" when the extension last
+    // reported this coupon working, and only if that was recent (<7 days).
+    // null (unshown) is the normal state until the extension starts reporting.
+    const workedAgo = formatWorkedAgo(coupon.lastWorkedAt)
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -77,6 +83,11 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                     {(coupon.timesUsed ?? 0) > 0 && (
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                             {coupon.timesUsed} used today
+                        </p>
+                    )}
+                    {workedAgo && (
+                        <p className="text-xs font-medium text-green-700 dark:text-green-400">
+                            {workedAgo}
                         </p>
                     )}
                     {coupon.status && STATUS_META[coupon.status] && (

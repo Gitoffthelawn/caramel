@@ -67,6 +67,16 @@ vi.mock('@/lib/rateLimit', () => ({
         }),
 }))
 
+// coupons/route.ts now calls attachSignals(), which reads the app-owned
+// coupon_signals table via @/lib/prisma. Mock it so (a) no real PrismaClient
+// is constructed — the unit CI job doesn't run `prisma generate` — and (b) the
+// merge sees no signals, so each coupon gets lastWorkedAt:null (asserted
+// below). The other routes in this file don't touch prisma; the mock is inert
+// for them.
+vi.mock('@/lib/prisma', () => ({
+    default: { couponSignal: { findMany: vi.fn(async () => []) } },
+}))
+
 const { captureExceptionMock } = vi.hoisted(() => ({
     captureExceptionMock: vi.fn(),
 }))
@@ -118,6 +128,8 @@ describe('GET /api/coupons — list+count (CouponListRow + TotalCountRow)', () =
             id: '42',
             rating: 4.5,
             discount_amount: 10,
+            // attachSignals merges this on; no seeded signal → null.
+            lastWorkedAt: null,
         })
         expect(body.total).toBe(1)
         expect(body.hasMore).toBe(false)
