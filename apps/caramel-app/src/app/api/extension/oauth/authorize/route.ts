@@ -1,3 +1,4 @@
+import { handleRouteError } from '@/lib/api/handleRouteError'
 import { preflight, withRoute } from '@/lib/api/withRoute'
 import { env } from '@/lib/env'
 import { BASE_URL } from '@/lib/env.client'
@@ -172,12 +173,13 @@ export const GET = withRoute(
             }
         } catch (error) {
             console.error('OAuth authorization URL error:', error)
-            return NextResponse.json(
-                {
-                    error: `Internal server error while getting OAuth URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                },
-                { status: 500 },
-            )
+            // Route through the one error exit (Sentry + x-request-id) rather
+            // than the old console.error-only 500 that bypassed Sentry and
+            // leaked error.message into the response body (R-09).
+            return handleRouteError(error, {
+                req,
+                message: 'Internal server error while getting OAuth URL',
+            })
         }
     },
 )
