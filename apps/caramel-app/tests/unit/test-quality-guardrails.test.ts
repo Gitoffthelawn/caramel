@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Test-quality guardrails (E-08, "rules become checks") — two flakiness/focus
+// Test-quality guardrails ("rules become checks", CLAUDE.md) — two flakiness/focus
 // hazards a grep can catch at commit/CI time across every suite in both
 // packages:
 //
@@ -89,7 +89,7 @@ function matchSleep(content: string): string | null {
     return SLEEP_MATCHERS.find(m => m.re.test(content))?.name ?? null
 }
 
-describe('test-quality-guardrails (E-08)', () => {
+describe('test-quality-guardrails (rules become checks)', () => {
     it('no `.only(` under tests/** or e2e/** in either package', () => {
         const files = ONLY_SCAN_DIRS.flatMap(walk)
         expect(files.length).toBeGreaterThan(0) // sanity: the walk found tests
