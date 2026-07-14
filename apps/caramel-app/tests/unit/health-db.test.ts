@@ -59,8 +59,24 @@ describe('GET /api/health/db — dual-DB probe (F-001)', () => {
         expect(res.status).toBe(401)
     })
 
-    it('wrong bearer value -> 401', async () => {
+    // authorize() now compares in constant time (sha256-digest both sides,
+    // then timingSafeEqual — mirrors rateLimit.ts's isTrustedServer). The
+    // two wrong-bearer pins below characterize the contract that refactor
+    // must preserve: rejection by CONTENT at the same length (not merely a
+    // length check), and no throw on a DIFFERENT length (raw timingSafeEqual
+    // throws on length-mismatched inputs; the fixed-length digests prevent
+    // that). Unset-secret and missing-header fail-closed pins are above.
+    it('wrong bearer of a DIFFERENT length -> 401 (timingSafeEqual must not throw)', async () => {
         const res = await GET(makeRequest({ authorization: 'Bearer wrong' }))
+        expect(res.status).toBe(401)
+    })
+
+    it('wrong bearer of the SAME length as the secret -> 401 (not merely a length check)', async () => {
+        const sameLengthWrong = 'x'.repeat('test-health-secret'.length)
+        expect(sameLengthWrong.length).toBe('test-health-secret'.length)
+        const res = await GET(
+            makeRequest({ authorization: `Bearer ${sameLengthWrong}` }),
+        )
         expect(res.status).toBe(401)
     })
 
