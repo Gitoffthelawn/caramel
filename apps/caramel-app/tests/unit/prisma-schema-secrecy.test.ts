@@ -19,11 +19,17 @@ import { describe, expect, it } from 'vitest'
 // residual") and deliberately NOT scanned — rewriting committed migration
 // history is a bigger risk than the residual.
 //
-// One legitimate member of the Verification family is allowlisted:
-// better-auth's `Verification` model mapped to `verification_tokens` — auth
-// email-verification tokens, NOT the coupons-DB verification schema §2(k)
-// protects. Keyed by BOTH its model name and its mapped table, so any OTHER
-// Verification*/verification_* entity (a real coupons-DB leak) still fails.
+// Two legitimate members of the banned families are allowlisted, each an
+// app-owned entity that is NOT the external coupons catalog:
+//   - better-auth's `Verification` model mapped to `verification_tokens` —
+//     auth email-verification tokens, NOT the coupons-DB verification schema
+//     §2(k) protects. Keyed by BOTH its model name and its mapped table.
+//   - `CouponSignal` (W1) — app-owned "did this coupon work?" trust telemetry
+//     in OUR Postgres, mapped `coupon_signals` (NOT `coupons`). It reuses the
+//     Coupon* prefix but stores none of the external catalog's data, so it is
+//     allowlisted by MODEL NAME only. The allowlist stays surgical: any OTHER
+//     Coupon*/Verification*/Source* entity, or a `@@map("coupons")`/`sources`/
+//     `verification_*` target, is still a real coupons-DB leak and still fails.
 
 const REPO_ROOT = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -36,9 +42,10 @@ const SCHEMA_PATH = path.join(
 
 const BANNED_NAME_RE = /^(Coupon|Source|Verification)/i
 
-// Exact auth entities that share the Verification family prefix but are NOT
-// the coupons schema — the ONLY permitted members of the banned families.
-const ALLOWLISTED_MODEL_NAMES = new Set(['Verification'])
+// Exact app-owned entities that share a banned family prefix but are NOT the
+// external coupons schema — the ONLY permitted members of the banned families
+// (better-auth's Verification, and W1's app-owned CouponSignal telemetry).
+const ALLOWLISTED_MODEL_NAMES = new Set(['Verification', 'CouponSignal'])
 const ALLOWLISTED_MAP_TARGETS = new Set(['verification_tokens'])
 
 function isBannedMapTarget(target: string): boolean {
@@ -94,6 +101,29 @@ describe('prisma-schema-secrecy (DESIGN §2(k) forward-rule)', () => {
         const schema = fs.readFileSync(SCHEMA_PATH, 'utf8')
         expect(schema).toMatch(/\bmodel\s+Verification\b/)
         expect(schema).toMatch(/@@map\("verification_tokens"\)/)
+    })
+
+    it('allowlists app-owned CouponSignal by MATCHING it, while a rogue catalog Coupon model is STILL caught (surgical, not a hole)', () => {
+        // Same "match, not absence" guard for the W1 telemetry model: the
+        // schema really contains CouponSignal → coupon_signals, so the green
+        // result above is the allowlist working, not the model missing.
+        const schema = fs.readFileSync(SCHEMA_PATH, 'utf8')
+        expect(schema).toMatch(/\bmodel\s+CouponSignal\b/)
+        expect(schema).toMatch(/@@map\("coupon_signals"\)/)
+
+        // The allowlist exempts EXACTLY `CouponSignal`, nothing broader: a
+        // rogue model reusing the Coupon* prefix and mapping the real
+        // `coupons` catalog table is still flagged as a leak.
+        const rogue = [
+            'model Coupon {',
+            '  id String @id',
+            '  @@map("coupons")',
+            '}',
+        ].join('\n')
+        const rogueNames = findBannedSchemaEntities(rogue)
+            .map(v => v.name)
+            .sort()
+        expect(rogueNames).toEqual(['Coupon', 'coupons'].sort())
     })
 
     it('the gate itself catches a coupons-DB schema leak (red-proof)', () => {

@@ -77,6 +77,29 @@ model User {
   @@map("users")
 }
 
+// App-owned trust telemetry (W1 of the Coupons Ownership Inversion + Trust
+// Loop). Records the extension's "did this coupon work?" outcomes, keyed by
+// the external catalog's coupon id (a string, matching the app's
+// Coupon.id: string). Fed by POST /api/coupons/[id]/report and read back via
+// attachSignals() to surface "worked Xh ago" on the web card + popup. This
+// lives in OUR Postgres (DATABASE_URL) and is distinct from — never a mirror
+// of — the external read-only caramel_coupons catalog, whose schema the
+// Python service owns and which must never be modelled here (secrecy
+// forward-rule, DESIGN.md §2(k); the CouponSignal name is the one narrow,
+// deliberately-allowlisted exception in prisma-schema-secrecy.test.ts).
+model CouponSignal {
+  couponId       String    @id @map("coupon_id")
+  lastWorkedAt   DateTime? @map("last_worked_at")
+  lastFailedAt   DateTime? @map("last_failed_at")
+  workCount      Int       @default(0) @map("work_count")
+  failCount      Int       @default(0) @map("fail_count")
+  lastFailReason String?   @map("last_fail_reason")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("coupon_signals")
+}
+
 enum UserStatus {
   ACTIVE_USER
   DELETE_REQUESTED_BY_USER
