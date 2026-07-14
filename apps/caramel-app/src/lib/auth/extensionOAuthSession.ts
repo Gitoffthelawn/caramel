@@ -11,19 +11,23 @@
 // exchanges its OAuth `code` for tokens itself (chrome.identity can't do
 // a normal browser redirect back through better-auth's own callback), so
 // this route needs to mint a session from an ALREADY-COMPLETED provider
-// exchange. better-auth 1.5.3 has no PUBLIC server API for that — only
-// the INTERNAL, version-unstable `auth.$context.internalAdapter.createSession`
-// (used today only by admin-impersonate). PLAN-F-007.md's STOP-DESIGN
-// ruling: centralize the existing raw-Prisma mint rather than adopt that
-// internal API, since doing so would change the issued token's shape —
-// a security-surface risk out of proportion for a High/modularity fix.
-// Trigger to revisit: a characterization test proving a
-// internalAdapter-minted token authenticates via /api/auth/get-session +
-// bearer identically to today's token — until then, this stays raw
-// Prisma. DELETE WHEN: better-auth ships a public API for this
-// (park as a new finding — see PLAN-F-007.md §Approach).
-import { env } from '@/lib/env'
-import { BASE_URL } from '@/lib/env.client'
+// exchange. better-auth (1.6.23 installed) has no PUBLIC server API for
+// that — only the INTERNAL, version-unstable
+// `auth.$context.internalAdapter.createSession`. So the mint writes the
+// Session row itself and returns the RAW session token as the
+// extension's bearer credential. That token authenticates as-is:
+// better-auth's bearer plugin signs a dot-less bearer with the auth
+// secret on the fly, verifies it, and resolves the session from the raw
+// token (dist/plugins/bearer in 1.6.23). An earlier version self-fetched
+// our own auth API here to trade the raw token for a
+// bearer-plugin-issued one; that fetch was structurally dead in BOTH
+// halves — better-auth 1.6.23 registers /get-session (the code fetched
+// /api/auth/session → 404 every time), and even the correct path
+// requires a SIGNED session cookie while the mint only holds the raw
+// token — so every mint ever shipped returned the raw token, and the
+// dead fetch was deleted (NF-07). Parked per DESIGN.md §2(c): adopt
+// better-auth's own mint once a public external-code-exchange API
+// exists.
 import prisma from '@/lib/prisma'
 import { randomBytes } from 'crypto'
 
@@ -65,13 +69,10 @@ export class ExtensionOAuthEmailRequiredError extends Error {
 }
 
 /**
- * Finds-or-creates the User + Account link, mints a 7-day raw session
- * token, and resolves a bearer token for it (via better-auth's own
- * /api/auth/session bearer-issuance, falling back to the raw session
- * token if that self-fetch fails) — wire-identical to what the Google
- * and Apple branches of extension/oauth's POST each did independently
- * pre-F-007 (see PLAN-F-007.md §Premise correction: the mint lives here,
- * not in oauth/redirect).
+ * Finds-or-creates the User + Account link, mints a 7-day session, and
+ * returns the raw session token as `token` — the extension's bearer
+ * credential (better-auth's bearer plugin verifies it as-is; see the
+ * module header).
  */
 export async function mintExtensionSession({
     provider,
@@ -192,32 +193,8 @@ export async function mintExtensionSession({
         },
     })
 
-    // Generate bearer token. Better-auth's bearer plugin issues one based
-    // on a live session cookie — self-fetch our own /api/auth/session
-    // with the just-minted session cookie to get it. If that fails for
-    // any reason, fall back to the raw session token itself, which the
-    // extension can also use to authenticate.
-    let authToken: string | null = null
-    try {
-        const baseURL = env.BETTER_AUTH_URL || BASE_URL
-        const bearerTokenResponse = await fetch(`${baseURL}/api/auth/session`, {
-            method: 'GET',
-            headers: {
-                Cookie: `better-auth.session_token=${sessionToken}`,
-            },
-        })
-        if (bearerTokenResponse.ok) {
-            authToken = bearerTokenResponse.headers.get('set-auth-token')
-        }
-    } catch (error) {
-        console.error('Error getting bearer token:', error)
-    }
-    if (!authToken) {
-        authToken = sessionToken
-    }
-
     return {
-        token: authToken,
+        token: sessionToken,
         username: user.username || user.name || user.email || null,
         image: user.image || null,
     }

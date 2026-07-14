@@ -2,7 +2,7 @@ import {
     ExtensionOAuthEmailRequiredError,
     mintExtensionSession,
 } from '@/lib/auth/extensionOAuthSession'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // F-007 — extensionOAuthSession unit tests (PLAN-F-007.md §Test
 // strategy): google+apple both drive the SAME mintExtensionSession() and
@@ -11,14 +11,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // through the real POST /api/extension/oauth handler (HTTP-level,
 // end-to-end); this file exercises the module directly (unit-level),
 // covering shapes route-pipeline.test.ts doesn't (e.g. account-token
-// refresh on re-auth).
-
-const { envMock } = vi.hoisted(() => ({
-    envMock: {
-        BETTER_AUTH_URL: 'http://localhost:58000' as string | undefined,
-    },
-}))
-vi.mock('@/lib/env', () => ({ env: envMock }))
+// refresh on re-auth). The token every mint returns is the RAW session
+// token — the module's dead bearer self-fetch was deleted (NF-07), so
+// there is no fetch (and no env read) anywhere in the mint.
 
 const { prismaMock, prismaState } = vi.hoisted(() => {
     const prismaState = {
@@ -76,24 +71,7 @@ const { prismaMock, prismaState } = vi.hoisted(() => {
 })
 vi.mock('@/lib/prisma', () => ({ default: prismaMock }))
 
-const fetchMock = vi.fn(
-    async () =>
-        new Response(null, {
-            status: 200,
-            headers: { 'set-auth-token': 'bearer-token-xyz' },
-        }),
-)
-
 beforeEach(() => {
-    vi.stubGlobal('fetch', fetchMock)
-    fetchMock.mockClear()
-    fetchMock.mockImplementation(
-        async () =>
-            new Response(null, {
-                status: 200,
-                headers: { 'set-auth-token': 'bearer-token-xyz' },
-            }),
-    )
     prismaState.existingUser = null
     prismaState.existingAccount = null
     for (const fn of [
@@ -140,7 +118,11 @@ describe('mintExtensionSession — google and apple produce the SAME shape (the 
                 tokens: { accessToken: 'at', idToken: 'it' },
             })
 
-            expect(result.token).toBe('bearer-token-xyz')
+            // The mint returns the RAW session token — exactly the token it
+            // wrote to the Session row (NF-07: no bearer self-fetch exists).
+            expect(result.token).toBe(
+                prismaMock.session.create.mock.calls[0][0].data.token,
+            )
             expect(result.username).toBe(
                 providerUser.name ?? providerUser.email,
             )
@@ -237,33 +219,27 @@ describe('mintExtensionSession — no email, no existing account', () => {
             providerUser: { id: 'apple-id-1', email: null },
             tokens: {},
         })
-        expect(result.token).toBe('bearer-token-xyz')
+        expect(result.token).toBe(
+            prismaMock.session.create.mock.calls[0][0].data.token,
+        )
         expect(prismaMock.user.create).not.toHaveBeenCalled()
     })
 })
 
-describe('mintExtensionSession — bearer self-fetch fails', () => {
-    it('falls back to the raw session token rather than null/undefined', async () => {
-        fetchMock.mockImplementation(
-            async () => new Response(null, { status: 401 }),
-        )
-        const result = await mintExtensionSession({
-            provider: 'google',
-            providerUser: {
-                id: 'g1',
-                email: 'x@example.com',
-                emailVerified: true,
-            },
-            tokens: {},
-        })
-        expect(typeof result.token).toBe('string')
-        expect(result.token.length).toBeGreaterThan(0)
-        expect(result.token).not.toBe('bearer-token-xyz')
+// Replaces the old "bearer self-fetch fails -> falls back to the raw session
+// token" pins: the self-fetch was structurally dead (404 path + unsigned
+// cookie) and has been DELETED (NF-07), so the raw token isn't a fallback —
+// it's the one and only return path, and the mint performs no fetch at all.
+describe('mintExtensionSession — returns the raw session token directly (NF-07: dead bearer self-fetch deleted)', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
     })
 
-    it('a thrown fetch (network error) also falls back to the raw session token, not an unhandled rejection', async () => {
-        fetchMock.mockImplementation(async () => {
-            throw new Error('network down')
+    it('the returned token IS the Session row token, and the mint never fetches', async () => {
+        vi.stubGlobal('fetch', () => {
+            throw new Error(
+                'mintExtensionSession must not fetch — the bearer self-fetch was deleted (NF-07)',
+            )
         })
         const result = await mintExtensionSession({
             provider: 'google',
@@ -276,6 +252,9 @@ describe('mintExtensionSession — bearer self-fetch fails', () => {
         })
         expect(typeof result.token).toBe('string')
         expect(result.token.length).toBeGreaterThan(0)
+        expect(result.token).toBe(
+            prismaMock.session.create.mock.calls[0][0].data.token,
+        )
     })
 })
 

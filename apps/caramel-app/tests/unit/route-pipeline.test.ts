@@ -25,7 +25,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 //    extensionOAuthSession.ts (4b) and BEFORE the route was wrapped in
 //    withRoute (4c) — the {token,username,image} shape, the CORS
 //    reflection, and every 400 in this file are wire-identical
-//    characterizations, not new behavior.
+//    characterizations, not new behavior. (Later delta: the mint's dead
+//    bearer self-fetch was deleted — NF-07 — so the token pins are now
+//    the RAW session token; in production that is what every mint had
+//    ALWAYS returned, the mocked self-fetch success was unreachable in
+//    reality.)
 
 // NOTE: oauth/route.ts and oauth/authorize/route.ts both read
 // env.EXTENSION_OAUTH_STATE_SECRET / env.CHROME_EXTENSION_ORIGIN into a
@@ -70,10 +74,11 @@ vi.mock('node:crypto', async importOriginal => {
     const actual = await importOriginal<typeof import('node:crypto')>()
     return {
         ...actual,
-        // Deterministic session tokens so the raw-token fallback path (the
-        // bearer self-fetch failing) can be pinned to an EXACT value —
-        // real randomBytes would make that assertion impossible. Buffer is
-        // a Node global (not a node:crypto export), so it's used directly.
+        // Deterministic session tokens so the raw session token the mint
+        // returns (its only token path — NF-07 deleted the dead bearer
+        // self-fetch) can be pinned to an EXACT value — real randomBytes
+        // would make that assertion impossible. Buffer is a Node global
+        // (not a node:crypto export), so it's used directly.
         randomBytes: (size: number) => Buffer.alloc(size, 7),
     }
 })
@@ -197,24 +202,26 @@ async function defaultFetchImpl(input: RequestInfo | URL): Promise<Response> {
             }),
         })
     }
-    if (url.includes('/api/auth/session')) {
-        return new Response(null, {
-            status: 200,
-            headers: { 'set-auth-token': 'bearer-token-xyz' },
-        })
-    }
+    // NOTE deliberately NO branch for our own /api/auth/* here: the mint's
+    // bearer self-fetch was deleted (NF-07), so any fetch back into our own
+    // app is a regression and hits the throw below loudly.
     throw new Error(`route-pipeline.test.ts: unexpected fetch to ${url}`)
 }
 
 const fetchMock = vi.fn(defaultFetchImpl)
 
+// The raw session token every mint returns — deterministic via the
+// node:crypto randomBytes stub above (32 bytes of 0x07). NF-07: the raw
+// token isn't a fallback anymore; it's the mint's only token path.
+const RAW_SESSION_TOKEN = Buffer.alloc(32, 7).toString('base64url')
+
 beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
     // mockReset (not mockClear) — a prior test's mockImplementation()
-    // override (e.g. "bearer self-fetch fails") persists across tests
-    // otherwise, since mockClear only wipes call history, not the
-    // implementation. Re-arming the default here every time is what makes
-    // per-test overrides properly test-local.
+    // override (e.g. the R-11 gate tests' provider-claim variants) persists
+    // across tests otherwise, since mockClear only wipes call history, not
+    // the implementation. Re-arming the default here every time is what
+    // makes per-test overrides properly test-local.
     fetchMock.mockReset()
     fetchMock.mockImplementation(defaultFetchImpl)
     prismaState.existingUser = null
@@ -252,7 +259,7 @@ function exchangeRequest(
 }
 
 describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)', () => {
-    it('Google, brand-new user: 200 {token,username,image} via the bearer self-fetch, user/account/session all created once', async () => {
+    it('Google, brand-new user: 200 {token,username,image} with the raw session token, user/account/session all created once', async () => {
         const redirectUri = 'https://abc123.chromiumapp.org/'
         const state = signState({ provider: 'google', redirectUri })
 
@@ -267,7 +274,7 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
 
         expect(res.status).toBe(200)
         expect(await res.json()).toEqual({
-            token: 'bearer-token-xyz',
+            token: RAW_SESSION_TOKEN,
             username: 'Google User',
             image: 'https://example.com/google-pic.png',
         })
@@ -311,50 +318,12 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
         // resolves to the existing `username` (Google carries none), so only
         // the image visibly refreshes in this pin.
         expect(await res.json()).toEqual({
-            token: 'bearer-token-xyz',
+            token: RAW_SESSION_TOKEN,
             username: 'oldusername',
             image: 'https://example.com/google-pic.png',
         })
         expect(prismaMock.user.create).not.toHaveBeenCalled()
         expect(prismaMock.user.update).toHaveBeenCalledTimes(1)
-    })
-
-    it('bearer self-fetch fails (non-ok) -> falls back to the raw session token, not null/undefined', async () => {
-        fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
-            const url = String(input)
-            if (url.includes('oauth2.googleapis.com/token'))
-                return jsonResponse({
-                    access_token: 'google-access-token',
-                    id_token: 'google-id-token',
-                })
-            if (url.includes('googleapis.com/oauth2/v2/userinfo'))
-                return jsonResponse({
-                    id: 'google-user-id',
-                    email: 'googleuser@example.com',
-                    name: 'Google User',
-                    picture: 'https://example.com/google-pic.png',
-                    verified_email: true,
-                })
-            if (url.includes('/api/auth/session'))
-                return new Response(null, { status: 401 })
-            throw new Error(`unexpected fetch ${url}`)
-        })
-        const redirectUri = 'https://abc123.chromiumapp.org/'
-        const state = signState({ provider: 'google', redirectUri })
-
-        const res = await oauthPOST(
-            exchangeRequest({
-                provider: 'google',
-                code: 'auth-code',
-                state,
-                redirectUri,
-            }),
-        )
-
-        expect(res.status).toBe(200)
-        const json = await res.json()
-        // Deterministic thanks to the randomBytes(size) => Buffer.alloc(size, 7) stub.
-        expect(json.token).toBe(Buffer.alloc(32, 7).toString('base64url'))
     })
 
     it('Apple, brand-new user with email: 200, username falls through to email (Apple never gives a name)', async () => {
@@ -376,7 +345,7 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
         // ID token never carries a name), so this correctly falls through
         // to the email, not to a bare `null`.
         expect(await res.json()).toEqual({
-            token: 'bearer-token-xyz',
+            token: RAW_SESSION_TOKEN,
             username: 'appleuser@example.com',
             image: null,
         })
@@ -503,11 +472,6 @@ describe('extension/oauth (exchange) — emailVerified gate (R-11)', () => {
                         ? { verified_email: verifiedEmail }
                         : {}),
                 })
-            if (url.includes('/api/auth/session'))
-                return new Response(null, {
-                    status: 200,
-                    headers: { 'set-auth-token': 'bearer-token-xyz' },
-                })
             throw new Error(`unexpected fetch ${url}`)
         }
     }
@@ -523,11 +487,6 @@ describe('extension/oauth (exchange) — emailVerified gate (R-11)', () => {
                         email: 'appleuser@example.com',
                         email_verified: emailVerified,
                     }),
-                })
-            if (url.includes('/api/auth/session'))
-                return new Response(null, {
-                    status: 200,
-                    headers: { 'set-auth-token': 'bearer-token-xyz' },
                 })
             throw new Error(`unexpected fetch ${url}`)
         }
