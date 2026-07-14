@@ -1,0 +1,30 @@
+# Docker does NOT read .gitignore — anything not excluded here enters the build
+# context and can end up in image layers. Keep it slim; keep secrets + internal
+# archives OUT.
+
+# Dependencies / build outputs (reinstalled + rebuilt inside the image)
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+out
+
+# Secrets & local env — never bake a secret into a layer (.env.example is public)
+**/.env
+**/.env.*
+!**/.env.example
+.secrets
+
+# Internal, gitignored-local archives — secrecy forward-rule (DESIGN.md §2(k))
+audit
+apps/caramel-app/scripts/internal
+
+# VCS / editor / OS
+.git
+.claude
+.idea
+.vscode
+**/.DS_Store

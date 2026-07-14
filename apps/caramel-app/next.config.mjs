@@ -24,6 +24,12 @@ const SECURITY_HEADERS = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // F-016 one-root-compose: emit a self-contained server (.next/standalone)
+    // so the Docker runner stage boots `node apps/caramel-app/server.js` with a
+    // traced, minimal node_modules instead of the whole install. Pairs with
+    // outputFileTracingRoot below (monorepo root) so the trace resolves
+    // workspace deps correctly.
+    output: 'standalone',
     outputFileTracingRoot: workspaceRoot,
     turbopack: {
         root: workspaceRoot,

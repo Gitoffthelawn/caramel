@@ -29,6 +29,7 @@ const EXTENSION_DIR = path.resolve(
 // see .gitignore) never trip this in a dev's working copy; only what
 // actually ships in the repo counts.
 const ROOT_FILE_ALLOWLIST = new Set([
+    '.dockerignore',
     '.gitattributes',
     '.gitignore',
     '.oxlintrc.json',
@@ -36,9 +37,13 @@ const ROOT_FILE_ALLOWLIST = new Set([
     '.prettierrc.json',
     'CLAUDE.md',
     'DESIGN.md',
+    'Dockerfile',
     'LICENSE',
     'README.md',
     'RUNBOOK.md',
+    // One-root-compose (F-016): THE prod service graph lives at repo root.
+    'docker-compose.yml',
+    'docker-entrypoint.sh',
     'eslint.config.mjs',
     'package.json',
     'pnpm-lock.yaml',
