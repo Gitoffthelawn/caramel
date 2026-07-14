@@ -56,12 +56,6 @@ export default function CouponsSection({
     const [page, setPage] = useState(1)
     const [isLoadingMore, setIsLoadingMore] = useState(false)
     const [filters, setFilters] = useState<CouponFilters>(initialFiltersState)
-    // `setStoreOptions` is never called (its sibling `setDiscountOptions`
-    // below IS wired up from the same fetch) — `storeOptions` can never
-    // change from `[]`. Flagged as a new-finding candidate (looks like a
-    // forgotten fetch-response field, not dead code); not this finding's
-    // call to fix.
-    // oxlint-disable-next-line no-unused-vars
     const [storeOptions, setStoreOptions] = useState<string[]>([])
     const [discountOptions, setDiscountOptions] = useState<string[]>([])
     const couponsLengthRef = useRef(initialCoupons?.length || 0)
@@ -88,10 +82,13 @@ export default function CouponsSection({
         const loadFiltersMeta = async () => {
             try {
                 const res = await fetch(
-                    '/api/coupons/filters?includeSites=false',
+                    '/api/coupons/filters?includeSites=true',
                 )
                 if (!res.ok) throw new Error('Failed to load filter options')
                 const data = await res.json()
+                if (Array.isArray(data.sites)) {
+                    setStoreOptions(data.sites)
+                }
                 if (Array.isArray(data.discountTypes)) {
                     setDiscountOptions(data.discountTypes)
                 }
