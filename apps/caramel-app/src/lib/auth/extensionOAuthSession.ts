@@ -131,7 +131,13 @@ export async function mintExtensionSession({
             include: { accounts: true },
         })
     } else {
-        await prisma.user.update({
+        // Reassign `user` so the minted response below reflects the
+        // freshly-updated name/image (R-12 / NF-12). Previously the update ran
+        // but its result was discarded, so the response was built from the
+        // stale pre-update findFirst() row (DB correct, response stale).
+        // include:{accounts:true} keeps `user`'s type identical to the create
+        // branch and the findFirst() above.
+        user = await prisma.user.update({
             where: { id: user.id },
             data: {
                 name: providerUser.name ?? user.name,
@@ -141,6 +147,7 @@ export async function mintExtensionSession({
                         ? providerUser.emailVerified
                         : user.emailVerified,
             },
+            include: { accounts: true },
         })
     }
 

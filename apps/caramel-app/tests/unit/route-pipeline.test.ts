@@ -105,7 +105,7 @@ const { prismaMock, prismaState } = vi.hoisted(() => {
                 }: {
                     where: { id: string }
                     data: Record<string, unknown>
-                }) => ({ id: where.id, ...data }),
+                }) => ({ ...prismaState.existingUser, id: where.id, ...data }),
             ),
         },
         account: {
@@ -305,16 +305,15 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
         )
 
         expect(res.status).toBe(200)
-        // image stays the PRE-update `null`, not Google's fresh picture —
-        // wire-identical characterization of a genuine pre-existing quirk:
-        // the route never re-reads `user` after prisma.user.update(), so
-        // the response is built from the STALE findFirst() result even
-        // though the DB row itself gets the new image. Preserved as-is
-        // (not this fix's concern — only the mint's LOCATION moved).
+        // R-12 / NF-12 fixed: the mint now reassigns `user` to the
+        // prisma.user.update() result, so the response carries Google's FRESH
+        // picture rather than the stale pre-update `null`. username still
+        // resolves to the existing `username` (Google carries none), so only
+        // the image visibly refreshes in this pin.
         expect(await res.json()).toEqual({
             token: 'bearer-token-xyz',
             username: 'oldusername',
-            image: null,
+            image: 'https://example.com/google-pic.png',
         })
         expect(prismaMock.user.create).not.toHaveBeenCalled()
         expect(prismaMock.user.update).toHaveBeenCalledTimes(1)

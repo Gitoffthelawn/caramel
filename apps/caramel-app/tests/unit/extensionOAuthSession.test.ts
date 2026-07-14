@@ -42,7 +42,7 @@ const { prismaMock, prismaState } = vi.hoisted(() => {
                 }: {
                     where: { id: string }
                     data: Record<string, unknown>
-                }) => ({ id: where.id, ...data }),
+                }) => ({ ...prismaState.existingUser, id: where.id, ...data }),
             ),
         },
         account: {
@@ -276,5 +276,37 @@ describe('mintExtensionSession — bearer self-fetch fails', () => {
         })
         expect(typeof result.token).toBe('string')
         expect(result.token.length).toBeGreaterThan(0)
+    })
+})
+
+describe('mintExtensionSession — returning user gets a FRESH profile in the response (R-12)', () => {
+    it('reassigns user to the update result so name/image reflect the provider, not the stale pre-update row', async () => {
+        prismaState.existingUser = {
+            id: 'existing-user-id',
+            email: 'user@example.com',
+            name: 'Old Name',
+            username: null, // no username -> response username falls through to name
+            image: 'https://example.com/old.png',
+            emailVerified: true,
+        }
+
+        const result = await mintExtensionSession({
+            provider: 'google',
+            providerUser: {
+                id: 'google-id-1',
+                email: 'user@example.com',
+                name: 'New Name',
+                image: 'https://example.com/new.png',
+                emailVerified: true,
+            },
+            tokens: { accessToken: 'at', idToken: 'it' },
+        })
+
+        expect(prismaMock.user.create).not.toHaveBeenCalled()
+        expect(prismaMock.user.update).toHaveBeenCalledTimes(1)
+        // Pre-R-12 this returned the stale 'Old Name' / old.png (the update
+        // result was discarded). Now the response carries the fresh values.
+        expect(result.username).toBe('New Name')
+        expect(result.image).toBe('https://example.com/new.png')
     })
 })
