@@ -43,7 +43,6 @@ const ROOT_FILE_ALLOWLIST = new Set([
     'package.json',
     'pnpm-lock.yaml',
     'pnpm-workspace.yaml',
-    'tailwind.config.js',
     'turbo.json',
 ])
 
