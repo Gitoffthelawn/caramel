@@ -73,14 +73,14 @@ ENV BETTER_AUTH_SECRET=build-placeholder-not-a-secret
 # practice).
 RUN pnpm --filter caramel-app run build
 
-# Stage a self-contained Prisma CLI + engines for the runner's boot-time
-# `migrate deploy`. prisma is a caramel-app devDependency, so pnpm links it
-# under the WORKSPACE's node_modules (apps/caramel-app/node_modules), NOT the
-# monorepo root — and those links point into the virtual store, so `cp -RL`
-# dereferences to real files that survive the cross-stage COPY.
-RUN mkdir -p /prisma-cli/node_modules \
-  && cp -RL apps/caramel-app/node_modules/prisma /prisma-cli/node_modules/prisma \
-  && cp -RL apps/caramel-app/node_modules/@prisma /prisma-cli/node_modules/@prisma
+# Self-contained Prisma CLI for the runner's boot-time `migrate deploy`.
+# npm (not pnpm) gives a flat node_modules with every transitive dep real —
+# pnpm's isolated symlinks don't survive a cross-stage COPY (its deps live as
+# siblings in the virtual store, e.g. @prisma/engines, and cp -RL loses them).
+# The version comes from the app's own package.json (`dependencies.prisma`,
+# exact-pinned per repo rule) — one pin, no drift.
+RUN PRISMA_VERSION=$(node -p "require('./apps/caramel-app/package.json').dependencies.prisma") \
+  && npm install --prefix /prisma-cli "prisma@${PRISMA_VERSION}" --no-save --no-audit --no-fund
 
 # ---- runner: minimal standalone server; migrate then serve ----
 FROM node:22-alpine AS runner
@@ -100,8 +100,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/caramel-app/.next/static ./a
 COPY --from=builder --chown=nextjs:nodejs /app/apps/caramel-app/public ./apps/caramel-app/public
 # Prisma schema + migrations for `migrate deploy`.
 COPY --from=builder --chown=nextjs:nodejs /app/apps/caramel-app/prisma ./apps/caramel-app/prisma
-# Prisma CLI + engines (merged into the traced node_modules).
-COPY --from=builder --chown=nextjs:nodejs /prisma-cli/node_modules ./node_modules
+# Prisma CLI + engines in their OWN staged tree — the standalone bundle's
+# traced node_modules stays pristine (@prisma/client for the running app comes
+# from the trace, not from here).
+COPY --from=builder --chown=nextjs:nodejs /prisma-cli/node_modules ./prisma-cli/node_modules
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 

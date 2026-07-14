@@ -7,7 +7,9 @@
 set -e
 
 echo ">>> [entrypoint] applying prisma migrate deploy"
-node node_modules/prisma/build/index.js migrate deploy \
+# The CLI lives in its own staged tree (prisma-cli/), isolated from the app's
+# traced node_modules.
+node prisma-cli/node_modules/prisma/build/index.js migrate deploy \
   --schema apps/caramel-app/prisma/schema.prisma
 echo ">>> [entrypoint] migrations applied; starting server"
 
