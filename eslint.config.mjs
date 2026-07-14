@@ -48,4 +48,47 @@ export default [
             '@typescript-eslint/no-explicit-any': 'error',
         },
     },
+    {
+        // Env-door ban (DESIGN.md §1) — "rules become checks". Server and
+        // NEXT_PUBLIC env vars are read ONLY through the zod-validated modules
+        // src/lib/env.ts / env.client.ts (fail-fast at boot, one documented
+        // contract); a raw `process.env.X` read anywhere else bypasses that
+        // door. Was memory-only; now enforced. `**/src/**` (not an absolute
+        // path) for the same dual-invocation-base reason as the global-error
+        // block above (root husky cwd vs apps/caramel-app cwd).
+        //
+        // Exempt by SELECTOR: `process.env.NODE_ENV` / `NEXT_RUNTIME` —
+        // framework-managed runtime discriminators neither env module owns
+        // (env.ts is `server-only`, so client files like providers.tsx/gtag.ts
+        // cannot import it regardless), so there is no env-door home to route
+        // them through.
+        files: ['**/src/**/*.{ts,tsx}'],
+        ignores: [
+            // The env door itself — the one legitimate home for env reads.
+            '**/src/lib/env.ts',
+            '**/src/lib/env.client.ts',
+            // Instrumentation bootstrapping runs around/before the env door
+            // (Sentry init, edge-runtime discrimination) — out of scope.
+            '**/src/instrumentation.ts',
+            '**/src/instrumentation.client.ts',
+            // Documented exception (2026-07-14): decryptJsonData.ts must read
+            // NEXT_PUBLIC_API_ENCRYPTION_ENABLED live (not via the clientEnv
+            // singleton, which parses once at import) so decryptJsonData.test.ts
+            // can flip it per-case with vi.stubEnv. The var stays declared in
+            // env.client.ts's schema + .env.example — only this call site's
+            // read is dynamic (see the file's own header comment).
+            '**/src/lib/securityHelpers/decryptJsonData.ts',
+        ],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        "MemberExpression[object.object.name='process'][object.property.name='env']:not([property.name=/^(NODE_ENV|NEXT_RUNTIME)$/])",
+                    message:
+                        'Read env only through src/lib/env.ts (server) or src/lib/env.client.ts (client) — the zod-validated env door (DESIGN.md §1). process.env.NODE_ENV / NEXT_RUNTIME (framework flags) are exempt.',
+                },
+            ],
+        },
+    },
 ]

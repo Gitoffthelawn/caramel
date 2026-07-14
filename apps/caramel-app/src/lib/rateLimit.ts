@@ -194,13 +194,14 @@ export function isOriginAllowed(req: NextRequest): boolean {
         const host = req.headers.get('host')
         if (host && originUrl.host === host) return true
 
-        // Raw process.env read (not the `env` singleton in src/lib/env.ts) —
-        // pre-existing behavior, left as-is: out of scope for F-003 (see
-        // PLAN-F-003.md), which only touches the retired extension-key
-        // call sites (isTrustedServer above, and the routes that used to
-        // check it directly).
-        const allowed = (process.env.ALLOWED_ORIGINS || '')
-            .split(',')
+        // ALLOWED_ORIGINS flows through the zod env door (src/lib/env.ts,
+        // `ALLOWED_ORIGINS: z.string().default('')`) like every other server
+        // var — no raw `process.env` read (now banned by eslint
+        // no-restricted-syntax, DESIGN.md §1). `env` is already this module's
+        // singleton (isTrustedServer above reads env.COUPONS_ADMIN_SECRET);
+        // the empty-string default preserves the prior unset→empty semantics
+        // exactly, so `''.split(',').filter(Boolean)` still yields `[]`.
+        const allowed = env.ALLOWED_ORIGINS.split(',')
             .map(s => s.trim())
             .filter(Boolean)
         if (allowed.includes(origin)) return true
