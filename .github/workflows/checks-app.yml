@@ -89,6 +89,67 @@ jobs:
           esac
 
   # ─────────────────────────────────────────────────────────────
+  # Integration (W1) — real prisma against a live Postgres
+  # ─────────────────────────────────────────────────────────────
+  # The unit job (test-matrix) mocks prisma; this is its DB-backed sibling:
+  # tests/integration/**/*.itest.ts run the real prisma client against a live
+  # Postgres so the coupon_signals read/write path is exercised for real, not
+  # mocked. Same trigger as test-matrix (PR + push, not the nightly audit) so a
+  # regression is caught on every change, not just on PRs.
+  integration:
+    name: Integration (DB)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        # Prod-matching: docker-compose.yml pins postgres:18.4. (The e2e-pr
+        # job's postgres:15 is a separate, known pin-drift punch-list item —
+        # deliberately NOT copied here.)
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Writes apps/caramel-app/.env with a DATABASE_URL pointing at the
+      # postgres service (postgres:postgres@localhost:58005/caramel) — the same
+      # value vitest.integration.config.ts's loadEnvFile('.env') reads.
+      - name: Write minimal CI env
+        run: pnpm --filter caramel-app run setup:ci-env
+
+      - name: Generate Prisma Client
+        run: pnpm --filter caramel-app exec prisma generate
+
+      - name: Apply Prisma migrations
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Run integration tests
+        run: pnpm --filter caramel-app test:integration
+
+  # ─────────────────────────────────────────────────────────────
   # Dependency Vulnerability Audit (prod deps, high + critical)
   # ─────────────────────────────────────────────────────────────
   audit:
