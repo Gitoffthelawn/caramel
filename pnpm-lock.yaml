@@ -251,6 +251,12 @@ importers:
       jsdom:
         specifier: 29.0.2
         version: 29.0.2(@noble/hashes@2.2.0)
+      knip:
+        specifier: 5.70.2
+        version: 5.70.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@26.1.1)(typescript@5.9.2)
+      playwright:
+        specifier: 1.59.1
+        version: 1.59.1
       prettier:
         specifier: 3.6.2
         version: 3.6.2
@@ -8122,7 +8128,6 @@ snapshots:
   '@types/node@26.1.1':
     dependencies:
       undici-types: 8.3.0
-    optional: true
 
   '@types/offscreencanvas@2019.7.3': {}
 
@@ -10810,6 +10815,26 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
+  knip@5.70.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@26.1.1)(typescript@5.9.2):
+    dependencies:
+      '@nodelib/fs.walk': 1.2.8
+      '@types/node': 26.1.1
+      fast-glob: 3.3.3
+      formatly: 0.3.0
+      jiti: 2.6.1
+      js-yaml: 4.3.0
+      minimist: 1.2.8
+      oxc-resolver: 11.14.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)
+      picocolors: 1.1.1
+      picomatch: 4.0.5
+      smol-toml: 1.5.2
+      strip-json-comments: 5.0.3
+      typescript: 5.9.2
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+
   ky@1.14.3: {}
 
   kysely@0.29.3: {}
@@ -12520,8 +12545,7 @@ snapshots:
 
   undici-types@7.10.0: {}
 
-  undici-types@8.3.0:
-    optional: true
+  undici-types@8.3.0: {}
 
   undici@7.28.0: {}
 

@@ -12,7 +12,8 @@
         "dev": "web-ext run --target=chromium --source-dir=. --watch-file=./**/*",
         "test": "vitest run",
         "test:e2e": "node scripts/test-extension.mjs",
-        "size": "size-limit"
+        "size": "size-limit",
+        "knip": "knip"
     },
     "devDependencies": {
         "@size-limit/file": "12.1.0",
@@ -21,6 +22,8 @@
         "eslint-plugin-import": "2.32.0",
         "eslint-plugin-prettier": "5.5.1",
         "jsdom": "29.0.2",
+        "knip": "5.70.2",
+        "playwright": "1.59.1",
         "prettier": "3.6.2",
         "prettier-plugin-organize-imports": "4.1.0",
         "size-limit": "12.1.0",

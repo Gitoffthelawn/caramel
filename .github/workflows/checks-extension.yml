@@ -33,6 +33,8 @@ jobs:
         run: pnpm run lint
       - name: Run Prettier check
         run: pnpm run prettier-check
+      - name: Run knip
+        run: pnpm run knip
       - name: Run unit tests
         run: pnpm run test
       - name: Check bundle size
