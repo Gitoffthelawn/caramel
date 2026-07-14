@@ -12,11 +12,6 @@ export default function SuggestionForm({
     initialValue: string
     resetValue: () => void
 }) {
-    // `setUrl` is never called — this form has no input to edit `url`, so it
-    // always submits `initialValue` verbatim. Flagged as a new-finding
-    // candidate (looks like a missing editable-input bug, not dead code);
-    // not this finding's call to redesign the form.
-    // oxlint-disable-next-line no-unused-vars
     const [url, setUrl] = useState(initialValue)
     const [loading, setLoading] = useState(false)
 
@@ -51,6 +46,15 @@ export default function SuggestionForm({
             <p className="text-center leading-relaxed text-gray-700 dark:text-gray-300">
                 We don’t support that store yet. Let us know and we’ll add it!
             </p>
+            <input
+                type="url"
+                inputMode="url"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                aria-label="Store URL"
+                className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-3 text-center placeholder-gray-400 shadow-sm outline-none transition-all focus:border-caramel dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
+            />
             <motion.button
                 whileTap={{ scale: 0.95 }}
                 className="rounded-full bg-gradient-to-r from-caramel to-orange-600 px-8 py-3 font-semibold text-white shadow transition-all hover:shadow-lg"
