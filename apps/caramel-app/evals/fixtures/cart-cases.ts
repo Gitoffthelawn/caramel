@@ -16,8 +16,11 @@
 //    8 ambiguous/adversarial — genuinely dual-category carts and two
 //     prompt-injection attempts (the cart content must win over injected
 //     text asking for a different category).
-//    6 junk — empty/gibberish/non-commerce pages; must classify "other"
-//     with capped confidence.
+//    6 junk — empty/gibberish/non-commerce pages; must classify "other".
+//     Confidence is NOT gated ([0,1]): the model legitimately reads a clearly
+//     non-commerce page as high-confidence "other" (0.8–0.95 observed), so the
+//     old ≤0.6 upper cap penalized correct answers rather than catching
+//     overconfidence (NF-11 fixture calibration — evals/SCOREBOARD.md 2026-07-14).
 import type { CartSignals } from '@/lib/cartClassifier'
 import type { CartCase } from '../scorers'
 
@@ -565,7 +568,7 @@ const JUNK: CartCase[] = [
             meta_description: '',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
     c(
         'junk-gibberish-title',
@@ -574,7 +577,7 @@ const JUNK: CartCase[] = [
             title: 'asdkjhaskjdh 1283712 !!!### xoxo',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
     c(
         'junk-non-commerce-news',
@@ -585,7 +588,7 @@ const JUNK: CartCase[] = [
             og_type: 'article',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
     c(
         'junk-non-commerce-docs',
@@ -595,7 +598,7 @@ const JUNK: CartCase[] = [
             meta_description: 'Documentation for REST API endpoints.',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
     c(
         'junk-non-commerce-social',
@@ -605,7 +608,7 @@ const JUNK: CartCase[] = [
             og_type: 'profile',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
     c(
         'junk-blank-placeholder',
@@ -615,7 +618,7 @@ const JUNK: CartCase[] = [
             meta_description: '',
             cart_items: [],
         },
-        { primary: ['other'], secondary: null, confidence: [0, 0.6] },
+        { primary: ['other'], secondary: null, confidence: [0, 1] },
     ),
 ]
 
