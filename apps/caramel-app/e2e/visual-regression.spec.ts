@@ -8,6 +8,17 @@ test.describe.configure({ timeout: 60000 })
 // but can't trigger scroll-dependent state changes.
 async function triggerInViewAnimations(page: Page) {
     await page.evaluate(async () => {
+        // Yield animation frames instead of sleeping — wall-clock sleeps
+        // (setTimeout / new Promise(setTimeout)) are banned in e2e specs
+        // (tests/unit/test-quality-guardrails.test.ts). The instant
+        // `behavior: 'auto'` scrolls have no scroll animation to wait out; the
+        // frame yields exist only so IntersectionObserver fires each section's
+        // Framer Motion whileInView before capture. IO callbacks dispatch
+        // within a frame of the scroll, and Argos freezes animations
+        // (`animations: 'disabled'`) at screenshot time — so a few frames per
+        // step deterministically reaches the final triggered state, with no
+        // guessed millisecond budget. (The frame wait is inlined, not a
+        // helper: it must run in this browser page.evaluate context.)
         const step = Math.max(Math.floor(window.innerHeight * 0.8), 1)
         const maxScroll = Math.max(
             document.documentElement.scrollHeight - window.innerHeight,
@@ -16,11 +27,19 @@ async function triggerInViewAnimations(page: Page) {
 
         for (let position = 0; position <= maxScroll; position += step) {
             window.scrollTo({ top: position, behavior: 'auto' })
-            await new Promise(resolve => setTimeout(resolve, 75))
+            for (let frame = 0; frame < 6; frame += 1) {
+                await new Promise<void>(resolve =>
+                    requestAnimationFrame(() => resolve()),
+                )
+            }
         }
 
         window.scrollTo({ top: maxScroll, behavior: 'auto' })
-        await new Promise(resolve => setTimeout(resolve, 150))
+        for (let frame = 0; frame < 10; frame += 1) {
+            await new Promise<void>(resolve =>
+                requestAnimationFrame(() => resolve()),
+            )
+        }
         window.scrollTo({ top: 0, behavior: 'auto' })
     })
 }
