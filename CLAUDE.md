@@ -68,8 +68,8 @@
 
 ## Commands
 
-- Setup: `pnpm install` → `cp apps/caramel-app/.env.example apps/caramel-app/.env` (secrets table in README) → `pnpm dev:compose` (pg :58005, redis :58006) → `pnpm --filter caramel-app db:migrate:deploy`.
-- Run: `pnpm dev` (app :58000 + extension web-ext) · app only: `pnpm --filter caramel-app dev`.
+- Setup: `pnpm install` → `cp apps/caramel-app/.env.example apps/caramel-app/.env` (secrets table in README) → `pnpm dev` (F-016 one-root-compose: `docker compose up --build` builds web, boots pg :58005, runs `prisma migrate deploy` in-container).
+- Run: `pnpm dev` (docker compose up --build → app :58000; one root compose = local/CI/prod graph, hot reload traded away 2026-07-09) · host escape hatches (need `docker compose up postgres -d` first): `pnpm dev:next` (app :58000 with hot reload), `pnpm dev:extension` (web-ext). See docs/LOCAL-DEV.md.
 - Test: `pnpm test` (turbo → vitest: app `tests/unit/**/*.test.{ts,tsx}` + extension `tests/*.mjs`) · single file: `pnpm --filter caramel-app exec vitest run tests/unit/<file>` · e2e: `pnpm --filter caramel-app test:e2e` (needs DB+migrations) · evals (live LLM, costs money): `pnpm --filter caramel-app eval` (needs `OPENROUTER_API_KEY`).
 - Gates (all also run in husky pre-commit + CI): `pnpm lint` · `pnpm lint:oxlint` · `pnpm prettier-check` · `pnpm --filter caramel-app knip` · `pnpm -r run type-check`. Ops: `pnpm --filter caramel-app smoke`, `... check:coupons-schema` (see RUNBOOK.md).
 
@@ -88,7 +88,7 @@
 ## Gotchas (each cost a real debugging round)
 
 - `vi.mock('@/lib/couponsDb', {...importActual})` does NOT intercept internal calls of re-exported functions (closure binds the real module) — read the header comment in `tests/unit/coupons-visibility.test.ts` before touching such mocks.
-- No `.gitattributes`: a fresh Windows clone with `core.autocrlf=true` breaks the byte-exact generated-file test — `git config core.autocrlf false` + re-checkout (LOCAL-DEV.md troubleshooting).
+- No `.gitattributes`: a fresh Windows clone with `core.autocrlf=true` breaks the byte-exact generated-file test — `git config core.autocrlf false` + re-checkout (docs/LOCAL-DEV.md troubleshooting).
 - `openai/gpt-5-mini` is a REASONING model: completion budget must include hidden reasoning tokens (`maxTokens: 600`, see F-017 in `evals/SCOREBOARD.md`) — never trim it back to "just enough JSON".
 - Extension cross-file globals: a function used only from a sibling content-script file needs `// oxlint-disable-next-line no-unused-vars` as the LAST comment line above it (prettier reorders otherwise); `_isDevInstall` must stay in `caramel-base.js` (called at module-eval time — cross-file hoisting doesn't exist).
 - `server-only` throws under vitest — shimmed once in `tests/setup.ts`. `.env*` is gitignored — a new shareable env-named file needs a `!` negation entry (`.env.example` burned us).
@@ -98,4 +98,4 @@
 
 - Never push to or merge into `dev`/`main`; audit PRs are merged by humans only. Never mutate GitHub repo settings.
 - The coupons DB is read-only by discipline — no new write paths (`increment`/`expire`/`sources POST` are the sanctioned exceptions); its schema is owned by the external Python service.
-- Don't convert the extension to a bundler/ESM, don't "fix" `local-dev/docker-compose.yml` to run the apps (F-016 one-root-compose is a separate gated initiative), don't re-flag the deliberate designs listed in DESIGN.md §standoffs.
+- Don't convert the extension to a bundler/ESM, don't re-flag the deliberate designs listed in DESIGN.md §standoffs. F-016 one-root-compose landed the root `docker-compose.yml` (`pnpm dev`) for local/CI; the prod cutover onto it stays gated and human-run (never touch prod without explicit in-session confirmation).

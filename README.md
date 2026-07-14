@@ -42,7 +42,7 @@ It automatically tests codes at checkout, never sells your data, and never overw
 
 ## Getting Started
 
-Prerequisites: [Node.js](https://nodejs.org) 20+ (CI runs Node 20), [pnpm](https://pnpm.io) 9 (this repo's `packageManager` field — `corepack enable` picks it up), and [Docker](https://www.docker.com/) (for local Postgres/Redis).
+Prerequisites: [Docker](https://www.docker.com/) with Compose v2 (the one command that runs the app), plus [Node.js](https://nodejs.org) 22+ and [pnpm](https://pnpm.io) 9 (this repo's `packageManager` field — `corepack enable` picks it up) for installing deps, the escape hatches, and the test suites.
 
 1. **Install dependencies** (repo root):
 
@@ -58,33 +58,26 @@ Prerequisites: [Node.js](https://nodejs.org) 20+ (CI runs Node 20), [pnpm](https
 
     Then fill it in using the secrets table below — most values are already correct or optional.
 
-3. **Start local infra** (Postgres + Redis, via Docker):
-
-    ```bash
-    pnpm dev:compose
-    ```
-
-    See [`local-dev/LOCAL-DEV.md`](local-dev/LOCAL-DEV.md) for ports, connection strings, and the two-database topology.
-
-4. **Apply database migrations** (creates the auth-DB schema — nothing does this automatically):
-
-    ```bash
-    pnpm --filter caramel-app db:migrate:deploy
-    ```
-
-5. **Run it**:
+3. **Run it** — one command builds the image and boots the whole stack:
 
     ```bash
     pnpm dev
     ```
 
-    Opens the web app + API at **http://localhost:58000**. This also launches the extension in a `web-ext`-managed Chromium instance; for the web app only, run `pnpm --filter caramel-app dev` instead.
+    `pnpm dev` is `docker compose up --build`: it builds the `web` image, boots **Postgres 18.4** + **web**, runs `prisma migrate deploy` automatically inside the container, and serves the app + API at **http://localhost:58000**. Local, CI, and prod run this same `docker-compose.yml`, so behaviour matches prod — which means **hot reload is deliberately traded away** (ratified 2026-07-09). When you want framework hot reload or to run one package on the host, bring up Postgres alone (`docker compose up postgres -d`) and use an escape hatch:
 
-6. **Run the tests**:
+    ```bash
+    pnpm dev:next        # web app on the host (Next.js dev server, :58000, hot reload)
+    pnpm dev:extension   # the browser extension in a web-ext Chromium instance
+    ```
+
+    Coupon routes return `500` locally **by design** — the coupons DB is externally owned and not provisioned locally (the honest degraded mode; see [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md)).
+
+4. **Run the tests**:
 
     ```bash
     pnpm test                             # unit — real vitest, both packages (~300 tests)
-    pnpm --filter caramel-app test:e2e    # Playwright — needs step 4's migrations applied
+    pnpm --filter caramel-app test:e2e    # Playwright — needs Postgres up + migrations (docs/LOCAL-DEV.md)
     pnpm --filter caramel-app eval        # cart-classifier AI eval — needs OPENROUTER_API_KEY, see apps/caramel-app/evals/README.md
     ```
 
@@ -98,11 +91,11 @@ Prerequisites: [Node.js](https://nodejs.org) 20+ (CI runs Node 20), [pnpm](https
 postgresql://caramel:caramel_password@localhost:58005/caramel?schema=public
 ```
 
-This matches what `.env.example` ships — `pnpm dev:compose`'s Postgres creates exactly this `caramel` role (see `local-dev/docker-compose.yml`).
+This matches what `.env.example` ships — the compose Postgres creates exactly this `caramel` role (see `docker-compose.yml`).
 
 **`COUPONS_DATABASE_URL` — external, not available in local dev:**
 
-Owned by the external Python verification service. `pnpm dev:compose` never provisions a `caramel_coupons` database, so any non-empty value satisfies boot — the app only fails at _query_ time, not startup. The `.env.example` value (`postgresql://caramel:caramel_password@localhost:58005/caramel_coupons`) is correct as shipped, so the only failure you see is the real one: the database not existing. See [`local-dev/LOCAL-DEV.md`](local-dev/LOCAL-DEV.md)'s two-database topology section for the resulting (expected) degraded mode.
+Owned by the external Python verification service. The compose never provisions a `caramel_coupons` database, so any non-empty value satisfies boot — the app only fails at _query_ time, not startup. The `.env.example` value (`postgresql://caramel:caramel_password@localhost:58005/caramel_coupons`) is correct as shipped, so the only failure you see is the real one: the database not existing. See [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md)'s two-database topology section for the resulting (expected) degraded mode.
 
 **Generate locally (any random string) — at least one of the first two is required:**
 
@@ -136,31 +129,31 @@ Owned by the external Python verification service. `pnpm dev:compose` never prov
 
 **Human-only — external provider dashboards, optional for a basic boot:**
 
-| Variable                                                         | Needed for                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------------------------ |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                      | Google sign-in                                               |
-| `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET` / `APPLE_REDIRECT_URI` | Apple sign-in — see `local-dev/APPLE_OAUTH_LOCAL_TESTING.md` |
-| `USESEND_API_KEY`                                                | Outgoing email (signup verification, etc.)                   |
-| `OPENROUTER_API_KEY`                                             | The cart classifier (`/api/classify-cart`) and `pnpm eval`   |
-| `NEXT_PUBLIC_SENTRY_DSN`                                         | Error/APM reporting (no-op locally without it)               |
-| `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID`                                | Analytics                                                    |
+| Variable                                                         | Needed for                                                 |
+| ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                      | Google sign-in                                             |
+| `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET` / `APPLE_REDIRECT_URI` | Apple sign-in — see `docs/APPLE_OAUTH_LOCAL_TESTING.md`    |
+| `USESEND_API_KEY`                                                | Outgoing email (signup verification, etc.)                 |
+| `OPENROUTER_API_KEY`                                             | The cart classifier (`/api/classify-cart`) and `pnpm eval` |
+| `NEXT_PUBLIC_SENTRY_DSN`                                         | Error/APM reporting (no-op locally without it)             |
+| `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID`                                | Analytics                                                  |
 
 ### Repo layout at a glance
 
 - `apps/caramel-app` — Next.js web app + API (grabcaramel.com)
 - `apps/caramel-extension` — browser extension (Chrome/Edge/Firefox/Safari)
-- `local-dev/` — local Postgres/Redis compose + local-dev docs
+- `docker-compose.yml` + `Dockerfile` — one-root-compose (web + Postgres); `pnpm dev` runs it
 - `RUNBOOK.md` — deploys, health checks, rollback, on-call
 
-Full directory purposes: see [Project layout](#project-layout) below. Local infra detail: [`local-dev/LOCAL-DEV.md`](local-dev/LOCAL-DEV.md). Deploys/ops: [`RUNBOOK.md`](RUNBOOK.md).
+Full directory purposes: see [Project layout](#project-layout) below. Local infra detail: [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md). Deploys/ops: [`RUNBOOK.md`](RUNBOOK.md).
 
 ## Project layout
 
-| Path                     | Purpose                                                                                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/caramel-app`       | Web app + API for grabcaramel.com — Next.js, Prisma (auth DB), Better Auth                                                                                                |
-| `apps/caramel-extension` | Browser extension source (Chrome/Edge/Firefox/Safari — no in-repo Xcode project; release CI packages Safari from `dist/` via `safari-web-extension-converter`, see below) |
-| `local-dev/`             | Local Postgres/Redis Docker Compose + local-dev docs                                                                                                                      |
+| Path                                | Purpose                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/caramel-app`                  | Web app + API for grabcaramel.com — Next.js, Prisma (auth DB), Better Auth                                                                                                |
+| `apps/caramel-extension`            | Browser extension source (Chrome/Edge/Firefox/Safari — no in-repo Xcode project; release CI packages Safari from `dist/` via `safari-web-extension-converter`, see below) |
+| `docker-compose.yml` / `Dockerfile` | One-root-compose: `web` + Postgres — the graph `pnpm dev` (and prod) builds and runs                                                                                      |
 
 ### Safari Extension Icons
 

@@ -25,7 +25,7 @@ pnpm test --force
 pnpm --filter caramel-app exec vitest run tests/unit/<file>.test.ts
 
 # E2E — needs local Postgres up + migrations applied first:
-#   pnpm dev:compose && pnpm --filter caramel-app db:migrate:deploy
+#   docker compose up postgres -d && pnpm --filter caramel-app db:migrate:deploy
 pnpm --filter caramel-app test:e2e
 
 # Coupons structural drift — needs a reachable COUPONS_DATABASE_URL. The public
