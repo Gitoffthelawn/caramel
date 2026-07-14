@@ -190,6 +190,21 @@ export const POST = withRoute(
                     )
                 }
 
+                // R-11 — gate the mint on the PROVIDER's verified-email claim,
+                // mirroring better-auth's own social-login semantics. Google's
+                // userinfo returns a real boolean `verified_email`; anything
+                // other than an explicit `true` (absent or false) refuses the
+                // mint. A local User row with emailVerified=false is NOT a
+                // blocker — only the provider claim gates (web-parity).
+                if (googleUser.verified_email !== true) {
+                    return NextResponse.json(
+                        {
+                            error: 'Your Google email address is not verified. Please verify it with Google and try again.',
+                        },
+                        { status: 403 },
+                    )
+                }
+
                 const minted = await mintExtensionSession({
                     provider: 'google',
                     providerUser: {
@@ -197,7 +212,7 @@ export const POST = withRoute(
                         email: userEmail,
                         name: googleUser.name || null,
                         image: googleUser.picture || null,
-                        emailVerified: googleUser.verified_email || false,
+                        emailVerified: true,
                     },
                     tokens: { accessToken: access_token, idToken: id_token },
                 })
@@ -285,11 +300,32 @@ export const POST = withRoute(
                     ).toString(),
                 )
 
+                // Apple's ID token carries email_verified as a boolean OR the
+                // string "true"/"false" — normalize both. A bare
+                // `payload.email_verified || false` treats the string "false"
+                // as truthy, which would wrongly mark it verified.
+                const appleEmailVerified =
+                    payload.email_verified === true ||
+                    payload.email_verified === 'true'
+
                 const appleUser = {
                     id: payload.sub, // Apple user ID
                     email: payload.email || null, // Email (may be null if user chose to hide it)
-                    emailVerified: payload.email_verified || false,
+                    emailVerified: appleEmailVerified,
                     name: null, // Name is not available in ID token when using email-only scope
+                }
+
+                // R-11 — gate the mint on the PROVIDER's verified-email claim,
+                // mirroring better-auth's own social-login semantics. Absent or
+                // false refuses the mint (403) before any user/session write —
+                // and before the email-required check below.
+                if (!appleUser.emailVerified) {
+                    return NextResponse.json(
+                        {
+                            error: 'Your Apple email address is not verified. Please verify it with Apple and try again.',
+                        },
+                        { status: 403 },
+                    )
                 }
 
                 try {

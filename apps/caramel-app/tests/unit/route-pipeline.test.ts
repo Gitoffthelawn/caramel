@@ -394,10 +394,14 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
             if (url.includes('appleid.apple.com/auth/token'))
                 return jsonResponse({
                     access_token: 'apple-access-token',
+                    // email_verified: true so this still exercises the
+                    // email-required (400) path — R-11's verified-email gate
+                    // (403) now runs FIRST and would otherwise intercept a
+                    // false claim (that ordering is pinned separately below).
                     id_token: buildAppleIdToken({
                         sub: 'apple-user-id-no-email',
                         email: null,
-                        email_verified: false,
+                        email_verified: true,
                     }),
                 })
             throw new Error(`unexpected fetch ${url}`)
@@ -471,6 +475,136 @@ describe('extension/oauth (exchange) — mint characterization (F-007 4a/4b/4c)'
             exchangeRequest({}, 'chrome-extension://some-other-unknown-id'),
         )
         expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    })
+})
+
+// R-11 — the mint is gated on the PROVIDER's verified-email claim (Google
+// userinfo `verified_email`; Apple ID-token `email_verified`, boolean OR the
+// string "true"/"false"), mirroring better-auth's social-login semantics.
+// Absent/false -> 403 with a named error, no user/session write. Present+true
+// -> mint proceeds even when the local User row is emailVerified:false.
+describe('extension/oauth (exchange) — emailVerified gate (R-11)', () => {
+    const redirectUri = 'https://abc123.chromiumapp.org/'
+
+    function googleFetch(verifiedEmail: unknown, hasVerifiedKey = true) {
+        return async (input: RequestInfo | URL) => {
+            const url = String(input)
+            if (url.includes('oauth2.googleapis.com/token'))
+                return jsonResponse({
+                    access_token: 'google-access-token',
+                    id_token: 'google-id-token',
+                })
+            if (url.includes('googleapis.com/oauth2/v2/userinfo'))
+                return jsonResponse({
+                    id: 'google-user-id',
+                    email: 'googleuser@example.com',
+                    name: 'Google User',
+                    picture: null,
+                    ...(hasVerifiedKey
+                        ? { verified_email: verifiedEmail }
+                        : {}),
+                })
+            if (url.includes('/api/auth/session'))
+                return new Response(null, {
+                    status: 200,
+                    headers: { 'set-auth-token': 'bearer-token-xyz' },
+                })
+            throw new Error(`unexpected fetch ${url}`)
+        }
+    }
+
+    function appleFetch(emailVerified: unknown) {
+        return async (input: RequestInfo | URL) => {
+            const url = String(input)
+            if (url.includes('appleid.apple.com/auth/token'))
+                return jsonResponse({
+                    access_token: 'apple-access-token',
+                    id_token: buildAppleIdToken({
+                        sub: 'apple-user-id',
+                        email: 'appleuser@example.com',
+                        email_verified: emailVerified,
+                    }),
+                })
+            if (url.includes('/api/auth/session'))
+                return new Response(null, {
+                    status: 200,
+                    headers: { 'set-auth-token': 'bearer-token-xyz' },
+                })
+            throw new Error(`unexpected fetch ${url}`)
+        }
+    }
+
+    function exchange(provider: 'google' | 'apple') {
+        return oauthPOST(
+            exchangeRequest({
+                provider,
+                code: 'auth-code',
+                state: signState({ provider, redirectUri }),
+                redirectUri,
+            }),
+        )
+    }
+
+    it('Google, verified_email false -> 403 named error, nothing minted', async () => {
+        fetchMock.mockImplementation(googleFetch(false))
+        const res = await exchange('google')
+        expect(res.status).toBe(403)
+        expect(await res.json()).toEqual({
+            error: 'Your Google email address is not verified. Please verify it with Google and try again.',
+        })
+        expect(prismaMock.user.create).not.toHaveBeenCalled()
+        expect(prismaMock.session.create).not.toHaveBeenCalled()
+    })
+
+    it('Google, verified_email absent -> 403 (claim required, not merely non-false)', async () => {
+        fetchMock.mockImplementation(googleFetch(undefined, false))
+        const res = await exchange('google')
+        expect(res.status).toBe(403)
+        expect(prismaMock.session.create).not.toHaveBeenCalled()
+    })
+
+    it('Apple, email_verified false -> 403 BEFORE the email-required check', async () => {
+        fetchMock.mockImplementation(appleFetch(false))
+        const res = await exchange('apple')
+        expect(res.status).toBe(403)
+        expect(await res.json()).toEqual({
+            error: 'Your Apple email address is not verified. Please verify it with Apple and try again.',
+        })
+        expect(prismaMock.user.create).not.toHaveBeenCalled()
+    })
+
+    it("Apple, email_verified string 'false' -> 403 (string coercion handled, not truthy)", async () => {
+        fetchMock.mockImplementation(appleFetch('false'))
+        const res = await exchange('apple')
+        expect(res.status).toBe(403)
+        expect(prismaMock.user.create).not.toHaveBeenCalled()
+    })
+
+    it("Apple, email_verified string 'true' -> 200, user minted as verified", async () => {
+        fetchMock.mockImplementation(appleFetch('true'))
+        const res = await exchange('apple')
+        expect(res.status).toBe(200)
+        expect(prismaMock.user.create).toHaveBeenCalledTimes(1)
+        expect(prismaMock.user.create.mock.calls[0][0].data).toMatchObject({
+            emailVerified: true,
+            status: 'ACTIVE_USER',
+        })
+    })
+
+    it('web-parity: provider claim true mints even when the local User row is emailVerified:false', async () => {
+        prismaState.existingUser = {
+            id: 'existing-user-id',
+            email: 'googleuser@example.com',
+            name: 'Google User',
+            image: null,
+            username: 'oldusername',
+            emailVerified: false, // local row unverified — social flow signs in anyway
+        }
+        fetchMock.mockImplementation(googleFetch(true))
+        const res = await exchange('google')
+        expect(res.status).toBe(200)
+        expect(prismaMock.user.create).not.toHaveBeenCalled()
+        expect(prismaMock.session.create).toHaveBeenCalledTimes(1)
     })
 })
 
