@@ -88,7 +88,7 @@
 ## Gotchas (each cost a real debugging round)
 
 - `vi.mock('@/lib/couponsDb', {...importActual})` does NOT intercept internal calls of re-exported functions (closure binds the real module) — read the header comment in `tests/unit/coupons-visibility.test.ts` before touching such mocks.
-- No `.gitattributes`: a fresh Windows clone with `core.autocrlf=true` breaks the byte-exact generated-file test — `git config core.autocrlf false` + re-checkout (docs/LOCAL-DEV.md troubleshooting).
+- `.gitattributes` pins `eol=lf` (NF-04) so fresh clones are safe, but a clone predating it with `core.autocrlf=true` breaks the byte-exact generated-file test — `git config core.autocrlf false && git checkout-index -a -f` (`git reset --hard` won't rewrite round-trip-clean files; docs/LOCAL-DEV.md troubleshooting).
 - `openai/gpt-5-mini` is a REASONING model: completion budget must include hidden reasoning tokens (`maxTokens: 600`, see F-017 in `evals/SCOREBOARD.md`) — never trim it back to "just enough JSON".
 - Extension cross-file globals: a function used only from a sibling content-script file needs `// oxlint-disable-next-line no-unused-vars` as the LAST comment line above it (prettier reorders otherwise); `_isDevInstall` must stay in `caramel-base.js` (called at module-eval time — cross-file hoisting doesn't exist).
 - `server-only` throws under vitest — shimmed once in `tests/setup.ts`. `.env*` is gitignored — a new shareable env-named file needs a `!` negation entry (`.env.example` burned us).

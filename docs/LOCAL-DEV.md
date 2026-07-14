@@ -1,10 +1,11 @@
 # Caramel Local Development Guide
 
 Caramel runs on **one root Docker Compose** (F-016). `pnpm dev` builds the app
-image and boots the real service graph — the same `docker-compose.yml` that
-production runs — so local behaviour matches prod. Hot reload is deliberately
-traded away for that parity (ratified 2026-07-09); use the `pnpm dev:next`
-escape hatch below when you want framework hot reload.
+image and boots the real service graph in prod-mode builds. This same
+`docker-compose.yml` is the deployment unit production migrates onto (cutover
+gated, human-run) — so what you run locally is what ships. Hot reload is
+deliberately traded away for that parity (ratified 2026-07-09); use the
+`pnpm dev:next` escape hatch below when you want framework hot reload.
 
 ## Quick start
 
@@ -165,8 +166,13 @@ and it is exactly what `apps/caramel-app/.env.example` ships in
 - **`P1000: Authentication failed` connecting to `caramel`**: your `.env`'s
   `DATABASE_URL` still has placeholder credentials — see Connecting above.
 - **`pnpm test` fails only on `coupon-constants.generated.test.ts`'s
-  byte-identical check, on Windows, right after a fresh clone**: this repo has
-  no `.gitattributes` normalizing line endings (NF-04). With the common Windows
-  Git default `core.autocrlf=true`, a fresh checkout converts the committed (LF)
-  generated file to CRLF on disk while the test's live-generated value is LF.
-  Workaround: `git config core.autocrlf false && git checkout -- apps/caramel-extension/coupon-constants.generated.js`.
+  byte-identical check, on Windows, on a clone that predates `.gitattributes`**:
+  `.gitattributes` pins `* text=auto eol=lf` (NF-04), so a fresh clone gets LF
+  regardless of `core.autocrlf` and this failure can no longer happen there. A
+  clone made before `.gitattributes` landed, with `core.autocrlf=true`, still
+  has the committed (LF) generated file sitting as CRLF on disk while the
+  test's live-generated value is LF. Renormalize:
+  `git config core.autocrlf false && git checkout-index -a -f`
+  (`git reset --hard` does NOT rewrite files whose conversion round-trips
+  clean — `checkout-index` is the command that actually rewrites the working
+  tree).

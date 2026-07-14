@@ -64,7 +64,7 @@ Prerequisites: [Docker](https://www.docker.com/) with Compose v2 (the one comman
     pnpm dev
     ```
 
-    `pnpm dev` is `docker compose up --build`: it builds the `web` image, boots **Postgres 18.4** + **web**, runs `prisma migrate deploy` automatically inside the container, and serves the app + API at **http://localhost:58000**. Local, CI, and prod run this same `docker-compose.yml`, so behaviour matches prod — which means **hot reload is deliberately traded away** (ratified 2026-07-09). When you want framework hot reload or to run one package on the host, bring up Postgres alone (`docker compose up postgres -d`) and use an escape hatch:
+    `pnpm dev` is `docker compose up --build`: it builds the `web` image, boots **Postgres 18.4** + **web**, runs `prisma migrate deploy` automatically inside the container, and serves the app + API at **http://localhost:58000**. Local and CI run this same `docker-compose.yml` in prod-mode builds — and it is the deployment unit production migrates onto (cutover gated, human-run) — so what you run locally is what ships, which means **hot reload is deliberately traded away** (ratified 2026-07-09). When you want framework hot reload or to run one package on the host, bring up Postgres alone (`docker compose up postgres -d`) and use an escape hatch:
 
     ```bash
     pnpm dev:next        # web app on the host (Next.js dev server, :58000, hot reload)
@@ -153,7 +153,7 @@ Full directory purposes: see [Project layout](#project-layout) below. Local infr
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/caramel-app`                  | Web app + API for grabcaramel.com — Next.js, Prisma (auth DB), Better Auth                                                                                                |
 | `apps/caramel-extension`            | Browser extension source (Chrome/Edge/Firefox/Safari — no in-repo Xcode project; release CI packages Safari from `dist/` via `safari-web-extension-converter`, see below) |
-| `docker-compose.yml` / `Dockerfile` | One-root-compose: `web` + Postgres — the graph `pnpm dev` (and prod) builds and runs                                                                                      |
+| `docker-compose.yml` / `Dockerfile` | One-root-compose: `web` + Postgres — the graph `pnpm dev` builds and runs — and the deployment unit production migrates onto                                              |
 
 ### Safari Extension Icons
 
