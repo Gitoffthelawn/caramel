@@ -100,6 +100,103 @@ model CouponSignal {
   @@map("coupon_signals")
 }
 
+// -----------------------------------------------------------------------------
+// App-owned PUBLISHED coupon catalog (W3a of the Coupons Ownership Inversion).
+//
+// W3a is PURELY ADDITIVE: it creates these tables + a synthetic seed and models
+// the PUBLISHED shape the app serves. It does NOT yet change any read path —
+// couponsRepo.ts / couponsDb.ts still read the external, Python-owned
+// `caramel_coupons` DB over the porsager client; W4 flips those reads onto
+// these models. Every field's type + nullability is reconciled 1:1 with
+// couponsDb.ts's zod row schemas (the published contract) and couponsRepo.ts's
+// real SQL — see the per-field notes. What stays SECRET and is NEVER modelled
+// here is the scraper's PIPELINE-INTERNAL machinery (verification_stores,
+// store_verification_configs, verification_configs/runs, agent_*/scraper_*
+// state) — enforced by tests/unit/prisma-schema-secrecy.test.ts.
+
+/// The published coupon row = couponsDb.ts's CouponListRowSchema. Column names
+/// mirror the external catalog's real columns (couponsRepo's SELECT list) so
+/// the W4 read swap is a pure source change. `id` is the pipeline coupon id
+/// (int8 externally) stored as a STRING to match couponIdSchema +
+/// CouponSignal.couponId and the app's `id: string` everywhere — NO FK to
+/// CouponSignal (a signal may outlive a tombstoned coupon).
+model Coupon {
+  id                  String    @id
+  code                String
+  // Nullable at the column level (SiteRowSchema.site is nullable); listCoupons'
+  // projection still requires it non-null — that stays a query-level guarantee.
+  site                String?
+  title               String
+  description         String
+  // numeric externally; the app coerces to number, so Float preserves the read
+  // shape (Decimal would return a Decimal object and break it).
+  rating              Float     @default(0)
+  // OPEN strings, NOT enums: the Python producer extends this vocabulary
+  // ('PERCENTAGE'/'CASH'/'fixed'/lowercase/null) without it being schema drift.
+  discountType        String?   @map("discount_type")
+  discountAmount      Float?    @map("discount_amount")
+  // TEXT, not DateTime — zod reads it as a string and expireCoupons writes
+  // NOW()::text into it.
+  expiry              String?
+  expired             Boolean   @default(false)
+  timesUsed           Int       @default(0) @map("times_used")
+  lastTimeUsed        DateTime? @map("last_time_used")
+  status              String
+  // Catalog column — the ONE allowed `verification*` @map target on Coupon
+  // (prisma-schema-secrecy.test.ts allowlists it alongside verification_tokens).
+  verificationMessage String?   @map("verification_message")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  // Pipeline last-write timestamp (W3b's only-if-newer authority) + the app's
+  // last-writer-wins stamp on expire. Deliberately NOT @updatedAt — Prisma's
+  // auto-@updatedAt would clobber the pipeline timestamp on every app write.
+  // @default(now()) is a PLAIN default (fills the column only when an insert
+  // omits it: seed rows + insert safety), never rewritten on update.
+  updatedAt           DateTime  @default(now()) @map("updated_at")
+
+  @@index([site])
+  @@index([status, expired])
+  @@map("coupons")
+}
+
+/// The FLATTENED published apply-config = couponsDb.ts's StoreConfigRowSchema,
+/// one row per store (ingest upserts by store_name). This is NOT the scraper's
+/// verification_stores ⋈ store_verification_configs join that PRODUCES it —
+/// that join stays pipeline-internal and secret. All 8 xpaths are nullable: the
+/// schema describes the table shape; the extension route's "needs 5 non-null"
+/// is a business filter layered on top, not a column constraint.
+model StoreConfig {
+  storeName             String   @id @map("store_name")
+  showInputXpath        String?  @map("show_input_xpath")
+  dismissButtonXpath    String?  @map("dismiss_button_xpath")
+  couponInputXpath      String?  @map("coupon_input_xpath")
+  applyButtonXpath      String?  @map("apply_button_xpath")
+  priceContainerXpath   String?  @map("price_container_xpath")
+  successIndicatorXpath String?  @map("success_indicator_xpath")
+  errorIndicatorXpath   String?  @map("error_indicator_xpath")
+  couponRemoveXpath     String?  @map("coupon_remove_xpath")
+  // Plain pipeline timestamp (only-if-newer), NOT @updatedAt — see Coupon.updatedAt.
+  updatedAt             DateTime @default(now()) @map("updated_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("store_configs")
+}
+
+/// The STORED `sources` columns only = couponsDb.ts's SourceRowSchema minus its
+/// computed aggregates (total_coupons/total_used/total_expired are LEFT JOIN
+/// COUNT/SUMs in listActiveSources, never stored — W4 keeps computing them).
+/// `id` is TEXT (requestSource inserts gen_random_uuid()::text).
+model Source {
+  id        String   @id
+  source    String
+  websites  String[] @default([])
+  status    String
+  createdAt DateTime @default(now()) @map("created_at")
+  // Plain pipeline timestamp, NOT @updatedAt — see Coupon.updatedAt.
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("sources")
+}
+
 enum UserStatus {
   ACTIVE_USER
   DELETE_REQUESTED_BY_USER
