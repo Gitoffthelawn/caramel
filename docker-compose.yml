@@ -9,6 +9,7 @@ name: caramel
 services:
   postgres:
     image: postgres:18.4
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-caramel}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caramel_password}
@@ -46,6 +47,12 @@ services:
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
         NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${NEXT_PUBLIC_GOOGLE_ANALYTICS_ID:-}
         NEXT_PUBLIC_API_ENCRYPTION_ENABLED: ${NEXT_PUBLIC_API_ENCRYPTION_ENABLED:-}
+    # Restart policy (both services) complements the fail-hard entrypoint — a
+    # failure still crashes loudly (visible exit + restart count climbing =
+    # crash-loop is diagnosable, never silent), but the stack self-recovers
+    # from transient boot races and survives host reboots; `unless-stopped`
+    # respects a manual stop (the retire/revert path).
+    restart: unless-stopped
     # App secrets (auth, email, OpenRouter, extension OAuth, …) come from the
     # env files below — later file wins on collision, so a local app .env
     # overrides a stray root one. Both optional so a clean checkout / CI can
