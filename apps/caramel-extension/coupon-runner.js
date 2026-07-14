@@ -9,6 +9,26 @@
 if (typeof _caramelCancelled === 'undefined') {
     var _caramelCancelled = false
 }
+
+// Fire-and-forget trust-loop report → background (content scripts can't hit
+// the API directly). Best-effort: an asleep/unreachable SW must never break
+// the apply flow, so send errors are swallowed. No-op without a real coupon
+// id (the #caramel-test mock list carries none).
+function reportOutcome(id, outcome, storeReason) {
+    if (!id) return
+    try {
+        const p = currentBrowser.runtime.sendMessage({
+            action: 'reportOutcome',
+            id: String(id),
+            outcome,
+            storeReason,
+        })
+        if (p && typeof p.then === 'function') p.catch(() => {})
+    } catch (e) {
+        log('REPORT_OUTCOME_SEND_FAILED', { error: String(e) })
+    }
+}
+
 async function startApplyingCoupons(rec) {
     log('=== Starting coupon flow ===')
     if (!rec) {
@@ -90,7 +110,7 @@ async function startApplyingCoupons(rec) {
                 })
                 return
             }
-            const { code } = linkCodes[i]
+            const { code, id } = linkCodes[i]
             await updateTestingModal(i + 1, linkCodes.length, code)
             _markTriedCode(code)
             const after = await applyViaDiscountLink(code)
@@ -103,6 +123,9 @@ async function startApplyingCoupons(rec) {
                     bestSave: saved,
                     t: performance.now(),
                 })
+                // Dispatch the "worked" trust-loop report BEFORE the reload
+                // below unloads the page (the POST is already in flight by then).
+                reportOutcome(id, 'worked')
                 // Reload so the page's own UI shows the applied discount
                 // (tag + new total), then re-show our result on the fresh
                 // document — sessionStorage survives same-tab reloads and is
@@ -189,7 +212,9 @@ async function startApplyingCoupons(rec) {
         : NaN
     let bestSave = 0
     let bestCode = null
+    let bestId = null // coupon id paired with bestCode, for the trust-loop report
     let lastStoreReason = null // last real error text the store showed us
+    let lastFailId = null // coupon id paired with lastStoreReason
     const triedCodes = []
     // Pattern-based early-exit: if the checkout gives ZERO feedback (no applied
     // row, no error text) for the first couple of codes, it isn't accepting our
@@ -263,6 +288,7 @@ async function startApplyingCoupons(rec) {
             log(`✓ ${code} saved ${diff || '(unknown — no priceContainer)'}`)
             bestSave = diff
             bestCode = code
+            bestId = coupons[i].id
             break
         }
 
@@ -285,6 +311,7 @@ async function startApplyingCoupons(rec) {
             !/timeout/i.test(res.errorMsg)
         ) {
             lastStoreReason = res.errorMsg
+            lastFailId = coupons[i].id // pair the reason with its coupon
         }
         if (res.committed) {
             await removeAppliedCoupon(rec)
@@ -324,6 +351,7 @@ async function startApplyingCoupons(rec) {
             tried: triedCodes,
             t: performance.now(),
         })
+        reportOutcome(bestId, 'worked')
         // A committed code that didn't move a READABLE total is usually a
         // threshold promo (min-spend) — say so instead of a bare "applied".
         const zeroEffect = hasPriceCfg && !isNaN(original) && !(bestSave > 0)
@@ -342,6 +370,13 @@ async function startApplyingCoupons(rec) {
             tried: triedCodes,
             t: performance.now(),
         })
+        // Report 'failed' ONLY when a coupon produced the store's real
+        // rejection reason (lastFailId set → lastStoreReason is that text).
+        // When the checkout gave no real signal — no-signal early-exit, time
+        // budget, or an untrusted synthetic click — lastFailId stays null and
+        // we fire NOTHING: a valid code the store rejected only because our
+        // click isn't trusted must never be recorded as a coupon failure.
+        if (lastFailId) reportOutcome(lastFailId, 'failed', lastStoreReason)
         // Nothing auto-applied. Hand the tried codes to the modal so the user
         // gets a manual copy/paste fallback (covers valid codes the store's
         // checkout rejected only because our synthetic click isn't trusted).

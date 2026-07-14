@@ -135,6 +135,25 @@ currentBrowser.runtime.onMessage.addListener(
                 .catch(err => sendResponse({ coupons: [], error: String(err) }))
 
             return true
+        } else if (message.action === 'reportOutcome') {
+            // Trust-loop signal from the apply flow (coupon-runner). Fire-and-forget:
+            // errors are logged, never surfaced — a report must not break checkout.
+            // A "worked" outcome also bumps the public usage counter.
+            const { id, outcome, storeReason } = message
+            fetchWithTimeout(caramelUrl(`api/coupons/${id}/report`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ outcome, storeReason }),
+            }).catch(err => console.error('reportOutcome error', err))
+            if (outcome === 'worked') {
+                fetchWithTimeout(caramelUrl('api/coupons/increment'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id }),
+                }).catch(err => console.error('increment error', err))
+            }
+            sendResponse({ success: true })
+            return true
         } else if (message.action === 'fetchSupportedStores') {
             const url = caramelUrl('api/extension/supported-stores')
             fetchWithTimeout(url)
