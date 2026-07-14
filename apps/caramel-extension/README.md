@@ -1,6 +1,6 @@
 # caramel-extension
 
-Plain-JS Manifest V3 browser extension (Chrome/Edge/Firefox; Safari wrapper in `apple-extension/`, see the root README's Project layout) — **no bundler**, every file loads verbatim as listed in `manifest.json` (Chrome/Edge) / `manifest-firefox.json` (Firefox).
+Plain-JS Manifest V3 browser extension (Chrome/Edge/Firefox; Safari is packaged in release CI from `dist/` via `safari-web-extension-converter` — no in-repo Xcode project, see `.github/workflows/release-extension.yml`) — **no bundler**, every file loads verbatim as listed in `manifest.json` (Chrome/Edge) / `manifest-firefox.json` (Firefox).
 
 **Setup:** root [README.md](../../README.md)'s Getting Started. This extension has no `.env` of its own.
 

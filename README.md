@@ -156,12 +156,11 @@ Full directory purposes: see [Project layout](#project-layout) below. Local infr
 
 ## Project layout
 
-| Path                                     | Purpose                                                                                                                                                                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/caramel-app`                       | Web app + API for grabcaramel.com — Next.js, Prisma (auth DB), Better Auth                                                                                                                                            |
-| `apps/caramel-extension`                 | Browser extension source (Chrome/Edge/Firefox/Safari)                                                                                                                                                                 |
-| `apps/caramel-extension/apple-extension` | Safari macOS/iOS Xcode project — scaffolded via `xcrun safari-web-extension-converter`, checked into git; release CI builds Safari fresh into its own ephemeral project rather than regenerating this one (see below) |
-| `local-dev/`                             | Local Postgres/Redis Docker Compose + local-dev docs                                                                                                                                                                  |
+| Path                     | Purpose                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/caramel-app`       | Web app + API for grabcaramel.com — Next.js, Prisma (auth DB), Better Auth                                                                                                |
+| `apps/caramel-extension` | Browser extension source (Chrome/Edge/Firefox/Safari — no in-repo Xcode project; release CI packages Safari from `dist/` via `safari-web-extension-converter`, see below) |
+| `local-dev/`             | Local Postgres/Redis Docker Compose + local-dev docs                                                                                                                      |
 
 ### Safari Extension Icons
 
