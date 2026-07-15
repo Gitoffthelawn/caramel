@@ -62,6 +62,20 @@ Structural gates share the same fs-walk style and also live in
 retries: 2` and `forbidOnly` only under CI; locally it defaults to parallel
   workers + 0 retries and boots `pnpm dev` (reused if already running). For a
   stable run against a cold dev server, pass `--workers=1 --retries=2`.
+- **E2E runs in TWO contexts — write specs for both.** `e2e-pr`/local is
+  _hermetic_: a fresh Postgres, `prisma migrate deploy` + the synthetic
+  `catalog_seed`, seedable users, `DATABASE_URL` set. `e2e-push` runs the SAME
+  specs against the _deployed_ dev site: NO `DATABASE_URL`, no generated prisma
+  client, REAL catalog data. Collection happens in BOTH. So any spec that
+  asserts specific DB content or touches the DB MUST gate itself on
+  `test.skip(!process.env.DATABASE_URL, …)` AND must never `import` from
+  `@prisma/client` at module top level (import it lazily inside the fn, or the
+  whole file crashes collection on `e2e-push`). Deployment-safe assertions
+  (page shell, generic content presence) stay ungated so they cover pushes too.
+  Live examples: `e2e/auth-flows.spec.ts` ("Login (real session)" group) and
+  the lazy-import comment in `e2e/support/seed-user.ts`. Two e2e-push reds were
+  caused by breaking exactly this rule (a top-level prisma import; a synthetic
+  seed row asserted against the real deployed catalog).
 - **App-owned coupon catalog.** `pnpm dev` (and `db:migrate:deploy`) creates and
   seeds the catalog, so coupon routes return `200` and `/api/health/db` reports
   `catalog: "ok"` locally — the pre-inversion "degraded mode" is retired.
