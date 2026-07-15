@@ -95,7 +95,7 @@ This matches what `.env.example` ships — the compose Postgres creates exactly 
 
 **`COUPONS_DATABASE_URL` — optional, bridge-sync only (leave unset locally):**
 
-The app serves its own coupon catalog from `DATABASE_URL`, so this is **unset in local dev** — the app never reads it at boot. It is consumed only by the migration-period `bridge:sync` job (`pnpm --filter caramel-app bridge:sync`), which reads the still-live external, Python-owned `caramel_coupons` Postgres (strictly read-only) and replays it into the app catalog through the same ingest engine as `POST /api/ingest/catalog`. Leave it blank unless you are running that bridge against a reachable external DB. See [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md) and [`docs/INGEST.md`](docs/INGEST.md).
+The app serves its own coupon catalog from `DATABASE_URL`, so this is **unset in local dev** — the app never reads it at boot. It is consumed only by the migration-period `bridge:sync` job (`pnpm --filter caramel-app bridge:sync`), which reads the still-live external, Python-owned `caramel_coupons` Postgres (strictly read-only) and replays it into the app catalog through the same ingest engine as `POST /api/ingest/catalog`. It ships commented out in `.env.example` — uncomment it only when running that bridge against a reachable external DB (set-but-empty fails fast at boot by design). See [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md) and [`docs/INGEST.md`](docs/INGEST.md).
 
 **Generate locally (any random string) — at least one of the first two is required:**
 
@@ -116,7 +116,8 @@ The app serves its own coupon catalog from `DATABASE_URL`, so this is **unset in
 | `USESEND_BASE_URL`                         | `https://usesend.devino.ca`            |
 | `USESEND_FROM_EMAIL` / `USESEND_FROM_NAME` | `no_reply@grabcaramel.com` / `Caramel` |
 | `OPENROUTER_MODEL`                         | `openai/gpt-5-mini`                    |
-| `NODE_ENV`                                 | framework-managed — leave alone        |
+
+(`NODE_ENV` is deliberately absent from `.env.example`: it is framework-managed — Next.js sets it per command and env files cannot override it.)
 
 **Local-optional — leave blank unless you need the specific feature:**
 

@@ -99,6 +99,13 @@ describe('.env.example drift', () => {
             content
                 .split('\n')
                 .map(line => line.trim())
+                // A commented-out assignment ("# KEY=value") still DOCUMENTS
+                // the key: .env.example deliberately ships the optional
+                // COUPONS_DATABASE_URL commented out (bridge-sync-only input;
+                // a set-but-EMPTY value fails env.ts's `.min(1)` at boot, so
+                // the template must not ship it active). Prose comments don't
+                // match the KEY= shape and stay excluded.
+                .map(line => line.replace(/^#\s*(?=[A-Z][A-Z0-9_]*=)/, ''))
                 .filter(line => line && !line.startsWith('#'))
                 .map(line => line.split('=')[0]?.trim())
                 .filter((key): key is string => Boolean(key)),
