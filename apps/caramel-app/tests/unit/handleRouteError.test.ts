@@ -14,39 +14,25 @@ vi.mock('@sentry/nextjs', () => ({
     captureException: captureExceptionMock,
 }))
 
-// Used only by the coupons/route.ts integration pin below — always-throws
-// so the route's try block reliably reaches its catch site. importActual
-// keeps visibleCouponsWhere/rankingOrderSql (real, unmocked — safe, they
-// only ever build a lazy fragment, never execute it standalone — see
-// coupons-visibility.test.ts's closure-timing note) wired: couponsRepo.ts's
-// listCoupons() calls visibleCouponsWhere() BEFORE ever touching couponsSql,
-// so without importActual that call itself throws first (a real, different
-// error than "db exploded") — the route's try/catch still reaches the
-// same 500 either way, but importActual keeps this pin testing the thing
-// its name says it tests.
-vi.mock('@/lib/couponsDb', async () => {
-    const actual =
-        await vi.importActual<typeof import('@/lib/couponsDb')>(
-            '@/lib/couponsDb',
-        )
-    return {
-        ...actual,
-        couponsSql: () => {
+// coupons/route.ts's GET → couponsRepo.listCoupons() → `prisma.$queryRaw`
+// against the app-owned catalog (since W4). Mock @/lib/prisma so importing the
+// route never constructs a real PrismaClient (the unit CI job doesn't run
+// `prisma generate`) AND so the first catalog query THROWS — driving the
+// route's try block into its catch, which is the F-002 mechanism under test.
+// attachSignals → couponSignal.findMany is stubbed for the same import-graph
+// reason; the route never reaches it (the $queryRaw throw fires first).
+// Pre-W4 this throw came from the porsager couponsSql client — the retarget
+// onto prisma is why the old @/lib/couponsDb mock is gone.
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $queryRaw: () => {
             throw new Error('db exploded')
         },
-    }
-})
+        couponSignal: { findMany: vi.fn(async () => []) },
+    },
+}))
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,
-}))
-
-// coupons/route.ts now imports attachSignals → @/lib/prisma; mock it so
-// importing the route never constructs a real PrismaClient (the unit CI job
-// doesn't run `prisma generate`). The couponsSql mock above throws inside
-// listCoupons, so the route hits its catch BEFORE attachSignals ever runs —
-// this mock exists only to keep the import graph off the real client.
-vi.mock('@/lib/prisma', () => ({
-    default: { couponSignal: { findMany: vi.fn(async () => []) } },
 }))
 
 beforeEach(() => {

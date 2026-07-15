@@ -39,34 +39,40 @@ describe('assertHomeOk', () => {
 })
 
 describe('assertHealthOk', () => {
-    it('PASS: 200, top-level status "ok", both checks "ok" (F-001 dual-DB shape)', () => {
+    it('PASS: 200, top-level status "ok", both checks "ok" (auth_db + catalog shape)', () => {
         const result = assertHealthOk(200, {
             status: 'ok',
             checks: {
                 auth_db: { status: 'ok', service: 'auth_db', latencyMs: 5 },
-                coupons_db: {
+                catalog: {
                     status: 'ok',
-                    service: 'coupons_db',
+                    service: 'catalog',
                     latencyMs: 8,
+                    details: {
+                        count: 30,
+                        freshestUpdatedAt: '2026-07-14T00:00:00.000Z',
+                        ageMinutes: 120,
+                        stale: false,
+                    },
                 },
             },
         })
         expect(result.ok).toBe(true)
     })
 
-    it('FAIL: 503 with coupons_db down (this is the exact F-001 gap the health route now surfaces)', () => {
+    it('FAIL: 503 with the catalog check down (unreachable or empty catalog)', () => {
         const result = assertHealthOk(503, {
             status: 'error',
             checks: {
                 auth_db: { status: 'ok' },
-                coupons_db: {
+                catalog: {
                     status: 'error',
-                    details: 'connect ECONNREFUSED',
+                    details: 'relation "coupons" does not exist',
                 },
             },
         })
         expect(result.ok).toBe(false)
-        expect(result.detail).toMatch(/coupons_db=error/)
+        expect(result.detail).toMatch(/catalog=error/)
     })
 
     it('FAIL: 401 unauthorized (missing/wrong UPKUMA_HEALTH_SECRET) has no {status,checks} body', () => {
@@ -80,17 +86,17 @@ describe('assertHealthOk', () => {
         expect(result.ok).toBe(false)
     })
 
-    it('FAIL: both DBs down', () => {
+    it('FAIL: both checks down', () => {
         const result = assertHealthOk(503, {
             status: 'error',
             checks: {
                 auth_db: { status: 'error' },
-                coupons_db: { status: 'error' },
+                catalog: { status: 'error' },
             },
         })
         expect(result.ok).toBe(false)
         expect(result.detail).toMatch(/auth_db=error/)
-        expect(result.detail).toMatch(/coupons_db=error/)
+        expect(result.detail).toMatch(/catalog=error/)
     })
 })
 

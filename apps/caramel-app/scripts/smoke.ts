@@ -7,7 +7,10 @@
 // repo). This is the callable half of that gap: hits the 3 endpoints that
 // between them prove "the app booted, the auth DB is reachable, the coupons
 // DB is reachable, and a real read query returns real data" — the same
-// signals a human would eyeball, run one command.
+// signals a human would eyeball, run one command. (Since W4 the "coupons DB"
+// leg is the app's OWN catalog in DATABASE_URL — the external caramel_coupons
+// DB and its degraded mode are retired; /api/health/db's catalog check proves
+// the catalog is reachable + non-empty.)
 //
 // Not wired into the Dokploy deploy pipeline itself (ops/human handoff —
 // see RUNBOOK.md "Post-deploy smoke"). Run manually:
@@ -54,11 +57,11 @@ export function assertHomeOk(
     return { name, ok: true }
 }
 
-/** Mirrors the ACTUAL /api/health/db response shape landed in F-001
- * (src/app/api/health/db/route.ts): {status, checks: {auth_db, coupons_db}},
+/** Mirrors the ACTUAL /api/health/db response shape
+ * (src/app/api/health/db/route.ts): {status, checks: {auth_db, catalog}},
  * where each check is {status: 'ok'|'error', service, latencyMs, details?}.
- * Generic over the checks key set (doesn't hardcode auth_db/coupons_db) so
- * this doesn't silently stop covering a future 3rd check. */
+ * Generic over the checks key set (doesn't hardcode auth_db/catalog) so this
+ * doesn't silently stop covering a future 3rd check. */
 interface HealthCheckEntry {
     status: string
     [key: string]: unknown

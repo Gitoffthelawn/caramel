@@ -1,69 +1,44 @@
 // lib/couponsDb.ts
 //
-// Read-only connection to the `caramel_coupons` database owned by the
-// Python verification service. All mutations to the coupon catalog flow
-// through that service — Next.js only reads (plus three narrow mutations,
-// all in src/lib/couponsRepo.ts: usage-increment and expire, both exposed
-// to the extension, and inserting a REQUESTED `sources` row from the
-// public "request a store" form). The Python service owns everything else
-// and must treat those specific columns as co-written — never clobber
-// `times_used`/`last_time_used`, honor `expired`/`expiry` once set. See
-// DESIGN.md §2 "Write-ownership" for the full coordination contract.
+// The published coupon catalog's zod ROW SCHEMAS + parseCouponRows() — the
+// runtime-validated READ BOUNDARY every coupon read in couponsRepo.ts flows
+// through. This module owns NO database connection: since W4 the catalog lives
+// in the app's OWN Postgres (DATABASE_URL), read via `prisma.$queryRaw` in
+// couponsRepo.ts (the 3 sanctioned WRITES flipped onto Prisma there too). The
+// external, Python-owned caramel_coupons Postgres and its porsager
+// `couponsSql` client were retired in W4-D3, together with the whole local
+// "degraded mode" — the app serves its own migrated + seeded (and, once wired,
+// bridge-synced) catalog.
 //
-// This file owns the boundary primitives only: the porsager connection
-// (`couponsSql`, still used by the 3 sanctioned WRITES in couponsRepo.ts) and
-// the zod row schemas + parseCouponRows(). The query text (10 reads on the
-// app's own Prisma catalog + 3 writes on couponsSql) lives in
-// src/lib/couponsRepo.ts, built on these primitives — routes import from
-// couponsRepo, never call couponsSql directly.
-import { env } from '@/lib/env'
-import postgres from 'postgres'
+// NOTE: the porsager `postgres` package stays a dependency (temporarily in
+// knip.json's ignoreDependencies) for the next-dispatch bridge-sync script,
+// which reconnects to the external caramel_coupons DB to refresh this catalog.
+// TODO(W4-bridge): once that script imports `postgres`, drop the postgres
+// entry from knip.json's ignoreDependencies.
+//
+// Every read still parses its raw rows through parseCouponRows() before the
+// data reaches a caller, so a schema/type drift in the catalog throws loudly
+// (→ Sentry via handleRouteError on API routes, → onRequestError on the SSR
+// page) instead of silently serving malformed/zeroed data. See
+// DESIGN.md §2 "Write-ownership" for the catalog coordination contract.
 import { z } from 'zod'
-
-const connectionString = env.COUPONS_DATABASE_URL
-
-// Reuse one client across hot-reloads in dev to avoid pool leaks.
-const globalForSql = globalThis as unknown as {
-    couponsSql?: ReturnType<typeof postgres>
-}
-
-export const couponsSql =
-    globalForSql.couponsSql ??
-    postgres(connectionString, {
-        max: 10,
-        idle_timeout: 20,
-        connect_timeout: 10,
-        prepare: false,
-        // F-011 — coarse cross-hop trace correlation. This hop has no
-        // header channel (raw SQL, not an instrumented HTTP call), so a
-        // real trace/request ID can't cross it; application_name is the
-        // closest attribution available, surfacing "caramel-app" in
-        // pg_stat_activity / DB logs instead of the porsager default
-        // ('postgres.js') so a slow/blocking query can be traced back to
-        // this process. See RUNBOOK.md "Trace correlation" for the
-        // documented limitation (not per-request, known debt).
-        connection: { application_name: 'caramel-app' },
-    })
-
-if (process.env.NODE_ENV !== 'production') {
-    globalForSql.couponsSql = couponsSql
-}
 
 // ---------------------------------------------------------------------------
 // Runtime-validated read boundary (F-001).
 //
-// couponsSql is untyped raw SQL against a database this repo doesn't own —
-// prior call sites papered over that with a TS generic
-// (`couponsSql<Array<{site:string}>>`), which is a compile-time cast with
-// zero runtime enforcement (top-sites even omitted `coupon_count` from its
-// generic while selecting it). These schemas replace those casts: every
-// read call site parses its raw rows through parseCouponRows() before
-// touching the data, so a schema/type drift in the Python-owned DB throws
-// loudly (→ Sentry via handleRouteError on API routes, → onRequestError on
-// the SSR page) instead of silently serving malformed/zeroed data.
+// The reads are untyped raw SQL (`prisma.$queryRaw` against the app catalog) —
+// prior porsager call sites papered over that with a TS generic
+// (`couponsSql<Array<{site:string}>>`), a compile-time cast with zero runtime
+// enforcement (top-sites even omitted `coupon_count` from its generic while
+// selecting it). These schemas replace those casts: every read call site parses
+// its raw rows through parseCouponRows() before touching the data, so a
+// schema/type drift in the catalog throws loudly (→ Sentry via handleRouteError
+// on API routes, → onRequestError on the SSR page) instead of silently serving
+// malformed/zeroed data.
 //
-// Traps mirrored here (postgres.js RUNTIME types, not the DB's nominal
-// column types):
+// Traps mirrored here (raw-query-driver RUNTIME types, not the DB's nominal
+// column types — the schemas were built against porsager's and still coerce
+// defensively under Prisma `$queryRaw`):
 //   - int8 (bigint) columns arrive as JS strings, int4 as JS numbers. `id`
 //     uses couponIdSchema (below) rather than z.coerce.string(): plain
 //     coercion turns a missing/null id into the literal string
@@ -203,13 +178,13 @@ export const StoreConfigRowSchema = z.object({
 export type StoreConfigRow = z.infer<typeof StoreConfigRowSchema>
 
 /**
- * Parse raw couponsSql rows through `schema`, throwing loudly on the first
+ * Parse raw catalog rows through `schema`, throwing loudly on the first
  * shape/type mismatch instead of letting malformed data reach a caller.
  * `queryLabel` identifies which query drifted (e.g. `'coupons.list'`) —
  * it's the only breadcrumb available once this throw reaches Sentry.
  *
  * ```ts
- * const rawCoupons = await couponsSql`SELECT id, code, ... FROM coupons`
+ * const rawCoupons = await prisma.$queryRaw(Prisma.sql`SELECT id, code, ... FROM coupons`)
  * const coupons = parseCouponRows(CouponListRowSchema, rawCoupons, 'coupons.list')
  * ```
  */
@@ -229,9 +204,4 @@ export function parseCouponRows<Output>(
         throw new Error(`coupons-db schema drift [${queryLabel}]: ${issues}`)
     }
     return result.data
-}
-
-/** Liveness probe for /api/health/db (F-001) — mirrors prisma.$queryRaw`SELECT 1`. */
-export async function pingCouponsDb(): Promise<void> {
-    await couponsSql`SELECT 1`
 }
