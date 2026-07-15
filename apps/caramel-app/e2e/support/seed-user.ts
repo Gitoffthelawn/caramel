@@ -10,7 +10,8 @@
 //      email, and emailAndPassword.requireEmailVerification is ON (auth.ts), so
 //      without this flip the seeded user could never sign in. This DB write is
 //      the ONLY part that bypasses a real user action, and it is deliberate +
-//      test-only (mirrors the extension e2e's flip in checks-extension.yml).
+//      test-only. The extension e2e job (checks-extension.yml) REUSES this
+//      exact helper via scripts/seed-e2e-user.ts to create its fixture login.
 //
 // Requires DATABASE_URL in the environment (playwright.config.ts loads .env).
 // Callers MUST gate on DATABASE_URL and skip when it is absent (deployed-site

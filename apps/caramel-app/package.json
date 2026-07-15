@@ -25,6 +25,7 @@
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "setup:ci-env": "tsx scripts/ci-env.ts",
+        "seed:e2e-user": "tsx scripts/seed-e2e-user.ts",
         "coupons:clone-local": "bash scripts/internal/clone-coupons-local.sh",
         "smoke": "tsx scripts/smoke.ts",
         "generate:coupon-constants": "tsx scripts/generate-coupon-constants.ts",

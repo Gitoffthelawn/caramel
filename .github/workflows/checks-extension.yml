@@ -39,3 +39,103 @@ jobs:
         run: pnpm run test
       - name: Check bundle size
         run: pnpm run size
+
+  # ─────────────────────────────────────────────────────────────
+  # Extension E2E (E-02) — real Chromium + unpacked extension + local app
+  # ─────────────────────────────────────────────────────────────
+  # Runs scripts/test-extension.mjs: boots the real app (dev server + a real
+  # Postgres, migrated AND catalog-seeded by `prisma migrate deploy`), loads a
+  # PATCHED TEMP COPY of the extension (base URL -> localhost; see the suite
+  # header — shipped code is never modified), and drives real login +
+  # supported-stores + coupons + popup UI + applyCoupon() injection.
+  # PR-only like checks-app.yml's e2e-pr job: it is the heavy DB-backed e2e
+  # tier, and there is no deployed-extension equivalent of e2e-push to cover
+  # pushes instead.
+  e2e:
+    name: extension e2e
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Matches e2e-pr's pin (postgres:15) so the two e2e tiers run the same
+        # database. (That pin's drift vs compose's postgres:18.4 is a known
+        # punch-list item — resolve both together, deliberately NOT diverging
+        # here.)
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ${{ github.workspace }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # test-extension.mjs imports `playwright` from the extension workspace
+      # (its own devDependency), so the browser install must run there too.
+      - name: Install Playwright Chromium
+        run: pnpm --filter caramel-extension exec playwright install --with-deps chromium
+
+      # Writes apps/caramel-app/.env (DATABASE_URL -> the postgres service on
+      # :58005, BETTER_AUTH secrets, NEXT_PUBLIC_BASE_URL=localhost:58000) —
+      # what both `prisma migrate deploy` and the dev server below read.
+      - name: Write minimal CI env
+        run: pnpm --filter caramel-app run setup:ci-env
+
+      - name: Generate Prisma Client
+        run: pnpm --filter caramel-app exec prisma generate
+
+      # Also seeds the app-owned coupon catalog (catalog_seed migration), so
+      # the suite's supported-stores/coupons checks see real rows.
+      - name: Apply Prisma migrations
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Boot the app on :58000
+        working-directory: ./apps/caramel-app
+        run: |
+          nohup pnpm exec next dev -p 58000 > /tmp/next-dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:58000/; then
+              echo "app ready after attempt $i"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::app never became ready on :58000'
+          tail -50 /tmp/next-dev.log
+          exit 1
+
+      # Creates the suite's fixture login (test@caramel.dev / test1234) through
+      # the REAL signup API, then flips email_verified directly in the DB — CI
+      # cannot click a verification email (announced loudly in
+      # e2e/support/seed-user.ts, which this script reuses).
+      - name: Seed verified extension test user
+        run: pnpm --filter caramel-app run seed:e2e-user
+
+      # The MV3 service worker needs a headed Chromium (the suite launches
+      # headless:false) — xvfb provides the display on the runner.
+      - name: Run extension e2e suite
+        run: |
+          sudo apt-get -yqq install xvfb
+          xvfb-run --auto-servernum pnpm --filter caramel-extension test:e2e
