@@ -1,5 +1,3 @@
-import { PrismaClient } from '@prisma/client'
-
 // E-05 e2e seeding helper — creates a REAL, email-verified user so the login
 // success spec can exercise the genuine better-auth sign-in path (real
 // credential hash, real session cookie), not a page.route mock.
@@ -68,6 +66,18 @@ export async function seedVerifiedUser({
     }
 
     // 2. Flip email_verified so requireEmailVerification lets the user sign in.
+    //
+    // ⚠️ @prisma/client MUST be imported lazily, here inside the function —
+    // NEVER at module top level. auth-flows.spec.ts imports this helper at
+    // collection time, and the e2e-push job runs against the DEPLOYED site
+    // without ever running `prisma generate` (correctly — it has no DB), so
+    // the GENERATED client (.prisma/client) is absent there BY DESIGN. A
+    // top-level import crashes the whole spec file at module load ("Cannot
+    // find module '.prisma/client/default'") before the test.skip(!SEEDABLE)
+    // gate can run — the skip gate protects execution, not imports. This
+    // dynamic import is only reached when DATABASE_URL is set (e2e-pr/local,
+    // where the client IS generated).
+    const { PrismaClient } = await import('@prisma/client')
     const prisma = new PrismaClient()
     try {
         await prisma.user.update({
