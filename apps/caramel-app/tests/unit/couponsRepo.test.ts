@@ -1,7 +1,6 @@
 import {
     expireCoupons,
     getCouponStats,
-    incrementCouponUsage,
     listCoupons,
     requestSource,
 } from '@/lib/couponsRepo'
@@ -13,23 +12,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // coupons-store-page.test.ts, supported-stores.test.ts, and
 // coupons-expire.test.ts — this file is deliberately NOT a duplicate of those.
 //
-// W4 split: the READS (listCoupons/getCouponStats) run on the app's Prisma
-// catalog via `prisma.$queryRaw(Prisma.sql`...`)`, so they're driven through a
-// mocked `@/lib/prisma` whose `$queryRaw` records the composed `.sql`
-// (flattened `?`-placeholder text) and returns rule-matched rows. The WRITES
-// (expire/increment/requestSource) still run on couponsDb.ts's porsager
-// `couponsSql`, so that recording thenable mock stays. Both mocks share one
-// rules/capturedQueries store (a given test exercises only one side).
+// W4-D2: reads AND writes now run on the app's own Prisma catalog, so a single
+// mocked `@/lib/prisma` covers both. `$queryRaw` (reads) records the composed
+// `.sql` (flattened `?`-placeholder text) and returns rule-matched rows;
+// `$executeRaw` (expire) records its `.sql` and returns a preset affected-row
+// count; `source.create` (requestSource) records its args. parseCouponRows +
+// the real row schemas come from the UNMOCKED couponsDb (the reads' zod parse).
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
 // Raw SQL text of every DB call, in order — lets a test assert on the
 // generated QUERY SHAPE itself.
 let capturedQueries: string[] = []
+// Affected-row count the mocked $executeRaw returns (expire).
+let executeRawResult = 0
+// Args every prisma.source.create() was called with (requestSource).
+let capturedSourceCreates: unknown[] = []
 function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
 }
 
-// Reads: prisma.$queryRaw receives a Prisma.Sql whose `.sql` getter is the
+// prisma.$queryRaw / $executeRaw receive a Prisma.Sql whose `.sql` getter is the
 // composed, flattened query text (nested fragments inlined, values as `?`).
 vi.mock('@/lib/prisma', () => ({
     default: {
@@ -38,35 +40,25 @@ vi.mock('@/lib/prisma', () => ({
             const rows = rules.find(r => r.match(arg.sql))?.rows ?? []
             return Promise.resolve(rows)
         },
+        $executeRaw: (arg: { sql: string }) => {
+            capturedQueries.push(arg.sql)
+            return Promise.resolve(executeRawResult)
+        },
         couponSignal: { findMany: vi.fn(async () => []) },
+        source: {
+            create: (arg: unknown) => {
+                capturedSourceCreates.push(arg)
+                return Promise.resolve({})
+            },
+        },
     },
 }))
-
-// Writes: couponsDb.ts's porsager couponsSql, a recording thenable.
-// importActual keeps parseCouponRows + the real row schemas wired (the reads'
-// zod parse imports them from this module too).
-vi.mock('@/lib/couponsDb', async () => {
-    const actual =
-        await vi.importActual<typeof import('@/lib/couponsDb')>(
-            '@/lib/couponsDb',
-        )
-    return {
-        ...actual,
-        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-            const sql = strings.join('?')
-            capturedQueries.push(sql)
-            const rows = rules.find(r => r.match(sql))?.rows ?? []
-            return {
-                // oxlint-disable-next-line no-thenable
-                then: (resolve: (rows: unknown[]) => void) => resolve(rows),
-            }
-        },
-    }
-})
 
 beforeEach(() => {
     rules = []
     capturedQueries = []
+    executeRawResult = 0
+    capturedSourceCreates = []
 })
 
 const couponFixture = {
@@ -175,54 +167,52 @@ describe('getCouponStats', () => {
     })
 })
 
-describe('expireCoupons (write)', () => {
-    it('returns rows.length from the UPDATE...RETURNING id', async () => {
-        mockRows(
-            sql =>
-                sql.includes('UPDATE coupons') &&
-                sql.includes('expired = TRUE'),
-            [{ id: 1 }, { id: 2 }],
-        )
+describe('expireCoupons (write, app catalog via prisma.$executeRaw)', () => {
+    it('UPDATEs the app coupons table and returns the affected-row count directly', async () => {
+        executeRawResult = 2
 
-        await expect(expireCoupons([1, 2])).resolves.toBe(2)
+        await expect(expireCoupons(['1', '2'])).resolves.toBe(2)
+
+        // The intent SQL — an UPDATE flipping expired=TRUE on the app catalog,
+        // guarded to only-currently-live rows (so the count = FALSE→TRUE
+        // transitions), on our OWN table (never the porsager couponsSql).
+        expect(capturedQueries).toHaveLength(1)
+        expect(capturedQueries[0]).toContain('UPDATE coupons')
+        expect(capturedQueries[0]).toContain('expired = TRUE')
+        expect(capturedQueries[0]).toContain('expired = FALSE')
     })
 
-    it('returns 0 when no row matched', async () => {
-        mockRows(
-            sql =>
-                sql.includes('UPDATE coupons') &&
-                sql.includes('expired = TRUE'),
-            [],
-        )
+    it('returns 0 when no live row matched (executeRaw affected 0)', async () => {
+        executeRawResult = 0
 
-        await expect(expireCoupons([999999])).resolves.toBe(0)
-    })
-})
-
-describe('incrementCouponUsage (write)', () => {
-    it('returns rows[0] (untyped passthrough, no zod) when a row matched', async () => {
-        const row = {
-            id: '42',
-            code: 'SAVE10',
-            site: 'example.com',
-            timesUsed: 6,
-        }
-        mockRows(sql => sql.includes('times_used = times_used + 1'), [row])
-
-        await expect(incrementCouponUsage(42)).resolves.toEqual(row)
+        await expect(expireCoupons(['999999'])).resolves.toBe(0)
+        expect(capturedQueries).toHaveLength(1)
     })
 
-    it('returns undefined when no coupon matched the id', async () => {
-        mockRows(sql => sql.includes('times_used = times_used + 1'), [])
-
-        await expect(incrementCouponUsage(999999)).resolves.toBeUndefined()
+    it('short-circuits an empty id list to 0 WITHOUT issuing SQL (IN () is invalid)', async () => {
+        await expect(expireCoupons([])).resolves.toBe(0)
+        expect(capturedQueries).toHaveLength(0)
     })
 })
 
-describe('requestSource (write)', () => {
-    it('issues the sources INSERT and resolves void', async () => {
-        mockRows(sql => sql.includes('INSERT INTO sources'), [])
-
+describe('requestSource (write, app sources INSERT via prisma.source.create)', () => {
+    it('creates a REQUESTED source row (empty websites[], minted id) and resolves void', async () => {
         await expect(requestSource('example.com')).resolves.toBeUndefined()
+
+        expect(capturedSourceCreates).toHaveLength(1)
+        const arg = capturedSourceCreates[0] as {
+            data: {
+                id: string
+                source: string
+                websites: string[]
+                status: string
+            }
+        }
+        expect(arg.data.source).toBe('example.com')
+        expect(arg.data.websites).toEqual([])
+        expect(arg.data.status).toBe('REQUESTED')
+        // id is minted app-side (Source.id has no DB default) — a non-empty string.
+        expect(typeof arg.data.id).toBe('string')
+        expect(arg.data.id.length).toBeGreaterThan(0)
     })
 })

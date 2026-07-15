@@ -7,19 +7,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // authorize()), fail-closed when unset. The id-validation branches below
 // are unchanged through the auth swap — asserting them here proves the
 // swap is behavior-isolated (see PLAN-F-003.md §Test strategy).
+//
+// W4-D2: expireCoupons now UPDATEs the app's OWN coupons table via
+// prisma.$executeRaw (which returns the affected-row count directly), not the
+// porsager couponsSql — so the DB mock targets @/lib/prisma, and the route
+// passes the validated ids through as STRINGS (the app Coupon.id is a string).
 
 const calls: string[] = []
-let resolvedRows: { id: number }[] = []
+let affectedRows = 0
 
-vi.mock('@/lib/couponsDb', () => ({
-    couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-        calls.push(strings.join('?'))
-        // Deliberate thenable mock — see tests/unit/coupons-visibility.test.ts
-        // for why this shape (replicates the `postgres` tagged-template result).
-        return {
-            // oxlint-disable-next-line no-thenable
-            then: (resolve: (rows: unknown[]) => void) => resolve(resolvedRows),
-        }
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $executeRaw: (arg: { sql: string }) => {
+            calls.push(arg.sql)
+            return Promise.resolve(affectedRows)
+        },
     },
 }))
 
@@ -50,7 +52,7 @@ function authedRequest(
 
 beforeEach(() => {
     calls.length = 0
-    resolvedRows = []
+    affectedRows = 0
     envMock.COUPONS_ADMIN_SECRET = ADMIN_SECRET
 })
 
@@ -108,7 +110,7 @@ describe('POST /api/coupons/expire — id validation (unchanged through the auth
     })
 
     it('dedupes + drops non-matching ids (/^\\d{1,18}$/) before querying, returns { count }', async () => {
-        resolvedRows = [{ id: 1 }, { id: 2 }]
+        affectedRows = 2
         const res = await POST(
             authedRequest({ ids: [1, '1', 2, 'abc', -1, 1.5, '3.14'] }),
         )

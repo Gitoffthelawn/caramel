@@ -19,12 +19,14 @@
 // int8/bigint → JS BigInt, which the `z.number()` count/stats schemas reject —
 // the `::int` casts return int4 → JS `number`, so the casts are load-bearing.
 //
-// The 3 sanctioned WRITES (incrementCouponUsage / expireCoupons /
-// requestSource) still run on couponsDb.ts's porsager `couponsSql` against the
-// externally-owned `caramel_coupons` DB — untouched by W4, flipped in a later
-// dispatch. They keep the optional trailing `sql` executor (typed `Sql`) so
-// scripts/internal/verify-writes.ts can thread a rolled-back transaction
-// through them.
+// The sanctioned WRITES now run on the app's OWN Prisma tables too (W4-D2):
+// expireCoupons UPDATEs the app `coupons` table and requestSource INSERTs an
+// app `sources` row (both via `prisma.$executeRaw` / the Prisma query-builder,
+// DATABASE_URL). The old incrementCouponUsage was RETIRED — usage telemetry
+// moved OUT of the catalog into the app-owned coupon_signals table
+// (couponSignals.recordUsage): an `UPDATE coupons SET times_used…` would bump
+// the row's updated_at and freeze it under the ingest only-if-newer rule
+// (RULING C′). No write touches the external `caramel_coupons` DB anymore.
 //
 // HTTP-only concerns stay OUT of this file by design: param parsing/caps,
 // `getBaseDomain`/domain-validation 400s, response envelopes, cache
@@ -47,14 +49,11 @@ import {
     type StoreConfigRow,
     StoreConfigRowSchema,
     TotalCountRowSchema,
-    couponsSql,
     parseCouponRows,
 } from '@/lib/couponsDb'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-
-/** Any executor a WRITE fn can run on — the module `couponsSql` singleton by default, or a `couponsSql.begin()` transaction (cast by the caller — see scripts/internal/verify-writes.ts). Reads run on `prisma` and take no executor. */
-export type Sql = typeof couponsSql
+import { randomUUID } from 'node:crypto'
 
 // ---------------------------------------------------------------------------
 // Coupon-domain SQL fragments (F-006), relocated here from couponsDb.ts as
@@ -382,62 +381,51 @@ export async function listActiveSources(): Promise<SourceRow[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Writes — the 3 sanctioned exceptions to "coupons DB is read-only by
-// discipline" (see couponsDb.ts's header + CLAUDE.md's Hard boundaries).
-// Still on couponsDb.ts's porsager `couponsSql` against the externally-owned
-// caramel_coupons DB — untouched by W4 (a later dispatch flips them). No zod
-// on these: they preserve the pre-existing untyped passthrough (increment) /
+// Writes — the sanctioned mutations of the app-owned published catalog (W4-D2).
+// They run on the app's OWN Postgres (DATABASE_URL) via prisma, NOT the external
+// read-only caramel_coupons DB. No zod on these: they preserve the pre-existing
 // plain-count (expire) / void (sources insert) shapes rather than introducing
-// new validation as a drive-by.
+// new validation as a drive-by. (incrementCouponUsage was retired — usage
+// telemetry now lives in couponSignals.recordUsage; see RULING C′.)
 
-/** api/coupons/increment/route.ts POST — usage counter, extension-facing. */
-export async function incrementCouponUsage(
-    id: number,
-    sql: Sql = couponsSql,
-): Promise<Record<string, unknown> | undefined> {
-    const rows = await sql`
-        UPDATE coupons
-        SET times_used = times_used + 1,
-            last_time_used = NOW(),
-            updated_at = NOW()
-        WHERE id = ${id}
-        RETURNING id, code, site,
-                  times_used AS "timesUsed",
-                  last_time_used AS "last_time_used"
-    `
-    return rows[0]
-}
-
-/** api/coupons/expire/route.ts POST — bulk-expire, COUPONS_ADMIN_SECRET-gated. Caller is expected to have already deduped/validated/capped `ids`. */
-export async function expireCoupons(
-    ids: number[],
-    sql: Sql = couponsSql,
-): Promise<number> {
-    const rows = await sql`
+/**
+ * api/coupons/expire/route.ts POST — bulk-expire, COUPONS_ADMIN_SECRET-gated.
+ * Caller has already deduped/validated/capped `ids` (numeric strings — the app
+ * Coupon.id is a string). `$executeRaw` returns the affected-row count directly,
+ * which — with the `AND expired = FALSE` guard — is exactly the number of
+ * FALSE→TRUE transitions (the old RETURNING-id `rows.length` semantics).
+ *
+ * The `updated_at = NOW()` bump is the deliberate admin-override "last-writer-
+ * wins": a later pipeline push carrying an OLDER updated_at won't un-expire the
+ * row under the ingest only-if-newer rule (intended). `IN ()` is invalid SQL, so
+ * an empty `ids` short-circuits to 0 (the route also guards this).
+ */
+export async function expireCoupons(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0
+    const affected = await prisma.$executeRaw(Prisma.sql`
         UPDATE coupons
         SET expired = TRUE,
             expiry = NOW()::text,
             updated_at = NOW()
-        WHERE id = ANY(${ids}) AND expired = FALSE
-        RETURNING id
-    `
-    return rows.length
+        WHERE id IN (${Prisma.join(ids)}) AND expired = FALSE
+    `)
+    return affected
 }
 
-/** api/sources/route.ts POST — "request a store"; caller has already validated `website` is a plausible domain. */
-export async function requestSource(
-    website: string,
-    sql: Sql = couponsSql,
-): Promise<void> {
-    await sql`
-        INSERT INTO sources (id, source, websites, status, created_at, updated_at)
-        VALUES (
-            gen_random_uuid()::text,
-            ${website},
-            ${[] as string[]},
-            'REQUESTED',
-            NOW(),
-            NOW()
-        )
-    `
+/**
+ * api/sources/route.ts POST — "request a store"; caller has already validated
+ * `website` is a plausible domain. Inserts an app `sources` row in the same
+ * REQUESTED shape the pipeline uses (empty websites[]). `Source.id` has no DB
+ * default, so mint a uuid app-side (mirrors the pre-W4 gen_random_uuid()::text);
+ * created_at/updated_at fill via their @default(now()).
+ */
+export async function requestSource(website: string): Promise<void> {
+    await prisma.source.create({
+        data: {
+            id: randomUUID(),
+            source: website,
+            websites: [],
+            status: 'REQUESTED',
+        },
+    })
 }

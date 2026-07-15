@@ -44,7 +44,7 @@ beforeEach(() => {
 })
 
 describe('POST /api/coupons/[id]/report — app-owned trust signal (W1)', () => {
-    it('outcome "worked" → 200 {ok:true}, upserts a work signal keyed by the PATH id', async () => {
+    it('outcome "worked" → 200 {ok:true}, stamps lastWorkedAt ONLY (no workCount — increment owns that)', async () => {
         const res = await POST(reportRequest('42', { outcome: 'worked' }))
 
         expect(res.status).toBe(200)
@@ -52,9 +52,14 @@ describe('POST /api/coupons/[id]/report — app-owned trust signal (W1)', () => 
         expect(prismaMock.couponSignal.upsert).toHaveBeenCalledTimes(1)
         const arg = prismaMock.couponSignal.upsert.mock.calls[0]![0]
         expect(arg.where).toEqual({ couponId: '42' })
-        expect(arg.create).toMatchObject({ couponId: '42', workCount: 1 })
+        // W4-D2 split: recordWorked owns lastWorkedAt; recordUsage (POST
+        // /increment) owns workCount. A "worked" report must NOT bump workCount,
+        // or a successful apply (which fires BOTH report+increment) double-counts.
+        expect(arg.create).toMatchObject({ couponId: '42' })
         expect(arg.create.lastWorkedAt).toBeInstanceOf(Date)
-        expect(arg.update).toMatchObject({ workCount: { increment: 1 } })
+        expect(arg.create).not.toHaveProperty('workCount')
+        expect(arg.update.lastWorkedAt).toBeInstanceOf(Date)
+        expect(arg.update).not.toHaveProperty('workCount')
     })
 
     it('outcome "failed" with a storeReason → 200, upserts a fail signal carrying the reason', async () => {

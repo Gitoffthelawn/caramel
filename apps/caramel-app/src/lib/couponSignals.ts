@@ -3,8 +3,15 @@
 // App-owned trust telemetry for the coupon catalog (W1 of the Coupons
 // Ownership Inversion + Trust Loop). This is the ONE place any
 // `coupon_signals` Prisma access lives — written by POST
-// /api/coupons/[id]/report (the extension will call it in W2) and read back by
-// attachSignals() to surface "worked Xh ago" on the web card + popup.
+// /api/coupons/[id]/report (worked/failed outcomes → recordWorked/recordFailed)
+// and POST /api/coupons/increment (a use → recordUsage, W4-D2) — and read back
+// by attachSignals() to surface "worked Xh ago" on the web card + popup.
+//
+// Field ownership — each writer owns exactly ONE field, so a successful apply
+// (which fires BOTH report{worked} AND increment) never double-counts:
+//   recordWorked → lastWorkedAt   (last successful-apply time)
+//   recordUsage  → workCount      (successful-use counter)
+//   recordFailed → failCount + lastFailedAt + lastFailReason
 //
 // It writes ONLY our own Postgres (DATABASE_URL) via prisma. It NEVER touches
 // the external read-only caramel_coupons catalog (couponsDb.ts) — the whole
@@ -14,12 +21,36 @@
 import prisma from '@/lib/prisma'
 import * as Sentry from '@sentry/nextjs'
 
-/** Extension reported this coupon worked at checkout — bump the work counter and stamp the time. */
+/**
+ * Extension reported this coupon worked at checkout — stamp the last-worked
+ * time. Deliberately does NOT bump workCount: a successful apply ALSO fires
+ * POST /api/coupons/increment (→ recordUsage), which owns the counter, so
+ * bumping it here too would double-count every success. This writer owns
+ * `lastWorkedAt` only.
+ */
 export async function recordWorked(couponId: string): Promise<void> {
     await prisma.couponSignal.upsert({
         where: { couponId },
-        create: { couponId, workCount: 1, lastWorkedAt: new Date() },
-        update: { workCount: { increment: 1 }, lastWorkedAt: new Date() },
+        create: { couponId, lastWorkedAt: new Date() },
+        update: { lastWorkedAt: new Date() },
+    })
+}
+
+/**
+ * A coupon was USED — the extension applied it and POST /api/coupons/increment
+ * fired (W4-D2). Bump the app-owned usage counter. NO timestamp: a use is not a
+ * trust "worked-at" stamp (recordWorked owns `lastWorkedAt`). This REPLACES the
+ * old external `coupons.times_used` UPDATE (RULING C′): touching the external
+ * catalog would bump its `updated_at` and, under the ingest only-if-newer rule
+ * (`excluded.updated_at >= coupons.updated_at`), freeze every future pipeline
+ * push for that row. Keyed by coupon id independently of catalog-row existence,
+ * so the upsert always succeeds. This writer owns `workCount` only.
+ */
+export async function recordUsage(couponId: string): Promise<void> {
+    await prisma.couponSignal.upsert({
+        where: { couponId },
+        create: { couponId, workCount: 1 },
+        update: { workCount: { increment: 1 } },
     })
 }
 

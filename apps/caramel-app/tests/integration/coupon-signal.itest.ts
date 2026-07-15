@@ -27,19 +27,22 @@ afterAll(async () => {
 })
 
 describe('couponSignals (real prisma, live pg :58005)', () => {
-    it('recordWorked creates the row (workCount 1, lastWorkedAt set) then increments to 2', async () => {
+    it('recordWorked stamps lastWorkedAt and leaves workCount at 0 (W4-D2 split — increment owns the counter)', async () => {
         await recordWorked(WORKED_ID)
         const first = await prisma.couponSignal.findUnique({
             where: { couponId: WORKED_ID },
         })
-        expect(first?.workCount).toBe(1)
         expect(first?.lastWorkedAt).toBeInstanceOf(Date)
+        expect(first?.workCount).toBe(0)
 
+        // A second worked-report re-stamps lastWorkedAt without ever bumping
+        // workCount — recordUsage (POST /increment) is the only counter writer.
         await recordWorked(WORKED_ID)
         const second = await prisma.couponSignal.findUnique({
             where: { couponId: WORKED_ID },
         })
-        expect(second?.workCount).toBe(2)
+        expect(second?.lastWorkedAt).toBeInstanceOf(Date)
+        expect(second?.workCount).toBe(0)
     })
 
     it('recordFailed sets failCount, lastFailedAt and lastFailReason', async () => {

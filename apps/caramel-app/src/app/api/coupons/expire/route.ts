@@ -38,13 +38,11 @@ export const POST = withRoute(
                 { status: 400 },
             )
         }
+        // Keep the validated ids as STRINGS — the app Coupon.id is a string, and
+        // expireCoupons now UPDATEs the app catalog by string id (W4-D2). (The
+        // /^\d{1,18}$/ shape still rejects anything non-numeric.)
         const clean = Array.from(
-            new Set(
-                ids
-                    .map(i => String(i))
-                    .filter(s => /^\d{1,18}$/.test(s))
-                    .map(Number),
-            ),
+            new Set(ids.map(i => String(i)).filter(s => /^\d{1,18}$/.test(s))),
         )
         if (clean.length === 0) {
             return NextResponse.json({ count: 0 })
