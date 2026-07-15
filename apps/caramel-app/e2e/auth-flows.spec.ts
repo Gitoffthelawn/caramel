@@ -1,4 +1,60 @@
 import { expect, test } from '@playwright/test'
+import { seedVerifiedUser } from './support/seed-user'
+
+// E-05 — the login SUCCESS path against a REAL better-auth session (every other
+// auth spec here mocks /api/auth/** via page.route; this one does not). A
+// verified user is seeded through the real signup API + a DB email_verified
+// flip (see seed-user.ts), then we drive the real UI login and assert a
+// genuinely authenticated landmark (the /profile page rendering the session's
+// email). Gated on DATABASE_URL: the deployed-site e2e-push job has no seedable
+// DB, so this group skips itself there and only runs in e2e-pr / local.
+const SEEDABLE = !!process.env.DATABASE_URL
+const REAL_LOGIN_EMAIL = 'e2e-login@caramel.dev'
+const REAL_LOGIN_PASSWORD = 'E2ePass1234'
+const seedBaseURL =
+    process.env.PLAYWRIGHT_BASE_URL ||
+    process.env.BASE_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    'http://localhost:58000'
+
+test.describe('Auth Flows — Login (real session)', () => {
+    test.skip(!SEEDABLE, 'needs a seedable local/CI Postgres (DATABASE_URL)')
+
+    test.beforeAll(async () => {
+        if (!SEEDABLE) return
+        await seedVerifiedUser({
+            baseURL: seedBaseURL,
+            email: REAL_LOGIN_EMAIL,
+            password: REAL_LOGIN_PASSWORD,
+            name: 'E2E Login User',
+        })
+    })
+
+    test('real credentials sign in and reach an authenticated /profile', async ({
+        page,
+    }) => {
+        await page.goto('/login')
+        await page.getByPlaceholder('Enter your email').fill(REAL_LOGIN_EMAIL)
+        await page
+            .getByPlaceholder('Enter your password')
+            .fill(REAL_LOGIN_PASSWORD)
+
+        await page.getByRole('button', { name: /login/i }).click()
+
+        // On success the client sets a real session cookie then does
+        // window.location.href = '/', so we land on the homepage.
+        await expect(page).toHaveURL(/\/$/, { timeout: 15000 })
+
+        // The session cookie now carries a real authenticated user: /profile is
+        // a protected route that bounces unauthenticated visitors to /login, so
+        // seeing the profile with the seeded email proves the session is real.
+        await page.goto('/profile')
+        await expect(
+            page.getByRole('heading', { name: 'Profile' }),
+        ).toBeVisible({ timeout: 10000 })
+        await expect(page.getByText(REAL_LOGIN_EMAIL).first()).toBeVisible()
+    })
+})
 
 test.describe('Auth Flows — Login', () => {
     test('login with invalid credentials shows error toast', async ({

@@ -1,5 +1,20 @@
 import { createArgosReporterOptions } from '@argos-ci/playwright/reporter'
 import { defineConfig, devices } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// Load this package's .env (the same file setup:ci-env writes in CI, and the
+// one `prisma migrate deploy` reads) so DATABASE_URL reaches the DB-seeding
+// e2e specs (E-05 real-login). Guarded by existsSync exactly like
+// vitest.integration.config.ts: the e2e-push job runs against a DEPLOYED site
+// with NO local .env, so the file is simply absent there — DATABASE_URL stays
+// unset and the seed-dependent specs skip themselves (see e2e/support/seed-user.ts).
+// (Playwright transpiles this config to CJS, so __dirname is available and
+// import.meta.url is not — unlike the Vite-run vitest configs.)
+const envPath = path.resolve(__dirname, '.env')
+if (fs.existsSync(envPath)) {
+    process.loadEnvFile(envPath)
+}
 
 const baseURL =
     process.env.PLAYWRIGHT_BASE_URL ||
