@@ -8,6 +8,28 @@ test.describe('Coupons Page', () => {
         await expect(page.getByText(/browse.*coupon/i).first()).toBeVisible()
     })
 
+    // Post-inversion (W4), `prisma migrate deploy` seeds the app-owned catalog
+    // (30 synthetic coupons) via the catalog_seed migration, so a fresh e2e DB
+    // renders real coupon cards — not just the page shell. This proves the
+    // /coupons client fetch → /api/coupons read path → CouponCard render works
+    // end-to-end against seeded rows, catching a broken read layer that the
+    // shell-text asserts above would miss. Anchor: the highest-rated (4.9)
+    // synthetic coupon "40% off Pro annual" (codecademy.com, LEARN40), which
+    // ORDER BY rating DESC, created_at DESC guarantees on the first page — see
+    // prisma/migrations/20260714220157_catalog_seed/migration.sql (SYNTHETIC,
+    // never the real scraped catalog).
+    test('renders a seeded catalog coupon card', async ({ page }) => {
+        await page.goto('/coupons')
+
+        // Client-side fetch + render, so allow generous time for the first page.
+        await expect(page.getByText('40% off Pro annual').first()).toBeVisible({
+            timeout: 15000,
+        })
+        await expect(
+            page.getByRole('button', { name: /get coupon code/i }).first(),
+        ).toBeVisible()
+    })
+
     test('sidebar has browser install links', async ({ page }) => {
         await page.goto('/coupons')
 
