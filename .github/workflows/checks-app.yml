@@ -57,8 +57,12 @@ jobs:
       - name: Validate dependencies
         run: pnpm doctor
 
-      # Prisma client only for typecheck
-      - if: matrix.task == 'typecheck'
+      # Prisma client for typecheck + unit. Since W4 the coupon unit tests
+      # import @prisma/client (the `Prisma` namespace — Prisma.sql/Prisma.join)
+      # through the couponsRepo read layer, so the `unit` job needs the generated
+      # client present too or collection fails with "Cannot find module
+      # '.prisma/client/default'". (integration/e2e jobs generate explicitly.)
+      - if: matrix.task == 'typecheck' || matrix.task == 'unit'
         name: Generate Prisma Client
         run: pnpm --filter caramel-app exec prisma generate
 

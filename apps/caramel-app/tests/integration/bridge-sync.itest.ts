@@ -45,7 +45,17 @@ beforeAll(async () => {
     // land on a different pooled socket). prepare:false mirrors the real bridge
     // client. Reads/writes here target bridge_ext_test.*; prisma (DATABASE_URL,
     // default search_path=public) is a SEPARATE connection writing public.*.
-    externalTestSql = postgres(process.env.DATABASE_URL!, {
+    //
+    // Strip the query string before handing DATABASE_URL to porsager: this var
+    // is PRISMA-shaped (CI's scripts/ci-env.ts writes `?schema=public`), and
+    // Prisma's `?schema=` is NOT a libpq startup parameter — porsager forwards it
+    // verbatim and Postgres rejects it with `unrecognized configuration parameter
+    // "schema"`. The search_path is (correctly) supplied the porsager-native way
+    // via connection.options below, so Prisma's query string is redundant here.
+    // The real bridge's main() needs no such strip: it opens COUPONS_DATABASE_URL,
+    // a porsager-native URL with no `?schema=`.
+    const externalUrl = process.env.DATABASE_URL!.split('?')[0]
+    externalTestSql = postgres(externalUrl, {
         max: 1,
         prepare: false,
         connection: { options: `-c search_path=${EXT_SCHEMA}` },
