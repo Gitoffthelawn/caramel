@@ -36,6 +36,17 @@ export default defineConfig({
         environment: 'node',
         include: ['tests/integration/**/*.itest.ts'],
         exclude: configDefaults.exclude,
+        // Run the integration FILES serially (one shared local Postgres). Vitest
+        // defaults to parallel file execution, which forces every suite to scope
+        // its assertions around whatever another file might transiently write
+        // (see coupons-read.itest.ts's defensive id-filtering / lower bounds).
+        // bridge-sync.itest.ts MUST publish a store_config carrying coupon_input
+        // + apply_button xpaths — which is EXACTLY listSupportedStoreConfigs'
+        // filter — so under parallel execution it would race coupons-read's exact
+        // store_config assertion. Serial execution makes each file's afterAll
+        // cleanup a real isolation boundary: a file never observes another's
+        // in-flight rows, so no suite can perturb another (W4-D4).
+        fileParallelism: false,
         // server-only shim — MANDATORY in any config that imports app modules:
         // a transitively-imported module may `import 'server-only'`, which
         // throws under vitest without this (see tests/setup.ts).
