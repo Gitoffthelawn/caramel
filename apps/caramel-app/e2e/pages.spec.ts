@@ -8,26 +8,46 @@ test.describe('Coupons Page', () => {
         await expect(page.getByText(/browse.*coupon/i).first()).toBeVisible()
     })
 
-    // Post-inversion (W4), `prisma migrate deploy` seeds the app-owned catalog
-    // (30 synthetic coupons) via the catalog_seed migration, so a fresh e2e DB
-    // renders real coupon cards — not just the page shell. This proves the
-    // /coupons client fetch → /api/coupons read path → CouponCard render works
-    // end-to-end against seeded rows, catching a broken read layer that the
-    // shell-text asserts above would miss. Anchor: the highest-rated (4.9)
-    // synthetic coupon "40% off Pro annual" (codecademy.com, LEARN40), which
-    // ORDER BY rating DESC, created_at DESC guarantees on the first page — see
-    // prisma/migrations/20260714220157_catalog_seed/migration.sql (SYNTHETIC,
-    // never the real scraped catalog).
-    test('renders a seeded catalog coupon card', async ({ page }) => {
+    // Deployment-safe (runs in BOTH e2e contexts — docs/testing.md "E2E runs
+    // in TWO contexts"): the /coupons client fetch → /api/coupons read path →
+    // CouponCard render, proven by a GENERIC card landmark. No catalog is
+    // ever legitimately empty here — hermetic e2e-pr/local is seeded by the
+    // catalog_seed migration, and the deployed dev site serves the real
+    // ingested catalog — so at least one card with its CTA must render.
+    test('renders at least one coupon card from the catalog', async ({
+        page,
+    }) => {
         await page.goto('/coupons')
 
         // Client-side fetch + render, so allow generous time for the first page.
+        await expect(
+            page.getByRole('button', { name: /get coupon code/i }).first(),
+        ).toBeVisible({ timeout: 15000 })
+    })
+
+    // HERMETIC-ONLY (gated like auth-flows' "Login (real session)" group —
+    // docs/testing.md two-context rule): asserts a SPECIFIC synthetic seed row,
+    // which only exists in the fresh-seeded e2e-pr/local DB. On the deployed
+    // dev site (e2e-push, no DATABASE_URL) the catalog is REAL ingested data:
+    // real rows outrank the anchor's 4.9 rating and a full-catalog ingest
+    // tombstones the synthetic rows — asserting it there failed 3/3, hence the
+    // gate. Anchor: the highest-rated (4.9) synthetic coupon "40% off Pro
+    // annual" (codecademy.com, LEARN40), which ORDER BY rating DESC,
+    // created_at DESC guarantees on the first page of a freshly seeded DB —
+    // see prisma/migrations/20260714220157_catalog_seed/migration.sql
+    // (SYNTHETIC, never the real scraped catalog).
+    test('renders the synthetic seed anchor coupon (hermetic DB only)', async ({
+        page,
+    }) => {
+        test.skip(
+            !process.env.DATABASE_URL,
+            'asserts a synthetic catalog_seed row — only present in the hermetic e2e-pr/local DB (docs/testing.md two-context rule)',
+        )
+        await page.goto('/coupons')
+
         await expect(page.getByText('40% off Pro annual').first()).toBeVisible({
             timeout: 15000,
         })
-        await expect(
-            page.getByRole('button', { name: /get coupon code/i }).first(),
-        ).toBeVisible()
     })
 
     test('sidebar has browser install links', async ({ page }) => {
