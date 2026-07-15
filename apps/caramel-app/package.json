@@ -28,7 +28,8 @@
         "coupons:clone-local": "bash scripts/internal/clone-coupons-local.sh",
         "smoke": "tsx scripts/smoke.ts",
         "generate:coupon-constants": "tsx scripts/generate-coupon-constants.ts",
-        "bridge:sync": "tsx scripts/bridge-sync.ts"
+        "bridge:sync": "tsx scripts/bridge-sync.ts",
+        "audit:prod": "tsx scripts/audit-prod-deps.ts"
     },
     "dependencies": {
         "@heroicons/react": "2.2.0",
