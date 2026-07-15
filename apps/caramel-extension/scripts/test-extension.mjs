@@ -3,7 +3,8 @@
  * Automated extension test suite.
  *
  * Launches Chromium with the unpacked extension loaded, checks:
- *   1. Background service worker boots and detects dev mode → localhost:58000
+ *   1. Background service worker boots; the PATCHED base URL (see below)
+ *      is in effect → localhost:58000
  *   2. Extension login via /api/extension/login succeeds
  *   3. /api/extension/supported-stores returns XPath-configured stores
  *   4. Supported store sample has valid selectors
@@ -18,12 +19,28 @@
  *
  * Prereqs:
  *   - caramel-app dev server running on localhost:58000 (pnpm dev)
- *   - Test user test@caramel.dev / test1234 exists
+ *   - Test user test@caramel.dev / test1234 exists (email_verified flipped)
+ *
+ * ⚠️ PATCHED TEST COPY (E-02): since 537547b, unpacked/dev installs point at
+ * the REMOTE dev deployment (dev.grabcaramel.com) — deliberate shipped
+ * behavior this suite must NOT revert, and a remote target it must NOT test
+ * against (non-hermetic: races the autodeploy, can't seed users). So the
+ * suite stages a TEMP COPY of the extension and surgically rewrites the ONE
+ * dev-base-URL ternary branch in background.js + popup.js to
+ * localhost:58000 IN THE COPY ONLY. Shipped extension code is untouched;
+ * the loaded extension is the patched copy (announced at runtime below).
  *
  * Run: pnpm -C apps/caramel-extension test:e2e
  */
 
-import { readFileSync } from 'node:fs'
+import {
+    cpSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -33,6 +50,57 @@ const EXT_PATH = path.resolve(__dirname, '..')
 const API_BASE = 'http://localhost:58000'
 const TEST_EMAIL = 'test@caramel.dev'
 const TEST_PASSWORD = 'test1234'
+
+// The EXACT dev-base-URL seam 537547b introduced: the true-branch of the
+// `_isDevInstall() ? <dev> : <prod>` ternary. Matched verbatim (quotes and
+// all) and required to appear EXACTLY ONCE per file — a broad find-replace
+// could mask real bugs (e.g. caramel-base.js's postMessage-origin allowlist
+// also names dev.grabcaramel.com and must NOT be patched: it is a security
+// allowlist, not a base URL, and nothing in this suite exercises it).
+const DEV_BASE_URL_SEAM = "? 'https://dev.grabcaramel.com'"
+const PATCHED_SEAM = `? '${API_BASE}'`
+const FILES_WITH_BASE_URL_SEAM = ['background.js', 'popup.js']
+
+/**
+ * Stages a temp copy of the extension with the dev base URL patched to the
+ * local app. Throws loudly if the seam is missing or ambiguous, so a future
+ * refactor of the base-URL wiring breaks this suite visibly instead of
+ * silently testing against the remote deployment.
+ */
+function stagePatchedExtensionCopy() {
+    const dest = mkdtempSync(path.join(tmpdir(), 'caramel-ext-patched-'))
+    cpSync(EXT_PATH, dest, {
+        recursive: true,
+        filter: src => {
+            const rel = path.relative(EXT_PATH, src)
+            const top = rel.split(path.sep)[0]
+            // Skip everything the browser never loads (manifest/index.html
+            // reference only top-level files + icons/assets) — node_modules
+            // alone would make the copy enormous.
+            return !['node_modules', 'dist', 'scripts', 'tests'].includes(top)
+        },
+    })
+
+    for (const file of FILES_WITH_BASE_URL_SEAM) {
+        const filePath = path.join(dest, file)
+        const source = readFileSync(filePath, 'utf8')
+        const occurrences = source.split(DEV_BASE_URL_SEAM).length - 1
+        if (occurrences !== 1) {
+            throw new Error(
+                `[test] expected exactly 1 dev-base-URL seam (${DEV_BASE_URL_SEAM}) in ${file}, found ${occurrences} — the base-URL wiring changed; update this patcher deliberately`,
+            )
+        }
+        writeFileSync(filePath, source.replace(DEV_BASE_URL_SEAM, PATCHED_SEAM))
+    }
+
+    console.log(
+        `[test] ⚠️ LOADING A PATCHED TEST COPY of the extension (${dest})`,
+    )
+    console.log(
+        `[test]    dev base URL rewritten -> ${API_BASE} in: ${FILES_WITH_BASE_URL_SEAM.join(', ')} (copy only; shipped code untouched)`,
+    )
+    return dest
+}
 
 const results = []
 function log(step, ok, detail = '') {
@@ -52,8 +120,12 @@ async function waitForServiceWorker(context, timeout = 15000) {
 }
 
 async function main() {
-    console.log(`[test] extension path: ${EXT_PATH}`)
+    console.log(`[test] extension source: ${EXT_PATH}`)
     console.log(`[test] api base: ${API_BASE}`)
+
+    // The browser loads the PATCHED TEMP COPY, never the shipped source dir
+    // (see the module header — base URL rewritten to the local app).
+    const patchedExtPath = stagePatchedExtensionCopy()
 
     const userDataDir = path.join(
         process.env.TEMP || '/tmp',
@@ -63,8 +135,8 @@ async function main() {
         headless: false,
         channel: 'chromium',
         args: [
-            `--disable-extensions-except=${EXT_PATH}`,
-            `--load-extension=${EXT_PATH}`,
+            `--disable-extensions-except=${patchedExtPath}`,
+            `--load-extension=${patchedExtPath}`,
             '--no-first-run',
         ],
     })
@@ -77,11 +149,16 @@ async function main() {
 
         const extensionId = new URL(sw.url()).host
 
-        // 2. Dev-mode URL switch
+        // 2. Patched base URL in effect. This asserts what THIS SUITE staged
+        // (the temp-copy rewrite to localhost), not shipped behavior — shipped
+        // unpacked installs point at dev.grabcaramel.com since 537547b. It
+        // proves the browser really loaded the patched copy (and the
+        // _isDevInstall() dev branch fired), so every later step talks to the
+        // hermetic local app instead of the remote deployment.
         await new Promise(r => setTimeout(r, 1500))
         const baseUrl = await sw.evaluate(() => globalThis.CARAMEL_BASE_URL)
         log(
-            'dev-mode URL switch',
+            'patched dev base URL in effect',
             baseUrl === API_BASE,
             `CARAMEL_BASE_URL=${baseUrl}`,
         )
@@ -206,6 +283,9 @@ async function main() {
             // needs coupon-constants.generated.js loaded first (F-006's
             // RESTRICTED_STATUSES rebind reads window.CaramelCoupons at
             // module-eval time). Real manifest.json/index.html load order.
+            // Deliberately read from EXT_PATH (the SHIPPED source, not the
+            // patched copy): none of these content scripts contain the
+            // base-URL seam, so this step exercises exactly what ships.
             const contentScriptFiles = [
                 'coupon-constants.generated.js',
                 'caramel-base.js',
@@ -301,6 +381,8 @@ async function main() {
         }
     } finally {
         await context.close()
+        // Best-effort: the patched copy is a throwaway in the OS temp dir.
+        rmSync(patchedExtPath, { recursive: true, force: true })
     }
 
     const failed = results.filter(r => !r.ok)
