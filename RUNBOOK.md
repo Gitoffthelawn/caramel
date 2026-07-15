@@ -153,9 +153,12 @@ where `protection.json` is:
         "contexts": [
             "lint",
             "prettier",
+            "prettier-root",
             "typecheck",
             "knip",
+            "unit",
             "oxlint",
+            "Integration (DB)",
             "Schema Drift",
             "checks",
             "E2E & Visual Regression (PR)"
@@ -166,6 +169,10 @@ where `protection.json` is:
     "restrictions": null
 }
 ```
+
+Deliberately NOT listed: `One-root-compose build` (`compose-build`) — it is
+path-filtered (runs only when compose/docker files change), and a required
+context that doesn't run blocks every unrelated PR.
 
 Run for each of `main` and `dev`. Verify current state first with
 `gh api repos/DevinoSolutions/caramel/branches/main/protection` (as of the
