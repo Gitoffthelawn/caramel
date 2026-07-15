@@ -27,7 +27,8 @@
         "setup:ci-env": "tsx scripts/ci-env.ts",
         "coupons:clone-local": "bash scripts/internal/clone-coupons-local.sh",
         "smoke": "tsx scripts/smoke.ts",
-        "generate:coupon-constants": "tsx scripts/generate-coupon-constants.ts"
+        "generate:coupon-constants": "tsx scripts/generate-coupon-constants.ts",
+        "bridge:sync": "tsx scripts/bridge-sync.ts"
     },
     "dependencies": {
         "@heroicons/react": "2.2.0",

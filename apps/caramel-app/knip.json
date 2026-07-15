@@ -19,7 +19,6 @@
         "src/lib/securityHelpers/cryptoHelpers.ts"
     ],
     "ignoreDependencies": [
-        "postgres",
         "@argos-ci/cli",
         "@tailwindcss/forms",
         "@types/gtag.js",

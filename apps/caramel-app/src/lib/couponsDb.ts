@@ -10,12 +10,6 @@
 // "degraded mode" — the app serves its own migrated + seeded (and, once wired,
 // bridge-synced) catalog.
 //
-// NOTE: the porsager `postgres` package stays a dependency (temporarily in
-// knip.json's ignoreDependencies) for the next-dispatch bridge-sync script,
-// which reconnects to the external caramel_coupons DB to refresh this catalog.
-// TODO(W4-bridge): once that script imports `postgres`, drop the postgres
-// entry from knip.json's ignoreDependencies.
-//
 // Every read still parses its raw rows through parseCouponRows() before the
 // data reaches a caller, so a schema/type drift in the catalog throws loudly
 // (→ Sentry via handleRouteError on API routes, → onRequestError on the SSR
