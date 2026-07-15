@@ -11,17 +11,17 @@ with `ls` or a repo search without knowing the doc structure first.
 
 ## System map
 
-| Component                                | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Where it lives                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **caramel-app**                          | Next.js 16 app — marketing site, web app, and the API (`grabcaramel.com`)                                                                                                                                                                                                                                                                                                                                                                                                                               | `apps/caramel-app`, deployed on Dokploy                                                  |
-| **caramel-extension**                    | Browser extension (Chrome/Edge/Firefox/Safari) — the client that calls caramel-app's API                                                                                                                                                                                                                                                                                                                                                                                                                | `apps/caramel-extension`, distributed via store review                                   |
-| **auth_db** (Postgres)                   | Users, sessions, Better Auth — owned and migrated by this repo (Prisma)                                                                                                                                                                                                                                                                                                                                                                                                                                 | `apps/caramel-app/prisma/schema.prisma`                                                  |
-| **coupons_db** (Postgres)                | The entire coupon catalog (`coupons`, `sources`, `verification_stores`, …) — **owned by an external Python verification service**, not this repo. caramel-app only reads it (+3 narrow mutations: usage-increment, expire, inserting a REQUESTED `sources` row) via a raw `postgres` client, never Prisma-migrated here. The Python service must treat those 3 columns/table as co-written — never clobber `times_used`/`last_time_used`, honor `expired`/`expiry` (see DESIGN.md §2 "Write-ownership") | `apps/caramel-app/src/lib/couponsDb.ts` (connection/schemas), `couponsRepo.ts` (queries) |
-| **Redis**                                | Provisioned in local-dev infra (`local-dev/docker-compose.yml`) but **not yet wired into application code** — rate limiting today is in-memory (`RateLimiterMemory`), documented as a swap-to-`RateLimiterRedis` TODO for multi-instance scale                                                                                                                                                                                                                                                          | `apps/caramel-app/src/lib/rateLimit.ts`                                                  |
-| **Sentry** (self-hosted)                 | Error + APM tracing. `org: devino`, `project: caramel`, instance `https://sentry.devino.ca`. Production-only (`sentry.common.config.ts` — no-ops in dev/test)                                                                                                                                                                                                                                                                                                                                           | `apps/caramel-app/sentry.*.config.ts`, `next.config.mjs`                                 |
-| **OpenRouter**                           | LLM hop for the extension's cart classifier (`/api/classify-cart`)                                                                                                                                                                                                                                                                                                                                                                                                                                      | `apps/caramel-app/src/lib/openrouter.ts`                                                 |
-| **usesend**                              | Transactional email (`usesend.devino.ca`)                                                                                                                                                                                                                                                                                                                                                                                                                                                               | env: `USESEND_*`                                                                         |
-| **External Python verification service** | Scrapes/verifies coupons, owns `coupons_db`. **Not in this repo** — TODO(human): link its repo/runbook here.                                                                                                                                                                                                                                                                                                                                                                                            | n/a                                                                                      |
+| Component                                | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Where it lives                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **caramel-app**                          | Next.js 16 app — marketing site, web app, and the API (`grabcaramel.com`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `apps/caramel-app`, deployed on Dokploy                                                                                |
+| **caramel-extension**                    | Browser extension (Chrome/Edge/Firefox/Safari) — the client that calls caramel-app's API                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `apps/caramel-extension`, distributed via store review                                                                 |
+| **auth_db** (Postgres)                   | Users, sessions, Better Auth — owned and migrated by this repo (Prisma)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `apps/caramel-app/prisma/schema.prisma`                                                                                |
+| **coupon catalog** (Postgres)            | The published coupon catalog (`coupons`, `store_configs`, `sources`) — **app-owned** since the Coupons Ownership Inversion, in the SAME Postgres as auth_db (`DATABASE_URL`), created by Prisma migrations (`catalog_tables` + a synthetic seed). The external Python pipeline is now a SUPPLIER: it pushes deltas to `POST /api/ingest/catalog` (`applyCatalogRows`, only-if-newer, tombstone-gated). Reads are `prisma.$queryRaw`; sanctioned app writes are `expireCoupons` + `requestSource`; usage telemetry moved to `coupon_signals`. See DESIGN.md §2 "Write-ownership" + docs/INGEST.md | `apps/caramel-app/src/lib/couponsRepo.ts` (queries), `couponsDb.ts` (zod schemas), `src/lib/catalog/*` (ingest/bridge) |
+| **Redis**                                | Provisioned in local-dev infra (`local-dev/docker-compose.yml`) but **not yet wired into application code** — rate limiting today is in-memory (`RateLimiterMemory`), documented as a swap-to-`RateLimiterRedis` TODO for multi-instance scale                                                                                                                                                                                                                                                                                                                                                   | `apps/caramel-app/src/lib/rateLimit.ts`                                                                                |
+| **Sentry** (self-hosted)                 | Error + APM tracing. `org: devino`, `project: caramel`, instance `https://sentry.devino.ca`. Production-only (`sentry.common.config.ts` — no-ops in dev/test)                                                                                                                                                                                                                                                                                                                                                                                                                                    | `apps/caramel-app/sentry.*.config.ts`, `next.config.mjs`                                                               |
+| **OpenRouter**                           | LLM hop for the extension's cart classifier (`/api/classify-cart`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `apps/caramel-app/src/lib/openrouter.ts`                                                                               |
+| **usesend**                              | Transactional email (`usesend.devino.ca`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | env: `USESEND_*`                                                                                                       |
+| **External Python verification service** | Scrapes/verifies coupons; the catalog SUPPLIER. **Not in this repo** — it feeds the app catalog through `POST /api/ingest/catalog` (target state), or during migration is read read-only by the `bridge:sync` job. TODO(human): link its repo/runbook here.                                                                                                                                                                                                                                                                                                                                      | n/a                                                                                                                    |
 
 ## Where to look
 
@@ -39,10 +39,9 @@ with `ls` or a repo search without knowing the doc structure first.
   `onRequestError`. TODO(human): confirm/record the alert routing (which
   Sentry alert rule pages who, and where — Slack/email/PagerDuty).
 - **GitHub Actions**: `.github/workflows/checks-app.yml` (lint / prettier /
-  typecheck / knip / unit / oxlint / schema-drift / e2e),
+  typecheck / knip / unit / oxlint / schema-drift / integration / e2e),
   `checks-extension.yml` (lint / prettier / unit / size-limit),
-  `release-extension.yml` (packages the extension on merge to `main`),
-  `coupons-schema-drift.yml` (manual — see below).
+  `release-extension.yml` (packages the extension on merge to `main`).
 - **Uptime monitor**: `src/app/api/health/db/route.ts`'s comments reference
   an external Uptime-Kuma monitor polling this route. TODO(human): record
   its dashboard URL and which monitor entry it is — not present in this
@@ -50,8 +49,9 @@ with `ls` or a repo search without knowing the doc structure first.
 
 ## Health checks
 
-`GET /api/health/db` — probes **both** databases this app depends on
-(auth_db via Prisma, coupons_db via the raw `postgres` client — F-001).
+`GET /api/health/db` — probes the two data dependencies of this app
+(auth_db via Prisma `SELECT 1`, and the app-owned coupon catalog's
+non-emptiness + freshness via `prisma.coupon.aggregate` — F-001).
 Requires `Authorization: Bearer $UPKUMA_HEALTH_SECRET`; no header (or a
 wrong one) is a fail-closed `401` with zero DB calls made.
 
@@ -66,11 +66,16 @@ Response shape:
 {
   "status": "ok" | "error",
   "checks": {
-    "auth_db":     { "status": "ok" | "error", "service": "auth_db",     "latencyMs": 5, "details"?: "..." },
-    "coupons_db":  { "status": "ok" | "error", "service": "coupons_db",  "latencyMs": 8, "details"?: "..." }
+    "auth_db": { "status": "ok" | "error", "service": "auth_db", "latencyMs": 5, "details"?: "..." },
+    "catalog": { "status": "ok" | "error", "service": "catalog", "latencyMs": 8, "details": { "count": 1234, "freshestUpdatedAt": "2026-07-14T…", "ageMinutes": 12, "stale": false } }
   }
 }
 ```
+
+The `catalog` check is `ok` iff the aggregate query succeeds AND the catalog is
+NON-EMPTY (`count > 0`); its `details` is the structured freshness object above
+(or the raw error string on an unexpected throw). `stale` (newest row older than
+48h) is observability only — it NEVER flips the check to error.
 
 HTTP status: `200` iff **both** checks are `"ok"`; `503` if **either** is
 down; `401` unauthenticated. The monitor's contract (HTTP status code +
@@ -78,11 +83,13 @@ top-level `status`) is preserved across the F-001 body-shape change, so an
 existing external monitor configured against the old single-DB shape still
 alarms correctly.
 
-**If coupons_db reports down:** that's the external Python service's
-database — this app has no ability to restart or repair it, only to
-observe the outage. Check whether the coupons-facing routes
-(`/api/coupons`, `/coupons/[store]`, `/api/extension/supported-stores`, …)
-are failing for real users, and escalate to whoever owns that service.
+**If the `catalog` check reports down:** it went `error` because the catalog is
+EMPTY (`count === 0`) or the query threw (DB/table unreachable) — NOT for
+staleness (a stale-but-non-empty catalog stays `ok`, surfacing `stale: true`).
+An empty catalog usually means migrations/seed never ran, or (in prod) the
+supplier feed hasn't populated it: confirm `prisma migrate deploy` ran, and that
+the pipeline is pushing to `POST /api/ingest/catalog` or the `bridge:sync` job is
+running (see "Coupons ingest & bridge sync" below and docs/INGEST.md).
 
 **If auth_db reports down:** login/signup/session-dependent routes are
 broken. Check Dokploy's Postgres container/managed DB status first.
@@ -149,37 +156,32 @@ audit, this returned `404 Branch not protected`).
 
 ## Known failure modes
 
-- **coupons_db schema drift.** `src/lib/couponsDb.ts`'s zod boundary
-  throws loudly (`coupons-db schema drift [<query>]: ...`) the instant a
-  read call site's expected columns/types don't match what the external
-  Python service's DB actually returns, instead of silently serving
-  malformed/zeroed data. These throws reach Sentry via `handleRouteError`
-  (API routes) or `onRequestError`/`error.tsx` (the SSR store page). The
-  proactive half — `pnpm --filter caramel-app check:coupons-schema` —
-  runs every query registered in `src/lib/couponsRepo.ts`'s
-  `couponsQueryProbes` for real (inside one transaction, always rolled
-  back) and catches a rename/drop before a request ever hits it: Postgres
-  plans every column/table/predicate before returning rows, so a
-  missing/renamed column throws regardless of row count — a run-the-real-
-  queries gate, not a hand-maintained column-list mirror (the old
-  `scripts/check-coupons-schema.ts` `EXPECTED_COLUMNS` approach, which
-  missed JOIN/WHERE columns absent from every zod _output_, e.g. the
-  `sources.websites`/`c.site` relationship — deleted). Still **only runs
-  via manual `workflow_dispatch`** on
-  `.github/workflows/coupons-schema-drift.yml` (a writable private
-  coupons DB reachable from GitHub Actions is an infra/security call
-  outside this repo's own scope — TODO(human): Aladdin to decide), and
-  **that workflow's `COUPONS_DATABASE_URL` repo secret has not been
-  added yet** — dispatching it today fails fast with a named error
-  pointing at this gap, it does not silently no-op.
-- **coupons_db unreachable entirely.** Distinct from drift — the DB itself
-  is down/unreachable. Surfaces as `/api/health/db`'s `coupons_db` check
-  going `"error"`, and as 500s with `{error: "Error fetching coupons."}`
-  (or similar, per-route) from `handleRouteError` on every coupons-facing
-  route. Locally this is the **expected, honest state** — no coupons DB is
-  provisioned in local dev or CI (see `.github/workflows/*` — no `services:`
-  block ever provisions `caramel_coupons`), so `coupons_db` reports down by
-  design, not as a bug.
+- **Catalog schema drift.** `src/lib/couponsDb.ts`'s zod boundary throws
+  loudly (`coupons-db schema drift [<query>]: ...`) the instant a read call
+  site's expected columns/types don't match what the app catalog returns,
+  instead of silently serving malformed/zeroed data. These throws reach
+  Sentry via `handleRouteError` (API routes) or `onRequestError`/`error.tsx`
+  (the SSR store page). The proactive half is now the **integration suite**
+  (`pnpm --filter caramel-app test:integration` — `coupons-read.itest.ts`,
+  `coupons-write.itest.ts`, `ingest-catalog.itest.ts`, `bridge-sync.itest.ts`)
+  running the real queries against a live app Postgres in CI; it REPLACED the
+  deleted structural drift gate (`check:coupons-schema` / `EXPECTED_COLUMNS` /
+  `couponsQueryProbes`, removed in W4).
+- **Ingest push refused (tombstone gate).** `POST /api/ingest/catalog` returns
+  `409 {error, gate}` (and the `bridge:sync` job logs `REFUSED` + exits
+  non-zero, writing NOTHING) when a single push would expire/tombstone >20% of
+  the currently-visible catalog. This is the wholesale-wipe guard, not a bug: a
+  broken producer cannot nuke the catalog with one bad push. A human confirms
+  the mass-expiry is legitimate, then re-runs with `force` (see "Coupons ingest
+  & bridge sync" below). Any OTHER error out of `applyCatalogRows` (bad data
+  mid-batch, DB loss) rolls the whole transaction back and reaches Sentry via
+  `handleRouteError` — never a partial write.
+- **Catalog empty / unreachable.** `/api/health/db`'s `catalog` check goes
+  `"error"` when the catalog is EMPTY (`count === 0`) or the aggregate query
+  throws (DB/table unreachable), returning `503`. NOT for staleness — a
+  stale-but-non-empty catalog stays `ok` with `stale: true`. An empty catalog in
+  prod means the pipeline/bridge has not populated it; locally it means `prisma
+migrate deploy` (which also seeds) has not run.
 - **Caught route errors used to vanish.** Before F-002, every
   `catch (error) { ... return 500 }` site swallowed the error — only
   truly uncaught errors reached Sentry. `handleRouteError`
@@ -214,28 +216,40 @@ audit, this returned `404 Branch not protected`).
   multiplied by instance count until the documented `RateLimiterRedis`
   swap happens.
 
-## Schema drift check
+## Coupons ingest & bridge sync
 
-`.github/workflows/coupons-schema-drift.yml` — manual-only
-(`workflow_dispatch`), by design: no coupons DB exists in CI. Run it from
-the Actions tab; it fails fast with a named error if the
-`COUPONS_DATABASE_URL` repo secret isn't configured (**not yet added as of
-this writing**) rather than silently skipping. Locally, `pnpm --filter
-caramel-app check:coupons-schema` runs `vitest run --config
-vitest.drift.config.ts`, which reads `COUPONS_DATABASE_URL` from
-`apps/caramel-app/.env` if present — no env-var prefix needed when that
-file already has the real value (it does, by convention — see the root
-README's Getting Started). To point it at a DIFFERENT DB one-off (e.g. a
-throwaway clone for a red/green proof), override on the command line —
-an already-exported shell var wins over `.env`:
+The app owns the coupon catalog; the external Python pipeline SUPPLIES it. Two
+feed paths share ONE engine (`applyCatalogRows` — a pure only-if-newer delta
+upsert in a single transaction, guarded by the >20% tombstone gate). Full
+contract: `docs/INGEST.md`.
+
+- **Direct push (target state):** the pipeline `POST`s catalog deltas to
+  `/api/ingest/catalog`, bearer-authed with `INGEST_API_KEY`. `200 {ok, applied}`
+  on success; `409 {error, gate}` if the tombstone gate refused it (nothing
+  written); `422` on an empty/invalid payload; `401` without the bearer.
+- **Bridge sync (migration-period feed):** until the pipeline pushes directly,
+  `pnpm --filter caramel-app bridge:sync` (needs `COUPONS_DATABASE_URL`, the
+  read-only external connection string) reads the still-live external
+  `caramel_coupons` Postgres (SELECT-only) and replays it through the same
+  engine. It logs `OK` with per-entity counts, or `REFUSED`/`FAILED` and exits
+  non-zero — never a silent no-op.
 
 ```bash
-COUPONS_DATABASE_URL=<real-url> pnpm --filter caramel-app check:coupons-schema
+COUPONS_DATABASE_URL=<read-only-external-url> pnpm --filter caramel-app bridge:sync
 ```
 
-The gate's red output names the failing query label (e.g. `coupons_db
-schema drift [sources.list]: column s.websites does not exist`) — see
-`src/lib/couponsRepo.ts`'s `couponsQueryProbes` for the full label list.
+**Tombstone-gate refusal (how to proceed).** A `409` (push) or `REFUSED`
+(bridge) means the feed would expire >20% of the currently-visible catalog and
+was rolled back untouched — the wholesale-wipe guard. A human verifies the
+mass-expiry is legitimate (e.g. a genuine large delisting), then re-runs with
+`force`: the push resends the same body with `"force": true`; the bridge needs
+`runBridge(sql, { force: true })` (a `--force` CLI flag is a documented TODO in
+`scripts/bridge-sync.ts`, to be wired by a human the first time it's needed).
+
+**Catalog freshness.** Check it any time via `GET /api/health/db` — the
+`catalog` check's `details` carries `{count, freshestUpdatedAt, ageMinutes,
+stale}`. `stale: true` (newest row older than 48h) is observability only; it
+never fails the check. Only an empty or unreachable catalog is a `503`.
 
 ## Post-deploy smoke check
 
@@ -272,13 +286,12 @@ than that:
   whatever Sentry span is active. This is annotation, not a new span —
   it's a no-op outside production (`Sentry.getActiveSpan()` is always
   `undefined` when Sentry isn't initialized).
-- **coupons_db** (`src/lib/couponsDb.ts`): a raw SQL connection, not an
-  instrumented HTTP call — there is no header channel to carry a trace ID
-  across it at all. The `postgres` client now sets
-  `connection.application_name: 'caramel-app'`, so queries from this app
-  are attributable in `pg_stat_activity` / DB logs instead of appearing
-  under the porsager default (`'postgres.js'`) — a per-process signal, not
-  a per-request one.
+- **coupon catalog** (`src/lib/couponsRepo.ts`): app reads are
+  `prisma.$queryRaw` against `DATABASE_URL` (the same Prisma pool as auth_db),
+  a raw SQL path with no header channel to carry a trace ID. The porsager
+  `postgres` client now survives ONLY in `scripts/bridge-sync.ts`, which tags
+  its read-only external connection `application_name: 'caramel-bridge-sync'`
+  in `pg_stat_activity` — a per-process signal, not a per-request one.
 - **Known debt:** full distributed tracing (a shared trace/request ID
   propagated end-to-end across the Next.js ↔ external Python
   coupon-verification service boundary) does not exist. What's here is
@@ -295,8 +308,9 @@ operationally load-bearing ones:
 
 | Var                      | Used for                                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | auth_db (Prisma) — required                                                                                   |
-| `COUPONS_DATABASE_URL`   | coupons_db (raw `postgres` client) — required                                                                 |
+| `DATABASE_URL`           | auth_db + the app-owned coupon catalog (Prisma) — required                                                    |
+| `COUPONS_DATABASE_URL`   | OPTIONAL, bridge-sync only — read-only external `caramel_coupons` connection string; unset in normal deploys  |
+| `INGEST_API_KEY`         | bearer for `POST /api/ingest/catalog` (the coupons pipeline supplier push) — server-to-server, never a client |
 | `COUPONS_ADMIN_SECRET`   | bearer for `POST /api/coupons/expire` + rate-limit trust exemption                                            |
 | `UPKUMA_HEALTH_SECRET`   | bearer for `GET /api/health/db`                                                                               |
 | `OPENROUTER_API_KEY`     | extension cart classifier (`/api/classify-cart`) — unset throws a named `OpenRouterError`, not a silent no-op |

@@ -7,11 +7,17 @@ const scriptDir = path.dirname(currentScriptPath)
 export const projectRoot = path.resolve(scriptDir, '..')
 export const repoRoot = path.resolve(scriptDir, '../../..')
 
+// COUPONS_DATABASE_URL is intentionally omitted (W5, coupons ownership inversion):
+// it is an OPTIONAL bridge-sync-only input, unset in local dev + CI. The app now
+// serves its OWN catalog (DATABASE_URL, migrated + seeded), and no CI-run path
+// requires it — env.ts marks it `.optional()`, smoke/health/db read only
+// DATABASE_URL, the integration tests build their external bridge client from
+// DATABASE_URL, and instrumentation.ts only logs its (now DISABLED) posture. So
+// the old fossil value pointing at a nonexistent caramel_coupons DB is dropped.
 export const ciEnvFileContents = `NODE_ENV=development
 PORT=58000
 PG_PORT=58005
 DATABASE_URL="postgresql://postgres:postgres@localhost:58005/caramel?schema=public"
-COUPONS_DATABASE_URL="postgresql://postgres:postgres@localhost:58005/caramel_coupons"
 BETTER_AUTH_URL="http://localhost:58000"
 BETTER_AUTH_SECRET=ci_better_auth_secret
 JWT_SECRET=ci_jwt_secret

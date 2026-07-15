@@ -3,8 +3,8 @@
 // SINGLE source of truth for the coupon status vocabulary (F-006). Pure —
 // no server imports — so it's importable by the 'use client' coupon-card.tsx
 // component AND by the extension codegen script
-// (scripts/generate-coupon-constants.ts), neither of which can pull in
-// couponsSql (postgres-backed, server-only). couponsDb.ts's SQL fragments
+// (scripts/generate-coupon-constants.ts), neither of which can pull in a
+// server-only DB client (@/lib/prisma). couponsRepo.ts's SQL fragments
 // import VISIBLE_COUPON_STATUSES from here, not the other way around — no
 // cycle.
 //

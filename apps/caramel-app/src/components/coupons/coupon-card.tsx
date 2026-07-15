@@ -80,6 +80,12 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                             {coupon.description}
                         </p>
                     )}
+                    {/* TODO: post-signal-split this "used today" count should read
+                        the app-owned workCount signal (couponSignals.recordUsage),
+                        NOT the catalog's coupon.timesUsed — usage telemetry was
+                        split out of the catalog (W1/W4-D2) so a use never bumps
+                        coupons.updated_at. Deferred pending UX sign-off; see
+                        docs/INGEST.md "Deferred human tasks". Behavior unchanged. */}
                     {(coupon.timesUsed ?? 0) > 0 && (
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                             {coupon.timesUsed} used today

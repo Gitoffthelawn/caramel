@@ -36,8 +36,9 @@ volume.
 | `postgres` | `postgres:18.4` | `127.0.0.1:58005` → `5432` | Auth DB (`caramel`) — owned + migrated by this repo |
 
 No Redis service: rate limiting is in-memory single-instance by design (NF-13).
-No coupons DB service: its schema is externally owned and deliberately absent
-locally (see the degraded mode below).
+No second coupons DB service: the coupon catalog is **app-owned** and lives in
+the `caramel` Postgres above, created and seeded by `prisma migrate deploy`
+(see the catalog topology below).
 
 ### Deploy knobs (compose variables)
 
@@ -52,15 +53,15 @@ the platform env) to override:
 
 ## Two env files — don't confuse them
 
-| File                                | Committed?      | Contains                                                                     | Loaded by                                                                                            |
-| ----------------------------------- | --------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `apps/caramel-app/.env`             | No (gitignored) | Real secrets, `DATABASE_URL`, `COUPONS_DATABASE_URL`                         | compose `env_file` (optional), Next.js's own `.env` loading, the Prisma CLI, `vitest.eval.config.ts` |
-| `docker-compose.yml` `environment:` | Yes (tracked)   | **Topology only** — the in-container `DATABASE_URL` / `COUPONS_DATABASE_URL` | the `web` container at runtime (overrides the app `.env`'s localhost values)                         |
+| File                                | Committed?      | Contains                                                                                                  | Loaded by                                                                                            |
+| ----------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `apps/caramel-app/.env`             | No (gitignored) | Real secrets, `DATABASE_URL` (+ optional bridge-only `COUPONS_DATABASE_URL`)                              | compose `env_file` (optional), Next.js's own `.env` loading, the Prisma CLI, `vitest.eval.config.ts` |
+| `docker-compose.yml` `environment:` | Yes (tracked)   | **Topology only** — the in-container `DATABASE_URL` (no `COUPONS_DATABASE_URL`: the catalog is app-owned) | the `web` container at runtime (overrides the app `.env`'s localhost values)                         |
 
 The compose `environment:` block points the in-container app at the `postgres`
 **service** (`@postgres:5432`), overriding whatever `localhost:58005` value the
 app `.env` ships. The app `.env`'s localhost values still serve the `pnpm
-dev:next` escape hatch and host-side `prisma` / drift commands.
+dev:next` escape hatch and host-side `prisma` / integration-test commands.
 
 See the root [README.md](../README.md)'s **Getting Started** for how to create
 `apps/caramel-app/.env` and what each variable is for — that table is the single
@@ -88,52 +89,45 @@ pnpm dev:extension       # = pnpm --filter caramel-extension dev
 `localhost:58005`), so the single `docker compose up postgres -d` above is all
 the infra it needs.
 
-## Two-database topology
+## Catalog topology (app-owned since the ownership inversion)
 
-`caramel-app` talks to two separate Postgres databases:
+`caramel-app` runs on **one** Postgres in local dev — the `caramel` database,
+which holds BOTH the auth/user tables AND the coupon catalog:
 
-| Database                       | Owner                                | Provisioned by this compose? | Migrated by                                                                |
-| ------------------------------ | ------------------------------------ | ---------------------------- | -------------------------------------------------------------------------- |
-| `caramel` (auth_db)            | This repo                            | Yes (the `postgres` service) | `prisma migrate` (entrypoint in-container, or `db:migrate:deploy` on host) |
-| `caramel_coupons` (coupons_db) | External Python verification service | **No**                       | Not this repo's concern — read-only from here (`src/lib/couponsDb.ts`)     |
+| Table group                                            | Owner              | Provisioned + migrated by                                                             |
+| ------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------------------- |
+| auth/user (`users`, `sessions`, …)                     | This repo          | `prisma migrate` (entrypoint in-container, or `db:migrate:deploy` on host)            |
+| coupon catalog (`coupons`, `store_configs`, `sources`) | This repo (Prisma) | `prisma migrate deploy` — the `catalog_tables` migration + a synthetic `catalog_seed` |
 
-**`caramel_coupons` does not exist in local dev by default.** The compose never
-provisions it — that's the expected, honest state for anyone without coupons-DB
-access, not a bug to paper over (seeding a fake one would be a behaviour change,
-and modelling its schema is forbidden by the secrecy forward-rule, DESIGN.md
-§2(k)). If you have real access (a reachable read replica or tunnel — never
-prod's primary directly), set `COUPONS_SOURCE_URL` in your gitignored
-`apps/caramel-app/.env` and run:
+So `pnpm dev` creates AND seeds the coupon catalog locally; coupon routes return
+`200` against real seeded rows, and `GET /api/health/db` reports the catalog's
+own freshness. There is no second database to provision, and modelling the
+catalog tables in Prisma is now legitimate (the secrecy forward-rule was
+inverted — only the scraper's pipeline-internal machinery stays out of the
+schema; see DESIGN.md §2(k) and `tests/unit/prisma-schema-secrecy.test.ts`).
 
-```bash
-pnpm --filter caramel-app coupons:clone-local
-```
+The external, Python-owned `caramel_coupons` Postgres still exists, but it is now
+a **supplier**, not the source of reads. During the migration period the app
+pulls it via the read-only `bridge:sync` job (`COUPONS_DATABASE_URL`, optional,
+unset by default — see below); eventually the pipeline pushes changes directly
+to `POST /api/ingest/catalog` and the bridge retires. See [`INGEST.md`](INGEST.md).
 
-This `pg_dump`s `COUPONS_SOURCE_URL` into a local `caramel_coupons` on the same
-compose Postgres (`scripts/internal/clone-coupons-local.sh`, itself gitignored
-and env-driven — no schema/DDL/secret hardcoded in it). Without
-`COUPONS_SOURCE_URL` access, stay in the degraded mode below — that's the
-correct state, not something to work around.
+### What healthy local looks like (no more "degraded mode")
 
-### The honest degraded mode (DESIGN.md §2(j))
-
-Following the documented setup verbatim, expect this, **not** an error in your
-setup:
+Following the documented setup verbatim, expect a fully working catalog — the
+pre-inversion "degraded mode" is retired:
 
 - `GET /api/health/db` (with `Authorization: Bearer $UPKUMA_HEALTH_SECRET`) →
-  `503`, with `checks.coupons_db.status: "error"` and
-  `checks.coupons_db.details: "database \"caramel_coupons\" does not exist"`.
-  `checks.auth_db.status` reports `"ok"`.
+  `200`, with `checks.auth_db.status: "ok"` and `checks.catalog.status: "ok"`.
+  The `catalog` check reports `{count, freshestUpdatedAt, ageMinutes, stale}`;
+  the seeded rows age past the 48h window over time, so `stale: true` is normal
+  locally and never fails the check (only an empty or unreachable catalog is a
+  `503`).
 - Any coupon-facing route (`GET /api/coupons`, `/api/coupons/stores`,
   `/api/coupons/filters`, `/api/extension/supported-stores`, the
-  `/coupons/[store]` marketing page, …) → `500` with a `{"error": "..."}` body.
-- Everything else — homepage, auth/signup/login, the marketing pages — works
-  normally.
-
-This isn't a boot failure: `COUPONS_DATABASE_URL` only has to be a non-empty
-string to satisfy `src/lib/env.ts`'s startup validation. The Postgres
-connection is lazy (the `postgres` client only connects on first query), so the
-failure surfaces per-request, not at startup.
+  `/coupons/[store]` marketing page, …) → `200`, serving the seeded catalog.
+- `COUPONS_DATABASE_URL` is **not** read at boot — it is an optional bridge-only
+  input; the app always serves its own `DATABASE_URL` catalog.
 
 ## Connecting
 
@@ -141,8 +135,8 @@ failure surfaces per-request, not at startup.
 - Container-internal hostname: `postgres` (used by the `web` service).
 
 `caramel` is the role the compose Postgres creates (`POSTGRES_USER: caramel`),
-and it is exactly what `apps/caramel-app/.env.example` ships in
-`DATABASE_URL`/`COUPONS_DATABASE_URL` — copy them as-is.
+and it is exactly what `apps/caramel-app/.env.example` ships in `DATABASE_URL`
+— copy it as-is. (`COUPONS_DATABASE_URL` is optional/bridge-only; leave it unset.)
 
 ## Migrations
 
@@ -161,8 +155,11 @@ and it is exactly what `apps/caramel-app/.env.example` ships in
 
 - **Port already in use**: override the host port(s), e.g.
   `WEB_PORT=59000 PG_PORT=59005 pnpm dev`, or bind elsewhere with `BIND_HOST`.
-- **Coupon routes return 500 / health check shows `coupons_db: error`**:
-  expected in local dev — see the degraded mode above, not a bug in your setup.
+- **Coupon routes return 500 / health check shows `catalog: error`**: NOT
+  expected anymore — the catalog is app-owned and seeded by `prisma migrate
+deploy`. Confirm the migrations actually ran against the compose Postgres
+  (`pnpm --filter caramel-app db:migrate:deploy`); an empty catalog is what
+  reports `catalog: "error"` (503).
 - **`P1000: Authentication failed` connecting to `caramel`**: your `.env`'s
   `DATABASE_URL` still has placeholder credentials — see Connecting above.
 - **`pnpm test` fails only on `coupon-constants.generated.test.ts`'s

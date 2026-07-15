@@ -64,14 +64,14 @@ Prerequisites: [Docker](https://www.docker.com/) with Compose v2 (the one comman
     pnpm dev
     ```
 
-    `pnpm dev` is `docker compose up --build`: it builds the `web` image, boots **Postgres 18.4** + **web**, runs `prisma migrate deploy` automatically inside the container, and serves the app + API at **http://localhost:58000**. Local and CI run this same `docker-compose.yml` in prod-mode builds — and it is the deployment unit production migrates onto (cutover gated, human-run) — so what you run locally is what ships, which means **hot reload is deliberately traded away** (ratified 2026-07-09). When you want framework hot reload or to run one package on the host, bring up Postgres alone (`docker compose up postgres -d`) and use an escape hatch:
+    `pnpm dev` is `docker compose up --build`: it builds the `web` image, boots **Postgres 18.4** + **web**, runs `prisma migrate deploy` automatically inside the container (creating **and seeding** the app-owned coupon catalog), and serves the app + API at **http://localhost:58000**. Local and CI run this same `docker-compose.yml` in prod-mode builds — and it is the deployment unit production migrates onto (cutover gated, human-run) — so what you run locally is what ships, which means **hot reload is deliberately traded away** (ratified 2026-07-09). When you want framework hot reload or to run one package on the host, bring up Postgres alone (`docker compose up postgres -d`) and use an escape hatch:
 
     ```bash
     pnpm dev:next        # web app on the host (Next.js dev server, :58000, hot reload)
     pnpm dev:extension   # the browser extension in a web-ext Chromium instance
     ```
 
-    Coupon routes return `500` locally **by design** — the coupons DB is externally owned and not provisioned locally (the honest degraded mode; see [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md)).
+    Coupon routes return `200` locally: the app **owns** its coupon catalog, created and seeded in the local Postgres by `prisma migrate deploy` when the stack boots. In production the external pipeline keeps it fresh by pushing to `POST /api/ingest/catalog` (see [`docs/INGEST.md`](docs/INGEST.md)); the old externally-owned-DB "degraded mode" is retired (see [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md)).
 
 4. **Run the tests**:
 
@@ -93,9 +93,9 @@ postgresql://caramel:caramel_password@localhost:58005/caramel?schema=public
 
 This matches what `.env.example` ships — the compose Postgres creates exactly this `caramel` role (see `docker-compose.yml`).
 
-**`COUPONS_DATABASE_URL` — external, not available in local dev:**
+**`COUPONS_DATABASE_URL` — optional, bridge-sync only (leave unset locally):**
 
-Owned by the external Python verification service. The compose never provisions a `caramel_coupons` database, so any non-empty value satisfies boot — the app only fails at _query_ time, not startup. The `.env.example` value (`postgresql://caramel:caramel_password@localhost:58005/caramel_coupons`) is correct as shipped, so the only failure you see is the real one: the database not existing. See [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md)'s two-database topology section for the resulting (expected) degraded mode.
+The app serves its own coupon catalog from `DATABASE_URL`, so this is **unset in local dev** — the app never reads it at boot. It is consumed only by the migration-period `bridge:sync` job (`pnpm --filter caramel-app bridge:sync`), which reads the still-live external, Python-owned `caramel_coupons` Postgres (strictly read-only) and replays it into the app catalog through the same ingest engine as `POST /api/ingest/catalog`. Leave it blank unless you are running that bridge against a reachable external DB. See [`docs/LOCAL-DEV.md`](docs/LOCAL-DEV.md) and [`docs/INGEST.md`](docs/INGEST.md).
 
 **Generate locally (any random string) — at least one of the first two is required:**
 
@@ -120,12 +120,13 @@ Owned by the external Python verification service. The compose never provisions 
 
 **Local-optional — leave blank unless you need the specific feature:**
 
-| Variable                                                                           | Unlocks                                                      |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `CHROME_EXTENSION_ORIGIN` / `FIREFOX_EXTENSION_ORIGIN` / `SAFARI_EXTENSION_ORIGIN` | Extension OAuth from a locally-loaded unpacked extension     |
-| `COUPONS_ADMIN_SECRET`                                                             | `POST /api/coupons/expire` (server-to-server)                |
-| `UPKUMA_HEALTH_SECRET`                                                             | `GET /api/health/db` — any value works, it just has to match |
-| `API_ENCRYPTION_ENABLED` / `NEXT_PUBLIC_API_ENCRYPTION_ENABLED`                    | Response encryption — the two flags must agree               |
+| Variable                                                                           | Unlocks                                                                            |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `CHROME_EXTENSION_ORIGIN` / `FIREFOX_EXTENSION_ORIGIN` / `SAFARI_EXTENSION_ORIGIN` | Extension OAuth from a locally-loaded unpacked extension                           |
+| `COUPONS_ADMIN_SECRET`                                                             | `POST /api/coupons/expire` (server-to-server)                                      |
+| `INGEST_API_KEY`                                                                   | `POST /api/ingest/catalog` — the coupons pipeline supplier push (server-to-server) |
+| `UPKUMA_HEALTH_SECRET`                                                             | `GET /api/health/db` — any value works, it just has to match                       |
+| `API_ENCRYPTION_ENABLED` / `NEXT_PUBLIC_API_ENCRYPTION_ENABLED`                    | Response encryption — the two flags must agree                                     |
 
 **Human-only — external provider dashboards, optional for a basic boot:**
 

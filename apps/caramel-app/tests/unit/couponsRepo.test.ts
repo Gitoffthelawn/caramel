@@ -175,7 +175,8 @@ describe('expireCoupons (write, app catalog via prisma.$executeRaw)', () => {
 
         // The intent SQL — an UPDATE flipping expired=TRUE on the app catalog,
         // guarded to only-currently-live rows (so the count = FALSE→TRUE
-        // transitions), on our OWN table (never the porsager couponsSql).
+        // transitions), on our OWN table via prisma.$executeRaw (never an
+        // external coupons DB).
         expect(capturedQueries).toHaveLength(1)
         expect(capturedQueries[0]).toContain('UPDATE coupons')
         expect(capturedQueries[0]).toContain('expired = TRUE')

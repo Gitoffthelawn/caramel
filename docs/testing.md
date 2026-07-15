@@ -7,13 +7,13 @@ it stays in sync with that table.
 
 ## Suite map
 
-| Suite             | Location                                         | Runner                               | What it covers                                                       |
-| ----------------- | ------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------- |
-| App unit          | `apps/caramel-app/tests/unit/**/*.test.{ts,tsx}` | vitest (node env, jsdom per-file)    | env/schemas, `withRoute` pipeline, coupons repo/db, structural gates |
-| Extension unit    | `apps/caramel-extension/tests/*.mjs`             | vitest + jsdom (`_load.mjs` harness) | content-script + popup + background behavior in one shared realm     |
-| Coupons drift     | `apps/caramel-app/tests/drift/*.drift.ts`        | vitest (`vitest.drift.config.ts`)    | every registered coupons query run for real against a live DB        |
-| E2E               | `apps/caramel-app/e2e/*.spec.ts`                 | Playwright (chromium)                | public pages, auth flows, extension-smoke, Argos visual regression   |
-| Eval (LIVE, paid) | `apps/caramel-app/evals/**/*.eval.ts`            | vitest (`vitest.eval.config.ts`)     | cart-classifier against the LIVE model + production prompt           |
+| Suite             | Location                                         | Runner                                  | What it covers                                                                 |
+| ----------------- | ------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------ |
+| App unit          | `apps/caramel-app/tests/unit/**/*.test.{ts,tsx}` | vitest (node env, jsdom per-file)       | env/schemas, `withRoute` pipeline, coupons repo/db, structural gates           |
+| Extension unit    | `apps/caramel-extension/tests/*.mjs`             | vitest + jsdom (`_load.mjs` harness)    | content-script + popup + background behavior in one shared realm               |
+| Integration       | `apps/caramel-app/tests/integration/*.itest.ts`  | vitest (`vitest.integration.config.ts`) | coupon reads/writes, ingest, bridge sync + signals against a real app Postgres |
+| E2E               | `apps/caramel-app/e2e/*.spec.ts`                 | Playwright (chromium)                   | public pages, auth flows, extension-smoke, Argos visual regression             |
+| Eval (LIVE, paid) | `apps/caramel-app/evals/**/*.eval.ts`            | vitest (`vitest.eval.config.ts`)        | cart-classifier against the LIVE model + production prompt                     |
 
 ## Running locally
 
@@ -28,10 +28,10 @@ pnpm --filter caramel-app exec vitest run tests/unit/<file>.test.ts
 #   docker compose up postgres -d && pnpm --filter caramel-app db:migrate:deploy
 pnpm --filter caramel-app test:e2e
 
-# Coupons structural drift — needs a reachable COUPONS_DATABASE_URL. The public
-# local setup has none, so it runs only where a real coupons DB exists (an
-# internal local clone, or workflow_dispatch in CI) — DESIGN.md §2(j), §5.
-pnpm --filter caramel-app check:coupons-schema
+# Integration — coupon reads/writes, ingest + bridge sync against a real app
+# Postgres. Needs local Postgres up + migrations applied first:
+#   docker compose up postgres -d && pnpm --filter caramel-app db:migrate:deploy
+pnpm --filter caramel-app test:integration
 
 # Eval — LIVE OpenRouter calls, COSTS REAL MONEY. Needs OPENROUTER_API_KEY in
 # apps/caramel-app/.env (loaded via Node's process.loadEnvFile). Red-proof
@@ -62,16 +62,17 @@ Structural gates share the same fs-walk style and also live in
 retries: 2` and `forbidOnly` only under CI; locally it defaults to parallel
   workers + 0 retries and boots `pnpm dev` (reused if already running). For a
   stable run against a cold dev server, pass `--workers=1 --retries=2`.
-- **No local coupons DB.** Coupon routes 500 with `{error}` and
-  `/api/health/db` reports `coupons_db: "error"` locally — the expected honest
-  degraded mode (DESIGN.md §2(j)), not a bug.
+- **App-owned coupon catalog.** `pnpm dev` (and `db:migrate:deploy`) creates and
+  seeds the catalog, so coupon routes return `200` and `/api/health/db` reports
+  `catalog: "ok"` locally — the pre-inversion "degraded mode" is retired.
 - **Windows EOL.** The byte-exact generated-constants test breaks on a fresh
   clone with `core.autocrlf=true` — run `git config core.autocrlf false` and
   re-checkout (no `.gitattributes` yet, NF-04).
 - **`server-only` under vitest.** It throws in the test runtime; shimmed once
   in `tests/setup.ts`.
-- **Unit env.** `vitest.config.ts` injects three dummy required vars
-  (`DATABASE_URL`, `COUPONS_DATABASE_URL`, `BETTER_AUTH_SECRET`) so `env.ts`'s
-  boot-time parse doesn't throw before any assertion runs.
+- **Unit env.** `vitest.config.ts` injects dummy values for `DATABASE_URL` and
+  `BETTER_AUTH_SECRET` (the required boot vars) plus a now-optional
+  `COUPONS_DATABASE_URL`, so `env.ts`'s boot-time parse doesn't throw before any
+  assertion runs.
 - **Eval budget.** `openai/gpt-5-mini` is a reasoning model — its completion
   budget already accounts for hidden reasoning tokens (F-017); don't trim it.

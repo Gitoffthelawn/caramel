@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // swap is behavior-isolated (see PLAN-F-003.md §Test strategy).
 //
 // W4-D2: expireCoupons now UPDATEs the app's OWN coupons table via
-// prisma.$executeRaw (which returns the affected-row count directly), not the
-// porsager couponsSql — so the DB mock targets @/lib/prisma, and the route
+// prisma.$executeRaw (which returns the affected-row count directly), not an
+// external coupons DB — so the DB mock targets @/lib/prisma, and the route
 // passes the validated ids through as STRINGS (the app Coupon.id is a string).
 
 const calls: string[] = []
