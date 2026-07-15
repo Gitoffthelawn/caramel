@@ -17,7 +17,7 @@ with `ls` or a repo search without knowing the doc structure first.
 | **caramel-extension**                    | Browser extension (Chrome/Edge/Firefox/Safari) — the client that calls caramel-app's API                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `apps/caramel-extension`, distributed via store review                                                                 |
 | **auth_db** (Postgres)                   | Users, sessions, Better Auth — owned and migrated by this repo (Prisma)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `apps/caramel-app/prisma/schema.prisma`                                                                                |
 | **coupon catalog** (Postgres)            | The published coupon catalog (`coupons`, `store_configs`, `sources`) — **app-owned** since the Coupons Ownership Inversion, in the SAME Postgres as auth_db (`DATABASE_URL`), created by Prisma migrations (`catalog_tables` + a synthetic seed). The external Python pipeline is now a SUPPLIER: it pushes deltas to `POST /api/ingest/catalog` (`applyCatalogRows`, only-if-newer, tombstone-gated). Reads are `prisma.$queryRaw`; sanctioned app writes are `expireCoupons` + `requestSource`; usage telemetry moved to `coupon_signals`. See DESIGN.md §2 "Write-ownership" + docs/INGEST.md | `apps/caramel-app/src/lib/couponsRepo.ts` (queries), `couponsDb.ts` (zod schemas), `src/lib/catalog/*` (ingest/bridge) |
-| **Redis**                                | Provisioned in local-dev infra (`local-dev/docker-compose.yml`) but **not yet wired into application code** — rate limiting today is in-memory (`RateLimiterMemory`), documented as a swap-to-`RateLimiterRedis` TODO for multi-instance scale                                                                                                                                                                                                                                                                                                                                                   | `apps/caramel-app/src/lib/rateLimit.ts`                                                                                |
+| **Redis**                                | Deliberately **NOT provisioned** — the root `docker-compose.yml` is web + postgres ONLY by design (NF-13). Rate limiting is in-memory single-instance (`RateLimiterMemory`), with a documented swap-to-`RateLimiterRedis` TODO deferred until caramel-app runs multi-instance                                                                                                                                                                                                                                                                                                                    | `apps/caramel-app/src/lib/rateLimit.ts`                                                                                |
 | **Sentry** (self-hosted)                 | Error + APM tracing. `org: devino`, `project: caramel`, instance `https://sentry.devino.ca`. Production-only (`sentry.common.config.ts` — no-ops in dev/test)                                                                                                                                                                                                                                                                                                                                                                                                                                    | `apps/caramel-app/sentry.*.config.ts`, `next.config.mjs`                                                               |
 | **OpenRouter**                           | LLM hop for the extension's cart classifier (`/api/classify-cart`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `apps/caramel-app/src/lib/openrouter.ts`                                                                               |
 | **usesend**                              | Transactional email (`usesend.devino.ca`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | env: `USESEND_*`                                                                                                       |
@@ -106,6 +106,13 @@ rollback automation or documentation existed anywhere in the tracked files
 before this doc** (confirmed: `git grep -i dokploy` across the repo,
 excluding `audit/`, returns a single code comment).
 
+Since F-016 the root `docker-compose.yml` (`Dockerfile` +
+`docker-entrypoint.sh`) is the INTENDED deployment unit — local and CI build
+and run this exact graph, and prod is meant to run the same file as one
+platform compose service. The prod cutover onto it is still gated and
+human-run (never move prod traffic without explicit in-session confirmation);
+until it lands, prod stays on the current Dokploy/Nixpacks deploy.
+
 Until the TODO above is filled in, the safe manual sequence is:
 
 1. Confirm the outage via `/api/health/db` and Sentry.
@@ -116,6 +123,16 @@ Until the TODO above is filled in, the safe manual sequence is:
 4. If the regression was a DB migration, `prisma migrate deploy` is
    forward-only — a bad migration needs a new forward migration or a
    manual DB fix, not a Prisma-level rollback.
+
+**Compose-mode migration failure (once prod runs the root compose).** The
+container applies `prisma migrate deploy` fail-hard at boot
+(`docker-entrypoint.sh`, `set -e`, no `|| true`), so a bad migration is a
+VISIBLE crash-loop, not a silent bad serve: `restart: unless-stopped` keeps
+restarting the `web` service, and `docker compose logs web` shows the
+entrypoint markers (`>>> [entrypoint] applying prisma migrate deploy` with no
+following `migrations applied` line) pinpointing the failing migration. The
+fix is the SAME forward-only rule: revert the offending migration commit and
+redeploy — never hand-edit the production database.
 
 ### Branch protection (handoff, not yet applied)
 
@@ -301,8 +318,8 @@ than that:
 
 ## Secrets & environment reference
 
-`apps/caramel-app/.env.example` is the tracked source of truth (30 vars,
-validated at boot by `src/lib/env.ts` — a misconfigured deploy fails fast
+`apps/caramel-app/.env.example` is the tracked source of truth
+(validated at boot by `src/lib/env.ts` — a misconfigured deploy fails fast
 with a named error instead of breaking deep inside a request handler). The
 operationally load-bearing ones:
 
