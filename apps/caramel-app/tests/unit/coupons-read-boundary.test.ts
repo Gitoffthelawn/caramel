@@ -10,52 +10,46 @@ import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // F-001 — proves parseCouponRows is actually wired into all 9 read sites:
-// (a) a production-shaped fixture (including the postgres.js runtime-type
-// traps — numeric columns as strings, an int4 id as a number) flows through
-// each route into the correct response shape, and (b) a drifted row causes
-// the flagship route (coupons/route.ts) to fail loudly (500 + Sentry), not
-// silently. Schema-level accept/reject coverage lives in
-// couponsDb-schemas.test.ts; this file is the route-wiring proof.
+// (a) a production-shaped fixture (including the runtime-type traps — numeric
+// columns as strings, an int4 id as a number) flows through each route into
+// the correct response shape, and (b) a drifted row causes the flagship route
+// (coupons/route.ts) to fail loudly (500 + Sentry), not silently. Schema-level
+// accept/reject coverage lives in couponsDb-schemas.test.ts; this file is the
+// route-wiring proof.
 //
-// couponsSql is mocked as a recording, rule-based thenable (see
-// coupons-visibility.test.ts for the base pattern) — each rule matches on
-// the literal SQL text (`strings.join('?')`) so one mock factory can serve
-// every route's distinct query shape, including routes that issue more
-// than one couponsSql call per request (coupons/route.ts's list+count,
-// filters/route.ts's sites+types). Unmatched calls (the WHERE-fragment
-// builder calls coupons/route.ts and the store page compose before their
-// real queries) resolve to `[]` — safe, since those results are only ever
-// embedded as values inside a later real query, never awaited directly.
+// W4 — the 9 reads run on the app's Prisma catalog via
+// `prisma.$queryRaw(Prisma.sql`...`)`, so `@/lib/prisma` is mocked: its
+// `$queryRaw` is a recording, rule-based resolver keyed on the composed `.sql`
+// (flattened `?`-placeholder text) so one factory serves every route's
+// distinct query shape, including routes that issue more than one query per
+// request (coupons/route.ts's list+count, filters/route.ts's sites+types).
+// Unmatched calls resolve to `[]`.
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
-// Raw SQL text of every couponsSql call this test run made, in order —
-// lets a test assert on the QUERY SHAPE itself (e.g. "does this route still
+// Composed `.sql` text of every $queryRaw call this run made, in order — lets
+// a test assert on the QUERY SHAPE itself (e.g. "does this route still
 // reference a column that doesn't exist"), which the rule-based row mocking
-// above can't: rules only ever match `sql`, never expose it to the test.
+// can't: rules only ever match `sql`, never expose it to the test.
 let capturedQueries: string[] = []
 
 function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
 }
 
-vi.mock('@/lib/couponsDb', async () => {
-    const actual =
-        await vi.importActual<typeof import('@/lib/couponsDb')>(
-            '@/lib/couponsDb',
-        )
-    return {
-        ...actual,
-        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-            const sql = strings.join('?')
-            capturedQueries.push(sql)
-            const rows = rules.find(r => r.match(sql))?.rows ?? []
-            return {
-                // oxlint-disable-next-line no-thenable
-                then: (resolve: (rows: unknown[]) => void) => resolve(rows),
-            }
+// coupons/route.ts + the store page also call attachSignals() → couponSignal;
+// stub it so the merge sees no signals (each coupon gets lastWorkedAt:null,
+// asserted below). $queryRaw receives a Prisma.Sql whose `.sql` getter is the
+// composed query text.
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $queryRaw: (arg: { sql: string }) => {
+            capturedQueries.push(arg.sql)
+            const rows = rules.find(r => r.match(arg.sql))?.rows ?? []
+            return Promise.resolve(rows)
         },
-    }
-})
+        couponSignal: { findMany: vi.fn(async () => []) },
+    },
+}))
 
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: async () => null,
@@ -65,16 +59,6 @@ vi.mock('@/lib/rateLimit', () => ({
         new Response(JSON.stringify({ error: 'Forbidden origin' }), {
             status: 403,
         }),
-}))
-
-// coupons/route.ts now calls attachSignals(), which reads the app-owned
-// coupon_signals table via @/lib/prisma. Mock it so (a) no real PrismaClient
-// is constructed — the unit CI job doesn't run `prisma generate` — and (b) the
-// merge sees no signals, so each coupon gets lastWorkedAt:null (asserted
-// below). The other routes in this file don't touch prisma; the mock is inert
-// for them.
-vi.mock('@/lib/prisma', () => ({
-    default: { couponSignal: { findMany: vi.fn(async () => []) } },
 }))
 
 const { captureExceptionMock } = vi.hoisted(() => ({
@@ -285,16 +269,12 @@ describe('GET /api/sources (SourceRow)', () => {
         ])
     })
 
-    // Regression pin: coupons.source_id has never existed in the real
-    // coupons DB (verified against the live schema — `\d coupons` has no
-    // such column), so this route 500'd on every call in production. The
-    // rule-based row mock above can't catch a bad JOIN column by itself
-    // (it never runs real SQL), so this test inspects the literal query
-    // text instead. The real, schema-verified relationship is
-    // sources.websites[] (the domains a source covers) against
-    // coupons.site (each coupon's own domain) — sources owns no
-    // source_id/coupon-count columns of its own either (only
-    // id/source/websites/status/created_at/updated_at).
+    // Regression pin: coupons.source_id has never existed (the external
+    // catalog never had it and the app's Coupon model doesn't either), so the
+    // real, schema-verified relationship is sources.websites[] (the domains a
+    // source covers) against coupons.site (each coupon's own domain). The
+    // rule-based row mock can't catch a bad JOIN column by itself (it never
+    // runs real SQL), so this test inspects the composed query text instead.
     it('joins coupons via the real schema (site ∈ websites[]) — never the phantom coupons.source_id column', async () => {
         mockRows(sql => sql.includes('FROM sources'), [])
 
@@ -312,7 +292,7 @@ describe('GET /api/sources (SourceRow)', () => {
 describe('GET /api/extension/supported-stores (StoreConfigRow)', () => {
     it('maps xpath columns to the extension contract, undefined (not null) for absent optional fields', async () => {
         mockRows(
-            sql => sql.includes('store_verification_configs'),
+            sql => sql.includes('FROM store_configs'),
             [
                 {
                     store_name: 'example.com',

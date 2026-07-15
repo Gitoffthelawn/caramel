@@ -1,4 +1,5 @@
 import StoreCouponsPage from '@/app/(marketing)/coupons/[store]/page'
+import { BASE_URL } from '@/lib/env.client'
 import type { ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,11 +7,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // page (not a route handler), so it's exercised by calling the default
 // export directly and inspecting the returned (unrendered) React element
 // tree rather than rendering to a DOM. CouponsSection ('use client';
-// framer-motion, next/image, react-infinite-scroll-component, ...) is
-// mocked out so importing page.tsx doesn't drag that whole client-component
-// tree into a plain `environment: 'node'` vitest run — React.createElement
-// never invokes the component function, so the mock's body is irrelevant
-// and its captured props are inspectable without ever calling render().
+// framer-motion, next/image, ...) is mocked out so importing page.tsx doesn't
+// drag that whole client-component tree into a plain `environment: 'node'`
+// run.
+//
+// W4 — listStoreCoupons runs on the app's Prisma catalog via
+// `prisma.$queryRaw(Prisma.sql`...`)`, so `@/lib/prisma` is mocked: `$queryRaw`
+// is a rule-based resolver keyed on the composed `.sql`, and couponSignal is
+// stubbed for attachSignals (no signals → lastWorkedAt:null).
 
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
@@ -18,34 +22,18 @@ function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
 }
 
-vi.mock('@/lib/couponsDb', async () => {
-    const actual =
-        await vi.importActual<typeof import('@/lib/couponsDb')>(
-            '@/lib/couponsDb',
-        )
-    return {
-        ...actual,
-        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-            const sql = strings.join('?')
-            const rows = rules.find(r => r.match(sql))?.rows ?? []
-            return {
-                // oxlint-disable-next-line no-thenable
-                then: (resolve: (rows: unknown[]) => void) => resolve(rows),
-            }
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $queryRaw: (arg: { sql: string }) => {
+            const rows = rules.find(r => r.match(arg.sql))?.rows ?? []
+            return Promise.resolve(rows)
         },
-    }
-})
+        couponSignal: { findMany: vi.fn(async () => []) },
+    },
+}))
 
 vi.mock('@/components/coupons/coupons-section', () => ({
     default: () => null,
-}))
-
-// The store page now calls attachSignals(), which reads the app-owned
-// coupon_signals table via @/lib/prisma. Mock it so no real PrismaClient is
-// constructed (the unit CI job doesn't run `prisma generate`) and the merge
-// sees no signals → each coupon gets lastWorkedAt:null (asserted below).
-vi.mock('@/lib/prisma', () => ({
-    default: { couponSignal: { findMany: vi.fn(async () => []) } },
 }))
 
 beforeEach(() => {
@@ -115,19 +103,23 @@ describe('StoreCouponsPage — CouponListRow + TotalCountRow', () => {
             scriptEl!.props.dangerouslySetInnerHTML.__html,
         )
         expect(structuredData.numberOfItems).toBe(1)
+        // url is built from BASE_URL (env.client), which Vitest resolves from
+        // the loaded .env locally (http://localhost:58000) but defaults to
+        // https://grabcaramel.com in CI where no .env exists — assert against
+        // the same resolved BASE_URL the page uses so the pin is env-agnostic.
         expect(structuredData.itemListElement).toEqual([
             {
                 '@type': 'ListItem',
                 position: 1,
-                url: 'https://grabcaramel.com/coupons/example.com',
+                url: `${BASE_URL}/coupons/example.com`,
                 name: couponFixture.title,
                 description: couponFixture.description,
             },
         ])
     })
 
-    it('an invalid store slug (fails getBaseDomain) short-circuits to zero coupons without ever querying couponsSql', async () => {
-        // No mockRows() rules registered — any couponsSql call here would
+    it('an invalid store slug (fails getBaseDomain) short-circuits to zero coupons without ever querying the catalog', async () => {
+        // No mockRows() rules registered — any $queryRaw call here would
         // return [] per the mock's fallback, but if the drift-detecting
         // parse actually ran on an empty page it wouldn't prove the
         // short-circuit; asserting rows stay empty and total is 0 for a

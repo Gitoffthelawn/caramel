@@ -1,5 +1,4 @@
 import {
-    couponsQueryProbes,
     expireCoupons,
     getCouponStats,
     incrementCouponUsage,
@@ -8,30 +7,44 @@ import {
 } from '@/lib/couponsRepo'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Replaces the deleted tests/unit/check-coupons-schema.test.ts (the old
-// EXPECTED_COLUMNS-mirror unit test — see PLAN-COUPONS-BOUNDARY.md). Two
-// jobs: (1) pin the couponsQueryProbes registry SHAPE the structural drift
-// gate (tests/drift/coupons-schema.drift.ts) depends on, and (2) a couple
-// of direct fn-level pins so couponsRepo.ts itself has coverage that
-// doesn't route through an HTTP handler. Exhaustive query-shape/behavior
-// pinning per route already lives in coupons-read-boundary.test.ts,
-// coupons-visibility.test.ts, coupons-store-page.test.ts,
-// supported-stores.test.ts, and coupons-expire.test.ts — this file is
-// deliberately NOT a duplicate of those.
+// Direct fn-level pins for couponsRepo.ts (coverage that doesn't route through
+// an HTTP handler). Exhaustive query-shape/behavior pinning per route lives in
+// coupons-read-boundary.test.ts, coupons-visibility.test.ts,
+// coupons-store-page.test.ts, supported-stores.test.ts, and
+// coupons-expire.test.ts — this file is deliberately NOT a duplicate of those.
 //
-// Same mock shape as coupons-read-boundary.test.ts: couponsSql is a
-// recording, rule-based thenable so one mock factory serves every query
-// this file exercises. importActual keeps parseCouponRows + the real
-// schemas/fragment factories wired (couponsRepo imports them too).
+// W4 split: the READS (listCoupons/getCouponStats) run on the app's Prisma
+// catalog via `prisma.$queryRaw(Prisma.sql`...`)`, so they're driven through a
+// mocked `@/lib/prisma` whose `$queryRaw` records the composed `.sql`
+// (flattened `?`-placeholder text) and returns rule-matched rows. The WRITES
+// (expire/increment/requestSource) still run on couponsDb.ts's porsager
+// `couponsSql`, so that recording thenable mock stays. Both mocks share one
+// rules/capturedQueries store (a given test exercises only one side).
 type MockRule = { match: (sql: string) => boolean; rows: unknown[] }
 let rules: MockRule[] = []
-// Raw SQL text of every couponsSql call, in order — lets a test assert on
-// the generated QUERY SHAPE itself (mirrors coupons-read-boundary.test.ts).
+// Raw SQL text of every DB call, in order — lets a test assert on the
+// generated QUERY SHAPE itself.
 let capturedQueries: string[] = []
 function mockRows(match: (sql: string) => boolean, rows: unknown[]) {
     rules.push({ match, rows })
 }
 
+// Reads: prisma.$queryRaw receives a Prisma.Sql whose `.sql` getter is the
+// composed, flattened query text (nested fragments inlined, values as `?`).
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $queryRaw: (arg: { sql: string }) => {
+            capturedQueries.push(arg.sql)
+            const rows = rules.find(r => r.match(arg.sql))?.rows ?? []
+            return Promise.resolve(rows)
+        },
+        couponSignal: { findMany: vi.fn(async () => []) },
+    },
+}))
+
+// Writes: couponsDb.ts's porsager couponsSql, a recording thenable.
+// importActual keeps parseCouponRows + the real row schemas wired (the reads'
+// zod parse imports them from this module too).
 vi.mock('@/lib/couponsDb', async () => {
     const actual =
         await vi.importActual<typeof import('@/lib/couponsDb')>(
@@ -72,49 +85,6 @@ const couponFixture = {
     verificationMessage: null,
 }
 
-describe('couponsQueryProbes registry (drift-gate contract)', () => {
-    it('has exactly 13 probes, one per read/write query, in the plan-fixed order', () => {
-        const labels = couponsQueryProbes.map(p => p.label)
-        expect(labels).toEqual([
-            'coupons.list',
-            'store-page.coupons',
-            'coupons.stats',
-            'coupons.stores',
-            'coupons.filters.sites',
-            'coupons.filters.types',
-            'sites.top-sites',
-            'sites.search-supported',
-            'extension.supported-stores',
-            'sources.list',
-            'coupons.increment',
-            'coupons.expire',
-            'sources.insert',
-        ])
-    })
-
-    it("every label is unique — the gate's red output names a label unambiguously", () => {
-        const labels = couponsQueryProbes.map(p => p.label)
-        expect(new Set(labels).size).toBe(labels.length)
-    })
-
-    it('flags exactly the 3 sanctioned writes as write:true — every other probe is a plain read', () => {
-        const writeLabels = couponsQueryProbes
-            .filter(p => p.write)
-            .map(p => p.label)
-        expect(writeLabels).toEqual([
-            'coupons.increment',
-            'coupons.expire',
-            'sources.insert',
-        ])
-    })
-
-    it('every probe exposes a callable run(sql) fn', () => {
-        for (const probe of couponsQueryProbes) {
-            expect(typeof probe.run).toBe('function')
-        }
-    })
-})
-
 describe('listCoupons', () => {
     it('parses a production-shaped fixture and derives total from the TotalCountRow', async () => {
         mockRows(
@@ -152,10 +122,9 @@ describe('listCoupons discount_type filter (case-insensitive)', () => {
 
         await listCoupons({ type: 'PERCENTAGE', limit: 10, skip: 0 })
 
-        // Target the discount_type PREDICATE fragment (built by calling the
-        // mocked couponsSql tagged template, so it lands in capturedQueries
-        // verbatim) — matched by shape, not the bare column name, since the
-        // SELECT column list also contains `discount_type`.
+        // Target the discount_type PREDICATE fragment in the composed SQL —
+        // matched by shape, not the bare column name, since the SELECT column
+        // list also contains `discount_type`.
         const predicate = capturedQueries.find(q =>
             /discount_type\)?\s*=/i.test(q),
         )

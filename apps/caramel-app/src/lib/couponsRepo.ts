@@ -1,30 +1,36 @@
 // lib/couponsRepo.ts
 //
-// The application queries against `caramel_coupons` — 13 named read/write
-// fns built on couponsDb.ts's boundary primitives (connection, SQL fragment
-// factories, zod row schemas, parseCouponRows). Every route that touches
-// the coupons DB calls a fn here instead of writing inline `couponsSql`
-// SQL — this is now the ONE place that SQL text lives, so a query can be
-// found, reasoned about, and drift-checked in one file instead of scattered
-// across 10 route files + 1 SSR page.
+// The 10 coupon-catalog READS now run against the app's OWN published Prisma
+// catalog (models Coupon/StoreConfig/Source, mapped to the coupons/
+// store_configs/sources tables in DATABASE_URL) via `prisma.$queryRaw` —
+// W4 of the Coupons Ownership Inversion. They deliberately use RAW SQL, not
+// the Prisma query-builder: keeping the SELECT column list + aliases verbatim
+// (`times_used AS "timesUsed"`, `verification_message AS "verificationMessage"`)
+// means couponsDb.ts's zod row schemas + parseCouponRows() still parse every
+// row unchanged, so the HTTP response shapes are byte-identical to the
+// pre-W4 porsager reads. `findMany` would return camelCase model fields and
+// break every schema — never use it here.
 //
-// Every fn takes an OPTIONAL trailing `sql` executor (defaults to the
-// module `couponsSql`) so the drift gate (tests/drift/coupons-schema.drift.ts)
-// can thread a single rolled-back transaction through every probe without
-// ever touching real data — see `couponsQueryProbes` at the bottom of this
-// file. The couponsDb.ts-exported fragment factories (`visibleCouponsWhere`,
-// `rankingOrderSql`, `verifiedCensusSql`) are NOT re-parameterized: they
-// always close over the module `couponsSql` (they always have — see
-// couponsDb.ts's own doc comment), which is safe because a fragment is
-// inert data until the OUTER tagged-template call (on the injected `sql`)
-// actually executes it — never awaited standalone.
+// Every read still zod-parses its rows through parseCouponRows() before
+// returning, so a schema/type drift in the catalog throws loudly (→ Sentry
+// via handleRouteError on API routes, → onRequestError on the SSR page)
+// instead of silently serving malformed data. Every `::int` cast in an
+// aggregate SELECT is preserved on purpose: `$queryRaw` maps Postgres
+// int8/bigint → JS BigInt, which the `z.number()` count/stats schemas reject —
+// the `::int` casts return int4 → JS `number`, so the casts are load-bearing.
+//
+// The 3 sanctioned WRITES (incrementCouponUsage / expireCoupons /
+// requestSource) still run on couponsDb.ts's porsager `couponsSql` against the
+// externally-owned `caramel_coupons` DB — untouched by W4, flipped in a later
+// dispatch. They keep the optional trailing `sql` executor (typed `Sql`) so
+// scripts/internal/verify-writes.ts can thread a rolled-back transaction
+// through them.
 //
 // HTTP-only concerns stay OUT of this file by design: param parsing/caps,
 // `getBaseDomain`/domain-validation 400s, response envelopes, cache
 // headers, `hasMore`/`active` computed fields, and auth/rate-limit/origin
-// gates all stay in the calling route (`withRoute` config + the route body)
-// exactly as before this file existed — see PLAN-COUPONS-BOUNDARY.md's
-// "Call-site edit pattern" for the full split.
+// gates all stay in the calling route (`withRoute` config + the route body).
+import { VISIBLE_COUPON_STATUSES } from '@/lib/coupons'
 import {
     type CouponListRow,
     CouponListRowSchema,
@@ -43,13 +49,42 @@ import {
     TotalCountRowSchema,
     couponsSql,
     parseCouponRows,
-    rankingOrderSql,
-    verifiedCensusSql,
-    visibleCouponsWhere,
 } from '@/lib/couponsDb'
+import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
-/** Any executor a query fn can run on — the module singleton by default, or a `couponsSql.begin()` transaction (cast by the caller — see the drift gate). */
+/** Any executor a WRITE fn can run on — the module `couponsSql` singleton by default, or a `couponsSql.begin()` transaction (cast by the caller — see scripts/internal/verify-writes.ts). Reads run on `prisma` and take no executor. */
 export type Sql = typeof couponsSql
+
+// ---------------------------------------------------------------------------
+// Coupon-domain SQL fragments (F-006), relocated here from couponsDb.ts as
+// `Prisma.sql` fragments when the reads flipped onto the app-owned catalog
+// (W4). Nested into a `$queryRaw` template via `${...}`, sql-template-tag
+// inlines each fragment's text and merges its bound parameters into the parent
+// query — so the composed query is still fully parameterized (injection-safe).
+// Factories, not consts, purely to mirror the pre-W4 shape (a fragment is
+// immutable data either way).
+
+/**
+ * The visibility predicate every listing read shares: verified,
+ * restriction-tagged, AND not-yet-verified coupons (VISIBLE_COUPON_STATUSES),
+ * excluding expired. `Prisma.join([...VISIBLE_COUPON_STATUSES])` expands to a
+ * parameterized `?,?,...` list (our own constants, never user input).
+ */
+const visibleCouponsWhere = () =>
+    Prisma.sql`status IN (${Prisma.join([...VISIBLE_COUPON_STATUSES])}) AND expired = FALSE`
+
+/** Shared ranking order — the list query and the marketing store page both sort by this identical order. */
+const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC`
+
+/**
+ * coupons/stats/route.ts's census predicate. Deliberately NOT
+ * visibleCouponsWhere(): stats reports a trust census (total vs. expired)
+ * among *verified* ('valid') coupons specifically, so it must INCLUDE
+ * expired ones (to count them) and EXCLUDE pending/restricted ones (not
+ * yet a verified fact) — the opposite shape from the visibility predicate.
+ */
+const verifiedCensusSql = () => Prisma.sql`status = 'valid'`
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -67,25 +102,24 @@ export type ListCouponsOpts = {
 /** api/coupons/route.ts GET — the main paginated listing. */
 export async function listCoupons(
     opts: ListCouponsOpts,
-    sql: Sql = couponsSql,
 ): Promise<{ coupons: CouponListRow[]; total: number }> {
     const { baseSite, search, type, keyWords, limit, skip } = opts
 
     // Visible-status predicate (verified, restriction-tagged, and
     // not-yet-verified coupons) — see lib/coupons.ts's
     // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
-    const conditions = [visibleCouponsWhere()]
+    const conditions: Prisma.Sql[] = [visibleCouponsWhere()]
 
     if (baseSite) {
         conditions.push(
-            sql`(site = ${baseSite} OR site LIKE ${'%.' + baseSite})`,
+            Prisma.sql`(site = ${baseSite} OR site LIKE ${'%.' + baseSite})`,
         )
     }
 
     if (search) {
         const s = `%${search}%`
         conditions.push(
-            sql`(site ILIKE ${s} OR title ILIKE ${s} OR description ILIKE ${s} OR code ILIKE ${s})`,
+            Prisma.sql`(site ILIKE ${s} OR title ILIKE ${s} OR description ILIKE ${s} OR code ILIKE ${s})`,
         )
     }
 
@@ -95,7 +129,13 @@ export async function listCoupons(
             .map(k => `%${k.trim()}%`)
             .filter(k => k.length > 2)
         if (patterns.length > 0) {
-            conditions.push(sql`description ILIKE ANY(${patterns})`)
+            // Prisma's raw layer won't reliably bind a JS array to an
+            // array-typed parameter, so build `ANY(ARRAY[?,?,...]::text[])`
+            // explicitly (same pattern as catalog/applyCatalogRows.ts's
+            // pgTextArray) instead of the porsager `ANY(${patterns})` form.
+            conditions.push(
+                Prisma.sql`description ILIKE ANY(ARRAY[${Prisma.join(patterns)}]::text[])`,
+            )
         }
     }
 
@@ -105,15 +145,13 @@ export async function listCoupons(
         // couponsDb.ts's CouponListRowSchema), so a case-sensitive `=`
         // silently dropped lowercase rows (e.g. 'percentage') from filtered
         // listings. Normalize both sides.
-        conditions.push(sql`UPPER(discount_type) = UPPER(${type})`)
+        conditions.push(Prisma.sql`UPPER(discount_type) = UPPER(${type})`)
     }
 
-    const whereClause = conditions.reduce(
-        (acc, cond) => sql`${acc} AND ${cond}`,
-    )
+    const whereClause = Prisma.join(conditions, ' AND ')
 
     const [rawCoupons, rawTotalRow] = await Promise.all([
-        sql`
+        prisma.$queryRaw(Prisma.sql`
             SELECT id, code, site, title, description, rating,
                    discount_type, discount_amount, expiry, expired,
                    times_used AS "timesUsed",
@@ -122,8 +160,10 @@ export async function listCoupons(
             WHERE ${whereClause}
             ORDER BY ${rankingOrderSql()}
             LIMIT ${limit} OFFSET ${skip}
-        `,
-        sql`SELECT COUNT(*)::int AS total FROM coupons WHERE ${whereClause}`,
+        `),
+        prisma.$queryRaw(
+            Prisma.sql`SELECT COUNT(*)::int AS total FROM coupons WHERE ${whereClause}`,
+        ),
     ])
     const coupons = parseCouponRows(
         CouponListRowSchema,
@@ -143,29 +183,28 @@ export async function listCoupons(
 export async function listStoreCoupons(
     baseSite: string,
     limit: number,
-    sql: Sql = couponsSql,
 ): Promise<{ coupons: CouponListRow[]; total: number }> {
     // Match /api/coupons: same visibility predicate, so SSR HTML and the
     // client fetch agree (no hydration flash) — see lib/coupons.ts's
     // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
-    const VISIBLE_STATUSES = visibleCouponsWhere()
+    const visible = visibleCouponsWhere()
     const [rawCoupons, rawTotalRow] = await Promise.all([
-        sql`
+        prisma.$queryRaw(Prisma.sql`
             SELECT id, code, site, title, description, rating,
                    discount_type, discount_amount, expiry, expired,
                    times_used AS "timesUsed",
                    status, verification_message AS "verificationMessage"
             FROM coupons
-            WHERE ${VISIBLE_STATUSES}
+            WHERE ${visible}
               AND (site = ${baseSite} OR site LIKE ${'%.' + baseSite})
             ORDER BY ${rankingOrderSql()}
             LIMIT ${limit}
-        `,
-        sql`
+        `),
+        prisma.$queryRaw(Prisma.sql`
             SELECT COUNT(*)::int AS total FROM coupons
-            WHERE ${VISIBLE_STATUSES}
+            WHERE ${visible}
               AND (site = ${baseSite} OR site LIKE ${'%.' + baseSite})
-        `,
+        `),
     ])
     const coupons = parseCouponRows(
         CouponListRowSchema,
@@ -181,15 +220,15 @@ export async function listStoreCoupons(
     return { coupons, total: totalRow[0]?.total ?? 0 }
 }
 
-/** api/coupons/stats/route.ts GET — trust census (verifiedCensusSql, NOT visibleCouponsWhere — see couponsDb.ts's doc comment). Falls back to a zeroed row (no `{total:0,expired:0}` shaping left for the route). */
-export async function getCouponStats(sql: Sql = couponsSql): Promise<StatsRow> {
-    const rawRows = await sql`
+/** api/coupons/stats/route.ts GET — trust census (verifiedCensusSql, NOT visibleCouponsWhere — see the fragment doc comment). Falls back to a zeroed row (no `{total:0,expired:0}` shaping left for the route). */
+export async function getCouponStats(): Promise<StatsRow> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
         SELECT
             COUNT(*)::int AS total,
             COUNT(*) FILTER (WHERE expired = TRUE)::int AS expired
         FROM coupons
         WHERE ${verifiedCensusSql()}
-    `
+    `)
     const rows = parseCouponRows(StatsRowSchema, rawRows, 'coupons.stats')
     return rows[0] ?? { total: 0, expired: 0 }
 }
@@ -198,30 +237,26 @@ export async function getCouponStats(sql: Sql = couponsSql): Promise<StatsRow> {
 export async function listStoreOptions(
     q: string,
     limit: number,
-    sql: Sql = couponsSql,
 ): Promise<SiteRow[]> {
     const rawRows = q
-        ? await sql`
+        ? await prisma.$queryRaw(Prisma.sql`
               SELECT DISTINCT site FROM coupons
               WHERE ${visibleCouponsWhere()}
                 AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
               ORDER BY site ASC
               LIMIT ${limit}
-          `
-        : await sql`
+          `)
+        : await prisma.$queryRaw(Prisma.sql`
               SELECT DISTINCT site FROM coupons
               WHERE ${visibleCouponsWhere()}
               ORDER BY site ASC
               LIMIT ${limit}
-          `
+          `)
     return parseCouponRows(SiteRowSchema, rawRows, 'coupons.stores')
 }
 
 /** api/coupons/filters/route.ts GET — sites half. The route's `includeSites` gate stays there (calls this only when true); this fn only owns its own `sitesLimit<=0` short-circuit. */
-export async function listFilterSites(
-    sitesLimit: number,
-    sql: Sql = couponsSql,
-): Promise<SiteRow[]> {
+export async function listFilterSites(sitesLimit: number): Promise<SiteRow[]> {
     if (sitesLimit <= 0) return []
     // F-006 — unified to the same visibleCouponsWhere() predicate every
     // other coupon read route uses. Previously this route alone used a
@@ -233,23 +268,21 @@ export async function listFilterSites(
     // filter lists to match the listing they filter. Rollback (if ever
     // needed): swap visibleCouponsWhere() back to `status = 'valid'`
     // (+ `AND expired = FALSE`) in both queries below.
-    const rawSites = await sql`
+    const rawSites = await prisma.$queryRaw(Prisma.sql`
         SELECT DISTINCT site FROM coupons
         WHERE ${visibleCouponsWhere()} AND site IS NOT NULL
         ORDER BY site ASC
         LIMIT ${sitesLimit}
-    `
+    `)
     return parseCouponRows(SiteRowSchema, rawSites, 'coupons.filters.sites')
 }
 
 /** api/coupons/filters/route.ts GET — types half, always runs (no gate). */
-export async function listFilterDiscountTypes(
-    sql: Sql = couponsSql,
-): Promise<DiscountTypeRow[]> {
-    const rawDiscountTypes = await sql`
+export async function listFilterDiscountTypes(): Promise<DiscountTypeRow[]> {
+    const rawDiscountTypes = await prisma.$queryRaw(Prisma.sql`
         SELECT DISTINCT discount_type FROM coupons
         WHERE ${visibleCouponsWhere()} AND discount_type IS NOT NULL
-    `
+    `)
     return parseCouponRows(
         DiscountTypeRowSchema,
         rawDiscountTypes,
@@ -258,75 +291,61 @@ export async function listFilterDiscountTypes(
 }
 
 /** api/sites/top-sites/route.ts GET — fixed LIMIT 4, no `.filter(Boolean)` (pre-existing behavior, preserved as-is). */
-export async function listTopSites(
-    sql: Sql = couponsSql,
-): Promise<SiteCountRow[]> {
-    const rawRows = await sql`
+export async function listTopSites(): Promise<SiteCountRow[]> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
         SELECT site, COUNT(*)::int AS coupon_count
         FROM coupons
         WHERE ${visibleCouponsWhere()}
         GROUP BY site
         ORDER BY coupon_count DESC
         LIMIT 4
-    `
+    `)
     return parseCouponRows(SiteCountRowSchema, rawRows, 'sites.top-sites')
 }
 
 /** api/sites/search-supported/route.ts POST — fixed LIMIT 20. The route's empty-query early return (`{sites:[]}` without querying) stays there; this fn assumes a non-empty `q`. */
-export async function searchSupportedSites(
-    q: string,
-    sql: Sql = couponsSql,
-): Promise<SiteRow[]> {
-    const rawRows = await sql`
+export async function searchSupportedSites(q: string): Promise<SiteRow[]> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
         SELECT DISTINCT site FROM coupons
         WHERE ${visibleCouponsWhere()}
           AND (site ILIKE ${'%' + q + '%'} OR site ILIKE ${q + '%'})
         ORDER BY site ASC
         LIMIT 20
-    `
+    `)
     return parseCouponRows(SiteRowSchema, rawRows, 'sites.search-supported')
 }
 
-/** api/extension/supported-stores/route.ts GET — one row per store, highest-priority active config with the 2 xpaths the extension's apply engine genuinely cannot work without. */
-export async function listSupportedStoreConfigs(
-    sql: Sql = couponsSql,
-): Promise<StoreConfigRow[]> {
-    const rawRows = await sql`
-        SELECT DISTINCT ON (s.store_name)
-            s.store_name,
-            cfg.show_input_xpath,
-            cfg.dismiss_button_xpath,
-            cfg.coupon_input_xpath,
-            cfg.apply_button_xpath,
-            cfg.price_container_xpath,
-            cfg.success_indicator_xpath,
-            cfg.error_indicator_xpath,
-            cfg.coupon_remove_xpath
-        FROM store_verification_configs cfg
-        JOIN verification_stores s ON s.id = cfg.store_id
-        WHERE cfg.is_active = TRUE
-          -- Require only the 2 fields the extension's apply engine
-          -- (coupon-apply.js) genuinely cannot work without: it fills
-          -- coupon_input then clicks apply_button, and bails early with
-          -- no fallback if either is missing/hidden. The other 3 xpaths
-          -- this predicate used to require ALL have generic fallbacks in
-          -- the apply engine (findAppliedSelector/detectCouponError/
-          -- findRemoveSelector -> GENERIC_APPLIED_SELECTORS /
-          -- GENERIC_ERROR_TEXT_RE / GENERIC_REMOVE_SELECTORS), so
-          -- requiring them here was over-strict: it silently excluded
-          -- ~25% of active configs — including the 3 demo stores
-          -- (ebay.com/amazon.com/codecademy.com) — that the generic
-          -- engine can actually drive fine (E2E report D1).
-          AND cfg.coupon_input_xpath      IS NOT NULL
-          AND cfg.apply_button_xpath      IS NOT NULL
-          -- Honor the agent's extension_compatible verdict. Stores like
-          -- christianbook.com have full xpaths but they live on the
-          -- checkout page, not the entry_url cart page — the extension
-          -- can't reach them. Agent / manual review sets this to false
-          -- when it observes that selectors don't render at entry_url.
-          AND COALESCE(cfg.metadata->>'extension_compatible', 'true') <> 'false'
-        ORDER BY s.store_name, cfg.priority DESC, cfg.updated_at DESC
-    `
+/**
+ * api/extension/supported-stores/route.ts GET — one row per store with the
+ * xpaths the extension's apply engine needs. W4 remap (RULING B): the app's
+ * `store_configs` is the FLATTENED published shape — one row per store_name,
+ * the 8 xpaths as columns, and NONE of the pipeline-internal
+ * is_active/priority/store_id/metadata that the pre-W4 external query joined
+ * across store_verification_configs ⋈ verification_stores. That selection
+ * logic (highest-priority active config, extension_compatible verdict) is
+ * PRE-RESOLVED at ingest time, so this read is a plain one-row-per-store
+ * projection. The only predicate kept is the business filter the extension
+ * genuinely can't work without: coupon_input + apply_button non-null
+ * (coupon-apply.js fills the input then clicks apply and bails with no
+ * fallback if either is missing; the other xpaths all have generic fallbacks).
+ * Still parses under StoreConfigRowSchema (identical column names).
+ */
+export async function listSupportedStoreConfigs(): Promise<StoreConfigRow[]> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
+        SELECT store_name,
+               show_input_xpath,
+               dismiss_button_xpath,
+               coupon_input_xpath,
+               apply_button_xpath,
+               price_container_xpath,
+               success_indicator_xpath,
+               error_indicator_xpath,
+               coupon_remove_xpath
+        FROM store_configs
+        WHERE coupon_input_xpath IS NOT NULL
+          AND apply_button_xpath IS NOT NULL
+        ORDER BY store_name
+    `)
     return parseCouponRows(
         StoreConfigRowSchema,
         rawRows,
@@ -335,22 +354,17 @@ export async function listSupportedStoreConfigs(
 }
 
 /**
- * api/sources/route.ts GET — coupons has no source_id column — never did
- * (verified against the live coupons DB schema: `\d coupons`). This route
- * 500'd on every call before this join was fixed. sources doesn't own its
- * own coupon-aggregate columns either (only id/source/websites/status/
- * created_at/updated_at — verified via `\d sources`), and there is no FK
- * between the two tables. The one real, schema-grounded relationship is
- * sources.websites[] (the domains a source covers, populated out-of-band
- * once a REQUESTED source is approved — requestSource() below inserts it
- * empty) against coupons.site (each coupon's own domain) — an
- * array-membership join, not a scalar FK. A source with an empty/no-match
- * websites[] simply, correctly, aggregates to zero.
+ * api/sources/route.ts GET — the published `sources` rows (id/source/websites/
+ * status), each LEFT JOINed to its coupons for the per-source aggregates.
+ * sources owns no coupon-aggregate columns and there is no FK to coupons; the
+ * one real relationship is sources.websites[] (the domains a source covers)
+ * against coupons.site (each coupon's own domain) — an array-membership join,
+ * not a scalar FK. A source with an empty/no-match websites[] correctly
+ * aggregates to zero. Every aggregate keeps its `::int` cast so `$queryRaw`
+ * returns JS `number`, not BigInt (which SourceRowSchema's z.number() rejects).
  */
-export async function listActiveSources(
-    sql: Sql = couponsSql,
-): Promise<SourceRow[]> {
-    const rawRows = await sql`
+export async function listActiveSources(): Promise<SourceRow[]> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
         SELECT
             s.id,
             s.source,
@@ -363,16 +377,18 @@ export async function listActiveSources(
         LEFT JOIN coupons c ON c.site = ANY(s.websites)
         WHERE s.status = 'ACTIVE'
         GROUP BY s.id, s.source, s.websites, s.status
-    `
+    `)
     return parseCouponRows(SourceRowSchema, rawRows, 'sources.list')
 }
 
 // ---------------------------------------------------------------------------
 // Writes — the 3 sanctioned exceptions to "coupons DB is read-only by
 // discipline" (see couponsDb.ts's header + CLAUDE.md's Hard boundaries).
-// No zod on these: they preserve the pre-existing untyped passthrough
-// (increment) / plain-count (expire) / void (sources insert) shapes rather
-// than introducing new validation as a drive-by.
+// Still on couponsDb.ts's porsager `couponsSql` against the externally-owned
+// caramel_coupons DB — untouched by W4 (a later dispatch flips them). No zod
+// on these: they preserve the pre-existing untyped passthrough (increment) /
+// plain-count (expire) / void (sources insert) shapes rather than introducing
+// new validation as a drive-by.
 
 /** api/coupons/increment/route.ts POST — usage counter, extension-facing. */
 export async function incrementCouponUsage(
@@ -425,74 +441,3 @@ export async function requestSource(
         )
     `
 }
-
-// ---------------------------------------------------------------------------
-// Structural drift gate registry (replaces the old hand-typed
-// EXPECTED_COLUMNS mirror — see tests/drift/coupons-schema.drift.ts). Every
-// registered query runs for real against the live/clone DB; Postgres plans
-// every column/table/predicate before returning rows, so a missing/renamed
-// column throws regardless of row count — the queries themselves are the
-// only contract, the DB the only source of truth. Nothing schema-descriptive
-// is committed here. Sentinel params (id 0, 'drift-probe*' strings) are
-// chosen to match zero real rows for the routes that accept a caller value,
-// so read probes are non-mutating by construction and write probes are
-// wrapped in the gate's own rolled-back transaction.
-export const couponsQueryProbes: ReadonlyArray<{
-    label: string
-    write?: boolean
-    run: (sql: Sql) => Promise<unknown>
-}> = [
-    // Bare {limit:1,skip:0} — the plan's original probe, exercising the
-    // real default /api/coupons path (no site/search/type/keyword filter).
-    // An earlier executor had temporarily pinned `type:'PERCENTAGE'` here
-    // instead, to dodge a real ~86-row data-quality slice (lowercase/4th-
-    // value/null discount_type, null expiry — see couponsDb.ts's
-    // CouponListRowSchema comment) that the old, over-strict enum schema
-    // flagged as drift; since that slice sorts to the very top of the
-    // unfiltered listing (`ORDER BY rating DESC` puts NULLS FIRST), the
-    // dodge was actually masking a live 500 on page 1 of the real
-    // production listing. Now that CouponListRowSchema itself tolerates
-    // that vocabulary, the dodge is no longer needed — reverted to bare so
-    // this probe exercises the same query real users hit, still getting a
-    // real row and the full zod numeric/id coercion path.
-    {
-        label: 'coupons.list',
-        run: s => listCoupons({ limit: 1, skip: 0 }, s),
-    },
-    {
-        label: 'store-page.coupons',
-        run: s => listStoreCoupons('drift-probe.invalid', 1, s),
-    },
-    { label: 'coupons.stats', run: s => getCouponStats(s) },
-    {
-        label: 'coupons.stores',
-        run: s => listStoreOptions('drift-probe', 1, s),
-    },
-    { label: 'coupons.filters.sites', run: s => listFilterSites(1, s) },
-    { label: 'coupons.filters.types', run: s => listFilterDiscountTypes(s) },
-    { label: 'sites.top-sites', run: s => listTopSites(s) },
-    {
-        label: 'sites.search-supported',
-        run: s => searchSupportedSites('drift-probe', s),
-    },
-    {
-        label: 'extension.supported-stores',
-        run: s => listSupportedStoreConfigs(s),
-    },
-    { label: 'sources.list', run: s => listActiveSources(s) },
-    {
-        label: 'coupons.increment',
-        write: true,
-        run: s => incrementCouponUsage(0, s),
-    },
-    {
-        label: 'coupons.expire',
-        write: true,
-        run: s => expireCoupons([0], s),
-    },
-    {
-        label: 'sources.insert',
-        write: true,
-        run: s => requestSource('drift-probe.invalid', s),
-    },
-]

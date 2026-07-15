@@ -52,6 +52,16 @@ const ALLOWLISTED_OCCURRENCES = new Set([
     'popup.js::valid_with_warning',
     'popup.js::category_restricted',
     'popup.js::seller_specific',
+    // W4 — couponsRepo.ts is the sanctioned home of the coupons SQL. The
+    // shared visibility predicate is composed as
+    // `Prisma.sql`status IN (${Prisma.join([...VISIBLE_COUPON_STATUSES])}) ...`,
+    // so the SQL predicate-shape token `status IN (` appears literally in
+    // source (unlike the pre-W4 porsager form, where `(` was generated at
+    // runtime). The status VALUES come from the imported VISIBLE_COUPON_STATUSES
+    // (lib/coupons.ts) — no vocabulary is re-declared here, so only this
+    // predicate-shape token is allowlisted; any raw status LITERAL in this
+    // file still fails the gate.
+    'couponsRepo.ts::status IN (',
 ])
 
 function isAllowlistedFile(filePath: string): boolean {

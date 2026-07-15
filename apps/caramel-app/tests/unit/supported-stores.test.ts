@@ -2,43 +2,29 @@ import { GET } from '@/app/api/extension/supported-stores/route'
 import { NextRequest, NextResponse } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// F-003 — GET /api/extension/supported-stores becomes a public read: the
-// payload is xpath selectors already shipped to every extension install, so
-// gating it behind a key has no secrecy value. Rate-limited like any other
-// public read route. A stale x-api-key header from a pre-F-003 extension
-// build is simply ignored — no cutover required (see PLAN-F-003.md §Breaking).
-
-// F-001 — re-export the REAL schemas/parseCouponRows via importActual and
-// only replace couponsSql itself: the route now imports parseCouponRows +
-// StoreConfigRowSchema from this module too, and a factory that provided
-// just `{ couponsSql }` would leave those undefined (TypeError before the
-// SQL mock is ever reached). An empty-array result parses through the real
-// schema trivially, so this stays a true characterization of unchanged
-// behavior.
-// Captures the literal SQL text of the most recent couponsSql call so a
-// test can assert on the QUERY SHAPE (which xpath columns the WHERE
-// actually requires) — the row-mock below always resolves to [], so it
-// can't otherwise prove anything about the predicate itself.
+// F-003 — GET /api/extension/supported-stores is a public read: the payload
+// is xpath selectors already shipped to every extension install, so gating it
+// behind a key has no secrecy value. Rate-limited like any other public read
+// route. A stale x-api-key header from a pre-F-003 extension build is simply
+// ignored — no cutover required (see PLAN-F-003.md §Breaking).
+//
+// W4 — listSupportedStoreConfigs now reads the app's FLATTENED store_configs
+// table via `prisma.$queryRaw(Prisma.sql`...`)`, so `@/lib/prisma` is mocked:
+// `$queryRaw` records the composed `.sql` so a test can assert the WHERE
+// predicate (which xpath columns the query requires); the row mock always
+// resolves to [], so it can't otherwise prove anything about the predicate.
 const { queryCapture } = vi.hoisted(() => ({
     queryCapture: { sql: '' },
 }))
 
-vi.mock('@/lib/couponsDb', async () => {
-    const actual =
-        await vi.importActual<typeof import('@/lib/couponsDb')>(
-            '@/lib/couponsDb',
-        )
-    return {
-        ...actual,
-        couponsSql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
-            queryCapture.sql = strings.join('?')
-            return {
-                // oxlint-disable-next-line no-thenable
-                then: (resolve: (rows: unknown[]) => void) => resolve([]),
-            }
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $queryRaw: (arg: { sql: string }) => {
+            queryCapture.sql = arg.sql
+            return Promise.resolve([])
         },
-    }
-})
+    },
+}))
 
 const { checkRateLimitMock } = vi.hoisted(() => ({
     checkRateLimitMock: vi.fn(async () => null as NextResponse | null),
@@ -88,29 +74,27 @@ describe('GET /api/extension/supported-stores — public read (F-003)', () => {
     })
 })
 
-// D1 (E2E report) — the old predicate required ALL of coupon_input,
-// apply_button, success_indicator, error_indicator AND coupon_remove to be
-// non-null, excluding ~25% of active configs (incl. the 3 hardcoded demo
-// stores: ebay.com/amazon.com/codecademy.com) even though the extension's
-// apply engine has generic fallbacks for everything except the input+button
-// pair:
-//   - successIndicator: coupon-apply.js findAppliedSelector() falls back to
-//     GENERIC_APPLIED_SELECTORS
-//   - errorIndicator: coupon-apply.js detectCouponError() falls back to a
-//     GENERIC_ERROR_TEXT_RE scan near the input
-//   - couponRemove: coupon-apply.js findRemoveSelector() falls back to
-//     GENERIC_REMOVE_SELECTORS, and removeAppliedCoupon() has a further
-//     clear-the-input fallback
-// couponInput/couponSubmit have NO such fallback — coupon-apply.js's
-// applyCoupon() and coupon-runner.js's startApplyingCoupons() both bail
-// early (`if (!input || ... || !applyBtn) return`) when either is missing,
-// so those two remain hard requirements.
-describe('GET /api/extension/supported-stores — qualification predicate (D1 fix)', () => {
-    it('requires coupon_input_xpath + apply_button_xpath — NOT success/error/remove indicators', async () => {
+// D1 (E2E report) — the extension's apply engine (coupon-apply.js) can only
+// work when it has BOTH the coupon input and the apply button: applyCoupon()
+// and coupon-runner.js's startApplyingCoupons() bail early
+// (`if (!input || ... || !applyBtn) return`) when either is missing. The other
+// xpaths all have generic fallbacks (findAppliedSelector/detectCouponError/
+// findRemoveSelector → GENERIC_* constants), so requiring them would exclude
+// ~25% of active configs — incl. the 3 demo stores — for no reason.
+//
+// W4 remap (RULING B): the app's store_configs is the FLATTENED published
+// shape — no pipeline-internal is_active/priority/store_id/metadata columns
+// (the highest-priority-active + extension_compatible selection is
+// pre-resolved at ingest time). So the query is a plain projection off
+// store_configs; the ONLY WHERE predicate left is the input+button non-null
+// business filter.
+describe('GET /api/extension/supported-stores — qualification predicate (D1 fix, W4 flattened table)', () => {
+    it('reads store_configs, requiring coupon_input_xpath + apply_button_xpath — NOT success/error/remove indicators, and NOT the retired extension_compatible metadata filter', async () => {
         queryCapture.sql = ''
 
         await GET(makeRequest())
 
+        expect(queryCapture.sql).toMatch(/FROM store_configs/)
         expect(queryCapture.sql).toMatch(/coupon_input_xpath\s+IS NOT NULL/)
         expect(queryCapture.sql).toMatch(/apply_button_xpath\s+IS NOT NULL/)
         expect(queryCapture.sql).not.toMatch(
@@ -122,9 +106,8 @@ describe('GET /api/extension/supported-stores — qualification predicate (D1 fi
         expect(queryCapture.sql).not.toMatch(
             /coupon_remove_xpath\s+IS NOT NULL/,
         )
-        // The extension_compatible escape hatch (agent/manual "this store
-        // genuinely doesn't work" verdict) is unrelated to xpath
-        // nullability and must survive the relaxation unchanged.
-        expect(queryCapture.sql).toMatch(/extension_compatible/)
+        // The flattened table has no metadata column — extension_compatible is
+        // resolved at ingest, so it must NOT appear as a query predicate.
+        expect(queryCapture.sql).not.toMatch(/extension_compatible/)
     })
 })
