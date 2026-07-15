@@ -2,8 +2,9 @@
 # (root `pnpm dev`) — local, CI and prod run this same graph in prod-mode
 # builds, so behaviour is identical everywhere. Services are web + postgres
 # ONLY: no redis (rate limiting is in-memory single-instance by design, NF-13)
-# and no coupons DB (its schema is externally owned and deliberately absent
-# locally — see the COUPONS_DATABASE_URL note on the web service).
+# and no separate coupons DB — the coupon catalog now lives in the local
+# `postgres` service itself (app-owned Prisma models coupons/store_configs/
+# sources, created by `prisma migrate deploy` + the catalog seed, W4).
 name: caramel
 
 services:
@@ -73,21 +74,22 @@ services:
       # Topology only — the in-container app talks to the postgres SERVICE, so
       # this overrides whatever localhost value the app .env ships.
       DATABASE_URL: postgresql://${POSTGRES_USER:-caramel}:${POSTGRES_PASSWORD:-caramel_password}@postgres:5432/${POSTGRES_DB:-caramel}
-      # DELIBERATELY names a database that does NOT exist: zod boot-validation
-      # passes (valid URL shape) but every coupons query fails loudly at request
-      # time — the documented local degraded mode (DESIGN.md §2(j)). This
-      # compose never creates the coupons DB; its schema is externally owned and
-      # must never be modelled here (secrecy forward-rule, DESIGN.md §2(k)).
-      COUPONS_DATABASE_URL: ${COUPONS_DATABASE_URL:-postgresql://caramel:caramel_password@postgres:5432/caramel_coupons}
+      # COUPONS_DATABASE_URL is intentionally NOT set here: the coupon catalog
+      # lives in the postgres service above (app-owned Prisma tables + seed), so
+      # the app serves its own catalog — no external DB, no "degraded mode"
+      # (both retired in W4-D3). It is now an OPTIONAL bridge-sync-only input;
+      # when a deploy runs the out-of-repo bridge it reaches the container via
+      # the env_file above, never hardcoded here.
     ports:
       - '${BIND_HOST:-127.0.0.1}:${WEB_PORT:-58000}:3000'
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      # busybox wget (node:22-alpine) — a plain GET on the homepage, which
-      # serves 200 in the local degraded mode. NOT /api/health/db (bearer-gated
-      # and 503 when coupons is down, so unusable as a liveness probe here).
+      # busybox wget (node:22-alpine) — a plain unauthenticated GET on the
+      # homepage. Deliberately NOT /api/health/db: that route is bearer-gated
+      # (401 without UPKUMA_HEALTH_SECRET), so it can't serve as an
+      # unauthenticated container liveness probe.
       test:
         ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1']
       interval: 15s
