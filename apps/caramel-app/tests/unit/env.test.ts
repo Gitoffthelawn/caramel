@@ -38,9 +38,10 @@ describe('parseServerEnv', () => {
         expect(() => parseServerEnv(rest)).toThrow(/DATABASE_URL/)
     })
 
-    it('(c) missing COUPONS_DATABASE_URL throws, naming COUPONS_DATABASE_URL', () => {
+    it('(c) COUPONS_DATABASE_URL is OPTIONAL — absent still parses (W4-D3: bridge-sync is opt-in, the app serves its own catalog)', () => {
         const { COUPONS_DATABASE_URL: _omit, ...rest } = validServerFixture
-        expect(() => parseServerEnv(rest)).toThrow(/COUPONS_DATABASE_URL/)
+        const parsed = parseServerEnv(rest)
+        expect(parsed.COUPONS_DATABASE_URL).toBeUndefined()
     })
 
     it('(d) both auth secrets absent throws, naming BETTER_AUTH_SECRET and JWT_SECRET', () => {

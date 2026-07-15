@@ -5,26 +5,35 @@
 // misconfigured deploy fails fast at boot with a named-variable error
 // instead of failing deep inside a request handler.
 //
-// Only the 3 vars proven present in every real boot context (prod Dokploy +
-// CI e2e — see apps/caramel-app/scripts/ci-env.ts) are required. Everything
-// else is optional/defaulted so `next dev`/`next build` never brick on a
-// feature the current environment simply doesn't configure (social login,
-// extension OAuth, email, ...).
+// Only DATABASE_URL is hard-required, plus at least one auth secret
+// (BETTER_AUTH_SECRET or JWT_SECRET, enforced by the .refine() below) — the
+// vars proven present in every real boot context (prod Dokploy + CI e2e — see
+// apps/caramel-app/scripts/ci-env.ts). Everything else is optional/defaulted so
+// `next dev`/`next build` never brick on a feature the current environment
+// simply doesn't configure (social login, extension OAuth, email, the
+// coupons-bridge sync, ...).
 import 'server-only'
 import { z } from 'zod'
 
 const serverObjectSchema = z.object({
     // ---- Required (fail-fast) ------------------------------------------
     DATABASE_URL: z.string().min(1, { error: 'DATABASE_URL is required' }),
-    COUPONS_DATABASE_URL: z
-        .string()
-        .min(1, { error: 'COUPONS_DATABASE_URL is required' }),
     // At least one of these two is required — enforced by the .refine()
     // below (kept optional here so either one alone satisfies the schema).
     BETTER_AUTH_SECRET: z.string().min(1).optional(),
     JWT_SECRET: z.string().min(1).optional(),
 
     // ---- Optional / defaulted -------------------------------------------
+    // OPTIONAL bridge-sync input (W4-D3). When set, the out-of-repo coupons
+    // bridge job uses it to pull rows from the external, Python-owned
+    // caramel_coupons Postgres into the app's OWN catalog (DATABASE_URL);
+    // absent → the app just serves its own migrated + seeded catalog and no
+    // bridge sync runs (logged once at boot — see instrumentation.ts). The old
+    // "required → local degraded mode when unreachable" contract is retired:
+    // the catalog lives in DATABASE_URL now. Leave it FULLY UNSET to serve the
+    // app-owned catalog; `.min(1)` means a set-but-EMPTY value fails fast as
+    // the misconfiguration it is, never accepted as a valid connection string.
+    COUPONS_DATABASE_URL: z.string().min(1).optional(),
     BETTER_AUTH_URL: z.string().min(1).optional(),
     BCRYPT_SALT_ROUNDS: z.coerce.number().int().positive().default(10),
     GOOGLE_CLIENT_ID: z.string().optional(),
