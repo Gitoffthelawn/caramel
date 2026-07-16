@@ -11,8 +11,8 @@
  *     positioning rules.
  *   - assets/* is already web_accessible in BOTH manifests, so content
  *     scripts can fetch() it in Chrome and Firefox alike.
- *   - the summed content-script size-limit budget (98 KB) counts JS files;
- *     embedding this sheet as a JS string would not fit.
+ *   - the summed content-script size-limit budget (.size-limit.json, 102 KB)
+ *     counts JS files; embedding this sheet as a JS string would not fit.
  *
  * The shadow boundary means host-page selectors can't reach these elements:
  * the old "!important hardening" block is gone for good. Only inheritable

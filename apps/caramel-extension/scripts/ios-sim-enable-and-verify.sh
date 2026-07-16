@@ -14,7 +14,11 @@
 #              Caramel > Allow Extension + Other Websites > Allow) via tap.py.
 set -euo pipefail
 
-UDID="${1:-710B0275-5AB4-454F-9B08-F6586A67E1ED}"
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <simulator-UDID>   (xcrun simctl list devices available)" >&2
+    exit 2
+fi
+UDID="$1"
 PHASE_DIR="$HOME/caramel-ext-phase4"
 APP_BUNDLE_ID="ca.devino.caramel.phase4test"
 EXT_KEY="${APP_BUNDLE_ID}.Extension (UNSIGNED)"

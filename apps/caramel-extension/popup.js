@@ -773,6 +773,16 @@ function renderCouponsView(coupons, user, domain) {
     /* save callback for login back-button */
     const selfCallback = () => renderCouponsView(coupons, user, domain)
 
+    /* Settings gear (header): visible whenever a user is signed in — this is
+       the main signed-in view, not just the no-tab profile card. */
+    const settingsIcon = document.getElementById('settingsIcon')
+    if (settingsIcon) {
+        settingsIcon.style.display = user ? 'block' : 'none'
+        if (user)
+            settingsIcon.onclick = () =>
+                window.open(caramelUrl('profile'), '_blank')
+    }
+
     /* logout */
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)

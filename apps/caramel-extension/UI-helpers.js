@@ -7,7 +7,8 @@
 // Styles: assets/content-ui.css + assets/tokens.css (web_accessible in BOTH
 // manifests) fetched ONCE, tokens rewritten ':root' → ':host, :root', one
 // <style> per shadow root, awaited before append (no unstyled flash).
-// Embedding the CSS as a JS string was rejected: the 98 KB size budget.
+// Embedding the CSS as a JS string was rejected: the summed content-script
+// size budget (.size-limit.json, 102 KB) counts JS bytes, not fetched CSS.
 
 // Inline SVG close glyph (stroke follows the button's currentColor).
 const CARAMEL_X_ICON =

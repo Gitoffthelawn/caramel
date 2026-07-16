@@ -28,5 +28,5 @@ def main():
     e = matches[idx]
     f = e["frame"]; x = f["x"] + f["width"]/2; y = f["y"] + f["height"]/2
     subprocess.run([IDB, "--companion", "localhost:10882", "ui", "tap", str(int(x)), str(int(y))], check=True, timeout=60)
-    print(f"TAPPED {e.get(chr(39)+chr(39),None) or e.get(chr(34)+chr(34),None) or e.get('AXLabel')} at {x},{y} value={e.get('AXValue')}")
+    print(f"TAPPED {e.get('AXLabel')} at {x},{y} value={e.get('AXValue')}")
 main()
