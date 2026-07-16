@@ -3,9 +3,7 @@ html,
 body {
     margin: 0;
     padding: 0;
-    font-family:
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-        sans-serif;
+    font-family: var(--cm-font-sans);
     -webkit-font-smoothing: antialiased;
     overflow: hidden; /* Keep extension popup from scrolling */
 }
@@ -20,7 +18,7 @@ body {
     display: flex;
     justify-content: center;
     position: relative;
-    background: #ffffff;
+    background: var(--cm-bg);
 }
 
 /* --- Doodles & Wave Background --- */
@@ -42,14 +40,6 @@ body {
     width: 420px;
     height: 220px;
     z-index: 2;
-}
-
-/* Doodles */
-.doodle {
-    position: absolute;
-    width: 420px;
-    opacity: 0.15;
-    z-index: 1;
 }
 
 /* --- Loading Overlay --- */
@@ -82,7 +72,7 @@ body {
     background: rgba(255, 255, 255, 0.75);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--cm-shadow-overlay);
     animation: fadeIn 0.8s ease forwards;
 }
 
@@ -121,30 +111,9 @@ body {
 }
 
 /* --- Login Prompt --- */
-.login-prompt h2 {
-    font-size: 24px;
-    color: #ea6925;
-    margin-bottom: 12px;
-}
-.login-prompt p {
-    font-size: 14px !important;
-    color: #444;
-    margin-bottom: 16px;
-}
 .login-prompt a {
-    color: #ea6925;
+    color: var(--cm-brand);
     text-decoration: none;
-}
-.login-button {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* --- Profile Card --- */
@@ -159,13 +128,13 @@ body {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .welcome-message {
-    font-size: 18px;
-    color: #ea6925;
+    font-size: var(--cm-text-lg);
+    color: var(--cm-brand);
     margin-top: 12px;
     font-weight: bold;
 }
 .username {
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     color: #555;
     margin-bottom: 16px;
 }
@@ -179,39 +148,31 @@ body {
 .logout-button {
     border: none;
     padding: 8px 16px;
-    border-radius: 8px;
+    border-radius: var(--cm-radius-sm);
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     transition: background 0.3s ease;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 .settings-button {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
 }
 .logout-button {
-    border: 1px solid #ea6925;
-    color: #ea6925;
+    border: 1px solid var(--cm-brand);
+    color: var(--cm-brand);
 }
 .settings-button:hover {
     background: #da7f52;
 }
 .logout-button:hover {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
 }
 
-/* --- Animations --- */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
+/* --- Animations ---
+   fadeIn / fadeInUp live further down (single definitions; the duplicated
+   earlier copies were shadowed by the cascade and have been removed). */
 @keyframes bounce {
     0%,
     20%,
@@ -230,16 +191,6 @@ body {
 .fade-in-up {
     animation: fadeInUp 0.6s ease forwards;
 }
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(15px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
 
 .login-prompt {
     max-width: 250px;
@@ -248,13 +199,16 @@ body {
     font-family: sans-serif;
 }
 
+/* Merged from the two historical .login-prompt h2 / p blocks: later-cascade
+   values won (margin/font-size here; the earlier 14px !important on p). */
 .login-prompt h2 {
     margin: 0 0 10px;
     font-size: 1.5em;
+    color: var(--cm-brand);
 }
 
 .login-prompt p {
-    font-size: 0.9em;
+    font-size: var(--cm-text-base) !important;
     color: #555;
     margin-bottom: 6px;
     margin-top: 5px;
@@ -288,19 +242,24 @@ body {
 }
 
 .login-form input:focus {
-    border-color: #ea6925; /* highlight border on focus */
+    border-color: var(--cm-brand); /* highlight border on focus */
 }
 
+/* Merged from the two historical .login-button blocks: later-cascade values
+   won (padding/radius/transition); font-size + box-shadow survive from the
+   earlier block because the later one never set them. */
 .login-button {
     padding: 10px;
     border: none;
     border-radius: 4px;
+    font-size: var(--cm-text-md);
     font-weight: 600;
     cursor: pointer;
-    background-color: #ea6925;
-    color: #fff;
+    background-color: var(--cm-brand);
+    color: var(--cm-on-brand);
     transform: scale(1);
     transition: 0.3s;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .login-button:hover {
@@ -320,11 +279,11 @@ body {
     justify-content: center;
     gap: 8px;
     padding: 10px 16px;
-    border: 1px solid #ea6925;
+    border: 1px solid var(--cm-brand);
     border-radius: 4px;
-    background-color: #fff;
+    background-color: var(--cm-surface);
     color: #333;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -333,7 +292,7 @@ body {
 
 .oauth-button:hover:not(:disabled) {
     background-color: rgba(234, 105, 37, 0.1);
-    border-color: #ea6925;
+    border-color: var(--cm-brand);
     transform: scale(1.02);
 }
 
@@ -354,7 +313,7 @@ body {
     text-align: center;
     margin: 16px 0;
     color: #666;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
 }
 
 .oauth-divider::before,
@@ -380,8 +339,8 @@ body {
 .resend-verification-btn {
     background: none;
     border: none;
-    color: #ea6925;
-    font-size: 14px;
+    color: var(--cm-brand);
+    font-size: var(--cm-text-base);
     font-weight: 600;
     text-decoration: underline;
     cursor: pointer;
@@ -405,10 +364,14 @@ body {
 
 /* -------------- Overall Card -------------- */
 .coupons-profile-card {
-    /* Subtle gradient with your brand color (#ea6925) in mind */
-    background: linear-gradient(135deg, #fff 50%, #fff3ec 100%);
+    /* Subtle gradient with your brand color (var(--cm-brand)) in mind */
+    background: linear-gradient(
+        135deg,
+        var(--cm-surface) 50%,
+        var(--cm-brand-soft-2) 100%
+    );
     padding: 16px;
-    border-radius: 12px;
+    border-radius: var(--cm-radius-md);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
     animation: fadeInUp 0.3s ease forwards;
     max-width: 420px;
@@ -449,20 +412,20 @@ body {
     border-radius: 50%;
     object-fit: cover;
     margin-right: 10px;
-    border: 2px solid #ea6925;
+    border: 2px solid var(--cm-brand);
 }
 
 /* The user label (e.g., "@username" or "Guest") */
 .coupons-user-label {
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     font-weight: bold;
     color: #333;
 }
 
 /* -------------- Header text for the coupon list -------------- */
 .coupon-header {
-    font-size: 16px;
-    color: #ea6925;
+    font-size: var(--cm-text-md);
+    color: var(--cm-brand);
     margin: 0 0 8px 0;
     font-weight: bold;
     text-align: center;
@@ -490,8 +453,8 @@ body {
 }
 .coupon-list::-webkit-scrollbar-thumb {
     background: #f0cdb4;
-    border-radius: 999px;
-    border: 2px solid #fff;
+    border-radius: var(--cm-radius-pill);
+    border: 2px solid var(--cm-surface);
 }
 .coupon-list::-webkit-scrollbar-thumb:hover {
     background: #e8b894;
@@ -508,7 +471,7 @@ body {
             8 8,
         copy;
     text-align: left;
-    border: 1px solid #efe4da;
+    border: 1px solid var(--cm-border);
     border-radius: 14px;
     padding: 14px 15px;
     margin-bottom: 12px;
@@ -518,26 +481,22 @@ body {
         box-shadow 0.18s ease,
         opacity 0.18s ease,
         transform 0.18s ease;
-    background-color: #fff;
-    box-shadow:
-        0 1px 2px rgba(20, 14, 10, 0.04),
-        0 8px 20px -12px rgba(20, 14, 10, 0.18);
+    background-color: var(--cm-surface);
+    box-shadow: var(--cm-shadow-card);
     position: relative;
 }
 
 /* Hover lifts the card and warms its edge; the code row gets the brand orange. */
 .coupon-item:hover {
-    background-color: #fff;
-    border-color: #f0b48a;
-    box-shadow:
-        0 2px 4px rgba(20, 14, 10, 0.05),
-        0 12px 26px -10px rgba(234, 105, 37, 0.24);
+    background-color: var(--cm-surface);
+    border-color: var(--cm-border-dashed-hover);
+    box-shadow: var(--cm-shadow-raised);
     transform: translateY(-1px);
 }
 
 /* Visible keyboard focus ring — cards are role="button" + tabindex="0". */
 .coupon-item:focus-visible {
-    outline: 2px solid #ea6925;
+    outline: 2px solid var(--cm-brand);
     outline-offset: 2px;
 }
 
@@ -574,7 +533,7 @@ body {
     flex: none;
     margin-top: 1px;
     padding: 2px 9px;
-    border-radius: 999px;
+    border-radius: var(--cm-radius-pill);
     font-size: 10.5px;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -588,9 +547,9 @@ body {
     flex: 1;
     min-width: 0;
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     line-height: 1.35;
-    color: #1c1917;
+    color: var(--cm-text-primary);
     /* Wrap even a single unbreakable string instead of overflowing the card. */
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -599,9 +558,9 @@ body {
 /* The coupon's description — muted, clamped to 2 lines so one long blurb can't
    make a card tower over its neighbours; still wraps unbreakable strings. */
 .coupon-desc {
-    font-size: 12.5px;
+    font-size: var(--cm-text-sm);
     line-height: 1.45;
-    color: #8a8079;
+    color: var(--cm-text-muted);
     margin: 0 0 11px;
     overflow-wrap: anywhere;
     display: -webkit-box;
@@ -619,16 +578,16 @@ body {
     gap: 10px;
     margin-top: 4px;
     padding: 7px 7px 7px 12px;
-    border: 1.5px dashed #e7c8ad;
+    border: 1.5px dashed var(--cm-border-dashed);
     border-radius: 10px;
-    background: #fff7f1;
+    background: var(--cm-brand-soft);
     transition:
         border-color 0.18s ease,
         background 0.18s ease;
 }
 .coupon-item:hover .coupon-code-row {
-    border-color: #ea6925;
-    background: #fff1e7;
+    border-color: var(--cm-brand);
+    background: var(--cm-brand-soft-3);
 }
 .coupon-code {
     flex: 1;
@@ -636,12 +595,11 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family:
-        'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+    font-family: var(--cm-font-mono);
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: #1c1917;
+    color: var(--cm-text-primary);
 }
 .coupon-copy {
     flex: none;
@@ -649,16 +607,16 @@ body {
     align-items: center;
     gap: 5px;
     padding: 7px 12px;
-    border-radius: 8px;
-    background: #ea6925;
-    color: #fff;
-    font-size: 12.5px;
+    border-radius: var(--cm-radius-sm);
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
+    font-size: var(--cm-text-sm);
     font-weight: 700;
     box-shadow: 0 1px 3px rgba(234, 105, 37, 0.3);
     transition: background 0.18s ease;
 }
 .coupon-item:hover .coupon-copy {
-    background: #d65d1f;
+    background: var(--cm-brand-strong);
 }
 .coupon-copy svg {
     flex: none;
@@ -666,9 +624,9 @@ body {
 
 /* -------------- Logout / Login Button -------------- */
 .coupons-logout-button {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+    border: 2px solid var(--cm-brand);
     border-radius: 6px;
     padding: 6px 16px;
     cursor: pointer;
@@ -678,8 +636,8 @@ body {
 }
 
 .coupons-logout-button:hover {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
 }
 
 /* -------------- Toast / Confirmation -------------- */
@@ -693,13 +651,13 @@ body {
 
 .copy-toast {
     background-color: #333;
-    color: #fff;
+    color: var(--cm-on-brand);
     padding: 10px 16px;
     border-radius: 4px;
     margin-bottom: 8px;
     opacity: 0.95;
     animation: fadeIn 0.3s ease forwards;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
 }
 
 /* Fade out after the setTimeout triggers 'fade-out' class */
@@ -747,8 +705,8 @@ body {
 
 /* --- Unsupported-site / no-coupons view ------------------------- */
 .no-coupons-view {
-    background: #fff;
-    border-radius: 16px;
+    background: var(--cm-surface);
+    border-radius: var(--cm-radius-lg);
     padding: 28px 22px;
     box-shadow: 0 4px 16px rgba(20, 14, 10, 0.1);
     text-align: center;
@@ -763,7 +721,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #fff1e8;
+    background: var(--cm-brand-soft-4);
     border-radius: 50%;
 }
 
@@ -771,13 +729,13 @@ body {
     margin: 0 0 6px;
     font-size: 17px;
     font-weight: 700;
-    color: #1c1917;
+    color: var(--cm-text-primary);
 }
 .no-coupons-view p {
     margin: 0 0 18px;
     font-size: 13px;
     line-height: 1.5;
-    color: #6b6460;
+    color: var(--cm-text-secondary);
 }
 
 /* Stacked full-width actions read far cleaner than a wrapped icon+button row. */
@@ -795,7 +753,7 @@ body {
     padding: 12px 16px;
     border-radius: 10px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     cursor: pointer;
     text-decoration: none;
     text-align: center;
@@ -807,13 +765,13 @@ body {
 }
 
 .supported-sites-btn {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
     border: none;
     box-shadow: 0 2px 8px rgba(234, 105, 37, 0.28);
 }
 .supported-sites-btn:hover {
-    background: #d65d1f;
+    background: var(--cm-brand-strong);
     box-shadow: 0 4px 12px rgba(234, 105, 37, 0.34);
 }
 .supported-sites-btn:active {
@@ -821,13 +779,13 @@ body {
 }
 
 .toggle-login-btn {
-    background: #fff;
-    color: #ea6925;
+    background: var(--cm-surface);
+    color: var(--cm-brand);
     border: 1.5px solid #f0c3a6;
 }
 .toggle-login-btn:hover {
     background: #fff5ef;
-    border-color: #ea6925;
+    border-color: var(--cm-brand);
 }
 
 /* "Open source" footer link — small GitHub mark + label, de-emphasized,
@@ -837,14 +795,14 @@ body {
     align-items: center;
     gap: 6px;
     margin-top: 16px;
-    color: #9b938d;
+    color: var(--cm-text-muted-2);
     font-size: 12px;
     font-weight: 600;
     text-decoration: none;
     transition: color 0.18s ease;
 }
 .oss-link:hover {
-    color: #6b6460;
+    color: var(--cm-text-secondary);
 }
 .oss-link svg {
     opacity: 0.85;
@@ -853,8 +811,8 @@ body {
 .back-btn {
     background: none;
     border: none;
-    color: #ea6925;
-    font-size: 14px;
+    color: var(--cm-brand);
+    font-size: var(--cm-text-base);
     cursor: pointer;
     margin-top: 16px;
 }
@@ -878,22 +836,15 @@ body {
         font-size: 15px;
     }
 
-    .copyBtn {
-        width: 100%;
-        justify-content: center;
-        padding: 12px;
-        font-size: 15px;
-    }
-
     .coupons-logout-button {
         padding: 6px 12px;
-        font-size: 14px;
+        font-size: var(--cm-text-base);
     }
 }
 
 /* Restriction warning chip on restricted coupons */
 .coupon-item-restricted {
-    border-color: #f0b34d;
+    border-color: var(--cm-restriction-accent);
     background: linear-gradient(180deg, #fffaf0 0%, #fff 80%);
 }
 .coupon-restriction {
@@ -904,13 +855,13 @@ body {
     margin: 6px 0 8px;
     padding: 7px 9px;
     font-size: 12px;
-    color: #8a5a00;
-    background: #fff5e0;
-    border-left: 3px solid #f0b34d;
+    color: var(--cm-restriction-text);
+    background: var(--cm-restriction-bg);
+    border-left: 3px solid var(--cm-restriction-accent);
     border-radius: 6px;
 }
 .coupon-restriction-icon {
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     line-height: 1;
 }
 .coupon-restriction-text {
@@ -918,13 +869,13 @@ body {
     line-height: 1.35;
 }
 .coupon-restriction-text b {
-    color: #d97706;
+    color: var(--cm-restriction-strong);
 }
 .coupon-restriction-detail {
     flex-basis: 100%;
     margin-top: 3px;
-    color: #6b4500;
-    font-size: 11px;
+    color: var(--cm-restriction-detail);
+    font-size: var(--cm-text-xs);
     opacity: 0.85;
     font-style: italic;
 }
@@ -950,9 +901,9 @@ body {
 .popup-container a:focus-visible,
 .popup-container button:focus-visible,
 .login-form input:focus-visible {
-    outline: 2px solid #ea6925;
+    outline: 2px solid var(--cm-brand);
     outline-offset: 2px;
-    border-radius: 8px;
+    border-radius: var(--cm-radius-sm);
 }
 .popup-container a:focus:not(:focus-visible),
 .popup-container button:focus:not(:focus-visible) {
