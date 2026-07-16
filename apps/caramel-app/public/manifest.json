@@ -1,6 +1,6 @@
 {
-    "background_color": "#934b90",
-    "description": "Best coupons extension",
+    "background_color": "#fff7f1",
+    "description": "Caramel automatically finds and applies the best coupon codes at checkout — open-source, privacy-first, and creator-friendly.",
     "dir": "ltr",
     "display": "standalone",
     "name": "Caramel",
@@ -8,7 +8,7 @@
     "scope": "/",
     "short_name": "Caramel",
     "start_url": "/",
-    "theme_color": "#3e4562",
+    "theme_color": "#ea6925",
     "icons": [
         {
             "src": "/app/windows11/SmallTile.scale-100.png",
@@ -332,7 +332,8 @@
         },
         {
             "src": "/app/android/android-launchericon-512-512.png",
-            "sizes": "512x512"
+            "sizes": "512x512",
+            "purpose": "maskable"
         },
         {
             "src": "/app/android/android-launchericon-192-192.png",
@@ -461,5 +462,43 @@
     ],
     "id": "grab.caramel",
     "lang": "en",
-    "display_override": "standalone"
+    "display_override": ["standalone"],
+    "shortcuts": [
+        {
+            "name": "Supported Stores",
+            "short_name": "Stores",
+            "description": "Browse the stores Caramel supports",
+            "url": "/supported-stores",
+            "icons": [
+                {
+                    "src": "/app/android/android-launchericon-96-96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Browse Coupons",
+            "short_name": "Coupons",
+            "description": "Find the latest coupon codes",
+            "url": "/coupons",
+            "icons": [
+                {
+                    "src": "/app/android/android-launchericon-96-96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Profile",
+            "short_name": "Profile",
+            "description": "Manage your Caramel account",
+            "url": "/profile",
+            "icons": [
+                {
+                    "src": "/app/android/android-launchericon-96-96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ]
 }
