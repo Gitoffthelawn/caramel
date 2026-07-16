@@ -1,7 +1,8 @@
-/* Caramel extension design tokens (Phase 0 of the UI modernization).
- * Popup-only for now: loaded FIRST by index.html (before styles.css).
- * NOT injected into host pages — caramel-content.css must NOT reference
- * these vars until the content UI moves into a Shadow DOM (later phase).
+/* Caramel extension design tokens.
+ * Loaded FIRST by index.html (before styles.css) for the popup, and fetched
+ * by createCaramelShadowHost() (UI-helpers.js) into each content-UI shadow
+ * root with ':root' rewritten to ':host, :root' so the vars resolve there.
+ * caramel-content.css (light-DOM host rules only) must stay var-free.
  */
 :root {
     /* --- Brand --- */
@@ -25,6 +26,23 @@
     --cm-bg: #ffffff; /* popup page background */
     --cm-surface: #ffffff; /* cards / raised surfaces */
     --cm-on-brand: #ffffff; /* text/icons sitting on brand fills */
+    /* Dimmed surfaces (dead/expired coupon cards) */
+    --cm-surface-dim: #fcfbfa;
+    --cm-border-dim: #e3ddd6;
+    --cm-border-dim-hover: #d2cbc4;
+    /* Loading skeleton (ghost bars + shimmer sheen) */
+    --cm-skeleton-base: #f3ede8;
+    --cm-skeleton-sheen: #fbf7f3;
+    /* Coupon-list scrollbar (warm tint) */
+    --cm-scrollbar: #f0cdb4;
+    --cm-scrollbar-hover: #e8b894;
+    /* Danger / error box */
+    --cm-danger-text: #721c24;
+    --cm-danger-bg: #f8d7da;
+    --cm-danger-border: #cc0000;
+    /* Toast */
+    --cm-toast-bg: #333333;
+    --cm-toast-text: #ffffff;
 
     /* --- Status tiers (popup badge palette; text / background pairs) --- */
     --cm-tier-green-text: #15803d;
@@ -100,6 +118,18 @@
         --cm-bg: #171210;
         --cm-surface: #211a16;
         --cm-on-brand: #ffffff;
+        --cm-surface-dim: #1d1713;
+        --cm-border-dim: #2e2620;
+        --cm-border-dim-hover: #3a3129;
+        --cm-skeleton-base: #262019;
+        --cm-skeleton-sheen: #322a22;
+        --cm-scrollbar: rgba(240, 122, 56, 0.35);
+        --cm-scrollbar-hover: rgba(240, 122, 56, 0.55);
+        --cm-danger-text: #f2a6ab;
+        --cm-danger-bg: rgba(248, 113, 113, 0.14);
+        --cm-danger-border: #f87171;
+        --cm-toast-bg: #38302a;
+        --cm-toast-text: #f4efec;
 
         /* Status tiers: lighter text on translucent tinted backgrounds */
         --cm-tier-green-text: #4ade80;

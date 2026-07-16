@@ -55,6 +55,24 @@ describe('popup.js renderCouponsView — badges + restriction banner (F-006)', (
         expect(html).toContain('Not valid')
     })
 
+    // UI modernization: tier colors moved from inline TIER_HEX styles onto
+    // tokens-based .coupon-badge--<tier> classes (dark mode via tokens.css).
+    // Pin the tier→class mapping and that no inline style remains, so the
+    // token discipline can't silently regress back to hard-coded hexes.
+    it('assigns tokens-based tier classes (no inline style) per STATUS_META tier', () => {
+        renderCouponsView(COUPONS, null, 'example.com')
+
+        const badges = document.querySelectorAll('#couponList .coupon-badge')
+        expect(badges).toHaveLength(4)
+        expect(badges[0].className).toContain('coupon-badge--green')
+        expect(badges[1].className).toContain('coupon-badge--amber')
+        expect(badges[2].className).toContain('coupon-badge--grey')
+        expect(badges[3].className).toContain('coupon-badge--red')
+        for (const badge of badges) {
+            expect(badge.getAttribute('style')).toBeNull()
+        }
+    })
+
     it('flags only the restricted coupon with the restriction banner + item class; the dead one gets the dead class', () => {
         renderCouponsView(COUPONS, null, 'example.com')
 
@@ -64,6 +82,11 @@ describe('popup.js renderCouponsView — badges + restriction banner (F-006)', (
         expect(items[1].className).toContain('coupon-item-restricted')
         expect(items[1].innerHTML).toContain('coupon-restriction-text')
         expect(items[1].innerHTML).toContain('Only on select items')
+        // UI modernization: the ⚠ text glyph became an inline
+        // triangle-alert SVG (stroke, currentColor).
+        expect(
+            items[1].querySelector('.coupon-restriction-icon svg'),
+        ).not.toBeNull()
         expect(items[3].className).toContain('coupon-item-dead')
     })
 })
