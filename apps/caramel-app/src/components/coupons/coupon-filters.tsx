@@ -141,12 +141,16 @@ export default function CouponFilters({
             <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
                 <div className="min-w-[220px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-search"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Search
                     </label>
                     <div className="relative">
                         <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-caramel" />
                         <input
+                            id="coupon-search"
                             type="text"
                             value={localSearch}
                             onChange={e => handleSearchChange(e.target.value)}
@@ -158,10 +162,14 @@ export default function CouponFilters({
 
                 {/* Store Filter */}
                 <div className="min-w-[220px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-store-filter"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Store
                     </label>
                     <AsyncSelect
+                        inputId="coupon-store-filter"
                         cacheOptions
                         defaultOptions
                         loadOptions={loadStoreOptions}
@@ -178,10 +186,14 @@ export default function CouponFilters({
 
                 {/* Type Filter */}
                 <div className="min-w-[200px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-type-filter"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Discount Type
                     </label>
                     <Select
+                        inputId="coupon-type-filter"
                         isClearable
                         isSearchable={false}
                         placeholder="All discount types"
@@ -202,13 +214,15 @@ export default function CouponFilters({
                 {/* Clear Filters Button */}
                 {(filters.search || filters.site || filters.type !== 'all') && (
                     <button
+                        type="button"
                         onClick={() => {
                             setLocalSearch('')
                             onChange({ search: '', site: '', type: 'all' })
                             onClearAll?.()
                         }}
-                        className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-caramel to-orange-600 text-white shadow-md transition hover:opacity-90"
+                        className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-caramel to-orange-600 text-white shadow-md transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkBg"
                         title="Clear filters"
+                        aria-label="Clear filters"
                     >
                         <XMarkIcon className="h-5 w-5" />
                     </button>
@@ -217,8 +231,10 @@ export default function CouponFilters({
 
             {/* Mobile toggle (md and down per custom breakpoints) */}
             <button
+                type="button"
+                aria-expanded={showFilters}
                 onClick={() => setShowFilters(!showFilters)}
-                className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-caramel shadow-md transition-all hover:shadow-lg dark:bg-gray-900 dark:text-orange-400 md:flex"
+                className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-caramel shadow-md transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:bg-gray-900 dark:text-orange-400 dark:focus-visible:ring-offset-darkBg md:flex"
             >
                 <FaFilter className="h-4 w-4" />
                 <span className="font-semibold">Filters</span>

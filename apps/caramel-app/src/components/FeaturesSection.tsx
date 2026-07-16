@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
     FaBolt,
     FaChrome,
@@ -83,6 +83,8 @@ const comparisonItems = [
 ]
 
 export default function FeaturesSection() {
+    const reduceMotion = useReducedMotion()
+
     return (
         <section id="features" className="relative overflow-hidden py-32">
             {/* Background Elements */}
@@ -100,7 +102,7 @@ export default function FeaturesSection() {
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="mb-20 text-center"
                 >
-                    <h2 className="mb-8 text-5xl font-extrabold text-caramel lg:text-4xl">
+                    <h2 className="mb-8 text-5xl font-extrabold leading-tight tracking-tight text-caramel lg:text-4xl">
                         Why Choose Caramel?
                     </h2>
                     <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
@@ -121,15 +123,22 @@ export default function FeaturesSection() {
                         {features.map((feat, index) => (
                             <motion.div
                                 key={feat.title}
-                                initial={{
-                                    opacity: 0,
-                                    x: index % 2 === 0 ? -50 : 50,
-                                }}
+                                initial={
+                                    reduceMotion
+                                        ? { opacity: 0 }
+                                        : {
+                                              opacity: 0,
+                                              x: index % 2 === 0 ? -32 : 32,
+                                          }
+                                }
                                 whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
+                                viewport={{
+                                    once: true,
+                                    margin: '0px 0px -60px 0px',
+                                }}
                                 transition={{
                                     duration: 0.6,
-                                    delay: index * 0.1,
+                                    delay: index * 0.08,
                                     type: 'spring',
                                     stiffness: 100,
                                     damping: 15,
@@ -141,10 +150,13 @@ export default function FeaturesSection() {
                                         '0 20px 40px rgba(234,105,37,0.15)',
                                     transition: { duration: 0.2 },
                                 }}
-                                className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 shadow-md dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                                className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 shadow-md transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
                                 {/* Animated Background Pattern */}
-                                <div className="absolute inset-0 opacity-5">
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute inset-0 opacity-5"
+                                >
                                     <motion.div
                                         className="h-full w-full"
                                         style={{
@@ -154,13 +166,17 @@ export default function FeaturesSection() {
                                             `,
                                             backgroundSize: '20px 20px',
                                         }}
-                                        animate={{
-                                            backgroundPosition: [
-                                                '0px 0px',
-                                                '20px 20px',
-                                                '0px 0px',
-                                            ],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      backgroundPosition: [
+                                                          '0px 0px',
+                                                          '20px 20px',
+                                                          '0px 0px',
+                                                      ],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 8,
                                             repeat: Infinity,
@@ -173,11 +189,16 @@ export default function FeaturesSection() {
                                 <div className="relative z-10 text-center">
                                     {/* Large icon - hidden on lg and down */}
                                     <motion.div
+                                        aria-hidden="true"
                                         className="mx-auto mb-6 text-6xl text-caramel transition-transform duration-300 xl:block lg:hidden"
-                                        animate={{
-                                            rotate: [0, 2, -2, 0],
-                                            scale: [1, 1.02, 1],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      rotate: [0, 2, -2, 0],
+                                                      scale: [1, 1.02, 1],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 4,
                                             repeat: Infinity,
@@ -192,7 +213,10 @@ export default function FeaturesSection() {
                                     {/* Mobile layout - icon + title in one row */}
                                     <div className="hidden text-left lg:block">
                                         <div className="mb-3 flex items-center">
-                                            <span className="mr-3 flex-shrink-0 text-2xl text-caramel">
+                                            <span
+                                                aria-hidden="true"
+                                                className="mr-3 flex-shrink-0 text-2xl text-caramel"
+                                            >
                                                 {feat.icon}
                                             </span>
                                             <h3 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white sm:text-xl">
@@ -231,7 +255,7 @@ export default function FeaturesSection() {
                     className="mb-24"
                 >
                     <div className="mb-12 text-center">
-                        <h3 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white lg:text-2xl">
+                        <h3 className="mb-4 text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
                             Caramel vs Others
                         </h3>
                         <p className="mx-auto max-w-2xl text-gray-600 dark:text-gray-400">
@@ -244,21 +268,31 @@ export default function FeaturesSection() {
                         {comparisonItems.map((item, index) => (
                             <motion.div
                                 key={item.title}
-                                initial={{ opacity: 0, y: 10 }}
+                                initial={
+                                    reduceMotion
+                                        ? { opacity: 0 }
+                                        : { opacity: 0, y: 10 }
+                                }
                                 whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
+                                viewport={{
+                                    once: true,
+                                    margin: '0px 0px -60px 0px',
+                                }}
                                 transition={{
                                     duration: 0.4,
-                                    delay: index * 0.1,
+                                    delay: index * 0.08,
                                     ease: 'easeOut',
                                 }}
-                                className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-caramel/30 dark:bg-darkerBg"
+                                className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 ease-caramel hover:border-caramel/30 hover:shadow-caramel-sm dark:border-caramel/30 dark:bg-darkerBg dark:hover:border-caramel/50"
                             >
                                 <div className="grid grid-cols-2 lg:grid-cols-2 sm:grid-cols-1">
                                     {/* Others */}
                                     <div className="flex items-center space-x-4 p-6">
                                         <div className="flex-shrink-0">
-                                            <HiXCircle className="h-8 w-8 text-red-500" />
+                                            <HiXCircle
+                                                aria-hidden="true"
+                                                className="h-8 w-8 text-red-500"
+                                            />
                                         </div>
                                         <div className="flex-1">
                                             <h4 className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400">
@@ -273,7 +307,10 @@ export default function FeaturesSection() {
                                     {/* Caramel */}
                                     <div className="flex items-center space-x-4 border-l border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-6 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:border-l-0 sm:border-t">
                                         <div className="flex-shrink-0">
-                                            <HiCheckCircle className="h-8 w-8 text-caramel" />
+                                            <HiCheckCircle
+                                                aria-hidden="true"
+                                                className="h-8 w-8 text-caramel"
+                                            />
                                         </div>
                                         <div className="flex-1">
                                             <h4 className="mb-1 text-sm font-medium uppercase tracking-wide text-caramel">
@@ -355,9 +392,12 @@ export default function FeaturesSection() {
                                             transition: { duration: 0.2 },
                                         }}
                                         whileTap={{ scale: 0.95 }}
-                                        className="inline-flex items-center rounded-full bg-white px-8 py-4 font-semibold text-caramel shadow-md transition-all duration-200 hover:bg-orange-50 hover:shadow-xl md:min-w-[200px]"
+                                        className="inline-flex items-center rounded-full bg-white px-8 py-4 font-semibold text-caramel shadow-md transition-all duration-200 ease-caramel hover:bg-orange-50 hover:shadow-xl md:min-w-[200px]"
                                     >
-                                        <span className="mr-3 text-2xl">
+                                        <span
+                                            aria-hidden="true"
+                                            className="mr-3 text-2xl"
+                                        >
                                             {browser.icon}
                                         </span>
                                         {browser.name}

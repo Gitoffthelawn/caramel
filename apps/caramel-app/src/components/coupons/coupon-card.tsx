@@ -55,7 +55,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.3, delay: index * 0.05 }}
-            className="group relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50/50 via-white to-orange-50/40 p-5 shadow-md transition-all hover:shadow-lg dark:border-orange-900/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900"
+            className="group relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50/50 via-white to-orange-50/40 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-lg dark:border-orange-900/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 dark:hover:border-orange-800/70"
         >
             <div className="flex items-center gap-5 md:flex-col md:items-start">
                 {/* Left: Discount Badge */}
@@ -109,8 +109,9 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                 {/* Right: CTA Button */}
                 <div className="shrink-0 md:w-full">
                     <button
+                        type="button"
                         onClick={handleCopyCode}
-                        className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg md:w-full"
+                        className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 md:w-full"
                     >
                         Get Coupon Code
                     </button>
@@ -120,9 +121,10 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             {/* Hover Overlay - Show Code */}
             {showCode && coupon.code && (
                 <motion.div
+                    role="status"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+                    className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/90 backdrop-blur-sm"
                 >
                     <div className="text-center">
                         <p className="mb-2 text-sm text-gray-300">Your Code:</p>

@@ -166,3 +166,19 @@ body {
     background-color: #55ff00;
     border-radius: 360px;
 }
+
+/* Landing refinement (additive): crafted keyboard focus ring in brand color.
+   :focus-visible only — mouse/touch interactions are unaffected. */
+@layer base {
+    :where(a, button, [role='button'], summary):focus-visible {
+        outline: 2px solid rgb(234 105 37 / 0.9);
+        outline-offset: 3px;
+    }
+}
+
+/* Landing refinement (additive): honor reduced-motion for smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}

@@ -13,7 +13,7 @@ export default function StoreButtons() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="m-auto w-full text-start text-3xl font-bold text-black drop-shadow-2xl dark:text-white md:text-lg"
+                className="m-auto w-full text-start text-3xl font-bold tracking-tight text-black drop-shadow-2xl dark:text-white md:text-lg"
             >
                 Where to get Caramel?
             </motion.div>
@@ -21,12 +21,16 @@ export default function StoreButtons() {
                 <motion.a
                     href="https://chrome.google.com/webstore"
                     target="_blank"
+                    rel="noopener noreferrer"
+                    aria-disabled="true"
+                    tabIndex={-1}
                     className="pointer-events-none flex items-center gap-2 rounded-xl border-[1.5px] border-black px-3 py-1.5 text-black/70 opacity-60 transition-transform duration-200 ease-in-out hover:scale-105 hover:border-caramel hover:bg-caramel hover:text-white dark:border-white dark:text-white"
                 >
                     <div className="w-10">
                         <Image
                             src={isDarkMode ? '/apple-white.png' : '/apple.png'}
-                            alt="Chrome"
+                            alt=""
+                            aria-hidden="true"
                             width={40}
                             height={40}
                         />
@@ -44,12 +48,16 @@ export default function StoreButtons() {
                 <motion.a
                     target="_blank"
                     href="https://chrome.google.com/webstore"
+                    rel="noopener noreferrer"
+                    aria-disabled="true"
+                    tabIndex={-1}
                     className="pointer-events-none flex items-center gap-2 rounded-xl border-[1.5px] border-black px-3 py-1.5 text-black/70 opacity-65 transition-transform duration-200 ease-in-out hover:scale-105 hover:border-caramel hover:bg-caramel hover:text-white dark:border-white dark:text-white"
                 >
                     <div className="w-10">
                         <Image
                             src="/chrome.png"
-                            alt="Chrome"
+                            alt=""
+                            aria-hidden="true"
                             width={40}
                             height={40}
                         />
