@@ -535,9 +535,13 @@ body {
    the title text regardless of length. */
 .coupon-head {
     display: flex;
+    /* wrap lets the badge + "worked Xh ago" pair drop below the title on
+       narrow popups (≤320px) instead of crushing the title into mid-word
+       breaks via overflow-wrap:anywhere. */
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
+    gap: 4px 8px;
     margin-bottom: 4px;
 }
 
@@ -581,9 +585,12 @@ body {
     font-weight: 600;
 }
 
-/* The coupon's title */
+/* The coupon's title. flex-basis 60% (not 0) keeps a readable measure when a
+   badge + "worked Xh ago" share the row — below that the pair wraps under the
+   title (.coupon-head is flex-wrap:wrap) instead of crushing it into mid-word
+   breaks at 320px-wide popups. */
 .coupon-title {
-    flex: 1;
+    flex: 1 1 60%;
     min-width: 0;
     font-weight: 700;
     font-size: var(--cm-text-base);
@@ -666,8 +673,10 @@ body {
     background: var(--cm-surface);
     color: var(--cm-brand);
     border: 2px solid var(--cm-brand);
-    border-radius: 6px;
+    border-radius: var(--cm-radius-sm);
     padding: 6px 16px;
+    /* 44px-class tap target (iOS Safari ships this same popup). */
+    min-height: 40px;
     cursor: pointer;
     font-size: 13px;
     font-weight: bold;
@@ -862,6 +871,8 @@ body {
     .coupons-logout-button {
         padding: 6px 12px;
         font-size: var(--cm-text-base);
+        /* keep the 40px tap-target floor at narrow widths too */
+        min-height: 40px;
     }
 }
 
