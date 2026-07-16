@@ -432,7 +432,7 @@ function renderSignInPrompt(backFn) {
         </button>
         <button type="button" id="appleSignInBtn" class="oauth-button" disabled>
           <svg class="oauth-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#000000" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
           </svg>
           <span>Sign in with Apple</span>
         </button>
@@ -443,16 +443,36 @@ function renderSignInPrompt(backFn) {
       </div>
 
       <form id="loginForm" class="login-form">
-        <div id="loginErrorMessage" class="error-message" style="display:none;"></div>
+        <div id="loginErrorMessage" class="error-message" role="alert" style="display:none;"></div>
 
         <div>
-          <label>Email</label>
-          <input type="email" id="email" required/>
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="email" required/>
         </div>
 
         <div>
-          <label>Password</label>
-          <input type="password" id="password" required/>
+          <label for="password">Password</label>
+          <div class="password-field">
+            <input type="password" id="password" autocomplete="current-password" required/>
+            <button
+              type="button"
+              id="togglePasswordBtn"
+              class="password-toggle"
+              aria-label="Show password"
+              aria-pressed="false"
+            >
+              <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg id="eyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <path d="m1 1 22 22"/>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="login-button">Login</button>
@@ -492,6 +512,26 @@ function renderSignInPrompt(backFn) {
 
     const backBtn = document.getElementById('backBtn')
     if (backBtn && returnView) backBtn.addEventListener('click', returnView)
+
+    // Show/hide password toggle: flips the input type and keeps the
+    // button's accessible state (aria-pressed/label) + icon in sync.
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn')
+    if (togglePasswordBtn)
+        togglePasswordBtn.addEventListener('click', () => {
+            const passwordInput = document.getElementById('password')
+            const eyeIcon = document.getElementById('eyeIcon')
+            const eyeOffIcon = document.getElementById('eyeOffIcon')
+            if (!passwordInput) return
+            const reveal = passwordInput.type === 'password'
+            passwordInput.type = reveal ? 'text' : 'password'
+            togglePasswordBtn.setAttribute('aria-pressed', String(reveal))
+            togglePasswordBtn.setAttribute(
+                'aria-label',
+                reveal ? 'Hide password' : 'Show password',
+            )
+            if (eyeIcon) eyeIcon.style.display = reveal ? 'none' : ''
+            if (eyeOffIcon) eyeOffIcon.style.display = reveal ? '' : 'none'
+        })
 
     const resendVerificationContainer = document.getElementById(
         'resendVerificationContainer',
@@ -574,15 +614,18 @@ function renderProfileCard(user) {
         ? user.image
         : 'assets/default-profile.png'
 
+    // Reuses the coupons-view card language (avatar+@username row + logout)
+    // so the two signed-in surfaces read as one design.
     container.innerHTML = `
-    <div class="profile-card fade-in-up">
-      <img src="${escHtml(avatar)}" class="profile-image" alt="Profile"/>
-      <div class="welcome-message">Welcome back, ${escHtml(user.username)}!</div>
-      <div class="username">@${escHtml(user.username)}</div>
-
-      <div class="profile-actions">
-        <button id="logoutBtn" class="logout-button">Logout</button>
+    <div class="coupons-profile-card fade-in-up">
+      <div class="coupons-profile-row">
+        <div class="coupons-profile-info">
+          <img src="${escHtml(avatar)}" class="coupons-profile-image" alt="avatar"/>
+          <span class="coupons-user-label">@${escHtml(user.username)}</span>
+        </div>
+        <button id="logoutBtn" class="coupons-logout-button">Logout</button>
       </div>
+      <p class="profile-signed-in-note">You're signed in — coupons appear automatically at checkout.</p>
     </div>
   `
 
@@ -668,7 +711,13 @@ function renderCouponsView(coupons, user, domain) {
                                   : ''
                               warning = `
               <div class="coupon-restriction" title="${escHtml(c.verificationMessage || baseMsg)}">
-                <span class="coupon-restriction-icon">⚠</span>
+                <span class="coupon-restriction-icon" aria-hidden="true">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <path d="M12 9v4"/>
+                    <path d="M12 17h.01"/>
+                  </svg>
+                </span>
                 <span class="coupon-restriction-text">${baseMsg}${cartHint}</span>
                 ${verifierMsg}
               </div>`
@@ -677,24 +726,16 @@ function renderCouponsView(coupons, user, domain) {
                           // grey=not yet verified (grace), red=known not valid.
                           // Labels + which status maps to which tier come from
                           // window.CaramelCoupons.STATUS_META
-                          // (coupon-constants.generated.js, F-006); this hex
-                          // palette is the popup-local half (the app's
-                          // coupon-card.tsx keeps its own Tailwind equivalent —
-                          // the 4-tier axis can't drift the way the 9-status
-                          // axis did).
-                          const TIER_HEX = {
-                              green: ['#15803d', '#dcfce7'],
-                              amber: ['#b45309', '#fef3c7'],
-                              grey: ['#4b5563', '#f3f4f6'],
-                              red: ['#b91c1c', '#fee2e2'],
-                          }
+                          // (coupon-constants.generated.js, F-006); the tier
+                          // palette lives in styles.css as
+                          // .coupon-badge--<tier> classes on tokens (with dark
+                          // values — the app's coupon-card.tsx keeps its own
+                          // Tailwind equivalent; the 4-tier axis can't drift
+                          // the way the 9-status axis did).
                           const meta =
                               window.CaramelCoupons.STATUS_META[c.status]
-                          const bd = meta
-                              ? [meta.label, ...TIER_HEX[meta.tier]]
-                              : undefined
-                          const badge = bd
-                              ? `<span class="coupon-badge" title="${escHtml(c.verificationMessage || '')}" style="color:${bd[1]};background:${bd[2]}">${bd[0]}</span>`
+                          const badge = meta
+                              ? `<span class="coupon-badge coupon-badge--${meta.tier}" title="${escHtml(c.verificationMessage || '')}">${meta.label}</span>`
                               : ''
                           // App-owned trust signal (W1): "worked Xh ago" when
                           // the extension last reported this coupon working
@@ -705,7 +746,7 @@ function renderCouponsView(coupons, user, domain) {
               <div class="coupon-head">
                 <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
                 ${badge}
-                ${workedAgo ? `<span class="coupon-worked-ago" style="color:#15803d;font-size:11px;font-weight:600">${escHtml(workedAgo)}</span>` : ''}
+                ${workedAgo ? `<span class="coupon-worked-ago">${escHtml(workedAgo)}</span>` : ''}
               </div>
               ${c.description ? `<div class="coupon-desc">${escHtml(c.description)}</div>` : ''}
               ${warning}
@@ -726,11 +767,21 @@ function renderCouponsView(coupons, user, domain) {
       </div>
     </div>
 
-    <div id="toastContainer" class="copy-toast-container"></div>
+    <div id="toastContainer" class="copy-toast-container" aria-live="polite"></div>
   `
 
     /* save callback for login back-button */
     const selfCallback = () => renderCouponsView(coupons, user, domain)
+
+    /* Settings gear (header): visible whenever a user is signed in — this is
+       the main signed-in view, not just the no-tab profile card. */
+    const settingsIcon = document.getElementById('settingsIcon')
+    if (settingsIcon) {
+        settingsIcon.style.display = user ? 'block' : 'none'
+        if (user)
+            settingsIcon.onclick = () =>
+                window.open(caramelUrl('profile'), '_blank')
+    }
 
     /* logout */
     const logoutBtn = document.getElementById('logoutBtn')

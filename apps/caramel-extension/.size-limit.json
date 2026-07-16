@@ -13,13 +13,13 @@
             "UI-helpers.js",
             "inject.js"
         ],
-        "limit": "98 KB",
+        "limit": "102 KB",
         "brotli": false
     },
     {
         "name": "popup.js",
         "path": "popup.js",
-        "limit": "34 KB",
+        "limit": "38 KB",
         "brotli": false
     },
     {
