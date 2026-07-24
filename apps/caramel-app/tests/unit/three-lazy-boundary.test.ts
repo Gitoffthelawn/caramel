@@ -17,7 +17,6 @@ const SRC = path.join(__dirname, '..', '..', 'src')
 // `./couponTicket3d`: the two dynamic scene chunks and the shared 3D helper
 // they both consume.
 const ALLOWED = new Set([
-    'components/CouponVaultScene.tsx',
     'components/HeroTicketScene.tsx',
     'components/couponTicket3d.tsx',
 ])

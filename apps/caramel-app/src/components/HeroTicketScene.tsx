@@ -30,7 +30,7 @@ import {
 } from './couponTicket3d'
 
 // One main coupon ticket. Front-face Z after center() is depth/2 + bevel —
-// perforation + stub + emblem sit just proud of it.
+// the perforation dashes + emblem sit just proud of it.
 const CARD = {
     w: 3.1,
     h: 2,
@@ -120,11 +120,6 @@ function HeroCard({ isDark }: { isDark: boolean }): React.JSX.Element {
         )
     })
 
-    // Stub region: everything below the perforation axis, as a slightly proud +
-    // more matte panel so the tear-off stub reads as its own strip.
-    const stubHeight = CARD.ny + CARD.h / 2 - 0.04
-    const stubCenterY = (CARD.ny - CARD.h / 2) / 2
-
     return (
         <Float speed={2} rotationIntensity={0.25} floatIntensity={0.45}>
             <group ref={groupRef}>
@@ -147,20 +142,6 @@ function HeroCard({ isDark }: { isDark: boolean }): React.JSX.Element {
                         emissiveIntensity={isDark ? 0.3 : 0.12}
                         attenuationColor={CARAMEL_LIGHT}
                         attenuationDistance={2.2}
-                    />
-                </mesh>
-                <mesh position={[0, stubCenterY, CARD_FRONT + 0.005]}>
-                    <boxGeometry
-                        args={[CARD.w - CARD.cr * 2, stubHeight, 0.02]}
-                    />
-                    <meshPhysicalMaterial
-                        color={isDark ? CARAMEL : CARAMEL_LIGHT}
-                        metalness={0.15}
-                        roughness={0.38}
-                        clearcoat={0.6}
-                        clearcoatRoughness={0.25}
-                        emissive={CARAMEL}
-                        emissiveIntensity={isDark ? 0.16 : 0.06}
                     />
                 </mesh>
                 <Perforation

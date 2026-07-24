@@ -68,6 +68,133 @@ function HeroTicketPoster(): React.JSX.Element {
     )
 }
 
+// The three hero stats, rendered as caramel coupon-ticket cards (shared
+// ticketNotchMask) at three deliberately different sizes and slight tilts so
+// they read as a scattered little stack under the 3D model. Each counts its
+// number up from 0 on first paint. This REPLACES the old inline stat row in
+// the left column.
+const STATS: {
+    value: number
+    suffix: string
+    label: string
+    format?: 'comma'
+    size: 'lg' | 'md' | 'sm'
+    tilt: string
+}[] = [
+    {
+        value: 5000,
+        suffix: '+',
+        label: 'Supported Stores',
+        format: 'comma',
+        size: 'lg',
+        tilt: '-rotate-3',
+    },
+    {
+        value: 100,
+        suffix: '%',
+        label: 'Open Source',
+        size: 'md',
+        tilt: 'rotate-2',
+    },
+    {
+        value: 0,
+        suffix: '%',
+        label: 'Data Selling',
+        size: 'sm',
+        tilt: '-rotate-2',
+    },
+]
+
+const STAT_SIZE: Record<
+    'lg' | 'md' | 'sm',
+    { pad: string; num: string; label: string }
+> = {
+    lg: { pad: 'px-6 py-5', num: 'text-4xl md:text-3xl', label: 'text-xs' },
+    md: {
+        pad: 'px-5 py-4',
+        num: 'text-3xl md:text-2xl',
+        label: 'text-[0.7rem]',
+    },
+    sm: {
+        pad: 'px-4 py-3.5',
+        num: 'text-2xl md:text-xl',
+        label: 'text-[0.65rem]',
+    },
+}
+
+// Count a value up from 0 to `target` with an easeOutCubic ramp, once `start`
+// flips true (first paint). reduced-motion / SSR shows the final value with no
+// animation. rAF math runs only in the effect, never during render.
+function useCountUp(target: number, start: boolean, reduce: boolean): number {
+    const [val, setVal] = useState(reduce ? target : 0)
+    useEffect(() => {
+        if (!start) return
+        if (reduce) {
+            setVal(target)
+            return
+        }
+        let raf = 0
+        const duration = 1200
+        const t0 = performance.now()
+        const tick = (now: number): void => {
+            const p = Math.min(1, (now - t0) / duration)
+            const eased = 1 - Math.pow(1 - p, 3)
+            setVal(target * eased)
+            if (p < 1) raf = requestAnimationFrame(tick)
+            else setVal(target)
+        }
+        raf = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(raf)
+    }, [target, start, reduce])
+    return val
+}
+
+function StatCoupon({
+    stat,
+    index,
+    start,
+    reduce,
+}: {
+    stat: (typeof STATS)[number]
+    index: number
+    start: boolean
+    reduce: boolean
+}): React.JSX.Element {
+    const n = useCountUp(stat.value, start, reduce)
+    const rounded = Math.round(n)
+    const shown =
+        stat.format === 'comma' ? rounded.toLocaleString('en-US') : `${rounded}`
+    const size = STAT_SIZE[stat.size]
+    return (
+        <motion.div
+            initial={
+                reduce ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.9 }
+            }
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+                duration: 0.5,
+                delay: 0.5 + index * 0.12,
+                ease: revealEase,
+            }}
+            whileHover={reduce ? undefined : { y: -4, scale: 1.03 }}
+            className={`relative ${stat.tilt} ${size.pad} rounded-2xl bg-gradient-to-br from-caramel to-orange-600 text-white shadow-caramel-lg`}
+            style={ticketNotchMask('0.55rem', '50%')}
+        >
+            <div
+                className={`font-extrabold leading-none tracking-tight ${size.num}`}
+            >
+                {shown}
+                {stat.suffix}
+            </div>
+            <div
+                className={`mt-1.5 font-medium uppercase tracking-wide text-white/85 ${size.label}`}
+            >
+                {stat.label}
+            </div>
+        </motion.div>
+    )
+}
+
 export default function HeroSection() {
     const reduceMotion = useReducedMotion()
     const { isDarkMode } = useContext(ThemeContext)
@@ -82,6 +209,12 @@ export default function HeroSection() {
     const [webglOK, setWebglOK] = useState(false)
     const [active, setActive] = useState(true)
     const [canvasReady, setCanvasReady] = useState(false)
+    // Flips true after first paint so the stat coupons count up on load.
+    const [statsStarted, setStatsStarted] = useState(false)
+
+    useEffect(() => {
+        setStatsStarted(true)
+    }, [])
 
     useEffect(() => {
         const mq = window.matchMedia('(min-width: 1024px)')
@@ -315,64 +448,9 @@ export default function HeroSection() {
                         .
                     </motion.p>
 
-                    {/* Stats Section */}
-                    <motion.div
-                        initial={
-                            reduceMotion
-                                ? { opacity: 0 }
-                                : { opacity: 0, y: 20 }
-                        }
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                            duration: 0.6,
-                            delay: 0.6,
-                            ease: revealEase,
-                        }}
-                        className="mb-10 flex items-center justify-start gap-8 lg:justify-center lg:gap-6 md:gap-4 sm:flex-col sm:items-start sm:gap-6"
-                    >
-                        {[
-                            { value: '5,000+', label: 'Supported Stores' },
-                            { value: '100%', label: 'Open Source' },
-                            { value: '0%', label: 'Data Selling' },
-                        ].map((stat, index) => (
-                            <React.Fragment key={stat.label}>
-                                <motion.div
-                                    className="text-center"
-                                    initial={
-                                        reduceMotion
-                                            ? { opacity: 0 }
-                                            : { opacity: 0, y: 10 }
-                                    }
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{
-                                        duration: 0.4,
-                                        delay: 0.6 + index * 0.1,
-                                        ease: revealEase,
-                                    }}
-                                    whileHover={
-                                        reduceMotion
-                                            ? undefined
-                                            : { scale: 1.05 }
-                                    }
-                                >
-                                    <div className="text-3xl font-bold tracking-tight text-caramel lg:text-2xl md:text-xl">
-                                        {stat.value}
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                        {stat.label}
-                                    </div>
-                                </motion.div>
-                                {index < 2 && (
-                                    <div
-                                        aria-hidden="true"
-                                        className="h-12 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600 sm:hidden"
-                                    ></div>
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </motion.div>
-
-                    {/* CTA Buttons */}
+                    {/* CTA Buttons — sized to sit inline on one row on desktop
+                        (stacked below md). The stats moved to the coupon cards
+                        in the right column. */}
                     <motion.div
                         initial={
                             reduceMotion
@@ -385,11 +463,11 @@ export default function HeroSection() {
                             delay: 0.8,
                             ease: revealEase,
                         }}
-                        className="flex flex-wrap justify-start gap-4 lg:justify-center md:flex-col md:items-center md:gap-3"
+                        className="flex flex-wrap items-center justify-start gap-3 lg:justify-center md:flex-col md:items-center"
                     >
                         <motion.a
                             href="#install-extension"
-                            className="rounded-full bg-gradient-to-r from-caramel to-orange-600 px-8 py-4 font-semibold text-black shadow-lg transition-all duration-300 hover:from-orange-600 hover:to-caramel hover:shadow-xl"
+                            className="rounded-full bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 text-sm font-semibold text-black shadow-lg transition-all duration-300 hover:from-orange-600 hover:to-caramel hover:shadow-xl md:w-full md:text-center"
                             initial={{
                                 boxShadow: '0 0 10px rgba(234,105,37,0.5)',
                             }}
@@ -425,7 +503,7 @@ export default function HeroSection() {
                             href="https://github.com/DevinoSolutions/caramel"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group inline-flex items-center gap-3 rounded-full border-2 border-caramel/40 bg-transparent px-6 py-3 text-sm font-semibold text-caramel backdrop-blur-sm transition-all duration-300 hover:border-caramel hover:bg-caramel hover:text-white"
+                            className="group inline-flex items-center justify-center gap-2 rounded-full border-2 border-caramel/40 bg-transparent px-5 py-3 text-sm font-semibold text-caramel backdrop-blur-sm transition-all duration-300 hover:border-caramel hover:bg-caramel hover:text-white md:w-full"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                         >
@@ -434,7 +512,7 @@ export default function HeroSection() {
                         </motion.a>
                         <motion.a
                             href="#features"
-                            className="rounded-full border-2 border-gray-300/60 bg-transparent px-8 py-4 font-semibold text-gray-700 backdrop-blur-sm transition-all duration-300 hover:border-caramel hover:text-caramel dark:border-gray-600/60 dark:text-gray-300"
+                            className="rounded-full border-2 border-gray-300/60 bg-transparent px-6 py-3 text-sm font-semibold text-gray-700 backdrop-blur-sm transition-all duration-300 hover:border-caramel hover:text-caramel dark:border-gray-600/60 dark:text-gray-300 md:w-full md:text-center"
                             whileHover={{
                                 scale: 1.05,
                                 borderColor: 'rgb(234, 105, 37)',
@@ -446,32 +524,50 @@ export default function HeroSection() {
                     </motion.div>
                 </div>
 
-                {/* RIGHT column: the interactive 3D coupon. Desktop-only
-                    (lg:hidden collapses it below lg so phones never mount WebGL
-                    and the layout returns to the original single column). The
-                    box is reserved up front; the live canvas cross-fades in
-                    over the poster, so there is zero CLS. */}
-                <div className="relative h-[32rem] w-[45%] lg:hidden">
-                    <div
-                        aria-hidden="true"
-                        className="absolute inset-0 transition-opacity duration-700 ease-out"
-                        style={{ opacity: canvasReady ? 0 : 1 }}
-                    >
-                        <HeroTicketPoster />
-                    </div>
-                    {showCanvas && (
+                {/* RIGHT column: the interactive 3D coupon (desktop-only) with
+                    the three stat coupons beneath it. Below lg the parent goes
+                    single-column and the WebGL box is hidden (lg:hidden) so
+                    phones never mount three — but the stat coupons stay visible,
+                    reflowing under the copy (they carry the stats that used to
+                    live in the left column). */}
+                <div className="relative flex w-[45%] flex-col items-center gap-8 lg:w-full">
+                    {/* 3D model box: reserved up front; the live canvas
+                        cross-fades in over the poster, so there is zero CLS. */}
+                    <div className="relative h-[26rem] w-full lg:hidden">
                         <div
                             aria-hidden="true"
                             className="absolute inset-0 transition-opacity duration-700 ease-out"
-                            style={{ opacity: canvasReady ? 1 : 0 }}
+                            style={{ opacity: canvasReady ? 0 : 1 }}
                         >
-                            <HeroTicketScene
-                                active={active}
-                                isDark={isDarkMode}
-                                onReady={() => setCanvasReady(true)}
-                            />
+                            <HeroTicketPoster />
                         </div>
-                    )}
+                        {showCanvas && (
+                            <div
+                                aria-hidden="true"
+                                className="absolute inset-0 transition-opacity duration-700 ease-out"
+                                style={{ opacity: canvasReady ? 1 : 0 }}
+                            >
+                                <HeroTicketScene
+                                    active={active}
+                                    isDark={isDarkMode}
+                                    onReady={() => setCanvasReady(true)}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Stat coupons — three sizes, count up on load. */}
+                    <div className="flex flex-wrap items-end justify-center gap-3">
+                        {STATS.map((stat, index) => (
+                            <StatCoupon
+                                key={stat.label}
+                                stat={stat}
+                                index={index}
+                                start={statsStarted}
+                                reduce={!!reduceMotion}
+                            />
+                        ))}
+                    </div>
                 </div>
             </div>
         </section>
