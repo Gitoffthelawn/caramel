@@ -11,20 +11,19 @@ import { Toaster } from 'sonner'
 const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
     loading: () => (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-            {/* Plain CSS spinner: this fallback wraps EVERY page, so it must
-                stay dependency-free — drei's <Loader> here used to drag the
-                whole three stack into first-load JS (see
-                tests/unit/three-lazy-boundary.test.ts). */}
-            <div
-                aria-hidden="true"
-                className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-caramel/25 border-t-caramel"
-            />
-            <div>
-                <p className="bg-gradient-rainbow-light font-SpaceGrotesk dark:bg-gradient-rainbow bg-clip-text text-center text-2xl font-bold text-transparent">
-                    Loading...
-                </p>
+        // Full-viewport, truly centered loader (min-h-screen — the old
+        // h-full collapsed to 0 with no sized parent, pinning the spinner to
+        // the top). Dependency-free CSS: this fallback wraps EVERY page, so it
+        // must not pull `three` into first-load JS (drei's <Loader> did — see
+        // tests/unit/three-lazy-boundary.test.ts).
+        <div className="flex min-h-screen w-full flex-col items-center justify-center gap-5">
+            <div className="relative h-14 w-14" aria-hidden="true">
+                <div className="absolute inset-0 rounded-full border-[3px] border-caramel/15" />
+                <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-transparent border-t-caramel" />
             </div>
+            <p className="bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-center text-lg font-semibold tracking-tight text-transparent">
+                Loading…
+            </p>
         </div>
     ),
 })

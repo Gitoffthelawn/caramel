@@ -15,7 +15,8 @@ test.describe('Home Page - Critical Sections', () => {
     })
 
     test('hero section loads with CTA buttons', async ({ page }) => {
-        // exact: the CouponVault welcome section also starts with "Welcome to"
+        // exact: the hero splits its heading into a "Welcome to" line + the
+        // logo image, so match that exact standalone line.
         await expect(
             page.getByText('Welcome to', { exact: true }),
         ).toBeVisible()
