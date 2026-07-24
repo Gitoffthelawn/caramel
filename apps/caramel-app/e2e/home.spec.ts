@@ -15,7 +15,10 @@ test.describe('Home Page - Critical Sections', () => {
     })
 
     test('hero section loads with CTA buttons', async ({ page }) => {
-        await expect(page.getByText('Welcome to')).toBeVisible()
+        // exact: the CouponVault welcome section also starts with "Welcome to"
+        await expect(
+            page.getByText('Welcome to', { exact: true }),
+        ).toBeVisible()
 
         const installBtn = page.getByRole('link', {
             name: /install extension/i,
