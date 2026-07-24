@@ -19,7 +19,9 @@ export default function ProfilePageClient() {
             <main className="relative -mt-[6.7rem] w-full">
                 <div className="container mx-auto px-4 py-16">
                     <div className="flex items-center justify-center">
-                        <div className="text-lg">Loading...</div>
+                        <div className="text-lg font-medium text-gray-500 dark:text-gray-400">
+                            Loading...
+                        </div>
                     </div>
                 </div>
             </main>
@@ -44,9 +46,9 @@ export default function ProfilePageClient() {
                         Profile
                     </h1>
 
-                    <div className="rounded-2xl bg-white p-8 shadow-lg dark:bg-darkerBg">
+                    <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-lg dark:border-gray-800 dark:bg-darkerBg">
                         <div className="mb-6 flex items-center gap-6">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-caramel text-2xl font-semibold text-white">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-caramel text-2xl font-semibold text-white ring-4 ring-caramel/15">
                                 {userInitial}
                             </div>
                             <div>
@@ -63,9 +65,9 @@ export default function ProfilePageClient() {
                             </div>
                         </div>
 
-                        <div className="space-y-4 border-t pt-6 dark:border-gray-700">
+                        <div className="space-y-4 border-t border-gray-100 pt-6 dark:border-gray-700">
                             <div>
-                                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                     Email
                                 </label>
                                 <p className="mt-1 text-gray-900 dark:text-gray-100">
@@ -75,7 +77,7 @@ export default function ProfilePageClient() {
 
                             {user.name && (
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         Name
                                     </label>
                                     <p className="mt-1 text-gray-900 dark:text-gray-100">
@@ -86,7 +88,7 @@ export default function ProfilePageClient() {
 
                             {(user.firstName || user.lastName) && (
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         First Name
                                     </label>
                                     <p className="mt-1 text-gray-900 dark:text-gray-100">
@@ -97,7 +99,7 @@ export default function ProfilePageClient() {
 
                             {(user.firstName || user.lastName) && (
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         Last Name
                                     </label>
                                     <p className="mt-1 text-gray-900 dark:text-gray-100">
@@ -108,7 +110,7 @@ export default function ProfilePageClient() {
 
                             {user.username && (
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         Username
                                     </label>
                                     <p className="mt-1 text-gray-900 dark:text-gray-100">

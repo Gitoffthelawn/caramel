@@ -102,7 +102,7 @@ export default function PricingSection() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ duration: 0.5, delay: 0.1 * index }}
-                            className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 text-center shadow-md dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                            className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 text-center shadow-md transition-shadow duration-300 hover:shadow-lg dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
                         >
                             {/* Animated Background Pattern */}
                             <div className="absolute inset-0 opacity-5">
@@ -154,7 +154,7 @@ export default function PricingSection() {
                     transition={{ duration: 0.6, delay: 0.3 }}
                     className="mx-auto max-w-4xl"
                 >
-                    <motion.div className="relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-12 shadow-md dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 lg:p-8 sm:p-6">
+                    <motion.div className="relative overflow-hidden rounded-2xl border border-caramel/30 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-12 shadow-xl ring-1 ring-caramel/10 dark:border-caramel/40 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 lg:p-8 sm:p-6">
                         {/* Animated Background Pattern */}
                         <div className="absolute inset-0 opacity-5">
                             <motion.div
@@ -224,7 +224,7 @@ export default function PricingSection() {
                                 rel="noopener noreferrer"
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-full bg-caramel px-10 py-5 text-lg font-bold text-white shadow-lg transition-shadow hover:shadow-xl lg:px-8 lg:py-4 lg:text-lg sm:px-6 sm:py-4 sm:text-base"
+                                className="mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-full bg-caramel px-10 py-5 text-lg font-bold text-white shadow-lg transition-shadow hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkBg lg:px-8 lg:py-4 lg:text-lg sm:px-6 sm:py-4 sm:text-base"
                             >
                                 <FaGithub className="text-2xl" />
                                 Get Started - It's Free

@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 
 export default function SupportedSitesPage() {
     return (
-        <main className="flex min-h-screen flex-col items-center px-6 pt-32">
+        <main className="flex min-h-screen flex-col items-center px-6 pt-32 dark:bg-darkBg">
             <SearchSection />
         </main>
     )

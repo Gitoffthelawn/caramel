@@ -82,7 +82,8 @@ export default function SearchSection() {
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="https://example.com"
-                    className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-4 text-lg placeholder-gray-400 shadow-md outline-none transition-all focus:border-caramel dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400 sm:text-base"
+                    aria-label="Search for a supported store"
+                    className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-4 text-lg placeholder-gray-400 shadow-md outline-none transition-all focus:border-caramel focus:shadow-lg dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400 sm:text-base"
                 />
 
                 {/* loader */}
@@ -140,7 +141,7 @@ export default function SearchSection() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.3 }}
-                                            className="mb-10 border-b-[1px] pb-10 text-center text-2xl font-bold text-gray-800 dark:text-gray-200"
+                                            className="mb-10 border-b border-caramel/15 pb-10 text-center text-2xl font-bold text-gray-800 dark:border-gray-800 dark:text-gray-200"
                                         >
                                             🏆 Top Supported Websites
                                         </motion.h2>

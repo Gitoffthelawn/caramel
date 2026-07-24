@@ -19,4 +19,4 @@ apps/caramel-app/scripts/internal/
 
 # Internal audit archive (cycle artifacts, findings, onload prompts) — kept
 # locally by maintainers, never published (same policy as scripts/internal).
-/audit/
+/audit/.playwright-mcp/

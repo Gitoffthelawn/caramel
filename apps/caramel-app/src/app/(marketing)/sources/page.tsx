@@ -124,14 +124,19 @@ export default function SourcesPage() {
                 Sources
             </motion.h1>
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
                     <motion.div
-                        className="relative w-1/3 rounded-lg bg-white p-6 shadow dark:bg-darkerBg md:w-11/12"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Submit a New Source"
+                        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-darkerBg"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
                         <button
-                            className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                            type="button"
+                            aria-label="Close"
+                            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel dark:hover:bg-darkBg dark:hover:text-gray-300"
                             onClick={() => setShowModal(false)}
                         >
                             X
@@ -145,30 +150,34 @@ export default function SourcesPage() {
                         </p>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-black dark:text-white">
+                                <label
+                                    htmlFor="source-website-url"
+                                    className="block text-sm font-medium text-black dark:text-white"
+                                >
                                     Website URL
                                 </label>
                                 <input
+                                    id="source-website-url"
                                     type="text"
                                     placeholder="https://"
                                     value={websitesInput}
                                     onChange={e =>
                                         setWebsitesInput(e.target.value)
                                     }
-                                    className="mt-1 w-full rounded border border-gray-300 p-2 text-black focus:outline-none focus:ring-2 focus:ring-caramel"
+                                    className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-black transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-gray-700 dark:bg-darkBg dark:text-white dark:placeholder-gray-500"
                                 />
                             </div>
                             <div className="flex justify-end space-x-2">
                                 <button
                                     type="button"
-                                    className="transform rounded bg-gray-500 px-4 py-2 text-white transition hover:scale-105"
+                                    className="transform rounded-lg bg-gray-500 px-4 py-2 text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkerBg"
                                     onClick={() => setShowModal(false)}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="transform rounded bg-caramel px-4 py-2 font-semibold text-white transition hover:scale-105"
+                                    className="transform rounded-lg bg-caramel px-4 py-2 font-semibold text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkerBg"
                                 >
                                     Submit
                                 </button>
@@ -183,8 +192,9 @@ export default function SourcesPage() {
                         Caramel coupon sources
                     </h2>
                     <button
+                        type="button"
                         onClick={() => setShowModal(true)}
-                        className="transform rounded bg-caramel px-4 py-2 font-semibold text-white transition hover:scale-105"
+                        className="transform rounded-lg bg-caramel px-4 py-2 font-semibold text-white shadow-md transition hover:scale-105 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkBg"
                     >
                         Add New Source
                     </button>
@@ -193,21 +203,26 @@ export default function SourcesPage() {
                     <input
                         type="text"
                         placeholder="Search sources, websites..."
+                        aria-label="Search sources"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full rounded border border-gray-300 p-2 text-black focus:outline-none focus:ring-2 focus:ring-caramel"
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-black shadow-sm transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-gray-700 dark:bg-darkerBg dark:text-white dark:placeholder-gray-500"
                     />
                 </div>
                 <div className="grid grid-cols-1 gap-6">
-                    <div className="overflow-x-auto rounded-lg bg-white p-6 shadow dark:bg-darkerBg">
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-gray-800 dark:bg-darkerBg">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="bg-gray-100 text-black dark:bg-darkBg dark:text-white">
-                                    <th className="px-4 py-2">Source</th>
-                                    <th className="px-4 py-2">Websites</th>
-                                    <th className="px-4 py-2">Coupons</th>
-                                    <th className="px-4 py-2">Success Rate</th>
-                                    <th className="px-4 py-2">Status</th>
+                                <tr className="bg-gray-100 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:bg-darkBg dark:text-gray-300">
+                                    <th className="rounded-l-lg px-4 py-3">
+                                        Source
+                                    </th>
+                                    <th className="px-4 py-3">Websites</th>
+                                    <th className="px-4 py-3">Coupons</th>
+                                    <th className="px-4 py-3">Success Rate</th>
+                                    <th className="rounded-r-lg px-4 py-3">
+                                        Status
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -215,7 +230,7 @@ export default function SourcesPage() {
                                     <tr>
                                         <td
                                             colSpan={5}
-                                            className="py-4 text-center text-gray-500 dark:text-gray-300"
+                                            className="py-10 text-center text-gray-500 dark:text-gray-300"
                                         >
                                             Loading...
                                         </td>
@@ -224,7 +239,7 @@ export default function SourcesPage() {
                                     <tr>
                                         <td
                                             colSpan={5}
-                                            className="py-4 text-center text-gray-500"
+                                            className="py-10 text-center text-gray-500 dark:text-gray-400"
                                         >
                                             Couldn&apos;t load sources.
                                         </td>
@@ -233,22 +248,22 @@ export default function SourcesPage() {
                                     filteredSources.map(src => (
                                         <tr
                                             key={src.id}
-                                            className="border-b hover:bg-gray-50 dark:hover:bg-darkBg/50"
+                                            className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-darkBg/50"
                                         >
-                                            <td className="px-4 py-2">
+                                            <td className="px-4 py-3 font-medium">
                                                 {src.source}
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                                                 {src.websites.join(', ')}
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-4 py-3 tabular-nums">
                                                 {src.numberOfCoupons}
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-4 py-3 tabular-nums">
                                                 {src.successRate}%
                                             </td>
-                                            <td className="px-4 py-2">
-                                                <div className="h-5 w-5 rounded-full bg-green-500"></div>
+                                            <td className="px-4 py-3">
+                                                <div className="h-3 w-3 rounded-full bg-green-500 ring-4 ring-green-100 dark:ring-green-900/40"></div>
                                             </td>
                                         </tr>
                                     ))
@@ -256,7 +271,7 @@ export default function SourcesPage() {
                                     <tr>
                                         <td
                                             colSpan={5}
-                                            className="py-4 text-center text-gray-500"
+                                            className="py-10 text-center text-gray-500 dark:text-gray-400"
                                         >
                                             No sources found.
                                         </td>
@@ -265,7 +280,7 @@ export default function SourcesPage() {
                             </tbody>
                         </table>
                     </div>
-                    <div className="rounded-lg bg-white p-6 shadow dark:bg-darkerBg">
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-gray-800 dark:bg-darkerBg">
                         <div className="h-96 w-full">
                             {loading ? (
                                 <div className="flex h-full items-center justify-center text-gray-500">

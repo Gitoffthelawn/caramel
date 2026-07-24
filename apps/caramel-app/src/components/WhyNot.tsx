@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useState } from 'react'
 import {
     FaExternalLinkAlt,
@@ -63,6 +63,7 @@ const caramelSolutions = [
 
 export default function WhyNotHoneySection() {
     const [videoLoaded, setVideoLoaded] = useState(false)
+    const reduceMotion = useReducedMotion()
 
     return (
         <section id="why-not" className="relative overflow-hidden py-32">
@@ -73,10 +74,14 @@ export default function WhyNotHoneySection() {
                 {/* Floating warning elements */}
                 <motion.div
                     className="left-1/6 absolute top-1/4 h-24 w-24 rounded-full bg-red-500/5 blur-xl"
-                    animate={{
-                        x: [0, 20, 0],
-                        y: [0, -15, 0],
-                    }}
+                    animate={
+                        reduceMotion
+                            ? undefined
+                            : {
+                                  x: [0, 20, 0],
+                                  y: [0, -15, 0],
+                              }
+                    }
                     transition={{
                         duration: 8,
                         repeat: Infinity,
@@ -85,10 +90,14 @@ export default function WhyNotHoneySection() {
                 />
                 <motion.div
                     className="right-1/6 absolute top-3/4 h-20 w-20 rounded-full bg-orange-500/5 blur-lg"
-                    animate={{
-                        x: [0, -15, 0],
-                        y: [0, 20, 0],
-                    }}
+                    animate={
+                        reduceMotion
+                            ? undefined
+                            : {
+                                  x: [0, -15, 0],
+                                  y: [0, 20, 0],
+                              }
+                    }
                     transition={{
                         duration: 10,
                         repeat: Infinity,
@@ -107,7 +116,7 @@ export default function WhyNotHoneySection() {
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="mb-20 text-center"
                 >
-                    <h2 className="mb-8 text-5xl font-extrabold leading-[80px] tracking-tight text-caramel lg:text-4xl">
+                    <h2 className="mb-8 text-5xl font-extrabold leading-tight tracking-tight text-caramel lg:text-4xl">
                         Why Not Just Use Honey?
                     </h2>
                     <p className="mx-auto mb-8 max-w-4xl text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
@@ -140,7 +149,10 @@ export default function WhyNotHoneySection() {
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                     >
-                                        <FaPlay className="text-lg" />
+                                        <FaPlay
+                                            aria-hidden="true"
+                                            className="text-lg"
+                                        />
                                         Watch: The Truth About Honey
                                     </motion.button>
                                 </div>
@@ -162,7 +174,7 @@ export default function WhyNotHoneySection() {
                             className="mt-4 inline-flex items-center gap-2 text-sm text-gray-600 transition-colors duration-200 hover:text-caramel dark:text-gray-400"
                             whileHover={{ scale: 1.02 }}
                         >
-                            <FaExternalLinkAlt />
+                            <FaExternalLinkAlt aria-hidden="true" />
                             Watch on YouTube
                         </motion.a>
                     </motion.div>
@@ -173,8 +185,8 @@ export default function WhyNotHoneySection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.8, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
+                    transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
+                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
                         Make the Switch to Caramel

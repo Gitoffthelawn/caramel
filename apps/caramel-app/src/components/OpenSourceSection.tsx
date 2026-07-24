@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
     FaBan,
     FaBug,
@@ -94,6 +94,8 @@ const securityFeatures = [
 ]
 
 export default function OpenSourceSection() {
+    const reduceMotion = useReducedMotion()
+
     return (
         <section id="opensource" className="relative overflow-hidden py-32">
             {/* Background Elements */}
@@ -111,7 +113,7 @@ export default function OpenSourceSection() {
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="mb-20 text-center"
                 >
-                    <h2 className="mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-5xl font-extrabold leading-[80px] tracking-tight text-transparent lg:text-4xl">
+                    <h2 className="mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text pb-1 text-5xl font-extrabold leading-tight tracking-tight text-transparent lg:text-4xl">
                         Open Source & Community Driven
                     </h2>
                     <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
@@ -137,15 +139,22 @@ export default function OpenSourceSection() {
                         {securityFeatures.map((feature, index) => (
                             <motion.div
                                 key={feature.title}
-                                initial={{
-                                    opacity: 0,
-                                    x: index % 2 === 0 ? -50 : 50,
-                                }}
+                                initial={
+                                    reduceMotion
+                                        ? { opacity: 0 }
+                                        : {
+                                              opacity: 0,
+                                              x: index % 2 === 0 ? -32 : 32,
+                                          }
+                                }
                                 whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
+                                viewport={{
+                                    once: true,
+                                    margin: '0px 0px -60px 0px',
+                                }}
                                 transition={{
                                     duration: 0.6,
-                                    delay: index * 0.1,
+                                    delay: index * 0.08,
                                     type: 'spring',
                                     stiffness: 100,
                                     damping: 15,
@@ -157,9 +166,12 @@ export default function OpenSourceSection() {
                                         '0 20px 40px rgba(234,105,37,0.15)',
                                     transition: { duration: 0.2 },
                                 }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div className="absolute inset-0 opacity-5">
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute inset-0 opacity-5"
+                                >
                                     <motion.div
                                         className="h-full w-full"
                                         style={{
@@ -169,13 +181,17 @@ export default function OpenSourceSection() {
                                             `,
                                             backgroundSize: '20px 20px',
                                         }}
-                                        animate={{
-                                            backgroundPosition: [
-                                                '0px 0px',
-                                                '20px 20px',
-                                                '0px 0px',
-                                            ],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      backgroundPosition: [
+                                                          '0px 0px',
+                                                          '20px 20px',
+                                                          '0px 0px',
+                                                      ],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 8,
                                             repeat: Infinity,
@@ -187,10 +203,14 @@ export default function OpenSourceSection() {
                                 <div className="relative z-10 text-center">
                                     <motion.div
                                         className="mx-auto mb-6 flex items-center justify-center text-6xl text-caramel transition-transform duration-300"
-                                        animate={{
-                                            rotate: [0, 2, -2, 0],
-                                            scale: [1, 1.02, 1],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      rotate: [0, 2, -2, 0],
+                                                      scale: [1, 1.02, 1],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 4,
                                             repeat: Infinity,
@@ -218,7 +238,7 @@ export default function OpenSourceSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.4, ease: 'easeOut' }}
+                    transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
                     className="mb-24"
                 >
                     <h3 className="mb-12 text-center text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
@@ -231,15 +251,22 @@ export default function OpenSourceSection() {
                                 href={platform.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                initial={{
-                                    opacity: 0,
-                                    x: index % 2 === 0 ? -50 : 50,
-                                }}
+                                initial={
+                                    reduceMotion
+                                        ? { opacity: 0 }
+                                        : {
+                                              opacity: 0,
+                                              x: index % 2 === 0 ? -32 : 32,
+                                          }
+                                }
                                 whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
+                                viewport={{
+                                    once: true,
+                                    margin: '0px 0px -60px 0px',
+                                }}
                                 transition={{
                                     duration: 0.6,
-                                    delay: index * 0.1,
+                                    delay: index * 0.08,
                                     type: 'spring',
                                     stiffness: 100,
                                     damping: 15,
@@ -251,9 +278,12 @@ export default function OpenSourceSection() {
                                         '0 20px 40px rgba(234,105,37,0.15)',
                                     transition: { duration: 0.2 },
                                 }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div className="absolute inset-0 opacity-5">
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute inset-0 opacity-5"
+                                >
                                     <motion.div
                                         className="h-full w-full"
                                         style={{
@@ -263,13 +293,17 @@ export default function OpenSourceSection() {
                                             `,
                                             backgroundSize: '20px 20px',
                                         }}
-                                        animate={{
-                                            backgroundPosition: [
-                                                '0px 0px',
-                                                '20px 20px',
-                                                '0px 0px',
-                                            ],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      backgroundPosition: [
+                                                          '0px 0px',
+                                                          '20px 20px',
+                                                          '0px 0px',
+                                                      ],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 8,
                                             repeat: Infinity,
@@ -281,10 +315,14 @@ export default function OpenSourceSection() {
                                 <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
                                     <motion.div
                                         className="flex h-16 w-16 items-center justify-center rounded-2xl bg-caramel/10 text-2xl text-caramel transition-transform duration-300 dark:bg-caramel/20"
-                                        animate={{
-                                            rotate: [0, 2, -2, 0],
-                                            scale: [1, 1.02, 1],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      rotate: [0, 2, -2, 0],
+                                                      scale: [1, 1.02, 1],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 4,
                                             repeat: Infinity,
@@ -314,7 +352,7 @@ export default function OpenSourceSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.6, ease: 'easeOut' }}
+                    transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
                     className="mb-24"
                 >
                     <h3 className="mb-12 text-center text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
@@ -324,15 +362,22 @@ export default function OpenSourceSection() {
                         {contributions.map((contribution, index) => (
                             <motion.div
                                 key={contribution.title}
-                                initial={{
-                                    opacity: 0,
-                                    x: index % 2 === 0 ? -50 : 50,
-                                }}
+                                initial={
+                                    reduceMotion
+                                        ? { opacity: 0 }
+                                        : {
+                                              opacity: 0,
+                                              x: index % 2 === 0 ? -32 : 32,
+                                          }
+                                }
                                 whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
+                                viewport={{
+                                    once: true,
+                                    margin: '0px 0px -60px 0px',
+                                }}
                                 transition={{
                                     duration: 0.6,
-                                    delay: index * 0.1,
+                                    delay: index * 0.08,
                                     type: 'spring',
                                     stiffness: 100,
                                     damping: 15,
@@ -344,9 +389,12 @@ export default function OpenSourceSection() {
                                         '0 20px 40px rgba(234,105,37,0.15)',
                                     transition: { duration: 0.2 },
                                 }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div className="absolute inset-0 opacity-5">
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute inset-0 opacity-5"
+                                >
                                     <motion.div
                                         className="h-full w-full"
                                         style={{
@@ -356,13 +404,17 @@ export default function OpenSourceSection() {
                                             `,
                                             backgroundSize: '20px 20px',
                                         }}
-                                        animate={{
-                                            backgroundPosition: [
-                                                '0px 0px',
-                                                '20px 20px',
-                                                '0px 0px',
-                                            ],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      backgroundPosition: [
+                                                          '0px 0px',
+                                                          '20px 20px',
+                                                          '0px 0px',
+                                                      ],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 8,
                                             repeat: Infinity,
@@ -374,10 +426,14 @@ export default function OpenSourceSection() {
                                 <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
                                     <motion.div
                                         className="text-4xl text-caramel transition-transform duration-300 sm:text-3xl"
-                                        animate={{
-                                            rotate: [0, 2, -2, 0],
-                                            scale: [1, 1.02, 1],
-                                        }}
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                      rotate: [0, 2, -2, 0],
+                                                      scale: [1, 1.02, 1],
+                                                  }
+                                        }
                                         transition={{
                                             duration: 4,
                                             repeat: Infinity,
@@ -420,8 +476,8 @@ export default function OpenSourceSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.8, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
+                    transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
+                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
                         Ready to Make a Difference?

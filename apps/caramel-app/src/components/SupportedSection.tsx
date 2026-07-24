@@ -1,7 +1,7 @@
 'use client'
 
 import { ThemeContext } from '@/lib/contexts'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import Image from 'next/image'
 import { useContext } from 'react'
 
@@ -59,6 +59,7 @@ const featuredStores = [
 
 export default function SupportedSection() {
     const { isDarkMode } = useContext(ThemeContext)
+    const reduceMotion = useReducedMotion()
 
     return (
         <section id="supported" className="relative overflow-hidden py-32">
@@ -77,7 +78,7 @@ export default function SupportedSection() {
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="mb-20 text-center"
                 >
-                    <h2 className="mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-5xl font-extrabold leading-[80px] tracking-tight text-transparent lg:text-4xl">
+                    <h2 className="mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text pb-1 text-5xl font-extrabold leading-tight tracking-tight text-transparent lg:text-4xl">
                         5,000+ Supported Stores
                     </h2>
                     <p className="max-w mx-auto text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
@@ -110,7 +111,11 @@ export default function SupportedSection() {
                     <div className="relative w-full overflow-hidden py-4">
                         <motion.div
                             className="flex gap-4"
-                            animate={{ x: ['0%', '-100%'] }}
+                            animate={
+                                reduceMotion
+                                    ? undefined
+                                    : { x: ['0%', '-100%'] }
+                            }
                             transition={{
                                 x: {
                                     repeat: Infinity,
@@ -124,7 +129,11 @@ export default function SupportedSection() {
                                 (store, index) => (
                                     <motion.div
                                         key={`${store.name}-${index}`}
-                                        className="group relative min-w-[280px] flex-shrink-0 overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 lg:min-w-[240px] sm:min-w-[200px] sm:p-6"
+                                        aria-hidden={
+                                            index >= featuredStores.length ||
+                                            undefined
+                                        }
+                                        className="group relative min-w-[280px] flex-shrink-0 overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 lg:min-w-[240px] sm:min-w-[200px] sm:p-6"
                                         whileHover={{
                                             scale: 1.02,
                                             y: -3,
@@ -133,7 +142,10 @@ export default function SupportedSection() {
                                             transition: { duration: 0.2 },
                                         }}
                                     >
-                                        <div className="absolute inset-0 opacity-5">
+                                        <div
+                                            aria-hidden="true"
+                                            className="absolute inset-0 opacity-5"
+                                        >
                                             <motion.div
                                                 className="h-full w-full"
                                                 style={{
@@ -143,13 +155,18 @@ export default function SupportedSection() {
                                                 `,
                                                     backgroundSize: '20px 20px',
                                                 }}
-                                                animate={{
-                                                    backgroundPosition: [
-                                                        '0px 0px',
-                                                        '20px 20px',
-                                                        '0px 0px',
-                                                    ],
-                                                }}
+                                                animate={
+                                                    reduceMotion
+                                                        ? undefined
+                                                        : {
+                                                              backgroundPosition:
+                                                                  [
+                                                                      '0px 0px',
+                                                                      '20px 20px',
+                                                                      '0px 0px',
+                                                                  ],
+                                                          }
+                                                }
                                                 transition={{
                                                     duration: 8,
                                                     repeat: Infinity,
@@ -167,7 +184,7 @@ export default function SupportedSection() {
                                                             ? store.imageLight
                                                             : store.image
                                                     }
-                                                    alt={store.name}
+                                                    alt={`${store.name} logo`}
                                                     width={80}
                                                     height={80}
                                                     className={`object-contain ${isDarkMode ? 'brightness-0 invert' : ''}`}
@@ -192,8 +209,8 @@ export default function SupportedSection() {
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.6, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8"
+                    transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
+                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
                         Donʼt See Your Favorite Store?

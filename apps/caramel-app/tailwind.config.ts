@@ -33,6 +33,15 @@ const config: Config = {
                 darkBg: '#191A1C',
                 darkerBg: '#101010',
             },
+            boxShadow: {
+                // Warm brand shadows for card/CTA depth (landing refinement)
+                'caramel-sm': '0 6px 18px -8px rgba(234, 105, 37, 0.25)',
+                'caramel-lg': '0 20px 40px -12px rgba(234, 105, 37, 0.3)',
+            },
+            transitionTimingFunction: {
+                // Soft decelerating ease shared by landing hover/reveal transitions
+                caramel: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            },
         },
     },
     plugins: [],
