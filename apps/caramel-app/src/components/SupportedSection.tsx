@@ -177,6 +177,20 @@ export default function SupportedSection() {
                                         </div>
                                         <div className="relative z-10 text-center">
                                             <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+                                                {/* eager on purpose: the marquee
+                                                    translates the duplicated half
+                                                    offscreen, so lazy copies never
+                                                    intersect and never load — real
+                                                    users see empty tiles cycle in,
+                                                    and Argos (animations frozen)
+                                                    waits 60s for them and times
+                                                    out the home-page screenshot.
+                                                    unoptimized on purpose too:
+                                                    these are right-sized ≤10KB
+                                                    brand PNGs; routing 16 of them
+                                                    through sharp on every cold
+                                                    load starves 2-core CI runners
+                                                    and flakes the nav e2e suite. */}
                                                 <Image
                                                     src={
                                                         isDarkMode &&
@@ -187,6 +201,8 @@ export default function SupportedSection() {
                                                     alt={`${store.name} logo`}
                                                     width={80}
                                                     height={80}
+                                                    loading="eager"
+                                                    unoptimized
                                                     className={`object-contain ${isDarkMode ? 'brightness-0 invert' : ''}`}
                                                 />
                                             </div>
