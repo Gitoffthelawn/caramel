@@ -2,7 +2,6 @@
 import { ThemeContext } from '@/lib/contexts'
 import * as gtag from '@/lib/gtag'
 import Hotjar from '@hotjar/browser'
-import { Loader } from '@react-three/drei'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import Script from 'next/script'
@@ -13,9 +12,14 @@ const Layout = dynamic(() => import('@/layouts/Layout/Layout'), {
     ssr: false,
     loading: () => (
         <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-            <div className="mx-auto h-fit">
-                <Loader />
-            </div>
+            {/* Plain CSS spinner: this fallback wraps EVERY page, so it must
+                stay dependency-free — drei's <Loader> here used to drag the
+                whole three stack into first-load JS (see
+                tests/unit/three-lazy-boundary.test.ts). */}
+            <div
+                aria-hidden="true"
+                className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-caramel/25 border-t-caramel"
+            />
             <div>
                 <p className="bg-gradient-rainbow-light font-SpaceGrotesk dark:bg-gradient-rainbow bg-clip-text text-center text-2xl font-bold text-transparent">
                     Loading...

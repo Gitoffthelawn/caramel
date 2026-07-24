@@ -17,13 +17,13 @@
 // scrolled out of view via an IntersectionObserver.
 
 import { ThemeContext } from '@/lib/contexts'
+import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
 import { motion, useReducedMotion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import React, { useContext, useEffect, useRef, useState } from 'react'
 import { FaGithub } from 'react-icons/fa'
-import { ticketNotchMask } from './couponTicket3d'
 
 const HeroTicketScene = dynamic(() => import('./HeroTicketScene'), {
     ssr: false,
@@ -232,6 +232,12 @@ export default function HeroSection() {
                                 reduceMotion ? undefined : { scale: 1.02 }
                             }
                         >
+                            {/* unoptimized on purpose: the wordmark is a 40KB
+                                PNG, but width=2000 makes the optimizer build a
+                                w=3840 variant ON the LCP critical path — a
+                                cold-cache sharp conversion that starves 2-core
+                                CI runners (nav e2e flakes) for zero visual
+                                gain. Static serve is instant and cacheable. */}
                             <Image
                                 src="/full-logo.png"
                                 alt="Caramel Logo"
@@ -239,6 +245,7 @@ export default function HeroSection() {
                                 width={2000}
                                 className="max-w-md drop-shadow-lg lg:mx-auto lg:w-full"
                                 priority
+                                unoptimized
                             />
                         </motion.div>
                     </motion.h1>

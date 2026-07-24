@@ -4,10 +4,15 @@
 // scenes (CouponVaultScene's full vault + HeroTicketScene's compact hero
 // ticket) so the notched-ticket geometry has ONE codepath and zero
 // duplication. Holds the caramel palette, the pure geometry factories
-// (rounded rect + two inward semicircular notches, extruded with a bevel),
-// the two small mesh building blocks (Perforation, PercentEmblem), and the
-// CSS notch-mask used by the DOM posters. No scene/camera/frameloop logic
-// lives here — that stays per-scene.
+// (rounded rect + two inward semicircular notches, extruded with a bevel)
+// and the two small mesh building blocks (Perforation, PercentEmblem). No
+// scene/camera/frameloop logic lives here — that stays per-scene.
+//
+// IMPORTANT: this module imports `three`, so it may ONLY be imported from the
+// lazily-loaded scene chunks (next/dynamic ssr:false). The DOM shells in the
+// main bundle use src/lib/ticketMask.ts for the CSS notch mask instead —
+// importing anything from here in a statically-imported component drags the
+// whole three stack into first-load JS.
 
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -179,24 +184,4 @@ export function PercentEmblem({
             </mesh>
         </group>
     )
-}
-
-// A CSS mask that punches a semicircular notch into each SHORT edge of a
-// ticket (left/right at the perforation axis) — the 2D twin of the extruded
-// notch above, used by the DOM poster fallbacks. Two radial gradients — each
-// opaque except a transparent disc at one edge — intersected so only the two
-// discs read as cut-outs. `axis` is the vertical position of the notch line.
-export function ticketNotchMask(
-    radius: string,
-    axis: string,
-): React.CSSProperties {
-    const grad = (at: string): string =>
-        `radial-gradient(circle ${radius} at ${at}, transparent calc(${radius} - 1px), #000 ${radius})`
-    const image = `${grad(`0 ${axis}`)}, ${grad(`100% ${axis}`)}`
-    return {
-        maskImage: image,
-        WebkitMaskImage: image,
-        maskComposite: 'intersect',
-        WebkitMaskComposite: 'source-in',
-    }
 }

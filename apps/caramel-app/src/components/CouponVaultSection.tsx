@@ -14,11 +14,11 @@
 // the canvas ever mounts or not.
 
 import { ThemeContext } from '@/lib/contexts'
+import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
 import { motion, useReducedMotion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useContext, useEffect, useRef, useState } from 'react'
-import { ticketNotchMask } from './couponTicket3d'
 
 const CouponVaultScene = dynamic(() => import('./CouponVaultScene'), {
     ssr: false,
