@@ -1,4 +1,5 @@
 'use client'
+import CouponVaultSection from '@/components/CouponVaultSection'
 import Doodles from '@/components/Doodles'
 import FeaturesSection from '@/components/FeaturesSection'
 import HeroSection from '@/components/HeroSection'
@@ -64,6 +65,18 @@ export default function Page() {
                             }}
                         />
                     ))}
+                </motion.div>
+                <CouponVaultSection />
+                <motion.div
+                    aria-hidden="true"
+                    className="relative h-px"
+                    initial={reduceMotion ? false : { scaleX: 0 }}
+                    whileInView={{ scaleX: 1 }}
+                    viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+                    transition={{ duration: 1.4, ease: dividerEase }}
+                >
+                    <div className="h-px bg-gradient-to-r from-transparent via-caramel/40 to-transparent"></div>
+                    <div className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-orange-500/20 to-transparent blur-sm"></div>
                 </motion.div>
                 <FeaturesSection />
                 <motion.div
