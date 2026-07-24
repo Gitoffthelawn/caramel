@@ -14,48 +14,17 @@
 // the canvas ever mounts or not.
 
 import { ThemeContext } from '@/lib/contexts'
+import { detectWebGL } from '@/lib/webglSupport'
 import { motion, useReducedMotion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useContext, useEffect, useRef, useState } from 'react'
+import { ticketNotchMask } from './couponTicket3d'
 
 const CouponVaultScene = dynamic(() => import('./CouponVaultScene'), {
     ssr: false,
 })
 
 const revealEase: [number, number, number, number] = [0.22, 1, 0.36, 1]
-
-// Cheap one-shot probe: can this browser actually create a WebGL context? A
-// pinned dep + a mounted <Canvas> still hard-fail on machines/policies with
-// no GL, so we gate on a real context before ever mounting the scene.
-function detectWebGL(): boolean {
-    if (typeof document === 'undefined') return false
-    try {
-        const canvas = document.createElement('canvas')
-        const gl =
-            canvas.getContext('webgl2') ??
-            canvas.getContext('webgl') ??
-            canvas.getContext('experimental-webgl')
-        return gl !== null
-    } catch {
-        return false
-    }
-}
-
-// A CSS mask that punches a semicircular notch into each SHORT edge of a
-// ticket (left/right at the perforation axis). Two radial gradients — each
-// opaque except a transparent disc at one edge — intersected so only the two
-// discs read as cut-outs. `axis` is the vertical position of the notch line.
-function ticketNotchMask(radius: string, axis: string): React.CSSProperties {
-    const grad = (at: string): string =>
-        `radial-gradient(circle ${radius} at ${at}, transparent calc(${radius} - 1px), #000 ${radius})`
-    const image = `${grad(`0 ${axis}`)}, ${grad(`100% ${axis}`)}`
-    return {
-        maskImage: image,
-        WebkitMaskImage: image,
-        maskComposite: 'intersect',
-        WebkitMaskComposite: 'source-in',
-    }
-}
 
 // Fine film grain, inlined as an SVG data URI (no network asset) — tiled small
 // and blended soft so it adds filmic depth without banding. Theme opacity is
