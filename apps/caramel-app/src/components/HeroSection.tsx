@@ -17,6 +17,7 @@
 // scrolled out of view via an IntersectionObserver.
 
 import { ThemeContext } from '@/lib/contexts'
+import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
 import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -68,103 +69,24 @@ function HeroTicketPoster(): React.JSX.Element {
     )
 }
 
-// The three hero stats, rendered as caramel coupon-ticket cards (shared
-// ticketNotchMask) at three deliberately different sizes and slight tilts so
-// they read as a scattered little stack under the 3D model. Each counts its
-// number up from 0 on first paint. This REPLACES the old inline stat row in
-// the left column.
-const STATS: {
-    value: number
-    suffix: string
-    label: string
-    format?: 'comma'
-    size: 'lg' | 'md' | 'sm'
-    tilt: string
-}[] = [
-    {
-        value: 5000,
-        suffix: '+',
-        label: 'Supported Stores',
-        format: 'comma',
-        size: 'lg',
-        tilt: '-rotate-3',
-    },
-    {
-        value: 100,
-        suffix: '%',
-        label: 'Open Source',
-        size: 'md',
-        tilt: 'rotate-2',
-    },
-    {
-        value: 0,
-        suffix: '%',
-        label: 'Data Selling',
-        size: 'sm',
-        tilt: '-rotate-2',
-    },
-]
-
-const STAT_SIZE: Record<
-    'lg' | 'md' | 'sm',
-    { pad: string; num: string; label: string }
-> = {
-    lg: { pad: 'px-6 py-5', num: 'text-4xl md:text-3xl', label: 'text-xs' },
-    md: {
-        pad: 'px-5 py-4',
-        num: 'text-3xl md:text-2xl',
-        label: 'text-[0.7rem]',
-    },
-    sm: {
-        pad: 'px-4 py-3.5',
-        num: 'text-2xl md:text-xl',
-        label: 'text-[0.65rem]',
-    },
-}
-
-// Count a value up from 0 to `target` with an easeOutCubic ramp, once `start`
-// flips true (first paint). reduced-motion / SSR shows the final value with no
-// animation. rAF math runs only in the effect, never during render.
-function useCountUp(target: number, start: boolean, reduce: boolean): number {
-    const [val, setVal] = useState(reduce ? target : 0)
-    useEffect(() => {
-        if (!start) return
-        if (reduce) {
-            setVal(target)
-            return
-        }
-        let raf = 0
-        const duration = 1200
-        const t0 = performance.now()
-        const tick = (now: number): void => {
-            const p = Math.min(1, (now - t0) / duration)
-            const eased = 1 - Math.pow(1 - p, 3)
-            setVal(target * eased)
-            if (p < 1) raf = requestAnimationFrame(tick)
-            else setVal(target)
-        }
-        raf = requestAnimationFrame(tick)
-        return () => cancelAnimationFrame(raf)
-    }, [target, start, reduce])
-    return val
-}
-
-function StatCoupon({
+// DOM fallback for the three hero stats, rendered as caramel coupon-ticket
+// cards (shared ticketNotchMask), ALL THE SAME SIZE, each counting its number
+// up from 0 on first paint. The primary presentation on desktop is now the 3D
+// stat coupons inside HeroTicketScene; these DOM cards are the stand-in shown
+// on mobile / reduced-motion / no-WebGL (and briefly under the canvas while its
+// chunk loads), sharing the same HERO_STATS data so the two never drift.
+function StatCard({
     stat,
     index,
     start,
     reduce,
 }: {
-    stat: (typeof STATS)[number]
+    stat: (typeof HERO_STATS)[number]
     index: number
     start: boolean
     reduce: boolean
 }): React.JSX.Element {
     const n = useCountUp(stat.value, start, reduce)
-    const rounded = Math.round(n)
-    const shown =
-        stat.format === 'comma' ? rounded.toLocaleString('en-US') : `${rounded}`
-    const size = STAT_SIZE[stat.size]
     return (
         <motion.div
             initial={
@@ -177,21 +99,39 @@ function StatCoupon({
                 ease: revealEase,
             }}
             whileHover={reduce ? undefined : { y: -4, scale: 1.03 }}
-            className={`relative ${stat.tilt} ${size.pad} rounded-2xl bg-gradient-to-br from-caramel to-orange-600 text-white shadow-caramel-lg`}
+            className="relative w-32 rounded-2xl bg-gradient-to-br from-caramel to-orange-600 px-5 py-4 text-white shadow-caramel-lg md:w-28"
             style={ticketNotchMask('0.55rem', '50%')}
         >
-            <div
-                className={`font-extrabold leading-none tracking-tight ${size.num}`}
-            >
-                {shown}
-                {stat.suffix}
+            <div className="text-3xl font-extrabold leading-none tracking-tight md:text-2xl">
+                {formatStat(n, stat)}
             </div>
-            <div
-                className={`mt-1.5 font-medium uppercase tracking-wide text-white/85 ${size.label}`}
-            >
+            <div className="mt-1.5 text-[0.7rem] font-medium uppercase tracking-wide text-white/85">
                 {stat.label}
             </div>
         </motion.div>
+    )
+}
+
+// A centered row of the three uniform stat cards (DOM fallback).
+function StatCards({
+    start,
+    reduce,
+}: {
+    start: boolean
+    reduce: boolean
+}): React.JSX.Element {
+    return (
+        <div className="flex flex-wrap items-stretch justify-center gap-3">
+            {HERO_STATS.map((stat, index) => (
+                <StatCard
+                    key={stat.label}
+                    stat={stat}
+                    index={index}
+                    start={start}
+                    reduce={reduce}
+                />
+            ))}
+        </div>
     )
 }
 
@@ -524,26 +464,37 @@ export default function HeroSection() {
                     </motion.div>
                 </div>
 
-                {/* RIGHT column: the interactive 3D coupon (desktop-only) with
-                    the three stat coupons beneath it. Below lg the parent goes
-                    single-column and the WebGL box is hidden (lg:hidden) so
-                    phones never mount three — but the stat coupons stay visible,
-                    reflowing under the copy (they carry the stats that used to
-                    live in the left column). */}
-                <div className="relative flex w-[45%] flex-col items-center gap-8 lg:w-full">
-                    {/* 3D model box: reserved up front; the live canvas
-                        cross-fades in over the poster, so there is zero CLS. */}
-                    <div className="relative h-[26rem] w-full lg:hidden">
+                {/* RIGHT column: on desktop, ONE interactive WebGL box holds
+                    the main 3D coupon AND the row of three same-size 3D stat
+                    coupons beneath it. A poster + the DOM stat cards cross-fade
+                    underneath until the canvas is ready — and stay as the
+                    permanent presentation for reduced-motion / no-WebGL desktop.
+                    Below lg the box is hidden (phones never mount three) and the
+                    DOM stat cards render in normal flow under the copy. */}
+                <div className="relative flex w-[45%] flex-col items-center lg:w-full">
+                    {/* DESKTOP 3D box: reserved up front; the live canvas
+                        cross-fades in over the fallback, so there is zero CLS. */}
+                    <div className="relative h-[34rem] w-full lg:hidden">
                         <div
-                            aria-hidden="true"
-                            className="absolute inset-0 transition-opacity duration-700 ease-out"
-                            style={{ opacity: canvasReady ? 0 : 1 }}
+                            className="absolute inset-0 flex flex-col justify-between transition-opacity duration-700 ease-out"
+                            style={{
+                                opacity: canvasReady ? 0 : 1,
+                                pointerEvents: canvasReady ? 'none' : undefined,
+                            }}
                         >
-                            <HeroTicketPoster />
+                            <div
+                                aria-hidden="true"
+                                className="relative h-[22rem] w-full"
+                            >
+                                <HeroTicketPoster />
+                            </div>
+                            <StatCards
+                                start={statsStarted}
+                                reduce={!!reduceMotion}
+                            />
                         </div>
                         {showCanvas && (
                             <div
-                                aria-hidden="true"
                                 className="absolute inset-0 transition-opacity duration-700 ease-out"
                                 style={{ opacity: canvasReady ? 1 : 0 }}
                             >
@@ -556,17 +507,13 @@ export default function HeroSection() {
                         )}
                     </div>
 
-                    {/* Stat coupons — three sizes, count up on load. */}
-                    <div className="flex flex-wrap items-end justify-center gap-3">
-                        {STATS.map((stat, index) => (
-                            <StatCoupon
-                                key={stat.label}
-                                stat={stat}
-                                index={index}
-                                start={statsStarted}
-                                reduce={!!reduceMotion}
-                            />
-                        ))}
+                    {/* MOBILE stats: the DOM stat cards in normal flow (the 3D
+                        box above is hidden below lg). */}
+                    <div className="hidden w-full lg:flex lg:justify-center">
+                        <StatCards
+                            start={statsStarted}
+                            reduce={!!reduceMotion}
+                        />
                     </div>
                 </div>
             </div>
