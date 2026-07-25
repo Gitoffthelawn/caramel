@@ -53,7 +53,7 @@ export default function SuggestionForm({
                 onChange={e => setUrl(e.target.value)}
                 placeholder="https://example.com"
                 aria-label="Store URL"
-                className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-3 text-center placeholder-gray-400 shadow-sm outline-none transition-all focus:border-caramel dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
+                className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-3 text-center placeholder-gray-400 shadow-sm outline-none transition-all focus:border-caramel dark:bg-darkSurface dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
             />
             <motion.button
                 type="submit"

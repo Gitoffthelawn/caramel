@@ -493,9 +493,19 @@ export default function HeroSection() {
                                 reduce={!!reduceMotion}
                             />
                         </div>
+                        {/* The canvas raster BLEEDS 48px/40px past the layout
+                            box (must match CANVAS_BLEED_X/Y_PX in
+                            HeroTicketScene, which subtracts the bleed from its
+                            fit math) so a tilted coupon or drifting droplet
+                            never touches the raster edge — the section's
+                            overflow-hidden still crops safely far away at the
+                            SECTION edge. 48px of left bleed = exactly the
+                            column gap (gap-12), so the pointer-capturing
+                            canvas never covers the copy column's links. The
+                            anchor box keeps its reserved h-[34rem] — zero CLS. */}
                         {showCanvas && (
                             <div
-                                className="absolute inset-0 transition-opacity duration-700 ease-out"
+                                className="absolute -inset-x-[48px] -inset-y-[40px] transition-opacity duration-700 ease-out"
                                 style={{ opacity: canvasReady ? 1 : 0 }}
                             >
                                 <HeroTicketScene

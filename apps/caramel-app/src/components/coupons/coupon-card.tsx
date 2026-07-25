@@ -22,7 +22,7 @@ interface CouponCardProps {
 const TIER_CLS: Record<CouponStatusTier, string> = {
     green: 'bg-green-100 text-green-700 ring-green-200 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-900/50',
     amber: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-900/50',
-    grey: 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700',
+    grey: 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-white/10 dark:text-gray-300 dark:ring-white/20',
     red: 'bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-900/50',
 }
 
@@ -55,7 +55,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.3, delay: index * 0.05 }}
-            className="group relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50/50 via-white to-orange-50/40 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-lg dark:border-orange-900/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 dark:hover:border-orange-800/70"
+            className="group relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50/50 via-white to-orange-50/40 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-lg dark:border-orange-900/50 dark:from-darkSurface dark:via-darkSurface dark:to-darkSurface dark:hover:border-orange-800/70"
         >
             <div className="flex items-center gap-5 md:flex-col md:items-start">
                 {/* Left: Discount Badge */}
@@ -111,7 +111,7 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                     <button
                         type="button"
                         onClick={handleCopyCode}
-                        className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 md:w-full"
+                        className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkSurface md:w-full"
                     >
                         Get Coupon Code
                     </button>

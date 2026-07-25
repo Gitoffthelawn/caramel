@@ -8,6 +8,24 @@ html {
     scrollbar-gutter: stable both-edges;
 }
 
+/* The `dark` class lives on an INNER wrapper div (Layout.tsx, (auth)/layout.tsx),
+   never on <html>/<body>, so Tailwind's `dark:` variant (which compiles to a
+   `.dark <el>` DESCENDANT selector) can never style the body. With no background
+   of their own, html/body showed the browser-default white wherever the themed
+   wrapper didn't cover — e.g. the white strip at the viewport bottom and in
+   overscroll/scrollbar-gutter areas. Mirror the wrappers' exact backgrounds
+   (light: bg-gray-50, dark: bg-darkBg) via :has(); browsers without :has()
+   simply keep today's white fallback. */
+html,
+body {
+    @apply bg-gray-50;
+}
+
+html:has(.dark),
+body:has(.dark) {
+    @apply bg-darkBg;
+}
+
 body {
     /* Keep a consistent vertical scrollbar to avoid layout shifts as content loads */
     overflow-y: scroll;

@@ -73,10 +73,25 @@ const STAT_X = [-2.15, 0, 2.15]
 const MAIN_Y = 1.4
 
 // Content bounds of the main + stat group (world units, pre-fit) used to scale
-// the group so nothing clips the narrow hero column. Kept as consts so the fit
-// math stays readable.
+// the group so it sizes itself to the LAYOUT box. Derivation against the
+// actual layout:
+//   half-W = max(CARD.w/2 = 1.55, STAT_X[2] + STAT.w/2 = 2.15 + 0.85) = 3.0
+//   half-H = max(MAIN_Y + CARD.h/2 = 1.4 + 1.0 = 2.4,
+//                |STAT_Y| + STAT.h/2 = 1.55 + 0.575 = 2.125)         = 2.4
+// Float amplitude + parallax tilt (rotY 0.5 main / 0.22 row + Float
+// rotationIntensity 0.2–0.25) swing a few % PAST these rest bounds — that
+// spill lands in the canvas bleed below, never at the raster edge.
 const CONTENT_HALF_W = 3.0
 const CONTENT_HALF_H = 2.4
+
+// The DOM shell (HeroSection) bleeds the canvas raster past the reserved
+// layout box by these px per side (the -inset-x-[48px] -inset-y-[40px]
+// wrapper — keep the two in sync) so tilted coupons and drifting droplets
+// never get guillotined at the raster edge. The fit math subtracts the bleed,
+// so the composition still sizes itself to the LAYOUT box: the bleed is pure
+// clip headroom, not extra content room.
+const CANVAS_BLEED_X_PX = 48
+const CANVAS_BLEED_Y_PX = 40
 
 // A small drifting caramel field — one instanced mesh, ≤10 spheres.
 const DROPLET_COUNT = 10
@@ -92,13 +107,18 @@ interface DropletDatum {
 // Randomized droplet layout is computed ONCE at module load (client-only — the
 // scene is dynamically imported ssr:false, single instance), never during
 // render, so Math.random() stays out of the render phase (react-hooks/purity)
-// and the field is stable across re-renders.
+// and the field is stable across re-renders. The y-spread is capped at 5 (not
+// the previous 6) because the field now lives inside the fit-scaled group:
+// worst case |y| = 2.5 origin + 0.9 drift + 0.17 radius = 3.57, times the
+// largest realistic fit (~0.66) = 2.36 world — safely inside the frustum
+// half-height (2.687), so a floating sphere never gets sliced at the top or
+// bottom raster edge.
 const DROPLET_DATA: DropletDatum[] = Array.from(
     { length: DROPLET_COUNT },
     () => ({
         origin: new THREE.Vector3(
             (Math.random() - 0.5) * 7,
-            (Math.random() - 0.5) * 6,
+            (Math.random() - 0.5) * 5,
             (Math.random() - 0.5) * 4 - 1,
         ),
         speed: 0.2 + Math.random() * 0.5,
@@ -242,34 +262,40 @@ function StatCoupon3D({
                     color={isDark ? CARAMEL_LIGHT : '#fff2e6'}
                 />
                 {/* Soft dark outline-blur = printed-ink shadow, so the type
-                    reads as pressed into the caramel glass. */}
+                    reads as pressed into the caramel glass (deliberately a
+                    touch stronger on the number so it pops off the caramel). */}
                 <Text
                     font={STAT_FONT}
-                    fontSize={0.3}
+                    fontSize={0.34}
                     position={[0, 0.13, STAT_FRONT + 0.012]}
                     anchorX="center"
                     anchorY="middle"
                     color="#ffffff"
-                    outlineWidth={0.012}
-                    outlineBlur={0.02}
+                    outlineWidth={0.016}
+                    outlineBlur={0.024}
                     outlineColor="#7a2f00"
-                    outlineOpacity={0.35}
+                    outlineOpacity={0.5}
                 >
                     {shown}
                 </Text>
+                {/* Label fit math (longest label = "SUPPORTED STORES", 16
+                    glyphs): Poppins-Bold uppercase averages ~0.62em advance,
+                    so width ≈ 16 × 0.11 × (0.62 + 0.08 letterSpacing) ≈ 1.23 —
+                    inside the usable face width of STAT.w 1.7 − 2 × notch r
+                    0.14 = 1.42, with ~0.095 margin per side. That's why the
+                    letterSpacing dropped 0.12 → 0.08 alongside the size bump. */}
                 <Text
                     font={STAT_FONT}
-                    fontSize={0.088}
-                    letterSpacing={0.12}
+                    fontSize={0.11}
+                    letterSpacing={0.08}
                     position={[0, -0.22, STAT_FRONT + 0.012]}
                     anchorX="center"
                     anchorY="middle"
                     color="#ffffff"
-                    fillOpacity={0.92}
                     outlineWidth={0.006}
                     outlineBlur={0.012}
                     outlineColor="#7a2f00"
-                    outlineOpacity={0.3}
+                    outlineOpacity={0.35}
                 >
                     {stat.label.toUpperCase()}
                 </Text>
@@ -384,16 +410,26 @@ function Droplets({ isDark }: { isDark: boolean }): React.JSX.Element {
 function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
     // The vertical FOV keeps world height constant, so on the narrow hero column
     // the main ticket + the stat-coupon row can overflow the frustum — scale the
-    // whole ticket group down to fit both dimensions (with a small margin).
-    // Reactive to resize via R3F size state; no per-frame camera work.
-    const aspect = useThree(state => state.size.width / state.size.height)
+    // whole ticket group down to fit both dimensions. The canvas raster is BLED
+    // past the layout box (CANVAS_BLEED_*_PX), so the fit is computed against
+    // the layout-box slice of the frustum, not the whole canvas: the composition
+    // keeps the size it had when canvas == layout box, and the bleed becomes
+    // pure headroom that tilted geometry can swing into without clipping. The
+    // 0.9 margin (was 0.94) leaves ~10% of the layout box as rest-pose slack
+    // before the bleed even starts. Reactive to resize via R3F size state; no
+    // per-frame camera work.
+    const { width, height } = useThree(state => state.size)
     const dist = 7
     const halfH = Math.tan((42 * Math.PI) / 180 / 2) * dist
-    const halfW = halfH * aspect
+    const worldPerPx = (halfH * 2) / height
+    const layoutHalfW =
+        (Math.max(1, width - CANVAS_BLEED_X_PX * 2) / 2) * worldPerPx
+    const layoutHalfH =
+        (Math.max(1, height - CANVAS_BLEED_Y_PX * 2) / 2) * worldPerPx
     const fit = Math.min(
         1,
-        (halfW * 0.94) / CONTENT_HALF_W,
-        (halfH * 0.94) / CONTENT_HALF_H,
+        (layoutHalfW * 0.9) / CONTENT_HALF_W,
+        (layoutHalfH * 0.9) / CONTENT_HALF_H,
     )
 
     return (
@@ -416,8 +452,12 @@ function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
                     <HeroCard isDark={isDark} />
                 </group>
                 <StatCoupons isDark={isDark} />
+                {/* Inside the fit group ON PURPOSE: the droplet field is wider
+                    than the layout box in raw world units, so scaling it with
+                    the content keeps every sphere inside the (bled) frustum
+                    instead of slicing them mid-sphere at the raster edge. */}
+                <Droplets isDark={isDark} />
             </group>
-            <Droplets isDark={isDark} />
 
             <Sparkles
                 count={16}
