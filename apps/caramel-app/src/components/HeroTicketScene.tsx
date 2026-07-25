@@ -4,8 +4,9 @@
 // desktop/lg+ only). Same ticket visual language as the shared ./couponTicket3d
 // geometry + palette, deliberately LIGHT: one big main ticket with springy
 // mouse-parallax tilt + Float, PLUS a row of THREE same-size 3D stat coupons
-// beneath it (each a real ticket mesh whose number counts up on load via a drei
-// <Html> billboard label), a handful of instanced droplets, low-count Sparkles,
+// beneath it (each a real ticket mesh, floating like the main card, its number
+// counting up as IN-CANVAS 3D text so the type moves with the ticket like
+// print), a handful of instanced droplets, low-count Sparkles,
 // and a one-frame Lightformer environment. No ContactShadows and no scroll
 // dolly — the hero doesn't scroll-drive. Loaded via next/dynamic ssr:false and
 // only mounted after the browser is idle + a real WebGL context + a lg+ viewport
@@ -17,16 +18,16 @@
 // the `active` prop (parent IntersectionObserver → 'never' when the hero is
 // scrolled out of view); every ticket geometry is built once (memoized) and the
 // three stat coupons SHARE one geometry; droplets are ONE instanced mesh (≤10);
-// the environment + emblem ship no external asset / network fetch; the <Html>
-// labels are three small billboards, count-up runs only ~1.2s after mount.
+// the environment + emblem ship no network fetch; the stat type is SDF text
+// (drei <Text>) on a SELF-HOSTED font, count-up runs only ~1.2s after mount.
 
 import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
 import {
     Environment,
     Float,
-    Html,
     Lightformer,
     Sparkles,
+    Text,
 } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
@@ -201,9 +202,16 @@ function HeroCard({ isDark }: { isDark: boolean }): React.JSX.Element {
     )
 }
 
-// One 3D stat coupon: a real caramel-glass ticket mesh (shared geometry) with a
-// billboarded <Html> label whose number counts up from 0 on mount. `center` +
-// no `transform` keeps the label upright and crisp even while the coupon floats.
+// Self-hosted bold font for the in-canvas stat text (troika needs ttf/otf/woff
+// — NOT woff2, and its default font is a CDN fetch we deliberately avoid).
+// Only requested when the scene mounts (desktop + idle), never on first paint.
+const STAT_FONT = '/fonts/Poppins-Bold.ttf'
+
+// One 3D stat coupon: a real caramel-glass ticket mesh (shared geometry) with
+// the number/label as IN-CANVAS 3D text (drei <Text>, SDF) sitting on the
+// coupon face — it inherits the Float + parallax transforms, so the type moves
+// and tilts WITH the ticket like print, instead of hovering as a flat DOM
+// billboard. The number counts up from 0 on mount.
 function StatCoupon3D({
     geometry,
     position,
@@ -220,7 +228,7 @@ function StatCoupon3D({
     const n = useCountUp(stat.value, true, false)
     const shown = formatStat(n, stat)
     return (
-        <Float speed={1.6} rotationIntensity={0.12} floatIntensity={0.3}>
+        <Float speed={2} rotationIntensity={0.2} floatIntensity={0.45}>
             <group position={position}>
                 <mesh geometry={geometry} castShadow receiveShadow>
                     <TicketMaterial isDark={isDark} />
@@ -233,30 +241,45 @@ function StatCoupon3D({
                     dash={0.05}
                     color={isDark ? CARAMEL_LIGHT : '#fff2e6'}
                 />
-                {/* Fixed-size billboard label (no distanceFactor) so the text
-                    stays crisp and sized to sit ON the coupon face — the hero
-                    container is max-w capped, so the coupon's on-screen size is
-                    effectively constant across desktop widths. */}
-                <Html
-                    center
-                    position={[0, 0, STAT_FRONT + 0.04]}
-                    zIndexRange={[10, 0]}
+                {/* Soft dark outline-blur = printed-ink shadow, so the type
+                    reads as pressed into the caramel glass. */}
+                <Text
+                    font={STAT_FONT}
+                    fontSize={0.3}
+                    position={[0, 0.13, STAT_FRONT + 0.012]}
+                    anchorX="center"
+                    anchorY="middle"
+                    color="#ffffff"
+                    outlineWidth={0.012}
+                    outlineBlur={0.02}
+                    outlineColor="#7a2f00"
+                    outlineOpacity={0.35}
                 >
-                    <div className="pointer-events-none w-24 select-none text-center leading-none text-white">
-                        <div className="text-2xl font-extrabold tracking-tight drop-shadow-[0_2px_5px_rgba(120,50,0,0.55)]">
-                            {shown}
-                        </div>
-                        <div className="mt-1.5 text-[0.55rem] font-semibold uppercase tracking-wide text-white/90 drop-shadow-[0_1px_2px_rgba(120,50,0,0.5)]">
-                            {stat.label}
-                        </div>
-                    </div>
-                </Html>
+                    {shown}
+                </Text>
+                <Text
+                    font={STAT_FONT}
+                    fontSize={0.088}
+                    letterSpacing={0.12}
+                    position={[0, -0.22, STAT_FRONT + 0.012]}
+                    anchorX="center"
+                    anchorY="middle"
+                    color="#ffffff"
+                    fillOpacity={0.92}
+                    outlineWidth={0.006}
+                    outlineBlur={0.012}
+                    outlineColor="#7a2f00"
+                    outlineOpacity={0.3}
+                >
+                    {stat.label.toUpperCase()}
+                </Text>
             </group>
         </Float>
     )
 }
 
 function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
+    const rowRef = useRef<THREE.Group>(null)
     // ONE geometry shared by all three coupons (they're the same size).
     const geometry = useMemo(
         () =>
@@ -271,8 +294,30 @@ function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
             ),
         [],
     )
+
+    // Mild pointer parallax for the whole row (about half the main card's) so
+    // the stat coupons answer the mouse like the main model does — Float alone
+    // reads static next to the parallaxing hero card.
+    useFrame((state, delta) => {
+        const row = rowRef.current
+        if (!row) return
+        const { x: px, y: py } = state.pointer
+        row.rotation.y = THREE.MathUtils.damp(
+            row.rotation.y,
+            px * 0.22,
+            4,
+            delta,
+        )
+        row.rotation.x = THREE.MathUtils.damp(
+            row.rotation.x,
+            -py * 0.16,
+            4,
+            delta,
+        )
+    })
+
     return (
-        <>
+        <group ref={rowRef}>
             {HERO_STATS.map((stat, i) => (
                 <StatCoupon3D
                     key={stat.label}
@@ -282,7 +327,7 @@ function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
                     isDark={isDark}
                 />
             ))}
-        </>
+        </group>
     )
 }
 
