@@ -100,22 +100,25 @@ export default function CouponFilters({
                 paddingLeft: '4px',
                 paddingRight: '4px',
                 minHeight: '44px',
-                backgroundColor: isDarkMode ? '#111827' : '#ffffff',
+                // react-select can't take Tailwind classes, so these hexes must
+                // track the brand surfaces: darkSurface #1E1916 (warm charcoal,
+                // tailwind.config.ts) instead of the blue-hued gray-900/800.
+                backgroundColor: isDarkMode ? '#1E1916' : '#ffffff',
                 width: '100%',
             }),
             menu: base => ({
                 ...base,
                 zIndex: 20,
-                backgroundColor: isDarkMode ? '#111827' : '#ffffff',
+                backgroundColor: isDarkMode ? '#1E1916' : '#ffffff',
             }),
             option: (base, state) => ({
                 ...base,
                 backgroundColor: state.isFocused
                     ? isDarkMode
-                        ? '#1f2937'
+                        ? '#2B241F' // warm hover step above darkSurface
                         : '#f3f4f6'
                     : isDarkMode
-                      ? '#111827'
+                      ? '#1E1916'
                       : '#ffffff',
                 color: isDarkMode ? '#ffffff' : '#111827',
                 cursor: 'pointer',
@@ -155,7 +158,7 @@ export default function CouponFilters({
                             value={localSearch}
                             onChange={e => handleSearchChange(e.target.value)}
                             placeholder="Search coupons by site, title, or description..."
-                            className="w-full rounded-md border-2 border-caramel/30 bg-white px-3 py-[11px] pl-10 text-sm outline-none transition-all focus:border-caramel dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
+                            className="w-full rounded-md border-2 border-caramel/30 bg-white px-3 py-[11px] pl-10 text-sm outline-none transition-all focus:border-caramel dark:bg-darkSurface dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
                         />
                     </div>
                 </div>
@@ -234,7 +237,7 @@ export default function CouponFilters({
                 type="button"
                 aria-expanded={showFilters}
                 onClick={() => setShowFilters(!showFilters)}
-                className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-caramel shadow-md transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:bg-gray-900 dark:text-orange-400 dark:focus-visible:ring-offset-darkBg md:flex"
+                className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-caramel shadow-md transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:bg-darkSurface dark:text-orange-400 dark:focus-visible:ring-offset-darkBg md:flex"
             >
                 <FaFilter className="h-4 w-4" />
                 <span className="font-semibold">Filters</span>
