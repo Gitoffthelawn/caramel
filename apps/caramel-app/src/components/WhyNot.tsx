@@ -2,6 +2,7 @@
 
 import { useReducedMotion } from '@/lib/reducedMotion'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { useState } from 'react'
 import {
     FaExternalLinkAlt,
@@ -11,6 +12,12 @@ import {
     FaShieldAlt,
     FaTimesCircle,
 } from 'react-icons/fa'
+
+const VIDEO_ID = 'vc4yL3YTwWk'
+const VIDEO_TITLE = 'The Truth About Honey'
+// maxresdefault verified 200 (166 KB) for this video; i.ytimg.com is
+// allowlisted in next.config.mjs images.remotePatterns.
+const VIDEO_THUMBNAIL = `https://i.ytimg.com/vi/${VIDEO_ID}/maxresdefault.jpg`
 
 // This copy isn't rendered by the JSX below yet (F-009 oxlint sweep found
 // it while adding the gate — flagged as a new-finding candidate: either
@@ -143,25 +150,53 @@ export default function WhyNotHoneySection() {
                     >
                         <div className="relative aspect-video overflow-hidden rounded-2xl bg-black shadow-2xl">
                             {!videoLoaded && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
-                                    <motion.button
-                                        onClick={() => setVideoLoaded(true)}
-                                        className="flex items-center gap-4 rounded-full bg-red-600 px-8 py-4 font-semibold text-white shadow-lg transition-all duration-300 hover:bg-red-700"
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        <FaPlay
-                                            aria-hidden="true"
-                                            className="text-lg"
-                                        />
-                                        Watch: The Truth About Honey
-                                    </motion.button>
-                                </div>
+                                // Click-to-load facade: the YouTube iframe (and
+                                // its cookies) stay off the page until the
+                                // visitor asks for the video. The whole poster
+                                // is the button so the hit area matches what it
+                                // looks like.
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setVideoLoaded(true)}
+                                    aria-label={`Play video: ${VIDEO_TITLE}`}
+                                    className="group absolute inset-0 block h-full w-full cursor-pointer"
+                                    whileHover="hover"
+                                    whileTap="tap"
+                                >
+                                    <Image
+                                        src={VIDEO_THUMBNAIL}
+                                        alt=""
+                                        fill
+                                        sizes="(max-width: 896px) 100vw, 896px"
+                                        className="object-cover"
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className="absolute inset-0 bg-darkerBg/55"
+                                    />
+                                    <span className="absolute inset-0 flex items-center justify-center">
+                                        <motion.span
+                                            variants={{
+                                                hover: { scale: 1.08 },
+                                                tap: { scale: 0.95 },
+                                            }}
+                                            className="flex h-20 w-20 items-center justify-center rounded-full bg-caramel shadow-lg shadow-black/40 sm:h-16 sm:w-16"
+                                        >
+                                            <FaPlay
+                                                aria-hidden="true"
+                                                className="ml-1 text-2xl text-white sm:text-xl"
+                                            />
+                                        </motion.span>
+                                    </span>
+                                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-darkerBg/85 to-transparent px-6 pb-4 pt-10 text-left text-sm font-semibold text-white sm:px-4 sm:text-xs">
+                                        {VIDEO_TITLE}
+                                    </span>
+                                </motion.button>
                             )}
                             {videoLoaded && (
                                 <iframe
-                                    src="https://www.youtube.com/embed/vc4yL3YTwWk?autoplay=1"
-                                    title="The Truth About Honey"
+                                    src={`https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1`}
+                                    title={VIDEO_TITLE}
                                     className="h-full w-full"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
@@ -169,7 +204,7 @@ export default function WhyNotHoneySection() {
                             )}
                         </div>
                         <motion.a
-                            href="https://www.youtube.com/watch?v=vc4yL3YTwWk"
+                            href={`https://www.youtube.com/watch?v=${VIDEO_ID}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-4 inline-flex items-center gap-2 text-sm text-gray-600 transition-colors duration-200 hover:text-caramel dark:text-gray-400"
@@ -187,12 +222,12 @@ export default function WhyNotHoneySection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
+                    className="rounded-3xl bg-gradient-to-br from-caramel to-[#c9531a] p-12 text-center text-white shadow-2xl ring-1 ring-inset ring-white/20 dark:border dark:border-caramel/30 dark:bg-caramel/[0.12] dark:bg-none dark:ring-0 lg:p-8 sm:p-6"
                 >
-                    <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
+                    <h3 className="mb-6 text-3xl font-semibold tracking-tight text-white lg:text-2xl">
                         Make the Switch to Caramel
                     </h3>
-                    <p className="mx-auto mb-8 max-w-3xl text-lg leading-relaxed opacity-90">
+                    <p className="mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-white/90">
                         Join thousands of users whoʼve made the switch to
                         Caramel. Save money while supporting the creators you
                         love, all with complete transparency and privacy

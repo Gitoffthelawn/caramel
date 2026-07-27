@@ -57,6 +57,15 @@ const nextConfig = {
                 port: '',
                 pathname: '/s2/favicons/**',
             },
+            // YouTube video thumbnails, used by the click-to-load video facade
+            // in WhyNot.tsx so no YouTube iframe (and no YouTube cookie) loads
+            // until the visitor actually asks for the video.
+            {
+                protocol: 'https',
+                hostname: 'i.ytimg.com',
+                port: '',
+                pathname: '/vi/**',
+            },
         ],
     },
     async headers() {

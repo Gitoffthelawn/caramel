@@ -29,7 +29,7 @@ const stats = [
         icon: <FaGithub />,
     },
     {
-        title: '∞',
+        title: '5,000+',
         desc: 'Stores Supported',
         icon: <FaHeart />,
     },
@@ -98,7 +98,7 @@ export default function PricingSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.2 }}
-                    className="mb-20 grid grid-cols-3 gap-8 lg:grid-cols-2 sm:grid-cols-1"
+                    className="mx-auto mb-20 grid max-w-4xl grid-cols-3 gap-6 lg:grid-cols-2 sm:grid-cols-1"
                 >
                     {stats.map((stat, index) => (
                         <motion.div
@@ -107,7 +107,7 @@ export default function PricingSection() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ duration: 0.5, delay: 0.1 * index }}
-                            className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 text-center shadow-md transition-shadow duration-300 hover:shadow-lg dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6"
+                            className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-6 text-center shadow-md transition-shadow duration-300 hover:shadow-lg dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-5"
                         >
                             {/* Animated Background Pattern */}
                             <div className="absolute inset-0 opacity-5">
@@ -137,10 +137,10 @@ export default function PricingSection() {
                             </div>
 
                             <div className="relative z-10">
-                                <motion.div className="mb-4 flex justify-center text-5xl text-caramel">
+                                <motion.div className="mb-3 flex justify-center text-4xl text-caramel">
                                     {stat.icon}
                                 </motion.div>
-                                <h3 className="mb-2 text-5xl font-bold text-gray-900 dark:text-white lg:text-4xl">
+                                <h3 className="mb-2 text-4xl font-bold text-gray-900 dark:text-white lg:text-3xl">
                                     {stat.title}
                                 </h3>
                                 <p className="text-gray-600 dark:text-gray-300">
@@ -188,11 +188,11 @@ export default function PricingSection() {
                         </div>
 
                         <div className="relative z-10">
-                            <div className="absolute right-0 top-0 rounded-bl-3xl bg-gradient-to-br from-caramel to-orange-600 px-8 py-3 text-sm font-bold text-white shadow-lg lg:px-6 lg:py-2.5 lg:text-sm sm:px-4 sm:py-2 sm:text-xs">
+                            <div className="absolute right-0 top-0 rounded-full bg-gradient-to-br from-caramel to-orange-600 px-5 py-2 text-xs font-bold tracking-[0.15em] text-white shadow-lg sm:px-4 sm:py-1.5 sm:text-[0.65rem]">
                                 ALWAYS FREE
                             </div>
 
-                            <div className="mb-10 border-b border-caramel/20 pb-10">
+                            <div className="pb-10">
                                 <h3 className="mb-4 text-4xl font-bold text-gray-900 dark:text-white lg:text-3xl sm:text-2xl">
                                     Free Forever Plan
                                 </h3>
@@ -202,7 +202,28 @@ export default function PricingSection() {
                                 </p>
                             </div>
 
-                            <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-1">
+                            {/* Coupon perforation: the tear line plus the two
+                                side notches. Full-bleed via negative margins
+                                (mirroring the card's own p-12/lg:p-8/sm:p-6) so
+                                each circle straddles a card edge and the card's
+                                overflow-hidden clips it into a bite. The notch
+                                fill must equal what sits behind the card: the
+                                page background (globals.css body = gray-50 /
+                                darkBg) under this section's caramel/5 wash. */}
+                            <div
+                                aria-hidden="true"
+                                className="relative -mx-12 lg:-mx-8 sm:-mx-6"
+                            >
+                                <div className="border-t-2 border-dashed border-caramel/30" />
+                                <div className="absolute left-0 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-50 dark:bg-darkBg">
+                                    <div className="h-full w-full rounded-full bg-caramel/5" />
+                                </div>
+                                <div className="absolute right-0 top-1/2 h-10 w-10 -translate-y-1/2 translate-x-1/2 rounded-full bg-gray-50 dark:bg-darkBg">
+                                    <div className="h-full w-full rounded-full bg-caramel/5" />
+                                </div>
+                            </div>
+
+                            <div className="mb-10 mt-10 grid grid-cols-2 gap-4 sm:grid-cols-1">
                                 {features.map((feature, index) => (
                                     <motion.div
                                         key={feature}
@@ -234,6 +255,24 @@ export default function PricingSection() {
                                 <FaGithub className="text-2xl" />
                                 Get Started - It's Free
                             </motion.a>
+
+                            {/* Serial strip: the printed barcode + coupon code
+                                every real ticket carries. Decorative only. */}
+                            <div
+                                aria-hidden="true"
+                                className="mt-10 flex flex-col items-center gap-3"
+                            >
+                                <div
+                                    className="h-8 w-full max-w-xs opacity-20"
+                                    style={{
+                                        backgroundImage:
+                                            'repeating-linear-gradient(90deg, #ea6925 0 2px, transparent 2px 5px, #ea6925 5px 6px, transparent 6px 11px)',
+                                    }}
+                                />
+                                <p className="font-mono text-xs tracking-[0.35em] text-gray-500 dark:text-gray-400">
+                                    CARAMEL-FREE-FOREVER
+                                </p>
+                            </div>
                         </div>
                     </motion.div>
                 </motion.div>
