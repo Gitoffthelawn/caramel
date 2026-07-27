@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from '@/lib/reducedMotion'
+import { motion } from 'framer-motion'
 import {
     FaBolt,
     FaChrome,
@@ -347,7 +348,7 @@ export default function FeaturesSection() {
                             {
                                 name: 'Chrome',
                                 icon: <FaChrome />,
-                                href: 'https://chromewebstore.google.com/detail/caramel/gaimofgglbackoimfjopicmbmnlccfoe',
+                                href: 'https://chromewebstore.google.com/detail/caramel-trusted-honey-alt/gaimofgglbackoimfjopicmbmnlccfoe',
                                 available: true,
                             },
                             {

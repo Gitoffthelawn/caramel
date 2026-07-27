@@ -22,6 +22,21 @@ const SECURITY_HEADERS = [
     },
 ]
 
+// Mirrors src/lib/env.client.ts's BASE_URL fallback and robots.ts's
+// PRODUCTION_ORIGINS. Read at config-evaluation time, which is build time —
+// the same moment NEXT_PUBLIC_BASE_URL is baked into the image (Dockerfile
+// build-arg), so the header and robots.ts always agree about the host.
+const PRODUCTION_ORIGINS = [
+    'https://grabcaramel.com',
+    'https://www.grabcaramel.com',
+]
+const IS_PRODUCTION_HOST = PRODUCTION_ORIGINS.includes(
+    (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://grabcaramel.com').replace(
+        /\/+$/,
+        '',
+    ),
+)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // F-016 one-root-compose: emit a self-contained server (.next/standalone)
@@ -45,7 +60,19 @@ const nextConfig = {
         ],
     },
     async headers() {
-        return [{ source: '/:path*', headers: SECURITY_HEADERS }]
+        const headers = [{ source: '/:path*', headers: SECURITY_HEADERS }]
+        // Belt-and-braces with src/app/robots.ts: robots.txt only asks a
+        // crawler not to fetch a page, while X-Robots-Tag keeps an
+        // already-fetched non-production URL (dev.grabcaramel.com, a preview
+        // host, localhost) out of the index outright. Keep the host list in
+        // sync with robots.ts's PRODUCTION_ORIGINS.
+        if (!IS_PRODUCTION_HOST) {
+            headers.push({
+                source: '/:path*',
+                headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+            })
+        }
+        return headers
     },
 }
 

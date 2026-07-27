@@ -27,7 +27,7 @@ It automatically tests codes at checkout, never sells your data, and never overw
 - Firefox (AMO)
 - Safari for macOS and iOS – converted from the Chromium build and re‑skinned automatically during CI
 
-<a href="https://chromewebstore.google.com/detail/caramel/gaimofgglbackoimfjopicmbmnlccfoe" target="_blank" rel="noopener noreferrer">
+<a href="https://chromewebstore.google.com/detail/caramel-trusted-honey-alt/gaimofgglbackoimfjopicmbmnlccfoe" target="_blank" rel="noopener noreferrer">
   <img width="150" height="90" alt="Chrome Web Store badge" src="https://github.com/user-attachments/assets/ac7a688a-9bcd-4073-a769-625e00ac6fa9" />
 </a>
 <a href="https://apps.apple.com/ke/app/caramel/id6741873881" target="_blank" rel="noopener noreferrer">

@@ -1,7 +1,8 @@
 'use client'
 
 import { ThemeContext } from '@/lib/contexts'
-import { motion, useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from '@/lib/reducedMotion'
+import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { useContext } from 'react'
 

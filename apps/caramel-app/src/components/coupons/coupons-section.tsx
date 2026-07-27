@@ -391,7 +391,7 @@ export default function CouponsSection({
                                 {
                                     name: 'Chrome',
                                     icon: <FaChrome />,
-                                    href: 'https://chromewebstore.google.com/detail/caramel/gaimofgglbackoimfjopicmbmnlccfoe',
+                                    href: 'https://chromewebstore.google.com/detail/caramel-trusted-honey-alt/gaimofgglbackoimfjopicmbmnlccfoe',
                                     available: true,
                                 },
                                 {

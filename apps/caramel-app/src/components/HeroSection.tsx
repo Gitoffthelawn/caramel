@@ -18,9 +18,10 @@
 
 import { ThemeContext } from '@/lib/contexts'
 import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
+import { useReducedMotion } from '@/lib/reducedMotion'
 import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import React, { useContext, useEffect, useRef, useState } from 'react'
@@ -311,9 +312,14 @@ export default function HeroSection() {
                                 cold-cache sharp conversion that starves 2-core
                                 CI runners (nav e2e flakes) for zero visual
                                 gain. Static serve is instant and cacheable. */}
+                            {/* alt completes the h1: the wordmark IS the rest of
+                                the heading, so crawlers (which count img alt
+                                inside an h1) read "Welcome to Caramel — the
+                                open-source coupon extension" instead of a bare
+                                "Welcome to". Alt text is not rendered. */}
                             <Image
                                 src="/full-logo.png"
-                                alt="Caramel Logo"
+                                alt="Caramel — the open-source coupon extension"
                                 height={2000}
                                 width={2000}
                                 className="max-w-md drop-shadow-lg lg:mx-auto lg:w-full"
@@ -490,7 +496,7 @@ export default function HeroSection() {
                             </div>
                             <StatCards
                                 start={statsStarted}
-                                reduce={!!reduceMotion}
+                                reduce={reduceMotion}
                             />
                         </div>
                         {/* The canvas raster BLEEDS 48px/40px past the layout
@@ -520,10 +526,7 @@ export default function HeroSection() {
                     {/* MOBILE stats: the DOM stat cards in normal flow (the 3D
                         box above is hidden below lg). */}
                     <div className="hidden w-full lg:flex lg:justify-center">
-                        <StatCards
-                            start={statsStarted}
-                            reduce={!!reduceMotion}
-                        />
+                        <StatCards start={statsStarted} reduce={reduceMotion} />
                     </div>
                 </div>
             </div>

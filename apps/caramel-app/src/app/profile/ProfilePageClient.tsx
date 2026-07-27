@@ -2,19 +2,28 @@
 
 import { useSession } from '@/lib/auth/client'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function ProfilePageClient() {
     const { data: session, isPending } = useSession()
     const router = useRouter()
+    // The session lives in a cookie the client reads for itself, so the server
+    // always renders the pending branch while a client that already has the
+    // session in its store renders the profile on its very first pass — a
+    // hydration mismatch that made React throw the whole tree away. Holding the
+    // pending branch until mounted makes the hydrating render match the server;
+    // the real state lands one commit later, before paint.
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => setMounted(true), [])
 
     useEffect(() => {
-        if (!isPending && !session?.user) {
+        if (mounted && !isPending && !session?.user) {
             router.push('/login')
         }
-    }, [session, isPending, router])
+    }, [mounted, session, isPending, router])
 
-    if (isPending) {
+    if (!mounted || isPending) {
         return (
             <main className="relative -mt-[6.7rem] w-full">
                 <div className="container mx-auto px-4 py-16">

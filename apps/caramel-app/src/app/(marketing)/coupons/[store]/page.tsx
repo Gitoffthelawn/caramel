@@ -73,6 +73,10 @@ export async function generateMetadata({
             description: 'Find coupons and promo codes on Caramel.',
         }
     }
+    // Declaring `openGraph` below REPLACES the root layout's object wholesale
+    // rather than merging into it, so the inherited og:image has to be restated
+    // here or these pages share links with no preview image at all.
+    const banner = `${baseUrl}/caramel_banner.png`
     const title = `${base} Coupons & Promo Codes | Caramel`
     const description = `Find verified ${base} coupon codes, promo codes, and discounts. Updated daily.`
     const canonical = `${baseUrl}/coupons/${encodeURIComponent(storeParam)}`
@@ -86,11 +90,23 @@ export async function generateMetadata({
             url: canonical,
             title,
             description,
+            locale: 'en_US',
+            siteName: 'Caramel',
+            images: [
+                {
+                    url: banner,
+                    width: 1200,
+                    height: 630,
+                    alt: `${base} coupon codes on Caramel`,
+                },
+            ],
         },
         twitter: {
             card: 'summary_large_image',
+            site: '@CaramelOfficial',
             title,
             description,
+            images: [banner],
         },
     }
 }

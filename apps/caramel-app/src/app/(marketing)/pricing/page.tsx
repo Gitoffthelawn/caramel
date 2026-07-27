@@ -15,16 +15,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: canonicalUrl,
     },
-    keywords: [
-        'free coupon extension',
-        'caramel pricing',
-        'free forever',
-        'no hidden fees',
-        'open source coupon finder',
-        'privacy-first extension',
-        'free shopping extension',
-        'caramel cost',
-    ],
     openGraph: {
         type: 'website',
         url: canonicalUrl,

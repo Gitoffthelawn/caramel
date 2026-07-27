@@ -171,7 +171,14 @@ export default function CouponFilters({
                     >
                         Store
                     </label>
+                    {/* instanceId pins the ids react-select stamps on its
+                        live-region/placeholder/listbox nodes. Without it they
+                        come from a module-level counter that keeps climbing in
+                        the server process (react-select-8-… on the Nth SSR)
+                        while a fresh client starts at 1 — an id-attribute
+                        hydration mismatch on every load of this page. */}
                     <AsyncSelect
+                        instanceId="coupon-store-filter"
                         inputId="coupon-store-filter"
                         cacheOptions
                         defaultOptions
@@ -196,6 +203,7 @@ export default function CouponFilters({
                         Discount Type
                     </label>
                     <Select
+                        instanceId="coupon-type-filter"
                         inputId="coupon-type-filter"
                         isClearable
                         isSearchable={false}
