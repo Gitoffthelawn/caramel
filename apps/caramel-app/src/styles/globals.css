@@ -193,6 +193,39 @@ body {
     border-radius: 360px;
 }
 
+/* WebKit paints its own background on autofilled inputs and ignores
+   `background-color` / `background-image` outright, so the near-black auth
+   cards flashed a bright lavender-white field the moment Chrome filled them.
+   The only lever that works is a huge inset box-shadow, which sits under the
+   text but over the UA layer. Colors mirror the auth inputs' own dark styling
+   (`dark:bg-darkBg` + `dark:text-gray-100` in the (auth) forms) so a filled
+   field is indistinguishable from a typed one.
+
+   Setting box-shadow also wipes Tailwind's `focus:ring-2 ring-caramel/30`, so
+   the :focus variant re-states that ring after the fill layer.
+
+   Light mode is left alone: Chrome's default fill (#e8f0fe) against the white
+   auth card still renders gray-900 text well above AA. */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:active,
+html.dark textarea:-webkit-autofill,
+html.dark select:-webkit-autofill {
+    box-shadow: inset 0 0 0 1000px #191a1c;
+    -webkit-text-fill-color: #f3f4f6;
+    caret-color: #f3f4f6;
+}
+
+html.dark input:-webkit-autofill:focus,
+html.dark textarea:-webkit-autofill:focus,
+html.dark select:-webkit-autofill:focus {
+    box-shadow:
+        inset 0 0 0 1000px #191a1c,
+        0 0 0 2px rgb(234 105 37 / 0.3);
+    -webkit-text-fill-color: #f3f4f6;
+    caret-color: #f3f4f6;
+}
+
 /* Landing refinement (additive): crafted keyboard focus ring in brand color.
    :focus-visible only — mouse/touch interactions are unaffected. */
 @layer base {

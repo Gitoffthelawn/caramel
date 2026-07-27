@@ -1,17 +1,34 @@
 'use client'
 
-import { ThemeContext } from '@/lib/contexts'
 import { useReducedMotion } from '@/lib/reducedMotion'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
-import { useContext } from 'react'
+
+// The store scroller runs on CSS keyframes rather than a framer x-loop for one
+// reason: `animation-play-state: paused` (the hover pause) only acts on CSS
+// animations — framer drives transforms through WAAPI/JS, where the property is
+// inert, and toggling its `animate` prop instead makes the track slide back to
+// its start. Motion profile is a 1:1 port of the loop it replaces (translateX
+// 0 → -100% over 30s, linear, forever), so tooling that freezes animations for
+// screenshots still lands on the same first frame as before.
+const marqueeStyles = `
+@keyframes caramel-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+}
+.caramel-marquee-track {
+    animation: caramel-marquee 30s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .caramel-marquee-track { animation: none; }
+}
+`
 
 const featuredStores = [
     {
         name: 'Amazon',
         desc: 'Worldʼs largest online retailer',
         image: '/amazon.png',
-        imageLight: '/amazon-light.png',
         category: 'marketplace',
     },
     {
@@ -59,7 +76,6 @@ const featuredStores = [
 ]
 
 export default function SupportedSection() {
-    const { isDarkMode } = useContext(ThemeContext)
     const reduceMotion = useReducedMotion()
 
     return (
@@ -109,39 +125,21 @@ export default function SupportedSection() {
                     transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
                     className="mb-24"
                 >
-                    <div className="relative w-full overflow-hidden py-4">
-                        <motion.div
-                            className="flex gap-4"
-                            animate={
-                                reduceMotion
-                                    ? undefined
-                                    : { x: ['0%', '-100%'] }
-                            }
-                            transition={{
-                                x: {
-                                    repeat: Infinity,
-                                    repeatType: 'loop',
-                                    duration: 30,
-                                    ease: 'linear',
-                                },
-                            }}
-                        >
+                    <style>{marqueeStyles}</style>
+                    {/* py-6, not py-4: the cards' hover lift and warm shadow
+                        reach ~20px below the card and would otherwise be
+                        guillotined by this element's own overflow-hidden. */}
+                    <div className="relative w-full overflow-hidden py-6 [-webkit-mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
+                        <div className="caramel-marquee-track flex gap-4 hover:[animation-play-state:paused]">
                             {[...featuredStores, ...featuredStores].map(
                                 (store, index) => (
-                                    <motion.div
+                                    <div
                                         key={`${store.name}-${index}`}
                                         aria-hidden={
                                             index >= featuredStores.length ||
                                             undefined
                                         }
-                                        className="group relative min-w-[280px] flex-shrink-0 overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 lg:min-w-[240px] sm:min-w-[200px] sm:p-6"
-                                        whileHover={{
-                                            scale: 1.02,
-                                            y: -3,
-                                            boxShadow:
-                                                '0 15px 30px rgba(234,105,37,0.12)',
-                                            transition: { duration: 0.2 },
-                                        }}
+                                        className="group relative min-w-[280px] flex-shrink-0 overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 lg:min-w-[240px] sm:min-w-[200px] sm:p-6"
                                     >
                                         <div
                                             aria-hidden="true"
@@ -177,7 +175,13 @@ export default function SupportedSection() {
                                             />
                                         </div>
                                         <div className="relative z-10 text-center">
-                                            <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+                                            {/* The chip keeps brand logos on a
+                                                light plate in dark mode. They
+                                                used to be flattened to white
+                                                (`brightness-0 invert`), which
+                                                turned Target, Best Buy, eBay and
+                                                Walmart into identical blobs. */}
+                                            <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center transition-transform duration-300 group-hover:scale-110 dark:rounded-xl dark:bg-white/90 dark:p-2">
                                                 {/* eager on purpose: the marquee
                                                     translates the duplicated half
                                                     offscreen, so lazy copies never
@@ -193,18 +197,13 @@ export default function SupportedSection() {
                                                     load starves 2-core CI runners
                                                     and flakes the nav e2e suite. */}
                                                 <Image
-                                                    src={
-                                                        isDarkMode &&
-                                                        store.imageLight
-                                                            ? store.imageLight
-                                                            : store.image
-                                                    }
+                                                    src={store.image}
                                                     alt={`${store.name} logo`}
                                                     width={80}
                                                     height={80}
                                                     loading="eager"
                                                     unoptimized
-                                                    className={`object-contain ${isDarkMode ? 'brightness-0 invert' : ''}`}
+                                                    className="h-full w-full object-contain"
                                                 />
                                             </div>
                                             <h3 className="mb-3 text-2xl font-semibold text-gray-800 dark:text-white sm:text-xl">
@@ -214,10 +213,10 @@ export default function SupportedSection() {
                                                 {store.desc}
                                             </p>
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 ),
                             )}
-                        </motion.div>
+                        </div>
                     </div>
                 </motion.div>
 
@@ -227,7 +226,7 @@ export default function SupportedSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
+                    className="rounded-3xl bg-gradient-to-br from-caramel to-[#c9531a] p-12 text-center text-white shadow-2xl ring-1 ring-inset ring-white/20 dark:border dark:border-caramel/30 dark:bg-caramel/[0.12] dark:bg-none dark:shadow-none dark:ring-0 lg:p-8 sm:p-6"
                 >
                     <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
                         Donʼt See Your Favorite Store?

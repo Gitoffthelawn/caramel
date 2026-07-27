@@ -16,6 +16,9 @@ interface HeaderProps {
 interface NavLink {
     name: string
     url: string
+    /* Full accessible name where the visible label is abbreviated to keep the
+       nav pill on one line. */
+    ariaLabel?: string
 }
 
 const links: NavLink[] = [
@@ -23,7 +26,7 @@ const links: NavLink[] = [
     { name: 'Coupons', url: '/coupons' },
     { name: 'Pricing', url: '/pricing' },
     { name: 'Privacy', url: '/privacy' },
-    { name: 'Supported Stores', url: '/supported-stores' },
+    { name: 'Stores', url: '/supported-stores', ariaLabel: 'Supported Stores' },
 ]
 
 const Link = motion.create(L)
@@ -93,8 +96,12 @@ export default function Header({ scrollRef }: HeaderProps) {
                     className="mb-auto mt-auto w-4/5 cursor-pointer sm:w-5/12"
                 />
             </Link>
+            {/* The pill holds five links, the auth block and the theme toggle in
+                one row between a fixed 237px logo gutter and a 32px right pad.
+                Everything is nowrap, so the gap/padding scale steps down at the
+                narrower desktop widths instead of breaking onto a second line. */}
             <motion.div
-                className={`mx-auto flex w-full items-center justify-center gap-8 rounded-[28px] bg-white py-[15px] shadow dark:bg-darkerBg lg:hidden`}
+                className={`mx-auto flex w-full items-center justify-center gap-5 rounded-[28px] bg-white py-[15px] shadow dark:bg-darkerBg 2xl:gap-4 xl:gap-2 lg:hidden`}
                 style={{
                     paddingLeft: 'calc(185px + 1.25rem + 32px)',
                     paddingRight: '32px',
@@ -107,15 +114,16 @@ export default function Header({ scrollRef }: HeaderProps) {
                         <Link
                             key={link.name}
                             href={link.url || ''}
+                            aria-label={link.ariaLabel}
                             aria-current={isActive ? 'page' : undefined}
-                            className={`px-[30px] py-2.5 hover:scale-105 ${isActive ? 'bg-caramel text-white shadow-sm' : 'text-caramel hover:bg-caramel/10'} inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60`}
+                            className={`whitespace-nowrap px-6 py-2.5 hover:scale-105 2xl:px-4 ${isActive ? 'bg-caramel text-white shadow-sm' : 'text-caramel hover:bg-caramel/10'} inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60 xl:px-3 xl:text-sm`}
                         >
                             {link.name}
                         </Link>
                     )
                 })}
                 {session?.user ? (
-                    <div ref={userMenuRef} className="relative ml-6">
+                    <div ref={userMenuRef} className="relative ml-2">
                         <button
                             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                             aria-haspopup="menu"
@@ -154,26 +162,29 @@ export default function Header({ scrollRef }: HeaderProps) {
                         </AnimatePresence>
                     </div>
                 ) : (
-                    <div className="ml-6 flex items-center gap-4">
+                    <div className="ml-2 flex items-center gap-3 xl:gap-2">
                         <Link
                             href="/login"
-                            className="inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl border border-caramel px-6 py-2.5 font-medium text-caramel transition hover:scale-105 hover:bg-caramel/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60"
+                            className="inline-flex cursor-pointer items-center justify-center gap-2.5 whitespace-nowrap rounded-3xl border border-caramel px-6 py-2.5 font-medium text-caramel transition hover:scale-105 hover:bg-caramel/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60 xl:px-3 xl:text-sm"
                         >
                             Login
                         </Link>
                         <Link
                             href="/signup"
-                            className="inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl bg-caramel px-6 py-2.5 font-medium text-white shadow-sm transition hover:scale-105 hover:bg-caramel/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60 focus-visible:ring-offset-2"
+                            className="inline-flex cursor-pointer items-center justify-center gap-2.5 whitespace-nowrap rounded-3xl bg-caramel px-6 py-2.5 font-medium text-white shadow-sm transition hover:scale-105 hover:bg-caramel/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60 focus-visible:ring-offset-2 xl:px-3 xl:text-sm"
                         >
                             Sign Up
                         </Link>
                     </div>
                 )}
+                <ThemeToggle className="shrink-0" />
             </motion.div>
-            <div className="flex items-center gap-2 lg:ml-6">
-                <ThemeToggle className="absolute -right-4 lg:relative lg:right-auto lg:ml-0" />
+            {/* Mobile-only companion to the in-pill toggle above: the pill is
+                hidden at <=1023px, so the toggle and the menu button live here. */}
+            <div className="hidden items-center gap-2 lg:ml-6 lg:flex">
+                <ThemeToggle />
                 <button
-                    className="hidden rounded-lg text-2xl text-caramel transition-colors hover:text-caramelLight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60 lg:block"
+                    className="rounded-lg text-2xl text-caramel transition-colors hover:text-caramelLight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
                     aria-expanded={isMenuOpen}
@@ -196,8 +207,9 @@ export default function Header({ scrollRef }: HeaderProps) {
                                     onClick={() => setIsMenuOpen(false)}
                                     key={link.name}
                                     href={link.url || ''}
+                                    aria-label={link.ariaLabel}
                                     aria-current={isActive ? 'page' : undefined}
-                                    className={`px-[30px] py-2.5 ${isActive ? 'bg-caramel text-white shadow-sm' : 'text-caramel hover:bg-caramel/10'} inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-3xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60`}
+                                    className={`px-[30px] py-2.5 ${isActive ? 'bg-caramel text-white shadow-sm' : 'text-caramel hover:bg-caramel/10'} inline-flex cursor-pointer items-center justify-center gap-2.5 whitespace-nowrap rounded-3xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60`}
                                 >
                                     {link.name}
                                 </Link>

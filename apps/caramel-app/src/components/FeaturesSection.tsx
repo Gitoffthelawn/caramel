@@ -144,102 +144,111 @@ export default function FeaturesSection() {
                                     stiffness: 100,
                                     damping: 15,
                                 }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    y: -5,
-                                    boxShadow:
-                                        '0 20px 40px rgba(234,105,37,0.15)',
-                                    transition: { duration: 0.2 },
-                                }}
-                                className="group relative overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 shadow-md transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                {/* Animated Background Pattern */}
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 opacity-5"
-                                >
-                                    <motion.div
-                                        className="h-full w-full"
-                                        style={{
-                                            backgroundImage: `
+                                {/* The entrance animation and the card chrome
+                                    are deliberately on separate elements:
+                                    framer leaves an inline `transform: none` on
+                                    anything it animates, which would outrank
+                                    the hover-lift class. */}
+                                <div className="group relative h-full overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6">
+                                    {/* Animated Background Pattern */}
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 opacity-5"
+                                    >
+                                        <motion.div
+                                            className="h-full w-full"
+                                            style={{
+                                                backgroundImage: `
                                                 linear-gradient(90deg, #ea6925 1px, transparent 1px),
                                                 linear-gradient(#ea6925 1px, transparent 1px)
                                             `,
-                                            backgroundSize: '20px 20px',
-                                        }}
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      backgroundPosition: [
-                                                          '0px 0px',
-                                                          '20px 20px',
-                                                          '0px 0px',
-                                                      ],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: 'linear',
-                                            repeatType: 'loop',
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="relative z-10 text-center">
-                                    {/* Large icon - hidden on lg and down */}
-                                    <motion.div
-                                        aria-hidden="true"
-                                        className="mx-auto mb-6 text-6xl text-caramel transition-transform duration-300 xl:block lg:hidden"
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      rotate: [0, 2, -2, 0],
-                                                      scale: [1, 1.02, 1],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 4,
-                                            repeat: Infinity,
-                                            ease: 'easeInOut',
-                                            repeatType: 'loop',
-                                        }}
-                                        whileHover={{ scale: 1.1 }}
-                                    >
-                                        {feat.icon}
-                                    </motion.div>
-
-                                    {/* Mobile layout - icon + title in one row */}
-                                    <div className="hidden text-left lg:block">
-                                        <div className="mb-3 flex items-center">
-                                            <span
-                                                aria-hidden="true"
-                                                className="mr-3 flex-shrink-0 text-2xl text-caramel"
-                                            >
-                                                {feat.icon}
-                                            </span>
-                                            <h3 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white sm:text-xl">
-                                                {feat.title}
-                                            </h3>
-                                        </div>
-                                        <p className="ml-11 text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
-                                            {feat.desc}
-                                        </p>
+                                                backgroundSize: '20px 20px',
+                                            }}
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          backgroundPosition: [
+                                                              '0px 0px',
+                                                              '20px 20px',
+                                                              '0px 0px',
+                                                          ],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 8,
+                                                repeat: Infinity,
+                                                ease: 'linear',
+                                                repeatType: 'loop',
+                                            }}
+                                        />
                                     </div>
 
-                                    {/* Desktop layout - original centered layout */}
-                                    <div className="xl:block lg:hidden">
-                                        <h3 className="mb-4 text-3xl font-bold tracking-tight text-gray-800 dark:text-white sm:text-2xl">
-                                            {feat.title}
-                                        </h3>
-                                        <p className="mb-4 text-lg leading-relaxed text-gray-600 dark:text-gray-400 sm:text-base">
-                                            {feat.desc}
-                                        </p>
-                                        <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400 sm:text-xs">
-                                            {feat.detail}
-                                        </p>
+                                    <div className="relative z-10 text-center">
+                                        {/* Large icon - hidden on lg and down. The
+                                        card-hover scale lives on this wrapper
+                                        because the inner element's ambient
+                                        framer animation owns its inline
+                                        transform; nesting lets both compose. */}
+                                        <div
+                                            aria-hidden="true"
+                                            className="mx-auto mb-6 text-6xl text-caramel transition-transform duration-300 group-hover:scale-110 xl:block lg:hidden"
+                                        >
+                                            <motion.div
+                                                animate={
+                                                    reduceMotion
+                                                        ? undefined
+                                                        : {
+                                                              rotate: [
+                                                                  0, 2, -2, 0,
+                                                              ],
+                                                              scale: [
+                                                                  1, 1.02, 1,
+                                                              ],
+                                                          }
+                                                }
+                                                transition={{
+                                                    duration: 4,
+                                                    repeat: Infinity,
+                                                    ease: 'easeInOut',
+                                                    repeatType: 'loop',
+                                                }}
+                                            >
+                                                {feat.icon}
+                                            </motion.div>
+                                        </div>
+
+                                        {/* Mobile layout - icon + title in one row */}
+                                        <div className="hidden text-left lg:block">
+                                            <div className="mb-3 flex items-center">
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="mr-3 flex-shrink-0 text-2xl text-caramel transition-transform duration-300 group-hover:scale-110"
+                                                >
+                                                    {feat.icon}
+                                                </span>
+                                                <h3 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white sm:text-xl">
+                                                    {feat.title}
+                                                </h3>
+                                            </div>
+                                            <p className="ml-11 text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
+                                                {feat.desc}
+                                            </p>
+                                        </div>
+
+                                        {/* Desktop layout - original centered layout */}
+                                        <div className="xl:block lg:hidden">
+                                            <h3 className="mb-4 text-3xl font-bold tracking-tight text-gray-800 dark:text-white sm:text-2xl">
+                                                {feat.title}
+                                            </h3>
+                                            <p className="mb-4 text-lg leading-relaxed text-gray-600 dark:text-gray-400 sm:text-base">
+                                                {feat.desc}
+                                            </p>
+                                            <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400 sm:text-xs">
+                                                {feat.detail}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -265,77 +274,97 @@ export default function FeaturesSection() {
                         </p>
                     </div>
 
-                    <div className="mx-auto max-w-4xl space-y-4">
-                        {comparisonItems.map((item, index) => (
-                            <motion.div
-                                key={item.title}
-                                initial={
-                                    reduceMotion
-                                        ? { opacity: 0 }
-                                        : { opacity: 0, y: 10 }
-                                }
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{
-                                    once: true,
-                                    margin: '0px 0px -60px 0px',
-                                }}
-                                transition={{
-                                    duration: 0.4,
-                                    delay: index * 0.08,
-                                    ease: 'easeOut',
-                                }}
-                                className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 ease-caramel hover:border-caramel/30 hover:shadow-caramel-sm dark:border-caramel/30 dark:bg-darkerBg dark:hover:border-caramel/50"
-                            >
-                                <div className="grid grid-cols-2 lg:grid-cols-2 sm:grid-cols-1">
-                                    {/* Others */}
-                                    <div className="flex items-center space-x-4 p-6">
-                                        <div className="flex-shrink-0">
-                                            <HiXCircle
-                                                aria-hidden="true"
-                                                className="h-8 w-8 text-red-500"
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                                                Other Extensions
-                                            </h4>
-                                            <p className="font-medium text-gray-900 dark:text-white">
+                    <div className="mx-auto max-w-4xl">
+                        {/* ONE column header for the whole table. The per-row
+                            "Other Extensions" / "Caramel" labels are gone — the
+                            columns are labelled once and the rows just compare.
+                            Padding here mirrors the row cells' so the two
+                            column edges line up. */}
+                        <div className="mb-4 grid grid-cols-2">
+                            <div className="px-6 text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 sm:px-4">
+                                Other Extensions
+                            </div>
+                            <div className="px-6 text-sm font-semibold uppercase tracking-wide text-caramel sm:px-4">
+                                Caramel
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {comparisonItems.map((item, index) => (
+                                <motion.div
+                                    key={item.title}
+                                    initial={
+                                        reduceMotion
+                                            ? { opacity: 0 }
+                                            : { opacity: 0, y: 10 }
+                                    }
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{
+                                        once: true,
+                                        margin: '0px 0px -60px 0px',
+                                    }}
+                                    transition={{
+                                        duration: 0.4,
+                                        delay: index * 0.08,
+                                        ease: 'easeOut',
+                                    }}
+                                >
+                                    {/* Card chrome sits inside the motion
+                                        element for the same reason as the
+                                        feature cards: framer's inline
+                                        transform would beat the hover lift.
+                                        Stays two columns at every width — the
+                                        comparison only reads as a comparison
+                                        side by side, and the labels that used
+                                        to carry a stacked layout are gone. */}
+                                    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 ease-caramel hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:bg-darkSurface">
+                                        {/* Losing column — neutral card surface
+                                            (never darker than the page) and
+                                            muted so the eye lands on Caramel. */}
+                                        <div className="flex items-center space-x-4 p-6 opacity-50 sm:space-x-3 sm:p-4">
+                                            <div className="flex-shrink-0">
+                                                <HiXCircle
+                                                    aria-hidden="true"
+                                                    className="h-8 w-8 rounded-full bg-gray-400/20 text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                                                />
+                                            </div>
+                                            <p className="flex-1 font-medium text-gray-900 dark:text-white">
                                                 {item.other}
                                             </p>
                                         </div>
-                                    </div>
 
-                                    {/* Caramel */}
-                                    <div className="flex items-center space-x-4 border-l border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-6 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:border-l-0 sm:border-t">
-                                        <div className="flex-shrink-0">
-                                            <HiCheckCircle
-                                                aria-hidden="true"
-                                                className="h-8 w-8 text-caramel"
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="mb-1 text-sm font-medium uppercase tracking-wide text-caramel">
-                                                Caramel
-                                            </h4>
-                                            <p className="font-medium text-gray-900 dark:text-white">
+                                        {/* Winning column — tinted and ringed
+                                            at full strength. The ring is inset
+                                            so the card's overflow-hidden can't
+                                            clip it. */}
+                                        <div className="flex items-center space-x-4 bg-caramel/[0.08] p-6 ring-1 ring-inset ring-caramel/40 sm:space-x-3 sm:p-4">
+                                            <div className="flex-shrink-0">
+                                                <HiCheckCircle
+                                                    aria-hidden="true"
+                                                    className="h-8 w-8 text-caramel"
+                                                />
+                                            </div>
+                                            <p className="flex-1 font-medium text-gray-900 dark:text-white">
                                                 {item.caramel}
                                             </p>
                                         </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.div>
+                            ))}
+                        </div>
                     </div>
                 </motion.div>
 
-                {/* Browser Support Section */}
+                {/* Browser Support Section. The transparent border is always
+                    present so the dark theme's caramel border doesn't change
+                    the slab's size. */}
                 <motion.div
                     id="install-extension"
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-black shadow-lg lg:p-8"
+                    className="rounded-3xl border border-transparent bg-gradient-to-br from-caramel to-[#c9531a] p-12 text-center text-white shadow-lg ring-1 ring-inset ring-white/20 dark:border-caramel/30 dark:bg-caramel/[0.12] dark:bg-none dark:ring-0 lg:p-8"
                 >
                     <h3 className="mb-6 text-3xl font-extrabold tracking-tight lg:text-2xl">
                         Available on Your Favorite Browser!

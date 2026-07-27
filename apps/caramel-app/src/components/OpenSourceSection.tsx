@@ -3,6 +3,7 @@
 import { useReducedMotion } from '@/lib/reducedMotion'
 import { motion } from 'framer-motion'
 import {
+    FaArrowRight,
     FaBan,
     FaBug,
     FaCode,
@@ -160,74 +161,77 @@ export default function OpenSourceSection() {
                                     stiffness: 100,
                                     damping: 15,
                                 }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    y: -5,
-                                    boxShadow:
-                                        '0 20px 40px rgba(234,105,37,0.15)',
-                                    transition: { duration: 0.2 },
-                                }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 opacity-5"
-                                >
-                                    <motion.div
-                                        className="h-full w-full"
-                                        style={{
-                                            backgroundImage: `
+                                {/* A framer motion element writes its
+                                    transform inline — including `none` at rest
+                                    — so a Tailwind hover:-translate-y-1 placed
+                                    on it never applies. Every card here splits
+                                    the two: the motion element owns only the
+                                    entrance, a plain child owns the chrome and
+                                    the hover. Same reason the icon scale below
+                                    rides on its own inner span. */}
+                                <div className="group relative h-full overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6">
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 opacity-5"
+                                    >
+                                        <motion.div
+                                            className="h-full w-full"
+                                            style={{
+                                                backgroundImage: `
                                                 linear-gradient(90deg, #ea6925 1px, transparent 1px),
                                                 linear-gradient(#ea6925 1px, transparent 1px)
                                             `,
-                                            backgroundSize: '20px 20px',
-                                        }}
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      backgroundPosition: [
-                                                          '0px 0px',
-                                                          '20px 20px',
-                                                          '0px 0px',
-                                                      ],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: 'linear',
-                                            repeatType: 'loop',
-                                        }}
-                                    />
-                                </div>
-                                <div className="relative z-10 text-center">
-                                    <motion.div
-                                        className="mx-auto mb-6 flex items-center justify-center text-6xl text-caramel transition-transform duration-300"
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      rotate: [0, 2, -2, 0],
-                                                      scale: [1, 1.02, 1],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 4,
-                                            repeat: Infinity,
-                                            ease: 'easeInOut',
-                                            repeatType: 'loop',
-                                        }}
-                                        whileHover={{ scale: 1.1 }}
-                                    >
-                                        {feature.icon}
-                                    </motion.div>
-                                    <h4 className="mb-4 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
-                                        {feature.title}
-                                    </h4>
-                                    <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
-                                        {feature.desc}
-                                    </p>
+                                                backgroundSize: '20px 20px',
+                                            }}
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          backgroundPosition: [
+                                                              '0px 0px',
+                                                              '20px 20px',
+                                                              '0px 0px',
+                                                          ],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 8,
+                                                repeat: Infinity,
+                                                ease: 'linear',
+                                                repeatType: 'loop',
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="relative z-10 text-center">
+                                        <motion.div
+                                            className="mx-auto mb-6 flex items-center justify-center text-6xl text-caramel"
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          rotate: [0, 2, -2, 0],
+                                                          scale: [1, 1.02, 1],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 4,
+                                                repeat: Infinity,
+                                                ease: 'easeInOut',
+                                                repeatType: 'loop',
+                                            }}
+                                        >
+                                            <span className="block transition-transform duration-300 group-hover:scale-110">
+                                                {feature.icon}
+                                            </span>
+                                        </motion.div>
+                                        <h4 className="mb-4 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
+                                            {feature.title}
+                                        </h4>
+                                        <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
+                                            {feature.desc}
+                                        </p>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}
@@ -272,75 +276,77 @@ export default function OpenSourceSection() {
                                     stiffness: 100,
                                     damping: 15,
                                 }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    y: -5,
-                                    boxShadow:
-                                        '0 20px 40px rgba(234,105,37,0.15)',
-                                    transition: { duration: 0.2 },
-                                }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 opacity-5"
-                                >
-                                    <motion.div
-                                        className="h-full w-full"
-                                        style={{
-                                            backgroundImage: `
+                                <div className="group relative h-full overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6">
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 opacity-5"
+                                    >
+                                        <motion.div
+                                            className="h-full w-full"
+                                            style={{
+                                                backgroundImage: `
                                                 linear-gradient(90deg, #ea6925 1px, transparent 1px),
                                                 linear-gradient(#ea6925 1px, transparent 1px)
                                             `,
-                                            backgroundSize: '20px 20px',
-                                        }}
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      backgroundPosition: [
-                                                          '0px 0px',
-                                                          '20px 20px',
-                                                          '0px 0px',
-                                                      ],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: 'linear',
-                                            repeatType: 'loop',
-                                        }}
-                                    />
-                                </div>
-                                <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
-                                    <motion.div
-                                        className="flex h-16 w-16 items-center justify-center rounded-2xl bg-caramel/10 text-2xl text-caramel transition-transform duration-300 dark:bg-caramel/20"
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      rotate: [0, 2, -2, 0],
-                                                      scale: [1, 1.02, 1],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 4,
-                                            repeat: Infinity,
-                                            ease: 'easeInOut',
-                                            repeatType: 'loop',
-                                        }}
-                                        whileHover={{ scale: 1.1 }}
-                                    >
-                                        {platform.icon}
-                                    </motion.div>
-                                    <div className="flex-1 sm:text-center">
-                                        <h3 className="mb-3 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
-                                            {platform.name}
-                                        </h3>
-                                        <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
-                                            {platform.desc}
-                                        </p>
+                                                backgroundSize: '20px 20px',
+                                            }}
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          backgroundPosition: [
+                                                              '0px 0px',
+                                                              '20px 20px',
+                                                              '0px 0px',
+                                                          ],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 8,
+                                                repeat: Infinity,
+                                                ease: 'linear',
+                                                repeatType: 'loop',
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
+                                        <motion.div
+                                            className="flex h-16 w-16 items-center justify-center rounded-2xl bg-caramel/10 text-2xl text-caramel dark:bg-caramel/20"
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          rotate: [0, 2, -2, 0],
+                                                          scale: [1, 1.02, 1],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 4,
+                                                repeat: Infinity,
+                                                ease: 'easeInOut',
+                                                repeatType: 'loop',
+                                            }}
+                                        >
+                                            <span className="block transition-transform duration-300 group-hover:scale-110">
+                                                {platform.icon}
+                                            </span>
+                                        </motion.div>
+                                        <div className="flex-1 sm:text-center">
+                                            <h3 className="mb-3 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
+                                                {platform.name}
+                                            </h3>
+                                            <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
+                                                {platform.desc}
+                                            </p>
+                                            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-caramel underline-offset-4 group-hover:underline">
+                                                Open {platform.name}
+                                                <FaArrowRight
+                                                    aria-hidden="true"
+                                                    className="transition-transform duration-300 group-hover:translate-x-1"
+                                                />
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.a>
@@ -383,88 +389,85 @@ export default function OpenSourceSection() {
                                     stiffness: 100,
                                     damping: 15,
                                 }}
-                                whileHover={{
-                                    scale: 1.02,
-                                    y: -5,
-                                    boxShadow:
-                                        '0 20px 40px rgba(234,105,37,0.15)',
-                                    transition: { duration: 0.2 },
-                                }}
-                                className="group relative overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-colors duration-300 hover:border-caramel/40 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 dark:hover:border-caramel/50 sm:p-6"
                             >
-                                <div
-                                    aria-hidden="true"
-                                    className="absolute inset-0 opacity-5"
-                                >
-                                    <motion.div
-                                        className="h-full w-full"
-                                        style={{
-                                            backgroundImage: `
+                                <div className="group relative h-full overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6">
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 opacity-5"
+                                    >
+                                        <motion.div
+                                            className="h-full w-full"
+                                            style={{
+                                                backgroundImage: `
                                                 linear-gradient(90deg, #ea6925 1px, transparent 1px),
                                                 linear-gradient(#ea6925 1px, transparent 1px)
                                             `,
-                                            backgroundSize: '20px 20px',
-                                        }}
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      backgroundPosition: [
-                                                          '0px 0px',
-                                                          '20px 20px',
-                                                          '0px 0px',
-                                                      ],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: 'linear',
-                                            repeatType: 'loop',
-                                        }}
-                                    />
-                                </div>
-                                <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
-                                    <motion.div
-                                        className="text-4xl text-caramel transition-transform duration-300 sm:text-3xl"
-                                        animate={
-                                            reduceMotion
-                                                ? undefined
-                                                : {
-                                                      rotate: [0, 2, -2, 0],
-                                                      scale: [1, 1.02, 1],
-                                                  }
-                                        }
-                                        transition={{
-                                            duration: 4,
-                                            repeat: Infinity,
-                                            ease: 'easeInOut',
-                                            repeatType: 'loop',
-                                        }}
-                                        whileHover={{ scale: 1.1 }}
-                                    >
-                                        {contribution.icon}
-                                    </motion.div>
-                                    <div className="flex-1 sm:text-center">
-                                        <h4 className="mb-3 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
-                                            {contribution.title}
-                                        </h4>
-                                        <p className="mb-6 text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
-                                            {contribution.desc}
-                                        </p>
-                                        <motion.a
-                                            href={contribution.href}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center rounded-full bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-xl"
-                                            whileHover={{
-                                                scale: 1.05,
-                                                transition: { duration: 0.2 },
+                                                backgroundSize: '20px 20px',
                                             }}
-                                            whileTap={{ scale: 0.95 }}
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          backgroundPosition: [
+                                                              '0px 0px',
+                                                              '20px 20px',
+                                                              '0px 0px',
+                                                          ],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 8,
+                                                repeat: Infinity,
+                                                ease: 'linear',
+                                                repeatType: 'loop',
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="relative z-10 flex items-start gap-6 sm:flex-col sm:items-center sm:gap-4">
+                                        <motion.div
+                                            className="text-4xl text-caramel sm:text-3xl"
+                                            animate={
+                                                reduceMotion
+                                                    ? undefined
+                                                    : {
+                                                          rotate: [0, 2, -2, 0],
+                                                          scale: [1, 1.02, 1],
+                                                      }
+                                            }
+                                            transition={{
+                                                duration: 4,
+                                                repeat: Infinity,
+                                                ease: 'easeInOut',
+                                                repeatType: 'loop',
+                                            }}
                                         >
-                                            {contribution.action}
-                                        </motion.a>
+                                            <span className="block transition-transform duration-300 group-hover:scale-110">
+                                                {contribution.icon}
+                                            </span>
+                                        </motion.div>
+                                        <div className="flex-1 sm:text-center">
+                                            <h4 className="mb-3 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
+                                                {contribution.title}
+                                            </h4>
+                                            <p className="mb-6 text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
+                                                {contribution.desc}
+                                            </p>
+                                            <motion.a
+                                                href={contribution.href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center rounded-full bg-gradient-to-r from-caramel to-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-xl"
+                                                whileHover={{
+                                                    scale: 1.05,
+                                                    transition: {
+                                                        duration: 0.2,
+                                                    },
+                                                }}
+                                                whileTap={{ scale: 0.95 }}
+                                            >
+                                                {contribution.action}
+                                            </motion.a>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -478,12 +481,12 @@ export default function OpenSourceSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
-                    className="rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-12 text-center text-white shadow-2xl lg:p-8 sm:p-6"
+                    className="rounded-3xl bg-gradient-to-br from-caramel to-[#c9531a] p-12 text-center text-white shadow-2xl ring-1 ring-inset ring-white/20 dark:border dark:border-caramel/30 dark:bg-caramel/[0.12] dark:bg-none dark:ring-0 lg:p-8 sm:p-6"
                 >
-                    <h3 className="mb-6 text-3xl font-semibold tracking-tight lg:text-2xl">
+                    <h3 className="mb-6 text-3xl font-semibold tracking-tight text-white lg:text-2xl">
                         Ready to Make a Difference?
                     </h3>
-                    <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed opacity-90">
+                    <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-white/90">
                         Join our mission to create ethical, transparent, and
                         user-first shopping tools. Your contribution, no matter
                         how small, helps build a better internet for everyone.

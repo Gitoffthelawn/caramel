@@ -3,50 +3,122 @@
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
+import { FaDiscord, FaGithub } from 'react-icons/fa'
+import { RiInstagramFill } from 'react-icons/ri'
 
-const footerLinks = [
+/* Read once at module scope so the server render and the first client render
+   produce the same string. The only divergence possible is a page that is
+   server-rendered on Dec 31 and hydrated on Jan 1, which is acceptable. */
+const currentYear = new Date().getFullYear()
+
+const productLinks = [
     { name: 'Home', url: '/' },
-    { name: 'Coupons', url: '/coupons' },
     { name: 'Pricing', url: '/pricing' },
-    { name: 'Privacy', url: '/privacy' },
+    { name: 'Coupons', url: '/coupons' },
     { name: 'Supported Stores', url: '/supported-stores' },
+    { name: 'Sources', url: '/sources' },
 ]
 
-export default function Footer() {
-    const currentYear = new Date().getFullYear()
+const communityLinks = [
+    {
+        name: 'GitHub',
+        url: 'https://github.com/DevinoSolutions/caramel',
+        icon: <FaGithub aria-hidden="true" />,
+    },
+    {
+        name: 'Discord',
+        url: 'https://discord.com/invite/2vVVrQ5CEB',
+        icon: <FaDiscord aria-hidden="true" />,
+    },
+    {
+        name: 'Instagram',
+        url: 'https://www.instagram.com/grab.caramel/',
+        icon: <RiInstagramFill aria-hidden="true" />,
+    },
+]
 
+const legalLinks = [{ name: 'Privacy Policy', url: '/privacy' }]
+
+const headingClasses =
+    'text-sm font-semibold uppercase tracking-wider text-white dark:text-caramel'
+const linkClasses =
+    'rounded text-[15px] text-white transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 dark:text-gray-300 dark:hover:text-white dark:focus-visible:ring-caramel/70'
+
+export default function Footer() {
     return (
-        <footer className="bg-caramel text-white">
-            <div className="container mx-auto px-6 pt-10">
+        <footer className="border-t-2 border-dashed border-white/40 bg-gradient-to-br from-caramel to-[#c9531a] text-white dark:border-caramel/40 dark:bg-darkSurface dark:bg-none">
+            <div className="container mx-auto px-6 pt-12">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                     viewport={{ once: true }}
-                    className="flex flex-col items-center gap-6 text-center"
+                    className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-10 md:grid-cols-2 sm:grid-cols-1 sm:text-center"
                 >
-                    <Link
-                        href="/"
-                        className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                    >
-                        <Image
-                            src="/full-logo.png"
-                            alt="Caramel"
-                            width={140}
-                            height={45}
-                            className="brightness-0 invert"
-                        />
-                    </Link>
-                    <p className="max-w-md text-sm text-white/90">
-                        The open-source, privacy-first way to save at checkout.
-                    </p>
-                    <nav aria-label="Footer">
-                        <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium">
-                            {footerLinks.map(link => (
+                    <div className="flex flex-col items-start gap-4 sm:items-center">
+                        <Link
+                            href="/"
+                            className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 dark:focus-visible:ring-caramel/70"
+                        >
+                            <Image
+                                src="/full-logo.png"
+                                alt="Caramel"
+                                width={140}
+                                height={45}
+                                className="brightness-0 invert"
+                            />
+                        </Link>
+                        <p className="max-w-xs text-[15px] text-white dark:text-gray-300">
+                            The open-source, privacy-first way to save at
+                            checkout.
+                        </p>
+                    </div>
+
+                    <nav aria-label="Product">
+                        <h2 className={headingClasses}>Product</h2>
+                        <ul className="mt-4 flex flex-col gap-2.5">
+                            {productLinks.map(link => (
                                 <li key={link.name}>
                                     <Link
                                         href={link.url}
-                                        className="rounded text-white/90 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                                        className={linkClasses}
+                                    >
+                                        {link.name}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+
+                    <nav aria-label="Community">
+                        <h2 className={headingClasses}>Community</h2>
+                        <ul className="mt-4 flex flex-col gap-2.5">
+                            {communityLinks.map(link => (
+                                <li key={link.name}>
+                                    <a
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`inline-flex items-center gap-2 ${linkClasses}`}
+                                    >
+                                        <span className="text-base">
+                                            {link.icon}
+                                        </span>
+                                        {link.name}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+
+                    <nav aria-label="Legal">
+                        <h2 className={headingClasses}>Legal</h2>
+                        <ul className="mt-4 flex flex-col gap-2.5">
+                            {legalLinks.map(link => (
+                                <li key={link.name}>
+                                    <Link
+                                        href={link.url}
+                                        className={linkClasses}
                                     >
                                         {link.name}
                                     </Link>
@@ -64,24 +136,22 @@ export default function Footer() {
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                     viewport={{ once: true }}
-                    className="border-t border-white/20 pt-6 text-center"
+                    className="mt-6 flex items-center justify-between gap-4 border-t border-white/25 pt-6 dark:border-white/10 sm:flex-col sm:text-center"
                 >
-                    <div className="flex flex-col items-center gap-3">
-                        <p className="text-sm text-white">
-                            © {currentYear} Caramel. All Rights Reserved.
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-white">
-                                Powered by
-                            </span>
-                            <Image
-                                src="/devino.png"
-                                alt="Devino"
-                                width={60}
-                                height={20}
-                                className="inline-block"
-                            />
-                        </div>
+                    <p className="text-sm text-white dark:text-gray-300">
+                        © {currentYear} Caramel. All Rights Reserved.
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-white dark:text-gray-300">
+                            Powered by
+                        </span>
+                        <Image
+                            src="/devino.png"
+                            alt="Devino"
+                            width={60}
+                            height={20}
+                            className="inline-block"
+                        />
                     </div>
                 </motion.div>
             </div>
