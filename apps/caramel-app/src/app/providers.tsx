@@ -18,16 +18,31 @@ import { Toaster } from 'sonner'
 
 export default function Providers({ children }: { children: ReactNode }) {
     const pathname = usePathname()
-    // Read back what the pre-hydration script (app/layout.tsx) already decided,
-    // so the first CLIENT render matches the painted DOM. The server has no
-    // access to it and renders the light default, hence the
-    // suppressHydrationWarning on the elements carrying the theme class.
-    const [isDarkMode, setDarkMode] = useState(
-        () =>
-            typeof document !== 'undefined' &&
-            document.documentElement.classList.contains('dark'),
-    )
+    // The stored theme is client-only knowledge, so this starts at the SERVER's
+    // answer (light) and adopts the real one in an effect. Reading the
+    // pre-hydration script's <html> class during the first client render instead
+    // made that render disagree with the server HTML everywhere isDarkMode
+    // drives an attribute — the store logos in SupportedSection, react-select's
+    // emotion classes on /coupons, the toggle's aria-label — and React does not
+    // patch mismatched attributes up, so a returning dark-mode visitor could be
+    // left holding the server's light values indefinitely.
+    // Nothing flashes: <html class="dark"> is already stamped pre-paint, and it
+    // is what satisfies every Tailwind `dark:` variant and paints the page
+    // background.
+    const [isDarkMode, setDarkMode] = useState(false)
     const pagesLayoutless = useMemo(() => ['/login', '/signup', '/verify'], [])
+
+    useEffect(() => {
+        setDarkMode(document.documentElement.classList.contains('dark'))
+        // Effects run only after React has committed the hydrated tree, so this
+        // attribute is the one honest "hydration is done" signal on the page.
+        // The visual-regression specs gate on it: Argos rewrites img loading/
+        // decoding and stamps data-argos-* before capturing, and doing that
+        // mid-hydration makes React report attribute mismatches it will not
+        // patch up. <html> already carries suppressHydrationWarning for the
+        // pre-paint theme script, so writing here is safe.
+        document.documentElement.dataset.hydrated = 'true'
+    }, [])
 
     useEffect(() => {
         const handleRouteChange = (url: string) => gtag.pageView(url)

@@ -16,13 +16,13 @@ export default function Layout({ children }: LayoutProps) {
         // satisfies every `dark:` variant below and what paints the page
         // background via globals.css. This wrapper's `dark`/`light` is a
         // secondary scope only — the server can't know the stored theme, so it
-        // always emits `light`, and React leaves that value on the DOM node
-        // until the first re-render (hence suppressHydrationWarning). Don't
-        // reintroduce a background here: it would repaint the whole viewport
-        // light until hydration, which is the flash this all exists to kill.
+        // emits `light`, and so does the first client render (providers.tsx
+        // adopts the stored theme in an effect), which is why no suppression is
+        // needed here. Don't reintroduce a background: it would repaint the
+        // whole viewport light until hydration, the flash this all exists to
+        // kill.
         <div
             ref={ref}
-            suppressHydrationWarning
             className={`flex min-h-screen flex-col overflow-x-hidden scroll-smooth ${
                 isDarkMode ? 'dark' : 'light'
             } font-Roboto`}

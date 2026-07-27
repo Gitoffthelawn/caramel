@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from '@/lib/reducedMotion'
+import { motion } from 'framer-motion'
 
 const dividerEase: [number, number, number, number] = [0.22, 1, 0.36, 1]
 

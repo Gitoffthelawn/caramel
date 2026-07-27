@@ -1,6 +1,7 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from '@/lib/reducedMotion'
+import { motion } from 'framer-motion'
 
 const Doodles = () => {
     const reduceMotion = useReducedMotion()

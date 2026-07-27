@@ -91,4 +91,33 @@ export default [
             ],
         },
     },
+    {
+        // Reduced-motion door — "rules become checks". framer-motion's
+        // useReducedMotion returns null on the server and the REAL preference
+        // on the first client render, so every prop branching on it (framer
+        // serializes initial/animate into the SSR'd style attribute) makes the
+        // hydrating render disagree with the server HTML. React then throws the
+        // whole tree away, which silently drops in-flight interactions — that
+        // is what broke the navigation e2e specs when the public pages started
+        // server-rendering. src/lib/reducedMotion.ts is the hydration-safe
+        // replacement; keep the raw hook out so this cannot come back.
+        // `**/src/**` for the same dual-invocation-base reason as the blocks
+        // above (root husky cwd vs apps/caramel-app cwd).
+        files: ['**/src/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'framer-motion',
+                            importNames: ['useReducedMotion'],
+                            message:
+                                "Import useReducedMotion from '@/lib/reducedMotion' — framer's version is not hydration-safe (returns null server-side, the real value on the first client render) and its mismatch regenerates the server tree.",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 ]

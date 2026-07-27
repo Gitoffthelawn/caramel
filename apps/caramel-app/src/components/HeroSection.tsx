@@ -18,9 +18,10 @@
 
 import { ThemeContext } from '@/lib/contexts'
 import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
+import { useReducedMotion } from '@/lib/reducedMotion'
 import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import React, { useContext, useEffect, useRef, useState } from 'react'
@@ -495,7 +496,7 @@ export default function HeroSection() {
                             </div>
                             <StatCards
                                 start={statsStarted}
-                                reduce={!!reduceMotion}
+                                reduce={reduceMotion}
                             />
                         </div>
                         {/* The canvas raster BLEEDS 48px/40px past the layout
@@ -525,10 +526,7 @@ export default function HeroSection() {
                     {/* MOBILE stats: the DOM stat cards in normal flow (the 3D
                         box above is hidden below lg). */}
                     <div className="hidden w-full lg:flex lg:justify-center">
-                        <StatCards
-                            start={statsStarted}
-                            reduce={!!reduceMotion}
-                        />
+                        <StatCards start={statsStarted} reduce={reduceMotion} />
                     </div>
                 </div>
             </div>

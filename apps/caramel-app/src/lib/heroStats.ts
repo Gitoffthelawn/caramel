@@ -29,25 +29,39 @@ export function formatStat(value: number, stat: HeroStat): string {
 }
 
 // Count a value up from 0 to `target` with an easeOutCubic ramp once `start`
-// flips true (first paint). reduced-motion / SSR shows the final value with no
+// flips true (first paint). reduced-motion shows the final value with no
 // animation. rAF math runs only inside the effect, never during render.
+//
+// The state starts at `target`, not 0, in BOTH motion modes deliberately: the
+// server can't know the visitor's motion preference, so seeding from `reduce`
+// made the server render "0+" while a reduced-motion client's first render said
+// "5,000+" — a hydration TEXT mismatch that made React regenerate the whole
+// tree. Starting at `target` also means the server HTML ships the real stat
+// values, which is what crawlers read. The ramp restarts from 0 inside the
+// effect, i.e. strictly after hydration.
 export function useCountUp(
     target: number,
     start: boolean,
     reduce: boolean,
 ): number {
-    const [val, setVal] = useState(reduce ? target : 0)
+    const [val, setVal] = useState(target)
     useEffect(() => {
         if (!start) return
         if (reduce) {
             setVal(target)
             return
         }
+        setVal(0)
         let raf = 0
         const duration = 1200
         const t0 = performance.now()
         const tick = (now: number): void => {
-            const p = Math.min(1, (now - t0) / duration)
+            // Clamp BOTH ends. rAF hands the callback the timestamp of the
+            // frame it belongs to, which can predate the performance.now() call
+            // above when the effect lands mid-frame — an unclamped negative
+            // progress runs easeOutCubic backwards and paints a negative stat
+            // ("-126+") for a frame.
+            const p = Math.min(1, Math.max(0, (now - t0) / duration))
             const eased = 1 - Math.pow(1 - p, 3)
             setVal(target * eased)
             if (p < 1) raf = requestAnimationFrame(tick)
