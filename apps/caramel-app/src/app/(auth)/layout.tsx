@@ -16,7 +16,9 @@ export default function AuthLayout({
     const { isDarkMode } = useContext(ThemeContext)
 
     return (
-        <div className={isDarkMode ? 'dark' : 'light'}>
+        // suppressHydrationWarning: the server has no access to the stored
+        // theme and always renders `light` (see app/layout.tsx).
+        <div suppressHydrationWarning className={isDarkMode ? 'dark' : 'light'}>
             <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-50 px-4 py-12 dark:bg-darkBg">
                 <div
                     aria-hidden="true"

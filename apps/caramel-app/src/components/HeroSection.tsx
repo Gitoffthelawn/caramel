@@ -311,9 +311,14 @@ export default function HeroSection() {
                                 cold-cache sharp conversion that starves 2-core
                                 CI runners (nav e2e flakes) for zero visual
                                 gain. Static serve is instant and cacheable. */}
+                            {/* alt completes the h1: the wordmark IS the rest of
+                                the heading, so crawlers (which count img alt
+                                inside an h1) read "Welcome to Caramel — the
+                                open-source coupon extension" instead of a bare
+                                "Welcome to". Alt text is not rendered. */}
                             <Image
                                 src="/full-logo.png"
-                                alt="Caramel Logo"
+                                alt="Caramel — the open-source coupon extension"
                                 height={2000}
                                 width={2000}
                                 className="max-w-md drop-shadow-lg lg:mx-auto lg:w-full"

@@ -8,19 +8,27 @@ html {
     scrollbar-gutter: stable both-edges;
 }
 
-/* The `dark` class lives on an INNER wrapper div (Layout.tsx, (auth)/layout.tsx),
-   never on <html>/<body>, so Tailwind's `dark:` variant (which compiles to a
-   `.dark <el>` DESCENDANT selector) can never style the body. With no background
-   of their own, html/body showed the browser-default white wherever the themed
-   wrapper didn't cover — e.g. the white strip at the viewport bottom and in
-   overscroll/scrollbar-gutter areas. Mirror the wrappers' exact backgrounds
-   (light: bg-gray-50, dark: bg-darkBg) via :has(); browsers without :has()
-   simply keep today's white fallback. */
+/* The `dark` class lives on an INNER wrapper div (Layout.tsx, (auth)/layout.tsx)
+   AND, since SSR was restored, on <html> itself (stamped pre-hydration by the
+   script in app/layout.tsx). Tailwind's `dark:` variant compiles to a
+   `.dark <el>` DESCENDANT selector, so it can never style html/body; without a
+   background of their own they showed the browser-default white wherever the
+   themed wrapper didn't cover — the strip at the viewport bottom, overscroll,
+   the scrollbar gutter. Mirror the wrappers' exact backgrounds (light:
+   bg-gray-50, dark: bg-darkBg).
+
+   `html.dark` is the one that matters BEFORE hydration (the inner wrapper is
+   still server-rendered `light` at that point, so :has() would miss); the
+   :has() rules keep working for the inner wrapper after hydration and for the
+   theme toggle. `html.dark body` is needed because plain `body` below would
+   otherwise out-specify the inherited page background. */
 html,
 body {
     @apply bg-gray-50;
 }
 
+html.dark,
+html.dark body,
 html:has(.dark),
 body:has(.dark) {
     @apply bg-darkBg;

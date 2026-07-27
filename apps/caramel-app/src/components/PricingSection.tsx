@@ -65,7 +65,12 @@ export default function PricingSection() {
                     transition={{ duration: 0.6 }}
                     className="mb-20 mt-32 text-center"
                 >
-                    <motion.h2
+                    {/* h1, not h2: this is /pricing's page title, and that route
+                        had no h1 at all. Only PricingPageClient renders this
+                        section, so `/` keeps its single hero h1. Tailwind's
+                        preflight resets heading size/weight to inherit, so the
+                        classes below render this byte-identically to the h2. */}
+                    <motion.h1
                         className="mb-6 text-5xl font-bold text-gray-900 dark:text-white lg:text-4xl"
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
@@ -74,7 +79,7 @@ export default function PricingSection() {
                     >
                         Simple, Transparent{' '}
                         <span className="text-caramel">Pricing</span>
-                    </motion.h2>
+                    </motion.h1>
                     <motion.p
                         className="mx-auto max-w-3xl text-xl text-gray-600 dark:text-gray-300 lg:text-lg"
                         initial={{ opacity: 0 }}
