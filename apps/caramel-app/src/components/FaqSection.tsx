@@ -83,9 +83,16 @@ export default function FaqSection(): React.JSX.Element {
 
                 <div className="mx-auto max-w-4xl space-y-4">
                     {faqItems.map(item => (
+                        /* Opaque base color (bg-gray-50/darkBg = the page bg the
+                           translucent gradient already composited over, so the
+                           card looks identical) — without it the fixed Doodles
+                           ornament layer (z-[1]) showed THROUGH the low-alpha
+                           card gradient and painted "over" the card surface.
+                           z-order was never the issue: this z-10 container
+                           already beats z-[1]; only opacity stops show-through. */
                         <details
                             key={item.question}
-                            className="group overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 shadow-md transition-all duration-300 open:border-caramel/60 hover:border-caramel/60 dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10"
+                            className="group overflow-hidden rounded-2xl border border-caramel/20 bg-gray-50 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 shadow-md transition-all duration-300 open:border-caramel/60 hover:border-caramel/60 dark:border-caramel/30 dark:bg-darkBg dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10"
                         >
                             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6 text-left text-lg font-bold tracking-tight text-gray-800 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/70 dark:text-white sm:p-4 sm:text-base [&::-webkit-details-marker]:hidden">
                                 {item.question}

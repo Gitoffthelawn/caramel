@@ -56,6 +56,12 @@ export default function Footer() {
         // both fail — so the footer runs a deepened caramel pair instead:
         // #c14e14 (4.81:1) → #a63f10 (6.29:1). Same hue family, text stays
         // white. Don't lighten these back to from-caramel without re-checking.
+        //
+        // Re-verified 2026-07-28 — the nav links in linkClasses are the same
+        // white (4.81:1 / 6.29:1 vs the two stops), hover keeps white (underline
+        // only). gray-300 here would FAIL: 3.26:1 / 4.27:1 — never use it on
+        // this gradient. Dark mode swaps the surface to darkSurface #1E1916,
+        // where gray-300 links hit 11.8:1 (hover white 17.4:1) — both pass.
         <footer className="border-t-2 border-dashed border-white/40 bg-gradient-to-br from-[#c14e14] to-[#a63f10] text-white dark:border-caramel/40 dark:bg-darkSurface dark:bg-none">
             <div className="container mx-auto px-6 pt-12">
                 <motion.div
