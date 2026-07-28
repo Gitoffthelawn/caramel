@@ -74,8 +74,8 @@ const contributions = [
 
 const securityFeatures = [
     {
-        title: 'Regular Security Audits',
-        desc: 'Professional security reviews of our codebase',
+        title: 'Open Security Reviews',
+        desc: 'Every change is peer-reviewed in public',
         icon: <FaLock />,
     },
     {
@@ -84,13 +84,13 @@ const securityFeatures = [
         icon: <FaEye />,
     },
     {
-        title: 'No Data Collection',
-        desc: "We don't store or transmit personal information",
+        title: 'No Ad Tracking',
+        desc: 'We never sell or share your personal information',
         icon: <FaBan />,
     },
     {
         title: 'Community Oversight',
-        desc: 'Thousands of developers can audit our code',
+        desc: 'Anyone in the world can audit our code',
         icon: <FaUsers />,
     },
 ]
@@ -120,9 +120,8 @@ export default function OpenSourceSection() {
                     </h2>
                     <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
                         Transparency is our core. Every line of code is open,
-                        auditable, and community-driven. Join thousands of
-                        developers building a better alternative to proprietary
-                        extensions.
+                        auditable, and community-driven. Join the developers
+                        building a better alternative to proprietary extensions.
                     </p>
                 </motion.div>
 
@@ -132,12 +131,17 @@ export default function OpenSourceSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
-                    className="mb-24"
+                    className="mb-16"
                 >
-                    <h3 className="mb-12 text-center text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
+                    <h3 className="mb-8 text-center text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
                         Security Through Transparency
                     </h3>
-                    <div className="grid grid-cols-4 gap-8 lg:grid-cols-2 sm:grid-cols-1">
+                    {/* Deliberately COMPACT: this row supports the two richer
+                        groups below (Community, Contribution Pathways), so its
+                        cards are quiet — small inline icon, tight padding, no
+                        ambient icon/grid animation. Visual hierarchy, not a
+                        third row of hero cards. */}
+                    <div className="grid grid-cols-4 gap-6 lg:grid-cols-2 sm:grid-cols-1">
                         {securityFeatures.map((feature, index) => (
                             <motion.div
                                 key={feature.title}
@@ -170,67 +174,22 @@ export default function OpenSourceSection() {
                                     entrance, a plain child owns the chrome and
                                     the hover. Same reason the icon scale below
                                     rides on its own inner span. */}
-                                <div className="group relative h-full overflow-hidden rounded-3xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-8 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10 sm:p-6">
-                                    <div
-                                        aria-hidden="true"
-                                        className="absolute inset-0 opacity-5"
-                                    >
-                                        <motion.div
-                                            className="h-full w-full"
-                                            style={{
-                                                backgroundImage: `
-                                                linear-gradient(90deg, #ea6925 1px, transparent 1px),
-                                                linear-gradient(#ea6925 1px, transparent 1px)
-                                            `,
-                                                backgroundSize: '20px 20px',
-                                            }}
-                                            animate={
-                                                reduceMotion
-                                                    ? undefined
-                                                    : {
-                                                          backgroundPosition: [
-                                                              '0px 0px',
-                                                              '20px 20px',
-                                                              '0px 0px',
-                                                          ],
-                                                      }
-                                            }
-                                            transition={{
-                                                duration: 8,
-                                                repeat: Infinity,
-                                                ease: 'linear',
-                                                repeatType: 'loop',
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="relative z-10 text-center">
-                                        <motion.div
-                                            className="mx-auto mb-6 flex items-center justify-center text-6xl text-caramel"
-                                            animate={
-                                                reduceMotion
-                                                    ? undefined
-                                                    : {
-                                                          rotate: [0, 2, -2, 0],
-                                                          scale: [1, 1.02, 1],
-                                                      }
-                                            }
-                                            transition={{
-                                                duration: 4,
-                                                repeat: Infinity,
-                                                ease: 'easeInOut',
-                                                repeatType: 'loop',
-                                            }}
+                                <div className="group relative h-full overflow-hidden rounded-2xl border border-caramel/20 bg-gradient-to-br from-caramel/5 via-orange-50/30 to-caramel/5 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:from-caramel/10 dark:via-orange-900/20 dark:to-caramel/10">
+                                    <div className="flex items-start gap-3">
+                                        <span
+                                            aria-hidden="true"
+                                            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-caramel/10 text-lg text-caramel transition-transform duration-300 group-hover:scale-110 dark:bg-caramel/20"
                                         >
-                                            <span className="block transition-transform duration-300 group-hover:scale-110">
-                                                {feature.icon}
-                                            </span>
-                                        </motion.div>
-                                        <h4 className="mb-4 text-2xl font-bold text-gray-800 dark:text-white sm:text-xl">
-                                            {feature.title}
-                                        </h4>
-                                        <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400 sm:text-sm">
-                                            {feature.desc}
-                                        </p>
+                                            {feature.icon}
+                                        </span>
+                                        <div>
+                                            <h4 className="mb-1 text-lg font-bold text-gray-800 dark:text-white">
+                                                {feature.title}
+                                            </h4>
+                                            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                                {feature.desc}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>

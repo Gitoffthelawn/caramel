@@ -46,7 +46,12 @@ const linkClasses =
 
 export default function Footer() {
     return (
-        <footer className="border-t-2 border-dashed border-white/40 bg-gradient-to-br from-caramel to-[#c9531a] text-white dark:border-caramel/40 dark:bg-darkSurface dark:bg-none">
+        // WCAG AA: white 15px links need 4.5:1 against BOTH gradient stops.
+        // The brand slab (from-caramel #ea6925 → #c9531a) gives 3.21/4.43 —
+        // both fail — so the footer runs a deepened caramel pair instead:
+        // #c14e14 (4.81:1) → #a63f10 (6.29:1). Same hue family, text stays
+        // white. Don't lighten these back to from-caramel without re-checking.
+        <footer className="border-t-2 border-dashed border-white/40 bg-gradient-to-br from-[#c14e14] to-[#a63f10] text-white dark:border-caramel/40 dark:bg-darkSurface dark:bg-none">
             <div className="container mx-auto px-6 pt-12">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}

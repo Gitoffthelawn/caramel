@@ -20,19 +20,19 @@ const features = [
     {
         title: 'Automated Coupon Application',
         desc: 'Saves you money by finding and applying the best coupon codes.',
-        detail: 'We monitor thousands of coupon codes across 5,000+ stores, ensuring you always get the best deal without lifting a finger.',
+        detail: 'We monitor thousands of coupon codes across 3,000+ stores, ensuring you always get the best deal without lifting a finger.',
         icon: <FaDollarSign />,
     },
     {
         title: 'Privacy-First & Transparent',
-        desc: "Your data stays yours. We don't track, sell, or monetize your information.",
-        detail: 'Unlike other extensions, we never collect personal data, track your browsing, or hijack affiliate commissions from content creators.',
+        desc: 'Your data stays yours. We never sell or monetize your personal information.',
+        detail: 'Unlike other extensions, we never sell your data, build ad profiles, or hijack affiliate commissions from content creators.',
         icon: <FaLock />,
     },
     {
         title: '100% Open Source',
-        desc: 'Our entire codebase is public and community-driven.',
-        detail: 'Join our GitHub to contribute features, report issues, or request enhancements. Audited by security professionals for your peace of mind.',
+        desc: 'Our extension and web app are fully public and community-driven.',
+        detail: 'Join our GitHub to contribute features, report issues, or request enhancements. Reviewed in the open by contributors and the community.',
         icon: <FaStar />,
     },
     {
@@ -58,13 +58,13 @@ const features = [
 const comparisonItems = [
     {
         title: 'Privacy Protection',
-        other: 'Sells your personal data',
+        other: 'Opaque data practices',
         caramel: '100% privacy-first approach',
     },
     {
         title: 'Data Collection',
         other: 'Tracks your browsing habits',
-        caramel: 'Zero tracking or data collection',
+        caramel: 'No ad tracking or data selling',
     },
     {
         title: 'Creator Support',
@@ -74,7 +74,7 @@ const comparisonItems = [
     {
         title: 'Code Transparency',
         other: 'Closed source & hidden',
-        caramel: 'Fully open source & audited',
+        caramel: 'Fully open source & peer-reviewed',
     },
     {
         title: 'Performance',

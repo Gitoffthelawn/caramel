@@ -105,9 +105,12 @@ test.describe('Home Page - Critical Sections', () => {
         await comparison.scrollIntoViewIfNeeded()
         await expect(comparison).toBeVisible()
 
-        await expect(page.getByText('Privacy Protection')).toBeVisible()
+        // Assert on the comparison cells that actually render (the row
+        // titles are data-only keys) — copy updated in the claim-integrity
+        // sweep, keep in sync with FeaturesSection's comparisonItems.
+        await expect(page.getByText('Opaque data practices')).toBeVisible()
         await expect(
-            page.getByRole('heading', { name: /data collection/i }),
+            page.getByText('No ad tracking or data selling'),
         ).toBeVisible()
     })
 })
