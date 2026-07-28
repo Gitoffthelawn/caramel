@@ -1,5 +1,10 @@
 'use client'
 
+import {
+    DISCORD_INVITE_URL,
+    GITHUB_REPO_URL,
+    INSTAGRAM_URL,
+} from '@/lib/brandLinks'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -22,17 +27,17 @@ const productLinks = [
 const communityLinks = [
     {
         name: 'GitHub',
-        url: 'https://github.com/DevinoSolutions/caramel',
+        url: GITHUB_REPO_URL,
         icon: <FaGithub aria-hidden="true" />,
     },
     {
         name: 'Discord',
-        url: 'https://discord.com/invite/2vVVrQ5CEB',
+        url: DISCORD_INVITE_URL,
         icon: <FaDiscord aria-hidden="true" />,
     },
     {
         name: 'Instagram',
-        url: 'https://www.instagram.com/grab.caramel/',
+        url: INSTAGRAM_URL,
         icon: <RiInstagramFill aria-hidden="true" />,
     },
 ]

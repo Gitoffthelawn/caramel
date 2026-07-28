@@ -98,6 +98,20 @@ describe('StoreCouponsPage — CouponListRow + TotalCountRow', () => {
         ])
         expect(couponsSectionEl.props.initialTotal).toBe(1)
 
+        // AEO prose (2026-07-28): the page also server-renders a visible
+        // "How Caramel finds …" section whose count is the SAME `total` the
+        // list uses — assert it exists, states the live count, and renders no
+        // fabricated freshness date (no verification timestamp exists in the
+        // row data, so none may appear).
+        const proseEl = children.find(
+            c => (c as ReactElement)?.type === 'section',
+        )
+        expect(proseEl).toBeTruthy()
+        const proseJson = JSON.stringify(proseEl)
+        expect(proseJson).toContain('How Caramel finds ')
+        expect(proseJson).toContain('1 active coupon code')
+        expect(proseJson).not.toMatch(/last verified|verified on/i)
+
         // oxlint-disable-next-line no-underscore-dangle -- React's own prop name
         const structuredData = JSON.parse(
             scriptEl!.props.dangerouslySetInnerHTML.__html,
@@ -134,5 +148,24 @@ describe('StoreCouponsPage — CouponListRow + TotalCountRow', () => {
 
         expect(couponsSectionEl.props.initialCoupons).toEqual([])
         expect(couponsSectionEl.props.initialTotal).toBe(0)
+    })
+
+    it('with zero coupons the prose section says so honestly instead of inventing a count', async () => {
+        mockRows(
+            sql => sql.includes('FROM coupons') && sql.includes('LIMIT'),
+            [],
+        )
+        mockRows(sql => sql.includes('COUNT(*)::int AS total'), [{ total: 0 }])
+
+        const mainEl = (await StoreCouponsPage({
+            params: { store: 'example.com' },
+        })) as ReactElement<{ children: ReactElement[] }>
+
+        const proseEl = mainEl.props.children.find(
+            c => (c as ReactElement)?.type === 'section',
+        )
+        const proseJson = JSON.stringify(proseEl)
+        expect(proseJson).toContain('has no active coupon codes')
+        expect(proseJson).not.toContain('currently lists')
     })
 })
