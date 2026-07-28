@@ -429,7 +429,7 @@ export default function CouponsSection({
 
                     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg dark:border-white/10 dark:bg-darkSurface">
                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            5,000+ Supported Stores
+                            3,000+ Supported Stores
                         </p>
                         <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                             From major retailers to niche marketplaces, Caramel

@@ -6,12 +6,12 @@ import { HiCheckCircle } from 'react-icons/hi'
 
 const features = [
     'Automated coupon application at checkout',
-    'Works on 5,000+ supported stores',
-    'Zero tracking or data collection',
+    'Works on 3,000+ supported stores',
+    'Zero ads or data selling',
     'Open source & community-driven',
     'Never hijacks affiliate commissions',
     'Lightning fast performance',
-    'Cross-browser support (Chrome, Firefox, Edge, Safari)',
+    'Cross-browser support (Chrome, Firefox, Edge, iOS Safari)',
     'Regular updates & new features',
     'No credit card required',
     'No hidden fees ever',
@@ -29,7 +29,7 @@ const stats = [
         icon: <FaGithub />,
     },
     {
-        title: '5,000+',
+        title: '3,000+',
         desc: 'Stores Supported',
         icon: <FaHeart />,
     },
@@ -311,9 +311,10 @@ export default function PricingSection() {
                             <strong className="text-caramel">
                                 100% Open Source.
                             </strong>{' '}
-                            Our entire codebase is public on GitHub. Anyone can
-                            audit, contribute, or fork the project. This
-                            transparency ensures we stay true to our mission.
+                            Our extension and web app are public on GitHub.
+                            Anyone can audit, contribute, or fork the project.
+                            This transparency ensures we stay true to our
+                            mission.
                         </motion.p>
                         <motion.p
                             initial={{ opacity: 0 }}
@@ -324,9 +325,9 @@ export default function PricingSection() {
                             <strong className="text-caramel">
                                 Your privacy matters.
                             </strong>{' '}
-                            We don't track your browsing, sell your data, or
-                            serve ads. Caramel exists to save you money, not to
-                            profit from your information.
+                            We never sell your data, build ad profiles, or serve
+                            ads. Caramel exists to save you money, not to profit
+                            from your information.
                         </motion.p>
                     </div>
                 </motion.div>

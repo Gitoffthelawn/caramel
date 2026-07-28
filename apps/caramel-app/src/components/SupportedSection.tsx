@@ -96,7 +96,7 @@ export default function SupportedSection() {
                     className="mb-20 text-center"
                 >
                     <h2 className="mb-8 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text pb-1 text-5xl font-extrabold leading-tight tracking-tight text-transparent lg:text-4xl">
-                        5,000+ Supported Stores
+                        3,000+ Supported Stores
                     </h2>
                     <p className="max-w mx-auto text-xl leading-relaxed text-gray-600 dark:text-gray-300 lg:text-lg">
                         From major retailers to niche marketplaces, Caramel

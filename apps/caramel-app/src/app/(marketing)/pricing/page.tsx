@@ -4,7 +4,7 @@ import PricingPageClient from './PricingPageClient'
 
 const title = 'Caramel Pricing | Free Forever Coupon Extension'
 const description =
-    'Caramel is 100% free, open source, and privacy-first. No hidden fees, no data tracking, no credit card required. Save money with the trusted alternative to Honey.'
+    'Caramel is 100% free, open source, and privacy-first. No hidden fees, no data selling, no credit card required. Save money with the trusted alternative to Honey.'
 const canonicalUrl = 'https://grabcaramel.com/pricing'
 const base = BASE_URL
 const banner = `${base}/caramel_banner.png`
