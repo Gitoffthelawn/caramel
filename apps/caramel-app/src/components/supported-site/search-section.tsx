@@ -4,34 +4,23 @@ import Loader from '@/components/Loader'
 import { AnimatePresence, motion } from 'framer-motion'
 import debounce from 'lodash.debounce'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import SiteCard from './site-card'
 import SuggestionForm from './suggestion-form'
 
-export default function SearchSection() {
+export default function SearchSection({
+    initialTopSites,
+}: {
+    /** Server-rendered "Top Supported Websites" (SEO) — same read as /api/sites/top-sites. */
+    initialTopSites: string[]
+}) {
     const [query, setQuery] = useState('')
-    const [sites, setSites] = useState([])
-    const [topSites, setTopSites] = useState([])
+    const [sites, setSites] = useState<string[]>([])
+    // No mount-time fetch: the /supported-stores server component passes the
+    // top sites down so they are already in the server-rendered HTML.
+    const topSites = initialTopSites
     const [loading, setLoading] = useState(false)
     const [searched, setSearched] = useState(false)
 
-    const loadTopSites = async () => {
-        setLoading(true)
-        setSearched(false)
-        setSites([])
-        try {
-            const res = await fetch('/api/sites/top-sites')
-            const data = await res.json()
-            setTopSites(data.sites || [])
-        } catch (err) {
-            toast.error('Failed to load top sites.')
-            console.error('Failed to load top sites:', err)
-        }
-        setLoading(false)
-    }
-    useEffect(() => {
-        loadTopSites()
-    }, [])
     const runSearch = async (q: string) => {
         setLoading(true)
         try {
