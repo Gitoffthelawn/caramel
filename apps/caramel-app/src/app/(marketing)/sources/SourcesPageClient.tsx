@@ -2,8 +2,9 @@
 import Doodles from '@/components/Doodles'
 import { ThemeContext } from '@/lib/contexts'
 import { decryptJsonData } from '@/lib/securityHelpers/decryptJsonData'
+import type { SourceMetrics } from '@/lib/sourceMetrics'
 import { motion } from 'framer-motion'
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useState } from 'react'
 import {
     Bar,
     CartesianGrid,
@@ -17,29 +18,27 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
-// numberOfCoupons/successRate are `number` — matches SourceMetrics in
-// app/api/sources/route.ts (the only producer of this shape). Previously
-// declared `string` here despite the server always sending numbers; the
-// mismatch was masked by `parseInt/parseFloat(x as any)`, which round-trips
-// an already-numeric value unchanged (String() then re-parse). Correcting
-// the type here removes the dead casts below with no behavior change.
-interface Source {
-    id: string
-    source: string
-    websites: string[]
-    numberOfCoupons: number
-    successRate: number
-}
+// The row shape is the shared SourceMetrics from lib/sourceMetrics.ts — the
+// ONE producer both the SSR page (initialSources prop) and the /api/sources
+// refetch below go through, so the two can never drift.
 
-export default function SourcesPageClient() {
-    const [sources, setSources] = useState<Source[]>([])
-    const [loading, setLoading] = useState(true)
+export default function SourcesPageClient({
+    initialSources,
+}: {
+    /** Server-rendered initial table (SEO) — same mapper as /api/sources. */
+    initialSources: SourceMetrics[]
+}) {
+    const [sources, setSources] = useState<SourceMetrics[]>(initialSources)
+    const [loading, setLoading] = useState(false)
     const [loadError, setLoadError] = useState(false)
     const [websitesInput, setWebsitesInput] = useState('')
     const [showModal, setShowModal] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const { isDarkMode } = useContext(ThemeContext)
 
+    // No mount-time fetch anymore: the server component already rendered the
+    // initial data into the HTML. This refetch runs only after submitting a
+    // new source, to refresh the table through the API.
     const fetchSources = async () => {
         setLoading(true)
         setLoadError(false)
@@ -47,7 +46,9 @@ export default function SourcesPageClient() {
             const res = await fetch('/api/sources')
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
-            const plainObj = await decryptJsonData<{ data?: Source[] }>(data)
+            const plainObj = await decryptJsonData<{ data?: SourceMetrics[] }>(
+                data,
+            )
             setSources(Array.isArray(plainObj?.data) ? plainObj.data : [])
         } catch (error) {
             console.error('Error fetching sources:', error)
@@ -57,10 +58,6 @@ export default function SourcesPageClient() {
             setLoading(false)
         }
     }
-
-    useEffect(() => {
-        fetchSources()
-    }, [])
 
     const isValidUrl = (url: string): boolean => {
         try {
@@ -114,7 +111,7 @@ export default function SourcesPageClient() {
     }))
 
     return (
-        <main className="relative min-h-screen overflow-x-clip bg-gray-50 p-6 text-gray-800 dark:bg-transparent dark:text-gray-50">
+        <main className="relative min-h-screen overflow-x-clip bg-gray-50 p-6 text-gray-800 dark:bg-darkBg dark:text-gray-50">
             <Doodles />
             <motion.h1
                 className="mb-4 text-center text-4xl font-bold text-caramel"
@@ -129,7 +126,7 @@ export default function SourcesPageClient() {
                         role="dialog"
                         aria-modal="true"
                         aria-label="Submit a New Source"
-                        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-darkerBg"
+                        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:border dark:border-caramel/30 dark:bg-darkSurface"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
@@ -164,20 +161,20 @@ export default function SourcesPageClient() {
                                     onChange={e =>
                                         setWebsitesInput(e.target.value)
                                     }
-                                    className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-black transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-gray-700 dark:bg-darkBg dark:text-white dark:placeholder-gray-500"
+                                    className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-black transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-white/10 dark:bg-darkBg dark:text-white dark:placeholder-gray-500"
                                 />
                             </div>
                             <div className="flex justify-end space-x-2">
                                 <button
                                     type="button"
-                                    className="transform rounded-lg bg-gray-500 px-4 py-2 text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkerBg"
+                                    className="transform rounded-lg bg-gray-500 px-4 py-2 text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkSurface"
                                     onClick={() => setShowModal(false)}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="transform rounded-lg bg-caramel px-4 py-2 font-semibold text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkerBg"
+                                    className="transform rounded-lg bg-caramel px-4 py-2 font-semibold text-white transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkSurface"
                                 >
                                     Submit
                                 </button>
@@ -206,11 +203,11 @@ export default function SourcesPageClient() {
                         aria-label="Search sources"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-black shadow-sm transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-gray-700 dark:bg-darkerBg dark:text-white dark:placeholder-gray-500"
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-black shadow-sm transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/40 dark:border-white/10 dark:bg-darkSurface dark:text-white dark:placeholder-gray-500"
                     />
                 </div>
                 <div className="grid grid-cols-1 gap-6">
-                    <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-gray-800 dark:bg-darkerBg">
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-caramel/30 dark:bg-darkSurface">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-gray-100 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:bg-darkBg dark:text-gray-300">
@@ -248,7 +245,7 @@ export default function SourcesPageClient() {
                                     filteredSources.map(src => (
                                         <tr
                                             key={src.id}
-                                            className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-darkBg/50"
+                                            className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-white/10 dark:hover:bg-darkBg/50"
                                         >
                                             <td className="px-4 py-3 font-medium">
                                                 {src.source}
@@ -280,7 +277,7 @@ export default function SourcesPageClient() {
                             </tbody>
                         </table>
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-gray-800 dark:bg-darkerBg">
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow dark:border-caramel/30 dark:bg-darkSurface">
                         <div className="h-96 w-full">
                             {loading ? (
                                 <div className="flex h-full items-center justify-center text-gray-500">

@@ -1,6 +1,14 @@
+import { listActiveSources } from '@/lib/couponsRepo'
 import { BASE_URL } from '@/lib/env.client'
+import { toSourceMetrics } from '@/lib/sourceMetrics'
 import type { Metadata } from 'next'
 import SourcesPageClient from './SourcesPageClient'
+
+// This page reads the coupon catalog from Postgres, and the production image
+// builds against a deliberately unreachable placeholder DATABASE_URL (see the
+// Dockerfile's `.invalid` builder env) — so it must be rendered per-request,
+// never prerendered at build time (same pattern as app/sitemap.ts).
+export const dynamic = 'force-dynamic'
 
 const title = 'Where Caramel Coupon Codes Come From | Sources'
 const description =
@@ -40,6 +48,11 @@ export const metadata: Metadata = {
     },
 }
 
-export default function SourcesPage() {
-    return <SourcesPageClient />
+export default async function SourcesPage() {
+    // SEO: fetch the initial table server-side (same read + mapper as
+    // /api/sources) so crawlers get the populated HTML instead of the old
+    // client-fetch "Loading..." shell. The client keeps refetching through
+    // the API after a source submission.
+    const initialSources = toSourceMetrics(await listActiveSources())
+    return <SourcesPageClient initialSources={initialSources} />
 }
