@@ -12,6 +12,7 @@ import {
     FaShieldAlt,
     FaTimesCircle,
 } from 'react-icons/fa'
+import { HiCheckCircle } from 'react-icons/hi'
 
 const VIDEO_ID = 'vc4yL3YTwWk'
 const VIDEO_TITLE = 'The Truth About Honey'
@@ -19,11 +20,11 @@ const VIDEO_TITLE = 'The Truth About Honey'
 // allowlisted in next.config.mjs images.remotePatterns.
 const VIDEO_THUMBNAIL = `https://i.ytimg.com/vi/${VIDEO_ID}/maxresdefault.jpg`
 
-// This copy isn't rendered by the JSX below yet (F-009 oxlint sweep found
-// it while adding the gate — flagged as a new-finding candidate: either
-// wire up a comparison grid or delete the dead copy; not this finding's
-// call to make).
-// oxlint-disable-next-line no-unused-vars
+// Rendered as the "Honey vs Caramel" comparison below (wired 2026-07-28 —
+// this copy sat unrendered since the F-009 oxlint sweep flagged it). The
+// Honey-side claims are documented public reporting (affiliate-link
+// replacement, data collection, creator revenue loss, closed source); the
+// Caramel-side claims are scoped to what the extension verifiably does.
 const problemsWithHoney = [
     {
         title: 'Affiliate Link Hijacking',
@@ -47,17 +48,19 @@ const problemsWithHoney = [
     },
 ]
 
-// Same as problemsWithHoney above: unrendered, flagged as a new-finding
-// candidate rather than deleted here.
-// oxlint-disable-next-line no-unused-vars
+// Paired row-for-row with problemsWithHoney in the comparison grid below.
+// "No Data Selling" is deliberately NOT "zero data collection": the extension
+// does send cart/page context to Caramel's own API to classify the cart, and
+// the website runs standard analytics — the honest, verifiable claim is that
+// personal information is never sold or shared (claim-verify ruling 2026-07-28).
 const caramelSolutions = [
     {
         title: 'Respects Creator Links',
         desc: 'We never override affiliate links - creators keep 100% of their rightful commissions',
     },
     {
-        title: 'Zero Data Collection',
-        desc: "Your browsing habits stay private - we don't track, store, or sell your personal information",
+        title: 'No Data Selling',
+        desc: 'Your browsing habits stay private - we never sell or share your personal information',
     },
     {
         title: 'Supports Content Creators',
@@ -65,7 +68,7 @@ const caramelSolutions = [
     },
     {
         title: 'Fully Open Source',
-        desc: 'Every line of code is public and auditable - see exactly what we do with your data',
+        desc: 'Every line of code is public and auditable under the AGPL-3.0 license - see exactly what the extension does',
     },
 ]
 
@@ -214,6 +217,111 @@ export default function WhyNotHoneySection() {
                             Watch on YouTube
                         </motion.a>
                     </motion.div>
+                </motion.div>
+
+                {/* Honey vs Caramel — the NAMED comparison. Same table
+                    treatment as FeaturesSection's "Caramel vs Others" (classes
+                    copied, not refactored — that file is owned by a parallel
+                    branch): one header row, muted losing column, tinted+ringed
+                    winning column. */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="mb-24"
+                >
+                    <div className="mb-12 text-center">
+                        <h3 className="mb-4 text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white lg:text-2xl">
+                            Honey vs Caramel
+                        </h3>
+                        <p className="mx-auto max-w-2xl text-gray-600 dark:text-gray-400">
+                            The documented problems with Honey — and what
+                            Caramel does instead
+                        </p>
+                    </div>
+
+                    <div className="mx-auto max-w-5xl">
+                        {/* ONE column header for the whole table; padding
+                            mirrors the row cells' so the edges line up. */}
+                        <div className="mb-4 grid grid-cols-2">
+                            <div className="px-6 text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 sm:px-4">
+                                Honey
+                            </div>
+                            <div className="px-6 text-sm font-semibold uppercase tracking-wide text-caramel sm:px-4">
+                                Caramel
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {problemsWithHoney.map((problem, index) => {
+                                const solution = caramelSolutions[index]
+                                return (
+                                    <motion.div
+                                        key={problem.title}
+                                        initial={
+                                            reduceMotion
+                                                ? { opacity: 0 }
+                                                : { opacity: 0, y: 10 }
+                                        }
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{
+                                            once: true,
+                                            margin: '0px 0px -60px 0px',
+                                        }}
+                                        transition={{
+                                            duration: 0.4,
+                                            delay: index * 0.08,
+                                            ease: 'easeOut',
+                                        }}
+                                    >
+                                        {/* Chrome + hover live on this plain
+                                            div: framer writes an inline
+                                            transform on the motion wrapper,
+                                            which would beat any Tailwind
+                                            hover translate placed there. */}
+                                        <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 ease-caramel hover:-translate-y-1 hover:border-caramel/60 hover:shadow-[0_12px_32px_-8px_rgba(234,105,37,0.35)] dark:border-caramel/30 dark:bg-darkSurface">
+                                            {/* Losing column — muted so the
+                                                eye lands on Caramel. */}
+                                            <div className="flex items-start gap-4 p-6 opacity-50 sm:gap-3 sm:p-4">
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="mt-1 flex-shrink-0 text-xl text-red-500"
+                                                >
+                                                    {problem.icon}
+                                                </span>
+                                                <div>
+                                                    <h4 className="mb-1 font-bold text-gray-900 dark:text-white">
+                                                        {problem.title}
+                                                    </h4>
+                                                    <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                                        {problem.desc}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Winning column — inset ring so
+                                                overflow-hidden can't clip it. */}
+                                            <div className="flex items-start gap-4 bg-caramel/[0.08] p-6 ring-1 ring-inset ring-caramel/40 sm:gap-3 sm:p-4">
+                                                <HiCheckCircle
+                                                    aria-hidden="true"
+                                                    className="mt-1 h-6 w-6 flex-shrink-0 text-caramel"
+                                                />
+                                                <div>
+                                                    <h4 className="mb-1 font-bold text-gray-900 dark:text-white">
+                                                        {solution.title}
+                                                    </h4>
+                                                    <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                                        {solution.desc}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )
+                            })}
+                        </div>
+                    </div>
                 </motion.div>
 
                 {/* Call to Action */}

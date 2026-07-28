@@ -1,4 +1,5 @@
 import Doodles from '@/components/Doodles'
+import FaqSection from '@/components/FaqSection'
 import FeaturesSection from '@/components/FeaturesSection'
 import HeroSection from '@/components/HeroSection'
 import HomeClientEffects from '@/components/HomeClientEffects'
@@ -48,6 +49,11 @@ export default function Page(): React.JSX.Element {
                     glowClassName="bg-gradient-to-r from-transparent via-orange-300/20 to-transparent blur-sm"
                 />
                 <OpenSourceSection />
+                <SectionDivider
+                    lineClassName="bg-gradient-to-r from-transparent via-caramel/40 to-transparent"
+                    glowClassName="bg-gradient-to-r from-transparent via-orange-500/20 to-transparent blur-sm"
+                />
+                <FaqSection />
             </div>
         </main>
     )

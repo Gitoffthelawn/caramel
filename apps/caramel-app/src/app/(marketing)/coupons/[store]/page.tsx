@@ -149,6 +149,39 @@ export default async function StoreCouponsPage({
                 heroTitle={`Best ${base} coupon codes today`}
                 heroSubtitle={`Save at ${base} with Caramel—the privacy-first coupon finder that applies the top deals automatically at checkout.`}
             />
+            {/* AEO citable prose — server-rendered visible copy (AI engines
+                extract visible HTML, not JSON-LD). The count is the same
+                server-side `total` the list uses; the mechanics paragraph is
+                generic and truthful (no per-store invented facts). No
+                freshness/"last verified" date is rendered because no such
+                verification timestamp exists in the row data. */}
+            <section
+                aria-labelledby="how-caramel-works-heading"
+                className="mx-auto max-w-4xl pb-24 pt-16"
+            >
+                <h2
+                    id="how-caramel-works-heading"
+                    className="mb-4 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
+                >
+                    How Caramel finds {base} coupon codes
+                </h2>
+                <p className="mb-4 leading-relaxed text-gray-600 dark:text-gray-400">
+                    {total > 0
+                        ? `Caramel's catalog currently lists ${total.toLocaleString('en-US')} active coupon ${total === 1 ? 'code' : 'codes'} for ${base}.`
+                        : `Caramel's catalog has no active coupon codes for ${base} right now — new codes are added automatically as they are found.`}{' '}
+                    The Caramel coupon extension is free, open source, and
+                    available for Chrome, Firefox, Edge, and Safari.
+                </p>
+                <p className="leading-relaxed text-gray-600 dark:text-gray-400">
+                    When you reach checkout on {base}, Caramel looks up the
+                    codes for that store from its own catalog, tries them in the
+                    promo-code field, and keeps the one with the biggest
+                    discount. It never replaces affiliate links, and it reports
+                    back only whether a code worked — with no account
+                    information attached — so code rankings stay accurate for
+                    every shopper.
+                </p>
+            </section>
             <script
                 type="application/ld+json"
                 suppressHydrationWarning

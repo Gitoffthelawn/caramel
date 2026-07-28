@@ -1,5 +1,6 @@
 'use client'
 
+import { CHROME_WEB_STORE_URL, FIREFOX_ADDONS_URL } from '@/lib/brandLinks'
 import { motion } from 'framer-motion'
 import { FaChrome, FaFirefox } from 'react-icons/fa'
 
@@ -16,7 +17,7 @@ export default function StoreButtons() {
             </motion.div>
             <div className="grid grid-cols-2 gap-8 xs:grid-cols-1">
                 <motion.a
-                    href="https://chromewebstore.google.com/detail/caramel-trusted-honey-alt/gaimofgglbackoimfjopicmbmnlccfoe"
+                    href={CHROME_WEB_STORE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-xl border-[1.5px] border-black px-3 py-1.5 text-black transition-transform duration-200 ease-in-out hover:scale-105 hover:border-caramel hover:bg-caramel hover:text-white dark:border-white dark:text-white"
@@ -35,7 +36,7 @@ export default function StoreButtons() {
                 </motion.a>
                 <motion.a
                     target="_blank"
-                    href="https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/"
+                    href={FIREFOX_ADDONS_URL}
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-xl border-[1.5px] border-black px-3 py-1.5 text-black transition-transform duration-200 ease-in-out hover:scale-105 hover:border-caramel hover:bg-caramel hover:text-white dark:border-white dark:text-white"
                 >

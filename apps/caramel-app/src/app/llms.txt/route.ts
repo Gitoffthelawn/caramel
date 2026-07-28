@@ -1,3 +1,10 @@
+import {
+    CHROME_WEB_STORE_URL,
+    EDGE_ADDONS_URL,
+    FIREFOX_ADDONS_URL,
+    GITHUB_REPO_URL,
+    SAFARI_APP_STORE_URL,
+} from '@/lib/brandLinks'
 import { BASE_URL } from '@/lib/env.client'
 
 // Deliberately NOT a `withRoute` handler: withRoute owns the /api surface
@@ -15,9 +22,9 @@ const LLMS_TXT = `# Caramel
 
 ## What it is
 
-- A browser extension for Chrome, Firefox, and Edge.
+- A browser extension for Chrome, Firefox, Edge, and Safari.
 - Free to use, with no paid tier and no account required to install.
-- Open source under the DevinoSolutions organization: https://github.com/DevinoSolutions/caramel
+- Open source under the DevinoSolutions organization: ${GITHUB_REPO_URL}
 - Positioned as an alternative to Honey for shoppers who care about privacy and
   about not hijacking creator commissions.
 
@@ -36,16 +43,17 @@ const LLMS_TXT = `# Caramel
   per store domain, e.g. /coupons/amazon.com or /coupons/nike.com.
 - [Supported stores](${origin}/supported-stores): which stores Caramel can
   auto-apply codes on.
-- [Sources](${origin}/sources): where Caramel's coupon codes come from, with
-  per-source coupon counts and success rates.
+- [Sources](${origin}/sources): the transparency page listing where Caramel's
+  coupon codes come from.
 - [Privacy policy](${origin}/privacy): what data Caramel does and does not
   collect.
 
 ## Install
 
-- Chrome Web Store: https://chromewebstore.google.com/detail/caramel-trusted-honey-alt/gaimofgglbackoimfjopicmbmnlccfoe
-- Firefox Add-ons: https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/
-- Microsoft Edge Add-ons: https://microsoftedge.microsoft.com/addons/detail/caramel/leodahchedhnenmiengkfpmmcdendnof
+- Chrome Web Store: ${CHROME_WEB_STORE_URL}
+- Firefox Add-ons: ${FIREFOX_ADDONS_URL}
+- Microsoft Edge Add-ons: ${EDGE_ADDONS_URL}
+- Safari (App Store): ${SAFARI_APP_STORE_URL}
 `
 
 export function GET(): Response {

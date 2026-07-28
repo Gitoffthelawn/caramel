@@ -113,4 +113,47 @@ test.describe('Home Page - Critical Sections', () => {
             page.getByText('No ad tracking or data selling'),
         ).toBeVisible()
     })
+
+    test('Honey vs Caramel named comparison renders both columns', async ({
+        page,
+    }) => {
+        const heading = page.getByRole('heading', {
+            name: 'Honey vs Caramel',
+        })
+        await heading.scrollIntoViewIfNeeded()
+        await expect(heading).toBeVisible()
+
+        // One documented Honey-side claim and its paired Caramel-side answer.
+        await expect(page.getByText('Affiliate Link Hijacking')).toBeVisible()
+        await expect(page.getByText('Respects Creator Links')).toBeVisible()
+        // The re-scoped privacy claim (never "zero data collection").
+        await expect(page.getByText('No Data Selling')).toBeVisible()
+    })
+
+    test('FAQ section renders visible answers and matching FAQPage JSON-LD', async ({
+        page,
+    }) => {
+        const faq = page.locator('#faq')
+        await faq.scrollIntoViewIfNeeded()
+        await expect(
+            page.getByRole('heading', { name: 'Frequently Asked Questions' }),
+        ).toBeVisible()
+        await expect(
+            faq.getByText(
+                'Does Caramel replace or hijack creator affiliate links?',
+            ),
+        ).toBeVisible()
+
+        // The FAQPage + Organization/SoftwareApplication entity markup is
+        // server-rendered on the landing page (deployment-safe: no DB).
+        const jsonLdBlocks = await page
+            .locator('script[type="application/ld+json"]')
+            .allTextContents()
+        expect(jsonLdBlocks.some(t => t.includes('"FAQPage"'))).toBe(true)
+        expect(
+            jsonLdBlocks.some(t => t.includes('"SoftwareApplication"')),
+        ).toBe(true)
+        // Claim-integrity rule: no invented social proof, ever.
+        expect(jsonLdBlocks.some(t => /aggregateRating/i.test(t))).toBe(false)
+    })
 })
