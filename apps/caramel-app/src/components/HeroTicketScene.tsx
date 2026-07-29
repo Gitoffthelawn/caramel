@@ -4,7 +4,7 @@
 // desktop/lg+ only). Same ticket visual language as the shared ./couponTicket3d
 // geometry + palette, deliberately LIGHT: one big main ticket with springy
 // mouse-parallax tilt + Float, PLUS three LARGE 3D stat coupons (each a real
-// ticket mesh at 0.62–0.71× the main coupon's size) SCATTERED around it at
+// ticket mesh at 0.68–0.81× the main coupon's size) SCATTERED around it at
 // varied depths — an art-directed "random soft floating" composition, not a
 // row. Each stat coupon drifts/bobs/sways on its own frequency + phase (never
 // in sync), and reacts to the pointer: the coupon nearest the cursor gently
@@ -28,7 +28,7 @@
 // The per-coupon pointer reaction adds one Vector3 project per stat coupon per
 // frame (3 total) — negligible.
 
-import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
+import { formatStatDigits, HERO_STATS, useCountUp } from '@/lib/heroStats'
 import {
     Environment,
     Float,
@@ -37,7 +37,7 @@ import {
     Text,
 } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
     CARAMEL,
@@ -67,18 +67,19 @@ const MAIN_POS: [number, number, number] = [-0.15, 0.9, 0.1]
 // drei Float on the main card translates ~±0.05 world at floatIntensity 0.45.
 const MAIN_FLOAT_SLACK = 0.06
 
-// The three stat coupons — ONE shared geometry, deliberately BIG (w 2.2 =
-// 0.71× the main coupon's 3.1) so they read as siblings of the hero ticket,
-// not chips. Per-coupon size variety comes from SCATTER[i].scale, not from
-// separate geometries. Front-face Z (post-center) is depth/2 + bevel.
+// The three stat coupons — ONE shared geometry, deliberately BIG (w 2.5 =
+// 0.81× the main coupon's 3.1, up from 2.2 after the 2026-07-29 design pass)
+// so they read as siblings of the hero ticket, not chips. Per-coupon size
+// variety comes from SCATTER[i].scale, not from separate geometries.
+// Front-face Z (post-center) is depth/2 + bevel.
 const STAT = {
-    w: 2.2,
-    h: 1.42,
-    cr: 0.18,
-    nr: 0.16,
+    w: 2.5,
+    h: 1.6,
+    cr: 0.2,
+    nr: 0.18,
     ny: 0,
-    depth: 0.3,
-    bevel: 0.045,
+    depth: 0.32,
+    bevel: 0.05,
 }
 const STAT_FRONT = STAT.depth / 2 + STAT.bevel
 
@@ -97,14 +98,24 @@ const STAT_FRONT = STAT.depth / 2 + STAT.bevel
 //       guarantee is POINTER-PROOF by construction: the main card's parallax
 //       is capped at rotY 0.25 / rotX 0.2 (see HeroCard), so its top-right
 //       corner's worst forward swing is 0.1 + 1.55·sin(0.25) + 1.05·sin(0.2)
-//       ≈ 0.69, while this coupon's overlapping corner never dips below
-//       ≈ z 0.65 + 0.10 (field parallax moves it forward on the same pointer
-//       side that swings the main corner forward). Iteration-3's z 0.35 +
-//       main rotY 0.5 violated exactly this and re-ate the label on hover.
+//       ≈ 0.69, while this coupon's overlapping lower-left corner never dips
+//       below ≈ z 0.72 + 0.20 (field parallax, forward on the same pointer
+//       side that swings the main corner forward) − 0.19 (its own worst
+//       rotY+sway corner dip, 1.05·0.84·sin(0.18)) ≈ 0.73. Iteration-3's
+//       z 0.35 + main rotY 0.5 violated exactly this and re-ate the label on
+//       hover — the 2026-07-29 resize kept the margin by bumping z 0.65→0.72.
 //   [2] "0% Data Selling" — mid-right and the DEEPEST ticket, so the four
-//       tickets cascade top-right → bottom-left (1.9 / 0.9 / −0.95 / −1.35)
+//       tickets cascade top-right → bottom-left (1.72 / 0.9 / −1.06 / −1.38)
 //       instead of pairing into a residual bottom row, with depth spread
-//       front→back (0.65 / 0.4 / 0.1 / −0.5).
+//       front→back (0.72 / 0.45 / 0.1 / −0.55). Its y sits low enough that
+//       its top edge keeps clear air from the main card's bottom-right corner
+//       at rest (iteration-1 screenshots showed them nearly touching at −0.98
+//       — a second, accidental-looking overlap moment; the deliberate overlap
+//       belongs to [1] alone).
+// The 2026-07-29 bigger-coupon pass pulled every |x|/|y| slightly INWARD:
+// SCENE_BOUNDS is derived from these numbers, so tighter anchors mean a LARGER
+// fit scale — the bigger tickets land bigger on screen instead of being eaten
+// by their own bounds growth (fit 0.62 → 0.65 at the reference viewport).
 // Frequencies/phases are mutually irrational-ish so no two coupons ever sync.
 interface ScatterSpot {
     position: [number, number, number]
@@ -119,33 +130,33 @@ interface ScatterSpot {
 }
 const SCATTER: ScatterSpot[] = [
     {
-        position: [-1.4, -1.35, 0.4],
+        position: [-1.22, -1.38, 0.45],
         scale: 1,
         rotZ: 0.07,
         rotY: 0.16,
-        bobAmp: 0.15,
+        bobAmp: 0.14,
         bobFreq: 0.55,
         driftAmp: 0.07,
         swayFreq: 0.5,
         phase: 0,
     },
     {
-        position: [1.6, 1.9, 0.65],
-        scale: 0.88,
+        position: [1.42, 1.72, 0.72],
+        scale: 0.84,
         rotZ: -0.08,
         rotY: -0.12,
-        bobAmp: 0.13,
+        bobAmp: 0.12,
         bobFreq: 0.72,
         driftAmp: 0.06,
         swayFreq: 0.62,
         phase: 2.1,
     },
     {
-        position: [1.8, -0.95, -0.5],
-        scale: 0.92,
+        position: [1.58, -1.06, -0.55],
+        scale: 0.88,
         rotZ: 0.1,
         rotY: -0.16,
-        bobAmp: 0.17,
+        bobAmp: 0.16,
         bobFreq: 0.45,
         driftAmp: 0.08,
         swayFreq: 0.55,
@@ -372,6 +383,96 @@ function HeroCard({ isDark }: { isDark: boolean }): React.JSX.Element {
 // Only requested when the scene mounts (desktop + idle), never on first paint.
 const STAT_FONT = '/fonts/Poppins-Bold.ttf'
 
+// --- Stat type treatment (2026-07-29 outline-free rework) -------------------
+// The espresso OUTLINE from the previous pass is gone (owner: "the black
+// border in text is ugly"). Contrast now lives at the color level: espresso
+// print-ink type (STAT_INK) directly on the caramel face — printed-ticket
+// look, immune to the clearcoat highlight sweeps that washed out the earlier
+// plain-white type (the reason the outline existed). The screenshot bake-off
+// against the other direction (white type on a matte face) picked the ink:
+// white needed a SECOND, flatter material that broke the one-glass-family
+// look and still read softer on the bright light-theme face. No outlines, no
+// halos, no blur. sdfGlyphSize 128 (troika default 64) stays — the "%"
+// counters and thin diagonal go lumpy at 64.
+//
+// The value renders as TWO <Text> nodes — full-size digits + a smaller suffix
+// ("%"/"+") at SUFFIX_RATIO, raised so its cap top roughly aligns with the
+// digits' cap top (superscript-style, deliberate typography). Troika only
+// does one size per run, hence the split.
+const STAT_INK = '#4a1c05'
+const VALUE_FONT_SIZE = 0.54
+const SUFFIX_RATIO = 0.6
+const SUFFIX_GAP = 0.025
+// anchorY is 'middle' on both runs; raising the smaller suffix by half the
+// size delta times Poppins' ~0.72 cap/block ratio top-aligns the caps.
+const SUFFIX_RAISE = ((VALUE_FONT_SIZE * (1 - SUFFIX_RATIO)) / 2) * 0.72
+const VALUE_Y = 0.2
+const LABEL_FONT_SIZE = 0.17
+const LABEL_Y = -0.33
+
+// drei's <Text> ref exposes the troika Text mesh; we only need its measured
+// block bounds after each sync (typed minimally — troika ships no types).
+interface MeasuredText extends THREE.Mesh {
+    textRenderInfo?: { blockBounds: [number, number, number, number] } | null
+}
+
+// Digits + smaller suffix, centered AS A PAIR from LIVE troika measurements.
+// The value counts up from 0, so the digit run's width changes every frame
+// ("0" → "3,000") — hard-coded offsets would only fit the final number.
+// onSync fires after every glyph-layout pass; re-centering there keeps the
+// pair balanced mid-count-up AND at rest.
+function StatValueText({
+    digits,
+    suffix,
+}: {
+    digits: string
+    suffix: string
+}): React.JSX.Element {
+    const digitsRef = useRef<MeasuredText>(null)
+    const suffixRef = useRef<MeasuredText>(null)
+    const layout = useCallback(() => {
+        const d = digitsRef.current
+        const s = suffixRef.current
+        const db = d?.textRenderInfo?.blockBounds
+        const sb = s?.textRenderInfo?.blockBounds
+        if (!d || !s || !db || !sb) return
+        const digitsWidth = db[2] - db[0]
+        const suffixWidth = sb[2] - sb[0]
+        const total = digitsWidth + SUFFIX_GAP + suffixWidth
+        d.position.x = -total / 2
+        s.position.x = -total / 2 + digitsWidth + SUFFIX_GAP
+        s.position.y = SUFFIX_RAISE
+    }, [])
+    return (
+        <group position={[0, VALUE_Y, STAT_FRONT + 0.03]}>
+            <Text
+                ref={digitsRef}
+                font={STAT_FONT}
+                fontSize={VALUE_FONT_SIZE}
+                anchorX="left"
+                anchorY="middle"
+                color={STAT_INK}
+                sdfGlyphSize={128}
+                onSync={layout}
+            >
+                {digits}
+            </Text>
+            <Text
+                ref={suffixRef}
+                font={STAT_FONT}
+                fontSize={VALUE_FONT_SIZE * SUFFIX_RATIO}
+                anchorX="left"
+                anchorY="middle"
+                color={STAT_INK}
+                sdfGlyphSize={128}
+                onSync={layout}
+            >
+                {suffix}
+            </Text>
+        </group>
+    )
+}
+
 // One 3D stat coupon: a real caramel-glass ticket mesh (shared geometry) with
 // the number/label as IN-CANVAS 3D text (drei <Text>, SDF) sitting on the
 // coupon face — it inherits every float/tilt transform, so the type moves
@@ -397,7 +498,7 @@ function StatCoupon3D({
     // The scene only ever mounts when motion is allowed (HeroSection gates it),
     // so count-up always animates here — start=true, reduce=false.
     const n = useCountUp(stat.value, true, false)
-    const shown = formatStat(n, stat)
+    const digits = formatStatDigits(n, stat)
     const anchorRef = useRef<THREE.Group>(null)
     const tiltRef = useRef<THREE.Group>(null)
     const scratch = useMemo(() => new THREE.Vector3(), [])
@@ -478,50 +579,27 @@ function StatCoupon3D({
                     y={STAT.ny}
                     z={STAT_FRONT + 0.015}
                     count={11}
-                    dash={0.06}
+                    dash={0.065}
                     color={isDark ? CARAMEL_LIGHT : '#fff2e6'}
                 />
-                {/* Sticker-print treatment (2026-07-29 legibility rework):
-                    white fill + a SOLID full-opacity espresso outline — a
-                    crisp dark rim keeps contrast against BOTH theme faces
-                    (bright CARAMEL in light, CARAMEL_DEEP in dark) no matter
-                    where the clearcoat highlight sweeps. sdfGlyphSize 128
-                    (troika default 64) keeps the "%" crisp — its two small
-                    counters and thin diagonal go lumpy at 64. Lifted a touch
-                    off the face (0.03) so the specular sheen doesn't kiss the
-                    glyph edges. Sizes are the shipped 1.7-wide treatment
-                    scaled by the new 2.2-wide face (×1.29). */}
-                <Text
-                    font={STAT_FONT}
-                    fontSize={0.49}
-                    position={[0, 0.18, STAT_FRONT + 0.03]}
-                    anchorX="center"
-                    anchorY="middle"
-                    color="#ffffff"
-                    outlineWidth={0.031}
-                    outlineColor="#4a1c05"
-                    outlineOpacity={1}
-                    sdfGlyphSize={128}
-                >
-                    {shown}
-                </Text>
+                {/* Print-ink type, lifted 0.03 off the face so the sheen
+                    never kisses the glyph edges — see the treatment block
+                    comment above StatValueText. */}
+                <StatValueText digits={digits} suffix={stat.suffix} />
                 {/* Label fit math (longest label = "SUPPORTED STORES", 16
                     glyphs): Poppins-Bold uppercase averages ~0.62em advance,
-                    so width ≈ 16 × 0.155 × (0.62 + 0.06 letterSpacing) ≈ 1.69
-                    — inside the usable face width of STAT.w 2.2 − 2 × notch r
-                    0.16 = 1.88, with ~0.095 margin per side (tilt only rotates
+                    so width ≈ 16 × 0.17 × (0.62 + 0.06 letterSpacing) ≈ 1.85
+                    — inside the usable face width of STAT.w 2.5 − 2 × notch r
+                    0.18 = 2.14, with ~0.145 margin per side (tilt only rotates
                     the ticket, the type rides it like print). */}
                 <Text
                     font={STAT_FONT}
-                    fontSize={0.155}
+                    fontSize={LABEL_FONT_SIZE}
                     letterSpacing={0.06}
-                    position={[0, -0.285, STAT_FRONT + 0.03]}
+                    position={[0, LABEL_Y, STAT_FRONT + 0.03]}
                     anchorX="center"
                     anchorY="middle"
-                    color="#ffffff"
-                    outlineWidth={0.01}
-                    outlineColor="#4a1c05"
-                    outlineOpacity={1}
+                    color={STAT_INK}
                     sdfGlyphSize={128}
                 >
                     {stat.label.toUpperCase()}
