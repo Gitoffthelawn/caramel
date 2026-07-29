@@ -13,8 +13,9 @@ export interface HeroStat {
     format?: 'comma'
 }
 
-// Same size for all three (deliberate — a uniform row reads cleaner than mixed
-// sizes). Order = left→right / first→last.
+// Order matters: HeroTicketScene's SCATTER array is index-matched to this
+// (entry 0 = the front/largest coupon); the DOM fallback renders them as a
+// uniform row left→right in the same order.
 export const HERO_STATS: HeroStat[] = [
     { value: 3000, suffix: '+', label: 'Supported Stores', format: 'comma' },
     { value: 100, suffix: '%', label: 'Open Source' },
