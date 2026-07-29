@@ -10,14 +10,25 @@
 // next/dynamic ssr:false component mounted ONLY once every gate passes — the
 // browser is idle (requestIdleCallback, setTimeout fallback) AND a real WebGL
 // context exists AND motion is allowed AND the viewport is lg+ (matchMedia,
-// re-checked on resize). Until then the right column shows a premium CSS ticket
-// poster (shared ticketNotchMask). The right column reserves its box up front,
-// and the live canvas cross-fades in over the poster, so there is zero CLS.
+// re-checked on resize). Until then the right column shows HeroCouponPoster —
+// a server-rendered DOM/CSS twin of the 3D scene: the SAME three stat coupons
+// (shared HERO_STATS + ticketNotchMask, espresso ink, dashed perforation) at
+// the same scatter positions, so the canvas cross-fade is a material swap,
+// not a composition change. The right column reserves its box up front, and
+// the live canvas cross-fades in over the poster on its first-frame onReady
+// signal, so there is zero CLS and no flash of empty space. The poster is
+// ALSO the permanent presentation for no-WebGL / reduced-motion desktops, and
+// because it SSRs, the three stats exist as crawlable HTML (SEO bonus).
 // The scene's frameloop is paused (frameloop='never') whenever the hero is
 // scrolled out of view via an IntersectionObserver.
 
 import { ThemeContext } from '@/lib/contexts'
-import { formatStat, HERO_STATS, useCountUp } from '@/lib/heroStats'
+import {
+    formatStat,
+    formatStatDigits,
+    HERO_STATS,
+    useCountUp,
+} from '@/lib/heroStats'
 import { useReducedMotion } from '@/lib/reducedMotion'
 import { ticketNotchMask } from '@/lib/ticketMask'
 import { detectWebGL } from '@/lib/webglSupport'
@@ -33,49 +44,228 @@ const HeroTicketScene = dynamic(() => import('./HeroTicketScene'), {
 
 const revealEase: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
-// Still-beautiful CSS-only stand-in shown until (or instead of) the live scene:
-// reduced-motion / no-WebGL / non-desktop, and underneath the canvas while its
-// chunk loads. aria-hidden — purely decorative; the real headline/links are DOM
-// in the left column. A caramel coupon ticket: side notches (mask) + a dashed
-// perforation across the axis + a big embossed "%".
-function HeroTicketPoster(): React.JSX.Element {
+// HeroCouponPoster — the server-rendered DOM/CSS twin of HeroTicketScene's
+// three-stat composition, and the ONE placeholder for both of its roles:
+// (a) the instant face of the hero canvas box until the WebGL scene signals
+// ready (the parent cross-fades this out), and (b) the PERMANENT presentation
+// on no-WebGL / reduced-capability / reduced-motion desktops. Index-matched
+// to HERO_STATS and to the scene's SCATTER: each spot mirrors that coupon's
+// anchor (as % of the layout box), z-order (depth), base rotZ, relative size
+// and type scale, so the poster→canvas cross-fade reads as the same three
+// coupons gaining glass and light — not a layout jump. Same brand recipe as
+// every ticket in the app: caramel gradient face, ticketNotchMask side
+// notches, dashed mid perforation, espresso print-ink type (the 3D STAT_INK)
+// with the small raised suffix. Values render via useCountUp, which SSRs the
+// FINAL numbers — so the stats are real crawlable HTML and the count-up only
+// replays after hydration. NOT aria-hidden: this is the accessible/crawler
+// face of the stats on desktop (the mobile StatCards row below lg covers
+// small viewports).
+const POSTER_INK = '#4a1c05'
+interface PosterSpot {
+    left: string
+    top: string
+    width: string
+    aspect: string
+    rotate: number
+    z: number
+    radius: string
+    notch: string
+    valueSize: string
+    labelSize: string
+    floatDuration: number
+    floatDelay: number
+}
+// Geometry mapping (reference 470×544 layout box, scene fit ≈ 0.67 → ≈77
+// px/world): anchor (x,y) → left/top %, ticket width = 2.5 · scale ·
+// perspective, type = the 3D 0.54/0.17 world sizes through the same factor.
+const POSTER_SPOTS: PosterSpot[] = [
+    {
+        left: '35%',
+        top: '68%',
+        width: '13.5rem',
+        aspect: '2.5 / 1.6',
+        rotate: -4,
+        z: 30,
+        radius: '1.1rem',
+        notch: '0.95rem',
+        valueSize: '2.7rem',
+        labelSize: '0.8rem',
+        floatDuration: 5.8,
+        floatDelay: 0.1,
+    },
+    {
+        left: '46%',
+        top: '29%',
+        width: '11.75rem',
+        aspect: '2.5 / 1.6',
+        rotate: 4,
+        z: 20,
+        radius: '0.95rem',
+        notch: '0.85rem',
+        valueSize: '2.35rem',
+        labelSize: '0.7rem',
+        floatDuration: 4.9,
+        floatDelay: 0.35,
+    },
+    {
+        left: '72%',
+        top: '51%',
+        width: '10.25rem',
+        aspect: '2.5 / 1.6',
+        rotate: -6,
+        z: 10,
+        radius: '0.85rem',
+        notch: '0.72rem',
+        valueSize: '2.05rem',
+        labelSize: '0.62rem',
+        floatDuration: 6.6,
+        floatDelay: 0.55,
+    },
+]
+
+function PosterCoupon({
+    stat,
+    spot,
+    index,
+    start,
+    reduce,
+}: {
+    stat: (typeof HERO_STATS)[number]
+    spot: PosterSpot
+    index: number
+    start: boolean
+    reduce: boolean
+}): React.JSX.Element {
+    const n = useCountUp(stat.value, start, reduce)
     return (
+        // Plain wrapper owns the anchor transform (center on the % spot +
+        // base rotation) so framer's animated transforms on the inner nodes
+        // never overwrite it.
         <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 overflow-hidden"
+            className="absolute"
+            style={{
+                left: spot.left,
+                top: spot.top,
+                width: spot.width,
+                zIndex: spot.z,
+                transform: `translate(-50%, -50%) rotate(${spot.rotate}deg)`,
+            }}
         >
-            <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-caramel/25 blur-3xl dark:bg-caramel/20" />
-            <div className="absolute left-[42%] top-[38%] h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-300/30 blur-2xl" />
-            <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative h-52 w-72 rotate-[-8deg]">
+            <motion.div
+                initial={
+                    reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.9 }
+                }
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                    duration: 0.6,
+                    delay: 0.35 + index * 0.12,
+                    ease: revealEase,
+                }}
+            >
+                {/* Inner looping float on its own node so the one-shot
+                    entrance transform above never fights the loop; each coupon
+                    gets its own duration + delay, so no two ever bob in sync
+                    (the DOM cousin of the scene's per-coupon
+                    frequencies/phases). */}
+                <motion.div
+                    animate={reduce ? undefined : { y: [0, -9, 0] }}
+                    transition={
+                        reduce
+                            ? undefined
+                            : {
+                                  duration: spot.floatDuration,
+                                  delay: spot.floatDelay,
+                                  repeat: Infinity,
+                                  ease: 'easeInOut',
+                              }
+                    }
+                    className="relative"
+                    style={{ aspectRatio: spot.aspect }}
+                >
                     <div
-                        className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-caramel via-orange-500 to-orange-600 shadow-caramel-lg"
-                        style={ticketNotchMask('1.1rem', '58%')}
+                        className="absolute inset-0 bg-gradient-to-br from-caramel via-orange-500 to-orange-600 shadow-caramel-lg"
+                        style={{
+                            borderRadius: spot.radius,
+                            ...ticketNotchMask(spot.notch, '50%'),
+                        }}
                     />
                     <div
-                        className="absolute inset-0 rounded-[2rem] bg-gradient-to-tr from-white/35 via-transparent to-transparent"
-                        style={ticketNotchMask('1.1rem', '58%')}
+                        className="absolute inset-0 bg-gradient-to-tr from-white/30 via-transparent to-transparent"
+                        style={{
+                            borderRadius: spot.radius,
+                            ...ticketNotchMask(spot.notch, '50%'),
+                        }}
                     />
-                    <span className="absolute inset-x-0 top-[20%] select-none text-center text-7xl font-black text-white/90 drop-shadow-lg">
-                        %
-                    </span>
-                    <div className="absolute inset-x-7 top-[58%] border-t-2 border-dashed border-white/70" />
+                    {/* Perforation: a row of discrete dashes (repeating
+                        gradient, ~11 dashes across like the 3D Perforation
+                        row) rather than border-dashed, whose long dashes read
+                        as a different motif than the scene's. */}
                     <div
-                        className="absolute -right-9 -top-7 h-14 w-20 rotate-12 rounded-2xl bg-caramelLight/90 shadow-caramel-sm"
-                        style={ticketNotchMask('0.6rem', '50%')}
+                        className="absolute inset-x-[9%] top-1/2 h-[3px] -translate-y-1/2"
+                        style={{
+                            backgroundImage:
+                                'repeating-linear-gradient(90deg, rgba(255,242,230,0.85) 0 8px, transparent 8px 19px)',
+                        }}
                     />
-                </div>
-            </div>
+                    {/* Value: cap-centered at 37.5% (3D VALUE_Y 0.2 over half-h
+                    0.8), suffix at 0.6× raised to cap-align — the DOM twin of
+                    StatValueText. */}
+                    <div
+                        className="absolute inset-x-0 top-[37.5%] -translate-y-1/2 whitespace-nowrap text-center font-black leading-none tracking-tight"
+                        style={{ color: POSTER_INK, fontSize: spot.valueSize }}
+                    >
+                        {formatStatDigits(n, stat)}
+                        <span className="align-[0.45em] text-[0.6em]">
+                            {stat.suffix}
+                        </span>
+                    </div>
+                    <div
+                        className="absolute inset-x-0 top-[70.5%] -translate-y-1/2 whitespace-nowrap text-center font-bold uppercase tracking-[0.08em]"
+                        style={{ color: POSTER_INK, fontSize: spot.labelSize }}
+                    >
+                        {stat.label}
+                    </div>
+                </motion.div>
+            </motion.div>
         </div>
     )
 }
 
-// DOM fallback for the three hero stats, rendered as caramel coupon-ticket
-// cards (shared ticketNotchMask), ALL THE SAME SIZE, each counting its number
-// up from 0 on first paint. The primary presentation on desktop is now the 3D
-// stat coupons inside HeroTicketScene; these DOM cards are the stand-in shown
-// on mobile / reduced-motion / no-WebGL (and briefly under the canvas while its
-// chunk loads), sharing the same HERO_STATS data so the two never drift.
+function HeroCouponPoster({
+    start,
+    reduce,
+}: {
+    start: boolean
+    reduce: boolean
+}): React.JSX.Element {
+    return (
+        <div className="pointer-events-none absolute inset-0">
+            <div
+                aria-hidden="true"
+                className="absolute inset-0 overflow-hidden"
+            >
+                <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-caramel/25 blur-3xl dark:bg-caramel/20" />
+                <div className="absolute left-[38%] top-[32%] h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-300/30 blur-2xl" />
+            </div>
+            {HERO_STATS.map((stat, index) => (
+                <PosterCoupon
+                    key={stat.label}
+                    stat={stat}
+                    spot={POSTER_SPOTS[index]}
+                    index={index}
+                    start={start}
+                    reduce={reduce}
+                />
+            ))}
+        </div>
+    )
+}
+
+// MOBILE-ONLY row of the three hero stats, rendered as small uniform caramel
+// coupon-ticket cards (shared ticketNotchMask) in normal flow under the copy,
+// each counting its number up from 0 on first paint. Desktop presentations
+// are HeroTicketScene (live) and HeroCouponPoster (placeholder/fallback);
+// all three share the same HERO_STATS data so they never drift.
 function StatCard({
     stat,
     index,
@@ -113,7 +303,7 @@ function StatCard({
     )
 }
 
-// A centered row of the three uniform stat cards (DOM fallback).
+// A centered row of the three uniform stat cards (mobile flow).
 function StatCards({
     start,
     reduce,
@@ -471,32 +661,27 @@ export default function HeroSection() {
                 </div>
 
                 {/* RIGHT column: on desktop, ONE interactive WebGL box holds
-                    the main 3D coupon AND three large 3D stat coupons
-                    scattered around it at varied depths (soft independent
-                    floating + pointer reaction — see HeroTicketScene's
-                    SCATTER). A poster + the DOM stat cards cross-fade
-                    underneath until the canvas is ready — and stay as the
-                    permanent presentation for reduced-motion / no-WebGL desktop.
-                    Below lg the box is hidden (phones never mount three) and the
+                    the three large 3D stat coupons scattered around the
+                    center at varied depths (soft independent floating +
+                    pointer reaction — see HeroTicketScene's SCATTER).
+                    HeroCouponPoster — the SSR'd DOM twin of that exact
+                    composition — paints instantly underneath, cross-fades out
+                    when the canvas signals ready, and stays as the permanent
+                    presentation for reduced-motion / no-WebGL desktop. Below
+                    lg the box is hidden (phones never mount three) and the
                     DOM stat cards render in normal flow under the copy. */}
                 <div className="relative flex w-[45%] flex-col items-center lg:w-full">
                     {/* DESKTOP 3D box: reserved up front; the live canvas
-                        cross-fades in over the fallback, so there is zero CLS. */}
+                        cross-fades in over the poster, so there is zero CLS. */}
                     <div className="relative h-[34rem] w-full lg:hidden">
                         <div
-                            className="absolute inset-0 flex flex-col justify-between transition-opacity duration-700 ease-out"
+                            className="absolute inset-0 transition-opacity duration-700 ease-out"
                             style={{
                                 opacity: canvasReady ? 0 : 1,
                                 pointerEvents: canvasReady ? 'none' : undefined,
                             }}
                         >
-                            <div
-                                aria-hidden="true"
-                                className="relative h-[22rem] w-full"
-                            >
-                                <HeroTicketPoster />
-                            </div>
-                            <StatCards
+                            <HeroCouponPoster
                                 start={statsStarted}
                                 reduce={reduceMotion}
                             />

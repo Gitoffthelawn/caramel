@@ -2,40 +2,35 @@
 
 // HeroTicketScene — the compact WebGL half of the split hero (right column,
 // desktop/lg+ only). Same ticket visual language as the shared ./couponTicket3d
-// geometry + palette, deliberately LIGHT: one big main ticket with springy
-// mouse-parallax tilt + Float, PLUS three LARGE 3D stat coupons (each a real
-// ticket mesh at 0.68–0.81× the main coupon's size) SCATTERED around it at
-// varied depths — an art-directed "random soft floating" composition, not a
-// row. Each stat coupon drifts/bobs/sways on its own frequency + phase (never
-// in sync), and reacts to the pointer: the coupon nearest the cursor gently
-// lifts toward the camera, tilts toward the pointer and pops ~4% — all damped,
-// no snapping. Numbers count up as IN-CANVAS 3D text so the type moves with
-// the ticket like print. A handful of instanced droplets, low-count Sparkles,
-// and a one-frame Lightformer environment complete the scene. No
-// ContactShadows and no scroll dolly — the hero doesn't scroll-drive. Loaded
-// via next/dynamic ssr:false and only mounted after the browser is idle + a
-// real WebGL context + a lg+ viewport (HeroSection gates all of that), so the
-// `three` chunk never touches phones or first paint. Below lg /
-// reduced-motion / no-WebGL the stats fall back to DOM coupon cards in
-// HeroSection (shared HERO_STATS data).
+// geometry + palette, deliberately LIGHT: THREE large 3D stat coupons (real
+// ticket meshes) scattered around the canvas center at varied depths — an
+// art-directed "random soft floating" composition, not a row. The big main
+// "%" coupon from earlier iterations is GONE (owner call 2026-07-29: "just
+// keep the 3 stats… remove the % big one"); the three stat tickets ARE the
+// scene now, recomposed to read centered and balanced on their own. Each
+// coupon drifts/bobs/sways on its own frequency + phase (never in sync), and
+// reacts to the pointer: the coupon nearest the cursor gently lifts toward
+// the camera, tilts toward the pointer and pops ~4% — all damped, no
+// snapping. Numbers count up as IN-CANVAS 3D text so the type moves with the
+// ticket like print. A handful of instanced droplets, low-count Sparkles, and
+// a one-frame Lightformer environment complete the scene. No ContactShadows
+// and no scroll dolly — the hero doesn't scroll-drive. Loaded via
+// next/dynamic ssr:false and only mounted after the browser is idle + a real
+// WebGL context + a lg+ viewport (HeroSection gates all of that), so the
+// `three` chunk never touches phones or first paint. Until (or instead of)
+// the canvas, HeroSection renders the SSR'd DOM twin of this exact
+// composition (HeroCouponPoster) and cross-fades it out on onReady.
 //
 // Perf posture (brief "not heavy"): DPR clamped [1, 1.5]; frameloop gated by
 // the `active` prop (parent IntersectionObserver → 'never' when the hero is
-// scrolled out of view); every ticket geometry is built once (memoized) and the
-// three stat coupons SHARE one geometry; droplets are ONE instanced mesh (≤10);
-// the environment + emblem ship no network fetch; the stat type is SDF text
-// (drei <Text>) on a SELF-HOSTED font, count-up runs only ~1.2s after mount.
-// The per-coupon pointer reaction adds one Vector3 project per stat coupon per
-// frame (3 total) — negligible.
+// scrolled out of view); the three stat coupons SHARE one memoized geometry;
+// droplets are ONE instanced mesh (≤10); the environment ships no network
+// fetch; the stat type is SDF text (drei <Text>) on a SELF-HOSTED font,
+// count-up runs only ~1.2s after mount. The per-coupon pointer reaction adds
+// one Vector3 project per stat coupon per frame (3 total) — negligible.
 
 import { formatStatDigits, HERO_STATS, useCountUp } from '@/lib/heroStats'
-import {
-    Environment,
-    Float,
-    Lightformer,
-    Sparkles,
-    Text,
-} from '@react-three/drei'
+import { Environment, Lightformer, Sparkles, Text } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -44,32 +39,10 @@ import {
     CARAMEL_DEEP,
     CARAMEL_LIGHT,
     makeTicketGeometry,
-    PercentEmblem,
     Perforation,
 } from './couponTicket3d'
 
-// One main coupon ticket. Front-face Z after center() is depth/2 + bevel —
-// the perforation dashes + emblem sit just proud of it.
-const CARD = {
-    w: 3.1,
-    h: 2,
-    cr: 0.22,
-    nr: 0.2,
-    ny: -0.5,
-    depth: 0.4,
-    bevel: 0.05,
-}
-const CARD_FRONT = CARD.depth / 2 + CARD.bevel
-
-// The main coupon's rest anchor — nudged left/up so the right-heavy stat
-// scatter (see SCATTER below) balances asymmetrically instead of stacking.
-const MAIN_POS: [number, number, number] = [-0.15, 0.9, 0.1]
-// drei Float on the main card translates ~±0.05 world at floatIntensity 0.45.
-const MAIN_FLOAT_SLACK = 0.06
-
-// The three stat coupons — ONE shared geometry, deliberately BIG (w 2.5 =
-// 0.81× the main coupon's 3.1, up from 2.2 after the 2026-07-29 design pass)
-// so they read as siblings of the hero ticket, not chips. Per-coupon size
+// The stat coupon ticket — ONE shared geometry for all three; per-coupon size
 // variety comes from SCATTER[i].scale, not from separate geometries.
 // Front-face Z (post-center) is depth/2 + bevel.
 const STAT = {
@@ -83,39 +56,36 @@ const STAT = {
 }
 const STAT_FRONT = STAT.depth / 2 + STAT.bevel
 
-// Art-directed scatter: one spot per HERO_STATS entry (index-matched). Varied
-// x/y/z, individual base rotations and per-coupon float parameters make the
-// composition read as coupons drifting in space around the main ticket —
-// "random-looking" but balanced:
-//   [0] "3,000+ Supported Stores" — front-left-low, nearest the camera and the
-//       largest (the headline stat).
-//   [1] "100% Open Source" — top-right, IN FRONT of the main coupon so its
-//       lower-left overlaps the main card's top-right corner like a fanned
-//       coupon stack. In-front on purpose: iteration-2 screenshots proved a
-//       behind-main placement intermittently occludes the label at float
-//       extremes ("EN SOURCE"), and the overlap only covers blank main-card
-//       face (emblem is central, perforation sits at ny −0.5). The in-front
-//       guarantee is POINTER-PROOF by construction: the main card's parallax
-//       is capped at rotY 0.25 / rotX 0.2 (see HeroCard), so its top-right
-//       corner's worst forward swing is 0.1 + 1.55·sin(0.25) + 1.05·sin(0.2)
-//       ≈ 0.69, while this coupon's overlapping lower-left corner never dips
-//       below ≈ z 0.72 + 0.20 (field parallax, forward on the same pointer
-//       side that swings the main corner forward) − 0.19 (its own worst
-//       rotY+sway corner dip, 1.05·0.84·sin(0.18)) ≈ 0.73. Iteration-3's
-//       z 0.35 + main rotY 0.5 violated exactly this and re-ate the label on
-//       hover — the 2026-07-29 resize kept the margin by bumping z 0.65→0.72.
-//   [2] "0% Data Selling" — mid-right and the DEEPEST ticket, so the four
-//       tickets cascade top-right → bottom-left (1.72 / 0.9 / −1.06 / −1.38)
-//       instead of pairing into a residual bottom row, with depth spread
-//       front→back (0.72 / 0.45 / 0.1 / −0.55). Its y sits low enough that
-//       its top edge keeps clear air from the main card's bottom-right corner
-//       at rest (iteration-1 screenshots showed them nearly touching at −0.98
-//       — a second, accidental-looking overlap moment; the deliberate overlap
-//       belongs to [1] alone).
-// The 2026-07-29 bigger-coupon pass pulled every |x|/|y| slightly INWARD:
-// SCENE_BOUNDS is derived from these numbers, so tighter anchors mean a LARGER
-// fit scale — the bigger tickets land bigger on screen instead of being eaten
-// by their own bounds growth (fit 0.62 → 0.65 at the reference viewport).
+// Art-directed scatter: one spot per HERO_STATS entry (index-matched). With
+// the main "%" coupon removed (2026-07-29) the three tickets were recomposed
+// to CENTER the constellation in the canvas: the scale-weighted centroid of
+// the anchors is ≈ (0.00, 0.00), and no two anchor pairs are collinear with
+// the third (no straight line through the scatter). Varied x/y/z, individual
+// base rotations and per-coupon float parameters keep it reading as coupons
+// drifting in space:
+//   [0] "3,000+ Supported Stores" — bottom-left, nearest the camera and the
+//       largest (the headline stat). Its top-right corner deliberately fans
+//       OVER the deeper [2] ticket's blank bottom-left corner — a coupon-
+//       stack moment, kept clear of [2]'s type (see the occlusion contract
+//       below).
+//   [1] "100% Open Source" — top, slightly LEFT of center (owner call
+//       2026-07-29: "make the open source slight to left so it's on
+//       center") — this is the coupon that re-centers the composition after
+//       living at the far top-right in the four-ticket layout.
+//   [2] "0% Data Selling" — mid-right and the DEEPEST ticket, so the three
+//       tickets cascade top → mid-right → bottom-left with depth spread
+//       front→back (0.45 / 0.05 / −0.5).
+//
+// OCCLUSION CONTRACT (checked whenever an anchor/scale/rotation moves): a
+// nearer coupon's body may only ever cover a deeper coupon's BLANK corner
+// face, never its type, including at float/hover extremes.
+//   [0] over [2]: [0]'s right-edge worst reach ≈ x −0.9 + 1.30 (rotZ-rotated
+//       half-extent) + 0.07 drift ≈ 0.47; [2]'s label ("DATA SELLING", ≈1.19
+//       wide at scale 0.86) starts at ≈ 1.32 − 0.60 − 0.08 drift = 0.64 —
+//       ≥0.17 clear. The fan overlap covers only [2]'s empty corner.
+//   [1] over [2]: [1]'s right corner reaches x ≈ −0.25 + 1.10 + 0.06 drift +
+//       0.05 pop ≈ 0.96; [2]'s "0%" digits start at ≈ 1.32 − 0.26 = 1.06 —
+//       clear in x alone, so [1]'s bob can never dip onto [2]'s value.
 // Frequencies/phases are mutually irrational-ish so no two coupons ever sync.
 interface ScatterSpot {
     position: [number, number, number]
@@ -130,7 +100,7 @@ interface ScatterSpot {
 }
 const SCATTER: ScatterSpot[] = [
     {
-        position: [-1.22, -1.38, 0.45],
+        position: [-0.9, -1.25, 0.45],
         scale: 1,
         rotZ: 0.07,
         rotY: 0.16,
@@ -141,19 +111,19 @@ const SCATTER: ScatterSpot[] = [
         phase: 0,
     },
     {
-        position: [1.42, 1.72, 0.72],
-        scale: 0.84,
-        rotZ: -0.08,
+        position: [-0.25, 1.45, 0.05],
+        scale: 0.92,
+        rotZ: -0.07,
         rotY: -0.12,
-        bobAmp: 0.12,
+        bobAmp: 0.1,
         bobFreq: 0.72,
         driftAmp: 0.06,
         swayFreq: 0.62,
         phase: 2.1,
     },
     {
-        position: [1.58, -1.06, -0.55],
-        scale: 0.88,
+        position: [1.32, -0.1, -0.5],
+        scale: 0.86,
         rotZ: 0.1,
         rotY: -0.16,
         bobAmp: 0.16,
@@ -166,7 +136,7 @@ const SCATTER: ScatterSpot[] = [
 
 // Pointer-reaction envelope (per stat coupon): proximity is a gaussian of the
 // NDC distance between the pointer and the coupon's projected rest anchor
-// (sigma² = PROX_SIGMA_SQ, ~0.45 NDC sigma — reaction peaks while hovering the
+// (sigma² = PROX_SIGMA_SQ, ~0.63 NDC sigma — reaction peaks while hovering the
 // coupon, fades smoothly by ~1 NDC). The nearest coupon lifts toward the
 // camera (≤ LIFT_MAX), tilts toward the cursor (the d·e^(−d²/σ²) product
 // self-caps at ~0.15 rad) and pops ≤ (POP_MAX−1). All damped — no snapping.
@@ -182,9 +152,9 @@ const POP_MAX = 1.045
 // then the whole extent is scaled by the perspective factor at the ticket's
 // CLOSEST approach to the camera (rest z + LIFT_MAX), because the camera
 // projects near geometry wider than the z=0 plane the fit math reasons in.
-// Pointer-parallax swing of the whole scatter group and the main card's Float
-// spill past these rest bounds by a few % — that lands in the canvas bleed
-// below, never at the raster edge.
+// Pointer-parallax swing of the whole scatter group spills past these rest
+// bounds by a few % — that lands in the canvas bleed below, never at the
+// raster edge.
 const CAM_DIST = 7
 const TILT_ALLOWANCE = 0.25
 
@@ -207,11 +177,8 @@ function perspectiveFactor(closestZ: number): number {
 }
 
 const SCENE_BOUNDS = ((): { halfW: number; halfH: number } => {
-    const mainExt = tiltedHalfExtents(CARD.w / 2, CARD.h / 2, CARD.bevel, 1)
-    const mainPersp = perspectiveFactor(MAIN_POS[2] + MAIN_FLOAT_SLACK)
-    let halfW = (Math.abs(MAIN_POS[0]) + mainExt.x) * mainPersp
-    let halfH =
-        (Math.abs(MAIN_POS[1]) + MAIN_FLOAT_SLACK + mainExt.y) * mainPersp
+    let halfW = 0
+    let halfH = 0
     for (const spot of SCATTER) {
         const ext = tiltedHalfExtents(
             STAT.w / 2,
@@ -255,12 +222,11 @@ interface DropletDatum {
 // Randomized droplet layout is computed ONCE at module load (client-only — the
 // scene is dynamically imported ssr:false, single instance), never during
 // render, so Math.random() stays out of the render phase (react-hooks/purity)
-// and the field is stable across re-renders. The y-spread is capped at 5 (not
-// the previous 6) because the field now lives inside the fit-scaled group:
-// worst case |y| = 2.5 origin + 0.9 drift + 0.17 radius = 3.57, times the
-// largest realistic fit (~0.66) = 2.36 world — safely inside the frustum
-// half-height (2.687), so a floating sphere never gets sliced at the top or
-// bottom raster edge.
+// and the field is stable across re-renders. The y-spread is capped at 5
+// because the field lives inside the fit-scaled group: worst case |y| = 2.5
+// origin + 0.9 drift + 0.17 radius = 3.57, times the largest realistic fit
+// (~0.70) = 2.50 world — safely inside the frustum half-height (2.687), so a
+// floating sphere never gets sliced at the top or bottom raster edge.
 const DROPLET_DATA: DropletDatum[] = Array.from(
     { length: DROPLET_COUNT },
     () => ({
@@ -290,8 +256,8 @@ export interface HeroTicketSceneProps {
     onReady?: () => void
 }
 
-// Shared caramel-glass material for every ticket (main + stats) so they read as
-// one family. Slightly tuned per theme.
+// Shared caramel-glass material for every ticket so they read as one family.
+// Slightly tuned per theme.
 function TicketMaterial({ isDark }: { isDark: boolean }): React.JSX.Element {
     return (
         <meshPhysicalMaterial
@@ -313,68 +279,6 @@ function TicketMaterial({ isDark }: { isDark: boolean }): React.JSX.Element {
             attenuationColor={CARAMEL_LIGHT}
             attenuationDistance={2.2}
         />
-    )
-}
-
-function HeroCard({ isDark }: { isDark: boolean }): React.JSX.Element {
-    const groupRef = useRef<THREE.Group>(null)
-    const geometry = useMemo(
-        () =>
-            makeTicketGeometry(
-                CARD.w,
-                CARD.h,
-                CARD.cr,
-                CARD.nr,
-                CARD.ny,
-                CARD.depth,
-                CARD.bevel,
-            ),
-        [],
-    )
-
-    useFrame((state, delta) => {
-        const group = groupRef.current
-        if (!group) return
-        const { x: px, y: py } = state.pointer
-        // Springy mouse-parallax tilt, eased with frame-rate-independent damp.
-        // No scroll term — the hero ticket only responds to the pointer.
-        // Capped at 0.25/0.2 (was 0.5/0.35): calmer for the biggest object,
-        // and load-bearing for the coupon-stack z-order — SCATTER[1] sits in
-        // front of this card and its comment derives the corner-swing budget
-        // from THESE two constants. Don't raise them without redoing that.
-        const targetRotY = px * 0.25
-        const targetRotX = -py * 0.2
-        group.rotation.y = THREE.MathUtils.damp(
-            group.rotation.y,
-            targetRotY,
-            4,
-            delta,
-        )
-        group.rotation.x = THREE.MathUtils.damp(
-            group.rotation.x,
-            targetRotX,
-            4,
-            delta,
-        )
-    })
-
-    return (
-        <Float speed={2} rotationIntensity={0.25} floatIntensity={0.45}>
-            <group ref={groupRef}>
-                <mesh geometry={geometry} castShadow receiveShadow>
-                    <TicketMaterial isDark={isDark} />
-                </mesh>
-                <Perforation
-                    width={CARD.w - CARD.nr * 2 - 0.1}
-                    y={CARD.ny}
-                    z={CARD_FRONT + 0.02}
-                    count={13}
-                    dash={0.075}
-                    color={isDark ? CARAMEL_LIGHT : '#fff2e6'}
-                />
-                <PercentEmblem isDark={isDark} frontZ={CARD_FRONT} />
-            </group>
-        </Float>
     )
 }
 
@@ -627,9 +531,9 @@ function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
         [],
     )
 
-    // Mild whole-field pointer parallax (well under the main card's 0.5/0.35)
-    // so the scatter answers the mouse as one drifting constellation; the
-    // per-coupon proximity reaction in StatCoupon3D layers on top of this.
+    // Mild whole-field pointer parallax so the scatter answers the mouse as
+    // one drifting constellation; the per-coupon proximity reaction in
+    // StatCoupon3D layers on top of this.
     useFrame((state, delta) => {
         const field = fieldRef.current
         if (!field) return
@@ -715,18 +619,17 @@ function Droplets({ isDark }: { isDark: boolean }): React.JSX.Element {
 
 function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
     // The vertical FOV keeps world height constant, so on the narrow hero
-    // column the main ticket + the scattered stat coupons can overflow the
-    // frustum — scale the whole ticket group down to fit both dimensions
-    // (bounds come from SCENE_BOUNDS, computed from the scatter config). The
-    // canvas raster is BLED past the layout box (CANVAS_BLEED_*_PX), so the
-    // fit is computed against the layout-box slice of the frustum, not the
-    // whole canvas: the composition keeps the size it had when canvas ==
-    // layout box, and the bleed becomes pure headroom that tilted geometry can
-    // swing into without clipping. The 0.92 margin leaves ~8% of the layout
-    // box as rest-pose slack before the bleed even starts (SCENE_BOUNDS
-    // already bakes in tilt/lift/pop/drift extremes, so this is belt-and-
-    // braces, not the only guard). Reactive to resize via R3F size state; no
-    // per-frame camera work.
+    // column the scattered stat coupons can overflow the frustum — scale the
+    // whole ticket group down to fit both dimensions (bounds come from
+    // SCENE_BOUNDS, computed from the scatter config). The canvas raster is
+    // BLED past the layout box (CANVAS_BLEED_*_PX), so the fit is computed
+    // against the layout-box slice of the frustum, not the whole canvas: the
+    // composition keeps the size it had when canvas == layout box, and the
+    // bleed becomes pure headroom that tilted geometry can swing into without
+    // clipping. The 0.92 margin leaves ~8% of the layout box as rest-pose
+    // slack before the bleed even starts (SCENE_BOUNDS already bakes in
+    // tilt/lift/pop/drift extremes, so this is belt-and-braces, not the only
+    // guard). Reactive to resize via R3F size state; no per-frame camera work.
     const { width, height } = useThree(state => state.size)
     const halfH = Math.tan((42 * Math.PI) / 180 / 2) * CAM_DIST
     const worldPerPx = (halfH * 2) / height
@@ -756,9 +659,6 @@ function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
             />
 
             <group scale={fit}>
-                <group position={MAIN_POS}>
-                    <HeroCard isDark={isDark} />
-                </group>
                 <StatCoupons isDark={isDark} />
                 {/* Inside the fit group ON PURPOSE: the droplet field is wider
                     than the layout box in raw world units, so scaling it with

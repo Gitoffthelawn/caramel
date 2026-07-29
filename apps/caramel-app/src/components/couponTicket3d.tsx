@@ -1,12 +1,13 @@
 'use client'
 
-// couponTicket3d — the reusable ticket visual language shared by BOTH 3D
-// scenes (CouponVaultScene's full vault + HeroTicketScene's compact hero
-// ticket) so the notched-ticket geometry has ONE codepath and zero
-// duplication. Holds the caramel palette, the pure geometry factories
-// (rounded rect + two inward semicircular notches, extruded with a bevel)
-// and the two small mesh building blocks (Perforation, PercentEmblem). No
-// scene/camera/frameloop logic lives here — that stays per-scene.
+// couponTicket3d — the reusable ticket visual language for the 3D scenes
+// (today: HeroTicketScene's three-stat hero constellation) so the
+// notched-ticket geometry has ONE codepath and zero duplication. Holds the
+// caramel palette, the pure geometry factories (rounded rect + two inward
+// semicircular notches, extruded with a bevel) and the Perforation mesh
+// building block. No scene/camera/frameloop logic lives here — that stays
+// per-scene. (PercentEmblem, the primitive-built "%" for the retired big
+// main hero coupon, was removed 2026-07-29 with that coupon.)
 //
 // IMPORTANT: this module imports `three`, so it may ONLY be imported from the
 // lazily-loaded scene chunks (next/dynamic ssr:false). The DOM shells in the
@@ -130,58 +131,4 @@ export function Perforation({
     }, [xs, y, z])
 
     return <instancedMesh ref={meshRef} args={[geometry, material, count]} />
-}
-
-// The "%" is built from primitives (two rings + a diagonal bar) instead of 3D
-// text so the scene ships no font file / network fetch. Raised off the card
-// face (frontZ = the card's front-face Z) with an emissive caramel tone to
-// read as embossed.
-export function PercentEmblem({
-    isDark,
-    frontZ,
-}: {
-    isDark: boolean
-    frontZ: number
-}): React.JSX.Element {
-    const emissive = isDark ? 1.1 : 0.65
-    return (
-        <group position={[0, 0.28, frontZ + 0.03]}>
-            <mesh position={[-0.42, 0.34, 0]}>
-                <torusGeometry args={[0.22, 0.09, 16, 40]} />
-                <meshPhysicalMaterial
-                    color={CARAMEL_LIGHT}
-                    emissive={CARAMEL}
-                    emissiveIntensity={emissive}
-                    metalness={0.35}
-                    roughness={0.2}
-                    clearcoat={1}
-                    clearcoatRoughness={0.12}
-                />
-            </mesh>
-            <mesh position={[0.42, -0.34, 0]}>
-                <torusGeometry args={[0.22, 0.09, 16, 40]} />
-                <meshPhysicalMaterial
-                    color={CARAMEL_LIGHT}
-                    emissive={CARAMEL}
-                    emissiveIntensity={emissive}
-                    metalness={0.35}
-                    roughness={0.2}
-                    clearcoat={1}
-                    clearcoatRoughness={0.12}
-                />
-            </mesh>
-            <mesh rotation={[0, 0, -Math.PI / 4]}>
-                <boxGeometry args={[0.15, 1.35, 0.15]} />
-                <meshPhysicalMaterial
-                    color={CARAMEL_LIGHT}
-                    emissive={CARAMEL}
-                    emissiveIntensity={emissive}
-                    metalness={0.35}
-                    roughness={0.2}
-                    clearcoat={1}
-                    clearcoatRoughness={0.12}
-                />
-            </mesh>
-        </group>
-    )
 }
