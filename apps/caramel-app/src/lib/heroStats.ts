@@ -22,11 +22,18 @@ export const HERO_STATS: HeroStat[] = [
     { value: 0, suffix: '%', label: 'Data Selling' },
 ]
 
-export function formatStat(value: number, stat: HeroStat): string {
+// The digit run WITHOUT the suffix — the 3D stat coupons render the suffix as
+// its own smaller <Text> node (typographic small-% treatment), so they need
+// the two halves separately; the DOM fallback keeps the joined formatStat.
+export function formatStatDigits(value: number, stat: HeroStat): string {
     const rounded = Math.round(value)
-    const num =
-        stat.format === 'comma' ? rounded.toLocaleString('en-US') : `${rounded}`
-    return `${num}${stat.suffix}`
+    return stat.format === 'comma'
+        ? rounded.toLocaleString('en-US')
+        : `${rounded}`
+}
+
+export function formatStat(value: number, stat: HeroStat): string {
+    return `${formatStatDigits(value, stat)}${stat.suffix}`
 }
 
 // Count a value up from 0 to `target` with an easeOutCubic ramp once `start`
