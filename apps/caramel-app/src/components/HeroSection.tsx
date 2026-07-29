@@ -471,8 +471,10 @@ export default function HeroSection() {
                 </div>
 
                 {/* RIGHT column: on desktop, ONE interactive WebGL box holds
-                    the main 3D coupon AND the row of three same-size 3D stat
-                    coupons beneath it. A poster + the DOM stat cards cross-fade
+                    the main 3D coupon AND three large 3D stat coupons
+                    scattered around it at varied depths (soft independent
+                    floating + pointer reaction — see HeroTicketScene's
+                    SCATTER). A poster + the DOM stat cards cross-fade
                     underneath until the canvas is ready — and stay as the
                     permanent presentation for reduced-motion / no-WebGL desktop.
                     Below lg the box is hidden (phones never mount three) and the
