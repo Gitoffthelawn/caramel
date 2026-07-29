@@ -261,41 +261,50 @@ function StatCoupon3D({
                     dash={0.05}
                     color={isDark ? CARAMEL_LIGHT : '#fff2e6'}
                 />
-                {/* Soft dark outline-blur = printed-ink shadow, so the type
-                    reads as pressed into the caramel glass (deliberately a
-                    touch stronger on the number so it pops off the caramel). */}
+                {/* Sticker-print treatment (2026-07-29 legibility rework):
+                    white fill + a SOLID full-opacity espresso outline — the
+                    old blurred half-opacity halo (outlineBlur 0.024/0.012 at
+                    50%/35%) read as smudged ink and let the glossy caramel
+                    highlights swallow the white fill. A crisp dark rim keeps
+                    contrast against BOTH theme faces (bright CARAMEL in light,
+                    CARAMEL_DEEP in dark) no matter where the clearcoat
+                    highlight sweeps. sdfGlyphSize 128 (troika default 64) is
+                    what fixes the "%" specifically — its two small counters
+                    and thin diagonal go lumpy at 64. Lifted a touch off the
+                    face (0.03) so the specular sheen doesn't kiss the glyph
+                    edges. */}
                 <Text
                     font={STAT_FONT}
-                    fontSize={0.34}
-                    position={[0, 0.13, STAT_FRONT + 0.012]}
+                    fontSize={0.38}
+                    position={[0, 0.14, STAT_FRONT + 0.03]}
                     anchorX="center"
                     anchorY="middle"
                     color="#ffffff"
-                    outlineWidth={0.016}
-                    outlineBlur={0.024}
-                    outlineColor="#7a2f00"
-                    outlineOpacity={0.5}
+                    outlineWidth={0.024}
+                    outlineColor="#4a1c05"
+                    outlineOpacity={1}
+                    sdfGlyphSize={128}
                 >
                     {shown}
                 </Text>
                 {/* Label fit math (longest label = "SUPPORTED STORES", 16
                     glyphs): Poppins-Bold uppercase averages ~0.62em advance,
-                    so width ≈ 16 × 0.11 × (0.62 + 0.08 letterSpacing) ≈ 1.23 —
+                    so width ≈ 16 × 0.12 × (0.62 + 0.06 letterSpacing) ≈ 1.31 —
                     inside the usable face width of STAT.w 1.7 − 2 × notch r
-                    0.14 = 1.42, with ~0.095 margin per side. That's why the
-                    letterSpacing dropped 0.12 → 0.08 alongside the size bump. */}
+                    0.14 = 1.42, with ~0.055 margin per side (float tilt only
+                    rotates the ticket, the type rides it like print). */}
                 <Text
                     font={STAT_FONT}
-                    fontSize={0.11}
-                    letterSpacing={0.08}
-                    position={[0, -0.22, STAT_FRONT + 0.012]}
+                    fontSize={0.12}
+                    letterSpacing={0.06}
+                    position={[0, -0.22, STAT_FRONT + 0.03]}
                     anchorX="center"
                     anchorY="middle"
                     color="#ffffff"
-                    outlineWidth={0.006}
-                    outlineBlur={0.012}
-                    outlineColor="#7a2f00"
-                    outlineOpacity={0.35}
+                    outlineWidth={0.008}
+                    outlineColor="#4a1c05"
+                    outlineOpacity={1}
+                    sdfGlyphSize={128}
                 >
                     {stat.label.toUpperCase()}
                 </Text>
