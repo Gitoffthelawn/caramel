@@ -4,7 +4,12 @@ test.describe('Coupons Page', () => {
     test('coupons page loads with content', async ({ page }) => {
         await page.goto('/coupons')
 
-        await expect(page.getByText(/all coupons/i).first()).toBeVisible()
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: /verified coupon codes/i,
+            }),
+        ).toBeVisible()
         await expect(page.getByText(/browse.*coupon/i).first()).toBeVisible()
     })
 

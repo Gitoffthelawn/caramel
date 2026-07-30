@@ -38,11 +38,14 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
         }
     }
 
+    // Honest badge only: when the catalog has no discount amount the badge
+    // says "DEAL" — it must NEVER invent a number (a fabricated "20% off"
+    // is a false public claim on every unquantified coupon).
     const discount = coupon.discount_amount
         ? coupon.discount_type === 'PERCENTAGE'
             ? `${coupon.discount_amount}%`
             : `$${coupon.discount_amount}`
-        : '20%'
+        : null
 
     // App-owned trust signal (W1) — "worked Xh ago" when the extension last
     // reported this coupon working, and only if that was recent (<7 days).
@@ -61,12 +64,20 @@ export default function CouponCard({ coupon, index }: CouponCardProps) {
                 {/* Left: Discount Badge */}
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-caramel to-orange-600 text-white shadow-md ring-1 ring-orange-200 dark:ring-orange-900/50">
                     <div className="text-center leading-tight">
-                        <span className="block text-xl font-black md:text-lg">
-                            {discount}
-                        </span>
-                        <span className="text-[11px] font-semibold text-white/90">
-                            off
-                        </span>
+                        {discount ? (
+                            <>
+                                <span className="block text-xl font-black md:text-lg">
+                                    {discount}
+                                </span>
+                                <span className="text-[11px] font-semibold text-white/90">
+                                    off
+                                </span>
+                            </>
+                        ) : (
+                            <span className="block text-sm font-black tracking-widest">
+                                DEAL
+                            </span>
+                        )}
                     </div>
                 </div>
 

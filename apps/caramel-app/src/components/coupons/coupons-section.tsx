@@ -61,6 +61,7 @@ export default function CouponsSection({
     const [discountOptions, setDiscountOptions] = useState<string[]>([])
     const couponsLengthRef = useRef(initialCoupons?.length || 0)
     const initialFetchDone = useRef(disableInitialFetch)
+    const lastFetchedFiltersRef = useRef(JSON.stringify(initialFiltersState))
     const sentinelRef = useRef<HTMLDivElement | null>(null)
 
     const storeDomain = (defaultFilters?.site || filters.site || '').trim()
@@ -183,9 +184,18 @@ export default function CouponsSection({
         [filters],
     )
 
-    // Trigger fetch when filters change
+    // Trigger fetch when filters change. Keyed on the last-FETCHED filter
+    // values, not effect timing: on an SSR page (disableInitialFetch +
+    // initialCoupons) this effect used to refire on hydration mount and wipe
+    // the server-rendered list with a loader + duplicate /api/coupons fetch.
+    // The ref starts at the initial filter state — already satisfied by the
+    // server render (or by the initial-fetch effect below) — so the effect
+    // fetches exactly when the filters differ from what's on screen, and a
+    // StrictMode double-invoke sees the ref already updated and no-ops.
     useEffect(() => {
-        if (!initialFetchDone.current) return
+        const filtersJson = JSON.stringify(filters)
+        if (filtersJson === lastFetchedFiltersRef.current) return
+        lastFetchedFiltersRef.current = filtersJson
         setPage(1)
         setCoupons([])
         setHasMore(true)
@@ -220,11 +230,11 @@ export default function CouponsSection({
         loadMore()
     }, [hasMore, isLoadingMore, loading, loadMore, page])
 
+    // List reset + refetch live in the filter effect above (keyed on the
+    // last-fetched values) — clearing here too would blank the list even when
+    // a re-selected value changes nothing.
     const handleFilterChange = (newFilters: Partial<CouponFilters>) => {
         setFilters(prev => ({ ...prev, ...newFilters }))
-        setPage(1)
-        setCoupons([])
-        setHasMore(true)
     }
 
     // IntersectionObserver fallback to trigger loadMore when the sentinel hits the viewport
