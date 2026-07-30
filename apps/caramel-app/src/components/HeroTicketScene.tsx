@@ -12,8 +12,19 @@
 // reacts to the pointer: the coupon nearest the cursor gently lifts toward
 // the camera, tilts toward the pointer and pops ~4% — all damped, no
 // snapping. Numbers count up as IN-CANVAS 3D text so the type moves with the
-// ticket like print. A handful of instanced droplets, low-count Sparkles, and
-// a one-frame Lightformer environment complete the scene. No ContactShadows
+// ticket like print. The coupons don't pop in: each plays a staggered soft
+// entrance (drop + scale + small-overshoot ease, see the entrance block above
+// SCATTER) choreographed with the parent's poster cross-fade so the reveal
+// reads as one continuous materialization. The whole choreography — poster
+// fade AND entrance clock AND count-up — keys off RevealGate's
+// first-PRESENTED-frame signal (every troika text synced + one full frame
+// rendered), NOT off GL context creation: the 2026-07-30 frame captures
+// proved onCreated fires seconds before the suspended scene (font fetch, env
+// bake, first-render shader compile, async SDF glyph generation) can present
+// anything, which faded the poster into a blank box and let the entrance
+// play unseen — the literal "they appear suddenly" complaint. A handful of
+// instanced droplets, low-count Sparkles, and a one-frame Lightformer
+// environment complete the scene. No ContactShadows
 // and no scroll dolly — the hero doesn't scroll-drive. Loaded via
 // next/dynamic ssr:false and only mounted after the browser is idle + a real
 // WebGL context + a lg+ viewport (HeroSection gates all of that), so the
@@ -26,13 +37,13 @@
 // scrolled out of view); the three stat coupons SHARE one memoized geometry;
 // droplets are ONE instanced mesh (≤10); the environment ships no network
 // fetch; the stat type is SDF text (drei <Text>) on a SELF-HOSTED font,
-// count-up runs only ~1.2s after mount. The per-coupon pointer reaction adds
+// count-up runs only ~1.2s from the reveal. The per-coupon pointer reaction adds
 // one Vector3 project per stat coupon per frame (3 total) — negligible.
 
 import { formatStatDigits, HERO_STATS, useCountUp } from '@/lib/heroStats'
 import { Environment, Lightformer, Sparkles, Text } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
     CARAMEL,
@@ -97,6 +108,12 @@ interface ScatterSpot {
     driftAmp: number
     swayFreq: number
     phase: number
+    // Entrance stagger (seconds after the scene's first presented frame).
+    // Order is deliberate: stores (0) → data selling (0.15) → open source
+    // (0.30) — front-to-back-to-top, matching POSTER_FADE_DELAYS_S in
+    // HeroSection so the poster ticket that fades out first is the 3D ticket
+    // that materializes first.
+    enterDelay: number
 }
 const SCATTER: ScatterSpot[] = [
     {
@@ -109,6 +126,7 @@ const SCATTER: ScatterSpot[] = [
         driftAmp: 0.07,
         swayFreq: 0.5,
         phase: 0,
+        enterDelay: 0,
     },
     {
         position: [-0.25, 1.45, 0.05],
@@ -120,6 +138,7 @@ const SCATTER: ScatterSpot[] = [
         driftAmp: 0.06,
         swayFreq: 0.62,
         phase: 2.1,
+        enterDelay: 0.3,
     },
     {
         position: [1.32, -0.1, -0.5],
@@ -131,8 +150,90 @@ const SCATTER: ScatterSpot[] = [
         driftAmp: 0.08,
         swayFreq: 0.55,
         phase: 4.2,
+        enterDelay: 0.15,
     },
 ]
+
+// --- Entrance choreography (2026-07-30, owner: "when they appear suddenly —
+// not good") -----------------------------------------------------------------
+// Each coupon materializes instead of popping: it starts ENTER_DROP world
+// units below its float path at ENTER_SCALE of its rest size, and eases up/out
+// over ENTER_DURATION_S with a small-overshoot back-ease (ENTER_BACK_C1 0.5 →
+// ~2.5% overshoot — a damped-spring feel, never a bounce). The offset/scale
+// are applied ON TOP of the always-running ambient float and the ease ends
+// with zero slope, so the handoff into the idle float has no velocity
+// discontinuity — the coupon simply IS floating by the time the offset
+// reaches zero. Staggered per coupon via SCATTER[i].enterDelay; the shared
+// clock origin (RevealState.t0) is stamped by RevealGate at the scene's
+// first PRESENTED frame — all troika texts synced + one full frame rendered
+// — never at mount or context creation, so slow font/SDF/shader warm-up can
+// never let the choreography play into a blank or textless canvas
+// (first-frame law: until t0 exists every coupon HOLDS the dropped start
+// pose, and no coupon ever shows at full rest before its entrance has
+// played). Pointer influence (lift/tilt/pop) is gated by the entrance ease
+// so a hover can't yank a coupon that is still materializing. Opacity is NOT
+// animated: transmission glass + troika SDF text make per-material fades
+// z-sorting-artifact bait — the parent's poster cross-fade covers the blend
+// instead (HeroSection fades the canvas in over the fading poster).
+// Clip math: the worst transient extent (spot [0] at full drop:
+// (1.25 + 0.55 + 0.14 + ext.y 1.19) · persp 1.12 ≈ 3.49 vs SCENE_BOUNDS
+// halfH 2.88) exceeds rest bounds by ~21%, which at the W-bound fit (~0.67)
+// stays ≈ 40px inside the bled raster edge — the drop lands in the canvas
+// bleed, never at the crop.
+const ENTER_DROP = 0.55
+const ENTER_SCALE = 0.92
+const ENTER_DURATION_S = 0.7
+const ENTER_BACK_C1 = 0.5
+
+// easeOutBack with a tame overshoot constant (~2.5% at c1 = 0.5); slope is 0
+// at p = 1, which is what makes the float handoff seamless.
+function easeOutBackSoft(p: number): number {
+    const c1 = ENTER_BACK_C1
+    const c3 = c1 + 1
+    const q = p - 1
+    return 1 + c3 * q * q * q + c1 * q * q
+}
+
+// --- Reveal gate -------------------------------------------------------------
+// Shared MUTABLE state, read/written inside useFrame only (never a React
+// state — per-frame writes must not render): readyNodes collects the troika
+// Text nodes that completed their first glyph sync; t0 is the choreography
+// clock origin, stamped by RevealGate once every text node is synced AND one
+// further full frame has been rendered (glyphs provably on screen).
+interface RevealState {
+    t0: number | null
+    readyNodes: Set<string>
+}
+// 3 troika nodes per coupon: value digits + value suffix + label.
+const REVEAL_TEXT_NODE_COUNT = HERO_STATS.length * 3
+
+// Sits INSIDE the scene tree, so it commits (and starts ticking) only when
+// React commits the resolved scene — after drei's suspenseful loaders (font
+// fetch, Environment) settle. From there it waits for troika's ASYNC SDF
+// glyph generation (not suspense-tracked — meshes commit and render EMPTY
+// until their first sync; the 2026-07-30 capture caught bare tickets without
+// type) plus one more rendered frame (the first gl.render pays the shader
+// compile for the transmission materials), then stamps reveal.t0 and tells
+// the parent — which is what actually starts the poster cross-fade, the
+// entrances and the count-up.
+function RevealGate({
+    reveal,
+    onRevealed,
+}: {
+    reveal: RevealState
+    onRevealed: () => void
+}): null {
+    const framesAfterTextRef = useRef(0)
+    useFrame(state => {
+        if (reveal.t0 !== null) return
+        if (reveal.readyNodes.size < REVEAL_TEXT_NODE_COUNT) return
+        framesAfterTextRef.current += 1
+        if (framesAfterTextRef.current < 2) return
+        reveal.t0 = state.clock.elapsedTime
+        onRevealed()
+    })
+    return null
+}
 
 // Pointer-reaction envelope (per stat coupon): proximity is a gaussian of the
 // NDC distance between the pointer and the coupon's projected rest anchor
@@ -328,9 +429,14 @@ interface MeasuredText extends THREE.Mesh {
 function StatValueText({
     digits,
     suffix,
+    statKey,
+    reveal,
 }: {
     digits: string
     suffix: string
+    // Unique per coupon — namespaces this pair's reveal-gate node keys.
+    statKey: string
+    reveal: RevealState
 }): React.JSX.Element {
     const digitsRef = useRef<MeasuredText>(null)
     const suffixRef = useRef<MeasuredText>(null)
@@ -347,6 +453,16 @@ function StatValueText({
         s.position.x = -total / 2 + digitsWidth + SUFFIX_GAP
         s.position.y = SUFFIX_RAISE
     }, [])
+    // onSync fires on EVERY glyph-layout pass; the Set makes the reveal-gate
+    // registration first-sync-only for free.
+    const digitsSynced = useCallback(() => {
+        reveal.readyNodes.add(`${statKey}:digits`)
+        layout()
+    }, [reveal, statKey, layout])
+    const suffixSynced = useCallback(() => {
+        reveal.readyNodes.add(`${statKey}:suffix`)
+        layout()
+    }, [reveal, statKey, layout])
     return (
         <group position={[0, VALUE_Y, STAT_FRONT + 0.03]}>
             <Text
@@ -357,7 +473,7 @@ function StatValueText({
                 anchorY="middle"
                 color={STAT_INK}
                 sdfGlyphSize={128}
-                onSync={layout}
+                onSync={digitsSynced}
             >
                 {digits}
             </Text>
@@ -369,7 +485,7 @@ function StatValueText({
                 anchorY="middle"
                 color={STAT_INK}
                 sdfGlyphSize={128}
-                onSync={layout}
+                onSync={suffixSynced}
             >
                 {suffix}
             </Text>
@@ -393,19 +509,29 @@ function StatCoupon3D({
     spot,
     stat,
     isDark,
+    reveal,
+    countStart,
 }: {
     geometry: THREE.ExtrudeGeometry
     spot: ScatterSpot
     stat: (typeof HERO_STATS)[number]
     isDark: boolean
+    reveal: RevealState
+    // Flips true at the reveal (RevealGate → parent state), so the count-up
+    // runs WHILE the coupon materializes instead of finishing invisibly
+    // during font/shader warm-up.
+    countStart: boolean
 }): React.JSX.Element {
-    // The scene only ever mounts when motion is allowed (HeroSection gates it),
-    // so count-up always animates here — start=true, reduce=false.
-    const n = useCountUp(stat.value, true, false)
+    // The scene only ever mounts when motion is allowed (HeroSection gates
+    // it) — reduce is always false here; start is the reveal signal.
+    const n = useCountUp(stat.value, countStart, false)
     const digits = formatStatDigits(n, stat)
     const anchorRef = useRef<THREE.Group>(null)
     const tiltRef = useRef<THREE.Group>(null)
     const scratch = useMemo(() => new THREE.Vector3(), [])
+    const labelSynced = useCallback(() => {
+        reveal.readyNodes.add(`${stat.label}:label`)
+    }, [reveal, stat.label])
 
     useFrame((state, delta) => {
         const anchor = anchorRef.current
@@ -413,23 +539,45 @@ function StatCoupon3D({
         if (!anchor || !tilt || !anchor.parent) return
         const t = state.clock.elapsedTime
 
+        // Entrance progress for THIS coupon: 0 (held at the dropped start
+        // pose) until RevealGate stamps the shared clock origin, then 0→1
+        // over ENTER_DURATION_S after this coupon's stagger. enter == eased
+        // progress, used to blend the drop offset/scale away and to gate the
+        // pointer reaction in.
+        const p =
+            reveal.t0 === null
+                ? 0
+                : THREE.MathUtils.clamp(
+                      (t - reveal.t0 - spot.enterDelay) / ENTER_DURATION_S,
+                      0,
+                      1,
+                  )
+        const enter = p === 0 ? 0 : easeOutBackSoft(p)
+
         // Ambient float: independent frequencies + phase offsets per coupon.
+        // The entrance drop rides ON TOP of the live float value, so when the
+        // offset hits zero (with zero slope) the coupon is already mid-float —
+        // no velocity discontinuity at the handoff.
         anchor.position.x =
             spot.position[0] +
             Math.cos(t * spot.bobFreq * 0.63 + spot.phase * 1.7) * spot.driftAmp
         anchor.position.y =
             spot.position[1] +
-            Math.sin(t * spot.bobFreq + spot.phase) * spot.bobAmp
+            Math.sin(t * spot.bobFreq + spot.phase) * spot.bobAmp -
+            ENTER_DROP * (1 - enter)
 
         // Pointer proximity, measured in NDC against the coupon's projected
         // REST anchor (parent world matrix = fit scale + scatter parallax).
+        // Gated by the entrance ease so a hover can't yank a coupon that is
+        // still materializing.
         scratch
             .set(spot.position[0], spot.position[1], spot.position[2])
             .applyMatrix4(anchor.parent.matrixWorld)
             .project(state.camera)
         const dx = THREE.MathUtils.clamp(state.pointer.x - scratch.x, -0.8, 0.8)
         const dy = THREE.MathUtils.clamp(state.pointer.y - scratch.y, -0.8, 0.8)
-        const influence = Math.exp(-(dx * dx + dy * dy) / PROX_SIGMA_SQ)
+        const influence =
+            Math.exp(-(dx * dx + dy * dy) / PROX_SIGMA_SQ) * Math.min(enter, 1)
 
         // Lift toward the camera + gentle scale pop under the cursor.
         anchor.position.z = THREE.MathUtils.damp(
@@ -438,13 +586,23 @@ function StatCoupon3D({
             3.5,
             delta,
         )
-        const pop = THREE.MathUtils.damp(
-            anchor.scale.x,
-            spot.scale * (1 + (POP_MAX - 1) * influence),
-            3.5,
-            delta,
-        )
-        anchor.scale.setScalar(pop)
+        // Scale = entrance growth (ENTER_SCALE → 1, set DIRECTLY while the
+        // entrance plays so the choreography isn't smeared by damping) times
+        // the damped hover pop once at rest. The two agree exactly at p = 1
+        // (growth factor 1), so the switch is seamless.
+        const enterScale =
+            spot.scale * (ENTER_SCALE + (1 - ENTER_SCALE) * enter)
+        if (p < 1) {
+            anchor.scale.setScalar(enterScale)
+        } else {
+            const pop = THREE.MathUtils.damp(
+                anchor.scale.x,
+                spot.scale * (1 + (POP_MAX - 1) * influence),
+                3.5,
+                delta,
+            )
+            anchor.scale.setScalar(pop)
+        }
 
         // Base pose + slow sway + tilt toward the cursor (the d·gaussian
         // product self-caps at ~0.15 rad — tasteful, never a snap).
@@ -473,7 +631,18 @@ function StatCoupon3D({
     })
 
     return (
-        <group ref={anchorRef} position={spot.position} scale={spot.scale}>
+        // Initial JSX pose = the entrance START pose (dropped + small), so
+        // even a frame presented before the first useFrame tick could never
+        // flash the coupon at full rest (first-frame law).
+        <group
+            ref={anchorRef}
+            position={[
+                spot.position[0],
+                spot.position[1] - ENTER_DROP,
+                spot.position[2],
+            ]}
+            scale={spot.scale * ENTER_SCALE}
+        >
             <group ref={tiltRef} rotation={[0, spot.rotY, spot.rotZ]}>
                 <mesh geometry={geometry} castShadow receiveShadow>
                     <TicketMaterial isDark={isDark} />
@@ -489,7 +658,12 @@ function StatCoupon3D({
                 {/* Print-ink type, lifted 0.03 off the face so the sheen
                     never kisses the glyph edges — see the treatment block
                     comment above StatValueText. */}
-                <StatValueText digits={digits} suffix={stat.suffix} />
+                <StatValueText
+                    digits={digits}
+                    suffix={stat.suffix}
+                    statKey={stat.label}
+                    reveal={reveal}
+                />
                 {/* Label fit math (longest label = "SUPPORTED STORES", 16
                     glyphs): Poppins-Bold uppercase averages ~0.62em advance,
                     so width ≈ 16 × 0.17 × (0.62 + 0.06 letterSpacing) ≈ 1.85
@@ -505,6 +679,7 @@ function StatCoupon3D({
                     anchorY="middle"
                     color={STAT_INK}
                     sdfGlyphSize={128}
+                    onSync={labelSynced}
                 >
                     {stat.label.toUpperCase()}
                 </Text>
@@ -513,7 +688,15 @@ function StatCoupon3D({
     )
 }
 
-function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
+function StatCoupons({
+    isDark,
+    reveal,
+    countStart,
+}: {
+    isDark: boolean
+    reveal: RevealState
+    countStart: boolean
+}): React.JSX.Element {
     const fieldRef = useRef<THREE.Group>(null)
     // ONE geometry shared by all three coupons (same shape; per-coupon size
     // comes from SCATTER[i].scale on the anchor group).
@@ -561,6 +744,8 @@ function StatCoupons({ isDark }: { isDark: boolean }): React.JSX.Element {
                     spot={SCATTER[i]}
                     stat={stat}
                     isDark={isDark}
+                    reveal={reveal}
+                    countStart={countStart}
                 />
             ))}
         </group>
@@ -617,7 +802,17 @@ function Droplets({ isDark }: { isDark: boolean }): React.JSX.Element {
     )
 }
 
-function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
+function SceneContents({
+    isDark,
+    reveal,
+    countStart,
+    onRevealed,
+}: {
+    isDark: boolean
+    reveal: RevealState
+    countStart: boolean
+    onRevealed: () => void
+}): React.JSX.Element {
     // The vertical FOV keeps world height constant, so on the narrow hero
     // column the scattered stat coupons can overflow the frustum — scale the
     // whole ticket group down to fit both dimensions (bounds come from
@@ -658,8 +853,17 @@ function SceneContents({ isDark }: { isDark: boolean }): React.JSX.Element {
                 distance={18}
             />
 
+            {/* Registered before the coupons (mount order = useFrame order)
+                so t0 is stamped before any coupon reads it in the same
+                tick. */}
+            <RevealGate reveal={reveal} onRevealed={onRevealed} />
+
             <group scale={fit}>
-                <StatCoupons isDark={isDark} />
+                <StatCoupons
+                    isDark={isDark}
+                    reveal={reveal}
+                    countStart={countStart}
+                />
                 {/* Inside the fit group ON PURPOSE: the droplet field is wider
                     than the layout box in raw world units, so scaling it with
                     the content keeps every sphere inside the (bled) frustum
@@ -709,6 +913,22 @@ export default function HeroTicketScene({
     isDark,
     onReady,
 }: HeroTicketSceneProps): React.JSX.Element {
+    // Shared mutable reveal state (see RevealGate). Deliberately NOT the
+    // Canvas onCreated signal: context creation precedes the first real
+    // frame by font-fetch + SDF generation + shader-compile time, and firing
+    // the poster cross-fade there is exactly the blank-box pop this
+    // choreography replaces.
+    const reveal = useMemo<RevealState>(
+        () => ({ t0: null, readyNodes: new Set<string>() }),
+        [],
+    )
+    // React-side echo of the reveal for the count-up hooks (state, not the
+    // mutable object, because useCountUp needs a render to start).
+    const [revealStarted, setRevealStarted] = useState(false)
+    const handleRevealed = useCallback(() => {
+        setRevealStarted(true)
+        onReady?.()
+    }, [onReady])
     return (
         <Canvas
             className="h-full w-full"
@@ -720,9 +940,13 @@ export default function HeroTicketScene({
                 antialias: true,
                 powerPreference: 'high-performance',
             }}
-            onCreated={() => onReady?.()}
         >
-            <SceneContents isDark={isDark} />
+            <SceneContents
+                isDark={isDark}
+                reveal={reveal}
+                countStart={revealStarted}
+                onRevealed={handleRevealed}
+            />
         </Canvas>
     )
 }

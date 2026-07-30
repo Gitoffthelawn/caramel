@@ -15,8 +15,10 @@
 // (shared HERO_STATS + ticketNotchMask, espresso ink, dashed perforation) at
 // the same scatter positions, so the canvas cross-fade is a material swap,
 // not a composition change. The right column reserves its box up front, and
-// the live canvas cross-fades in over the poster on its first-frame onReady
-// signal, so there is zero CLS and no flash of empty space. The poster is
+// the reveal is choreographed: on the canvas's first-frame onReady signal the
+// canvas fades in (500ms) while each poster ticket fades out on a per-coupon
+// stagger timed to its 3D twin's drop-in entrance — one continuous
+// materialization, zero CLS, no flash of empty space. The poster is
 // ALSO the permanent presentation for no-WebGL / reduced-motion desktops, and
 // because it SSRs, the three stats exist as crawlable HTML (SEO bonus).
 // The scene's frameloop is paused (frameloop='never') whenever the hero is
@@ -74,7 +76,18 @@ interface PosterSpot {
     labelSize: string
     floatDuration: number
     floatDelay: number
+    // Cross-fade stagger (seconds after canvasReady) — MUST mirror the same
+    // coupon's SCATTER[i].enterDelay in HeroTicketScene: the poster ticket
+    // fades out exactly while its 3D twin plays its entrance, so the eye
+    // reads one continuous materialization per coupon instead of a global
+    // A-then-B swap (owner 2026-07-30: "when they appear suddenly — not
+    // good").
+    fadeDelay: number
 }
+// Poster ticket fade-out length. The last coupon (open source, delay 0.3s)
+// finishes at ~0.9s — inside the 3D entrance window (its twin rests at 1.0s),
+// so the DOM ticket vanishes just before its glass twin settles.
+const POSTER_FADE_DURATION_S = 0.6
 // Geometry mapping (reference 470×544 layout box, scene fit ≈ 0.67 → ≈77
 // px/world): anchor (x,y) → left/top %, ticket width = 2.5 · scale ·
 // perspective, type = the 3D 0.54/0.17 world sizes through the same factor.
@@ -92,6 +105,7 @@ const POSTER_SPOTS: PosterSpot[] = [
         labelSize: '0.8rem',
         floatDuration: 5.8,
         floatDelay: 0.1,
+        fadeDelay: 0,
     },
     {
         left: '46%',
@@ -106,6 +120,7 @@ const POSTER_SPOTS: PosterSpot[] = [
         labelSize: '0.7rem',
         floatDuration: 4.9,
         floatDelay: 0.35,
+        fadeDelay: 0.3,
     },
     {
         left: '72%',
@@ -120,6 +135,7 @@ const POSTER_SPOTS: PosterSpot[] = [
         labelSize: '0.62rem',
         floatDuration: 6.6,
         floatDelay: 0.55,
+        fadeDelay: 0.15,
     },
 ]
 
@@ -129,12 +145,16 @@ function PosterCoupon({
     index,
     start,
     reduce,
+    fadeOut,
 }: {
     stat: (typeof HERO_STATS)[number]
     spot: PosterSpot
     index: number
     start: boolean
     reduce: boolean
+    // True once the live canvas is presenting: this ticket then fades out on
+    // its own fadeDelay stagger while its 3D twin plays its entrance.
+    fadeOut: boolean
 }): React.JSX.Element {
     const n = useCountUp(stat.value, start, reduce)
     return (
@@ -155,12 +175,24 @@ function PosterCoupon({
                 initial={
                     reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.9 }
                 }
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{
-                    duration: 0.6,
-                    delay: 0.35 + index * 0.12,
-                    ease: revealEase,
-                }}
+                animate={
+                    fadeOut
+                        ? { opacity: 0, y: 0, scale: 1 }
+                        : { opacity: 1, y: 0, scale: 1 }
+                }
+                transition={
+                    fadeOut
+                        ? {
+                              duration: POSTER_FADE_DURATION_S,
+                              delay: spot.fadeDelay,
+                              ease: 'easeOut',
+                          }
+                        : {
+                              duration: 0.6,
+                              delay: 0.35 + index * 0.12,
+                              ease: revealEase,
+                          }
+                }
             >
                 {/* Inner looping float on its own node so the one-shot
                     entrance transform above never fights the loop; each coupon
@@ -234,15 +266,21 @@ function PosterCoupon({
 function HeroCouponPoster({
     start,
     reduce,
+    fadeOut,
 }: {
     start: boolean
     reduce: boolean
+    // Flips true when the canvas presents its first frame (onReady): the
+    // glow bed fades over ~0.9s and each ticket fades on its own stagger —
+    // the poster side of the choreographed materialization.
+    fadeOut: boolean
 }): React.JSX.Element {
     return (
         <div className="pointer-events-none absolute inset-0">
             <div
                 aria-hidden="true"
-                className="absolute inset-0 overflow-hidden"
+                className="absolute inset-0 overflow-hidden transition-opacity duration-[900ms] ease-out"
+                style={{ opacity: fadeOut ? 0 : 1 }}
             >
                 <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-caramel/25 blur-3xl dark:bg-caramel/20" />
                 <div className="absolute left-[38%] top-[32%] h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-300/30 blur-2xl" />
@@ -255,6 +293,7 @@ function HeroCouponPoster({
                     index={index}
                     start={start}
                     reduce={reduce}
+                    fadeOut={fadeOut}
                 />
             ))}
         </div>
@@ -665,25 +704,33 @@ export default function HeroSection() {
                     center at varied depths (soft independent floating +
                     pointer reaction — see HeroTicketScene's SCATTER).
                     HeroCouponPoster — the SSR'd DOM twin of that exact
-                    composition — paints instantly underneath, cross-fades out
-                    when the canvas signals ready, and stays as the permanent
-                    presentation for reduced-motion / no-WebGL desktop. Below
-                    lg the box is hidden (phones never mount three) and the
-                    DOM stat cards render in normal flow under the copy. */}
+                    composition — paints instantly underneath and stays as the
+                    permanent presentation for reduced-motion / no-WebGL
+                    desktop. The reveal is CHOREOGRAPHED, not a hard swap
+                    (owner 2026-07-30): on canvasReady the canvas fades in
+                    over 500ms while each poster ticket fades out on its own
+                    stagger (POSTER_SPOTS[i].fadeDelay) exactly as its 3D twin
+                    plays its staggered drop-in entrance (SCATTER[i]
+                    .enterDelay) — one continuous materialization per coupon.
+                    Below lg the box is hidden (phones never mount three) and
+                    the DOM stat cards render in normal flow under the copy. */}
                 <div className="relative flex w-[45%] flex-col items-center lg:w-full">
-                    {/* DESKTOP 3D box: reserved up front; the live canvas
-                        cross-fades in over the poster, so there is zero CLS. */}
+                    {/* DESKTOP 3D box: reserved up front; zero CLS. The
+                        poster layer keeps opacity 1 — its coupons fade
+                        INDIVIDUALLY (staggered) via fadeOut, so a wrapper
+                        fade here would smear the stagger into one global
+                        dissolve. */}
                     <div className="relative h-[34rem] w-full lg:hidden">
                         <div
-                            className="absolute inset-0 transition-opacity duration-700 ease-out"
+                            className="absolute inset-0"
                             style={{
-                                opacity: canvasReady ? 0 : 1,
                                 pointerEvents: canvasReady ? 'none' : undefined,
                             }}
                         >
                             <HeroCouponPoster
                                 start={statsStarted}
                                 reduce={reduceMotion}
+                                fadeOut={canvasReady}
                             />
                         </div>
                         {/* The canvas raster BLEEDS 48px/40px past the layout
@@ -698,7 +745,7 @@ export default function HeroSection() {
                             anchor box keeps its reserved h-[34rem] — zero CLS. */}
                         {showCanvas && (
                             <div
-                                className="absolute -inset-x-[48px] -inset-y-[40px] transition-opacity duration-700 ease-out"
+                                className="absolute -inset-x-[48px] -inset-y-[40px] transition-opacity duration-500 ease-out"
                                 style={{ opacity: canvasReady ? 1 : 0 }}
                             >
                                 <HeroTicketScene
