@@ -381,6 +381,82 @@ jobs:
           retention-days: 14
 
   # ─────────────────────────────────────────────────────────────
+  # Lighthouse (PR – prod build, SEO/a11y budgets)
+  # ─────────────────────────────────────────────────────────────
+  # Locks in the coupon-page SEO elevation (2026-07-30): a production build is
+  # served against the hermetic seeded Postgres and lighthouserc.json asserts
+  # category budgets (SEO ≥0.95 + a11y ≥0.9 error; perf/best-practices warn) on
+  # /, /coupons, a seeded store page, /supported-stores and /pricing.
+  lighthouse:
+    name: Lighthouse (SEO & a11y budgets)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Same known pin-drift as e2e-pr (postgres:15 vs compose 18.4) —
+        # deliberately mirrored, not fixed here.
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Production origin ON PURPOSE: robots.ts and next.config's X-Robots-Tag
+      # noindex every non-production BASE_URL, which fails Lighthouse's
+      # heavily-weighted is-crawlable audit and caps the SEO score — the very
+      # category this job gates. The server still listens on localhost; only
+      # origin-derived strings (canonicals, robots ruleset) see prod.
+      NEXT_PUBLIC_BASE_URL: https://grabcaramel.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write minimal CI env
+        run: pnpm --filter caramel-app run setup:ci-env
+
+      - name: Generate Prisma Client
+        run: pnpm --filter caramel-app exec prisma generate
+
+      - name: Apply Prisma migrations (seeds the synthetic catalog)
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Build production bundle
+        working-directory: ./apps/caramel-app
+        run: pnpm build
+
+      - name: Run Lighthouse CI
+        working-directory: ./apps/caramel-app
+        run: pnpm lighthouse
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-reports
+          path: apps/caramel-app/lighthouse-reports/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
   # One-root-compose build (F-016) — clean-volume build + boot + migrate proof
   # ─────────────────────────────────────────────────────────────
   compose-build:

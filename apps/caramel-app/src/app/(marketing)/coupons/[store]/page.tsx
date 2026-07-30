@@ -1,10 +1,13 @@
 import CouponsSection from '@/components/coupons/coupons-section'
+import PopularStores from '@/components/coupons/popular-stores'
 import { attachSignals } from '@/lib/couponSignals'
 import { listStoreCoupons } from '@/lib/couponsRepo'
 import { BASE_URL } from '@/lib/env.client'
+import { jsonLdString } from '@/lib/jsonLd'
 import type { Coupon } from '@/types/coupon'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { cache } from 'react'
 
 const PAGE_SIZE = 5
 const baseUrl = BASE_URL
@@ -36,7 +39,10 @@ function getBaseDomain(raw: string): string {
 
 type StoreParams = { store: string }
 
-async function fetchStoreCoupons(storeParam: string) {
+// cache(): generateMetadata needs the coupon total too (for the zero-coupon
+// noindex below), and React request-level caching makes that share ONE catalog
+// read with the page body instead of doubling every store-page query.
+const fetchStoreCoupons = cache(async (storeParam: string) => {
     const base = getBaseDomain(storeParam)
     if (!base) {
         return { coupons: [] as Coupon[], total: 0, base: storeParam }
@@ -57,7 +63,7 @@ async function fetchStoreCoupons(storeParam: string) {
     const { coupons, total } = await listStoreCoupons(base, PAGE_SIZE)
     const couponsWithSignals = await attachSignals(coupons)
     return { coupons: couponsWithSignals as Coupon[], total, base }
-}
+})
 
 export async function generateMetadata({
     params,
@@ -79,12 +85,23 @@ export async function generateMetadata({
     const banner = `${baseUrl}/caramel_banner.png`
     const title = `${base} Coupons & Promo Codes | Caramel`
     const description = `Find verified ${base} coupon codes, promo codes, and discounts. Updated daily.`
-    const canonical = `${baseUrl}/coupons/${encodeURIComponent(storeParam)}`
+    // Canonical always points at the NORMALIZED base-domain URL: this route
+    // serves the same content for /coupons/www.nike.com, /coupons/shop.nike.com
+    // and /coupons/nike.com, so every variant must canonicalize to ONE URL or
+    // Google treats them as competing duplicates. (The sitemap emits only
+    // base-domain URLs — this makes the page agree with it.)
+    const canonical = `${baseUrl}/coupons/${encodeURIComponent(base)}`
+    // Stores with zero visible coupons stay reachable (the prose section
+    // renders an honest empty state) but are noindexed: thousands of thin
+    // "no codes right now" pages in the index are soft-404 bloat. cache()
+    // makes this share one catalog read with the page body.
+    const { total } = await fetchStoreCoupons(storeParam)
 
     return {
         title,
         description,
         alternates: { canonical },
+        robots: total === 0 ? { index: false, follow: true } : undefined,
         openGraph: {
             type: 'website',
             url: canonical,
@@ -124,19 +141,40 @@ export default async function StoreCouponsPage({
 
     const { coupons, total, base } = await fetchStoreCoupons(storeParam)
 
+    // Same normalized URL the canonical uses — structured data pointing at a
+    // slug variant would contradict the canonical it sits next to.
+    const storeUrl = `${baseUrl}/coupons/${encodeURIComponent(base)}`
+
     const structuredData = {
         '@context': 'https://schema.org',
         '@type': 'ItemList',
         name: `${base} coupons and promo codes`,
-        url: `${baseUrl}/coupons/${encodeURIComponent(storeParam)}`,
+        url: storeUrl,
         numberOfItems: total,
         itemListElement: (coupons || []).map((coupon: Coupon, idx: number) => ({
             '@type': 'ListItem',
             position: idx + 1,
-            url: `${baseUrl}/coupons/${encodeURIComponent(storeParam)}`,
+            url: storeUrl,
             name: coupon.title,
             description: coupon.description,
         })),
+    }
+
+    // BreadcrumbList mirrors the crumb trail Google shows in the snippet; the
+    // final item carries no `item` URL per the spec (it IS the current page).
+    const breadcrumbData = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: baseUrl },
+            {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Coupons',
+                item: `${baseUrl}/coupons`,
+            },
+            { '@type': 'ListItem', position: 3, name: `${base} coupons` },
+        ],
     }
 
     return (
@@ -182,11 +220,19 @@ export default async function StoreCouponsPage({
                     every shopper.
                 </p>
             </section>
+            <PopularStores currentSite={base} />
             <script
                 type="application/ld+json"
                 suppressHydrationWarning
                 dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(structuredData),
+                    __html: jsonLdString(structuredData),
+                }}
+            />
+            <script
+                type="application/ld+json"
+                suppressHydrationWarning
+                dangerouslySetInnerHTML={{
+                    __html: jsonLdString(breadcrumbData),
                 }}
             />
         </main>
