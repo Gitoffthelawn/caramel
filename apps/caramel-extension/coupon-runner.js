@@ -352,6 +352,15 @@ async function startApplyingCoupons(rec) {
             t: performance.now(),
         })
         reportOutcome(bestId, 'worked')
+        // Feed the popup's savings history — measured wins only. The DOM
+        // path reads bare numbers off the page, so the currency is the
+        // same "$" presentation the final modal uses.
+        caramelRecordSaving({
+            domain: location.hostname,
+            code: bestCode,
+            amount: bestSave,
+            currency: 'USD',
+        })
         // A committed code that didn't move a READABLE total is usually a
         // threshold promo (min-spend) — say so instead of a bare "applied".
         const zeroEffect = hasPriceCfg && !isNaN(original) && !(bestSave > 0)
@@ -415,6 +424,31 @@ if (!window.__caramel_listeners_bound) {
             )
         }
     })
+    // Website→extension sign-in relay: on our own site, when the extension
+    // has no session yet, announce ourselves — a signed-in page answers
+    // with a token (accepted by the listener above, allowlisted origins
+    // only). One hello per page load; the page mints at most once.
+    // typeof guard: unlike the deferred listener above, this runs at
+    // module-eval time, and the vitest harness evals each file separately
+    // (cross-file top-level consts aren't visible there — see _load.mjs).
+    if (
+        typeof CARAMEL_ALLOWED_ORIGINS !== 'undefined' &&
+        CARAMEL_ALLOWED_ORIGINS.has(location.origin)
+    ) {
+        try {
+            currentBrowser.storage.sync.get(['token'], res => {
+                if (!res?.token) {
+                    window.postMessage(
+                        { type: 'caramel-ext-hello' },
+                        location.origin,
+                    )
+                }
+            })
+        } catch {
+            /* storage unavailable — skip the handshake */
+        }
+    }
+
     currentBrowser.runtime.onMessage.addListener((req, _s, send) => {
         if (req.action === 'userLoggedIn') {
             log('AUTO_INSERT_TRIGGERED_BY_MESSAGE', { t: performance.now() })

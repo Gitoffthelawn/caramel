@@ -57,6 +57,24 @@ let onMessageListeners = []
  */
 export function installChromeStub() {
     const stub = makeChromeStub()
+
+    // storage.*.get/set invoke their callbacks like the real API does
+    // (empty storage). The bare permissive no-op never called them, which
+    // leaves any promise wrapped around chrome.storage (e.g.
+    // caramel-base.js's caramelGetSettings) pending forever. Tests that
+    // need specific stored values still override these per-test.
+    for (const area of ['sync', 'local', 'session']) {
+        stub.storage[area].get = (_keys, cb) => {
+            if (typeof cb === 'function') cb({})
+        }
+        stub.storage[area].set = (_items, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+        stub.storage[area].remove = (_keys, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+    }
+
     const listeners = []
     stub.runtime.onMessage.addListener = fn => listeners.push(fn)
     stub.runtime.onMessage.removeListener = fn => {

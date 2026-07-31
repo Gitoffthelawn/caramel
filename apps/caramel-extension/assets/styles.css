@@ -953,3 +953,103 @@ body {
 .popup-container button:focus:not(:focus-visible) {
     outline: none;
 }
+
+/* --- Savings banner (popup views + settings) --- */
+.savings-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 4px;
+    padding: 9px 12px;
+    background: var(--cm-brand-soft-2);
+    border: 1px dashed var(--cm-border-dashed);
+    border-radius: var(--cm-radius-md);
+    color: var(--cm-text-primary);
+    font-size: var(--cm-text-sm);
+}
+.savings-banner svg {
+    flex: none;
+    color: var(--cm-brand);
+}
+.savings-banner b {
+    color: var(--cm-brand-strong);
+}
+
+/* --- Settings view --- */
+.settings-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 2px;
+}
+.settings-title {
+    margin: 2px 0 4px;
+    font-size: var(--cm-text-md);
+    color: var(--cm-text-primary);
+}
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--cm-surface);
+    border: 1px solid var(--cm-border);
+    border-radius: var(--cm-radius-md);
+    cursor: pointer;
+}
+.settings-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.settings-copy span {
+    font-size: var(--cm-text-base);
+    color: var(--cm-text-primary);
+    overflow-wrap: anywhere;
+}
+.settings-copy small {
+    font-size: var(--cm-text-xs);
+    color: var(--cm-text-secondary);
+}
+/* Checkbox drawn as a brand toggle switch. */
+.settings-switch {
+    appearance: none;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    margin: 0;
+    background: var(--cm-border-dim-hover);
+    border-radius: var(--cm-radius-pill);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--cm-dur) var(--cm-ease);
+}
+.settings-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: var(--cm-on-brand);
+    border-radius: 50%;
+    box-shadow: var(--cm-shadow-card);
+    transition: transform var(--cm-dur) var(--cm-ease);
+}
+.settings-switch:checked {
+    background: var(--cm-brand);
+}
+.settings-switch:checked::after {
+    transform: translateX(16px);
+}
+.account-link {
+    align-self: flex-start;
+    font-size: var(--cm-text-sm);
+    color: var(--cm-brand-strong);
+    text-decoration: none;
+}
+.account-link:hover {
+    text-decoration: underline;
+}
