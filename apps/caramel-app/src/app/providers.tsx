@@ -1,4 +1,5 @@
 'use client'
+import ExtensionSessionRelay from '@/components/ExtensionSessionRelay'
 import Layout from '@/layouts/Layout/Layout'
 import { ThemeContext } from '@/lib/contexts'
 import * as gtag from '@/lib/gtag'
@@ -79,6 +80,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
                 {content}
             </ThemeContext.Provider>
+            <ExtensionSessionRelay />
             <Toaster
                 position="bottom-right"
                 toastOptions={{

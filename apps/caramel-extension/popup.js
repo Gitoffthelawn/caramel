@@ -52,6 +52,163 @@ const formatWorkedAgo = iso => {
 /* ------------------------------------------------------------ */
 let returnView = null // callback for the “Back” button, set dynamically
 
+// Set when this popup was opened as a WINDOW by the checkout modal's
+// "Sign In" button (background openPopup → index.html?callerId=<tabId>).
+// Finishing login must then notify that tab so the apply flow resumes.
+const CARAMEL_CALLER_ID = new URLSearchParams(location.search).get('callerId')
+
+function afterLoginSuccess() {
+    if (CARAMEL_CALLER_ID) {
+        try {
+            const p = currentBrowser.runtime.sendMessage({
+                action: 'userLoggedInFromPopup_' + CARAMEL_CALLER_ID,
+            })
+            if (p && typeof p.then === 'function') p.catch(() => {})
+        } catch {
+            /* originating tab may be gone — still close below */
+        }
+        // Give the message a beat to reach the service worker, then close
+        // this login window; the original tab takes over.
+        setTimeout(() => window.close(), 150)
+        return
+    }
+    initPopup()
+}
+
+/* ------------------------------------------------------------ */
+/*  Savings summary                                             */
+/* ------------------------------------------------------------ */
+// Totals the recorded savings history per currency (a EUR cart and a USD
+// cart don't sum) and renders "You've saved …" into #savingsSummary when
+// there's anything to show. History comes from caramelGetSavings()
+// (caramel-base.js) — written by the apply flow on measured wins only.
+function formatSavingsTotal(list) {
+    const totals = new Map()
+    for (const e of list || []) {
+        if (!e || !(e.amount > 0)) continue
+        const cur = e.currency || 'USD'
+        totals.set(cur, (totals.get(cur) || 0) + e.amount)
+    }
+    if (!totals.size) return ''
+    return Array.from(totals.entries())
+        .map(([cur, amt]) => {
+            try {
+                return new Intl.NumberFormat(undefined, {
+                    style: 'currency',
+                    currency: cur,
+                }).format(amt)
+            } catch {
+                return `${amt.toFixed(2)} ${cur}`
+            }
+        })
+        .join(' + ')
+}
+
+async function renderSavingsSummary() {
+    const slot = document.getElementById('savingsSummary')
+    if (!slot) return
+    const list = await caramelGetSavings()
+    const total = formatSavingsTotal(list)
+    if (!total) return
+    slot.innerHTML = `
+      <div class="savings-banner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 2v20"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        <span>You've saved <b>${escHtml(total)}</b> with Caramel</span>
+      </div>`
+}
+
+/* ------------------------------------------------------------ */
+/*  Settings view                                               */
+/* ------------------------------------------------------------ */
+// In-popup extension preferences: the global checkout-prompt toggle and a
+// pause-this-site toggle (when a site is known). Persisted via
+// caramelSetSettings() (storage.sync — roams with the browser profile);
+// the checkout pill honors them in insertCaramelPrompt().
+async function renderSettingsView(backFn, domain) {
+    const container = document.getElementById('auth-container')
+    if (!container) return
+    const s = await caramelGetSettings()
+    // Dot-less "domains" are extension pages (the popup opened as a tab /
+    // login window reports its own chrome-extension host) — no site toggle.
+    const site =
+        domain && domain.includes('.')
+            ? domain.toLowerCase().replace(/^www\./, '')
+            : null
+    const sitePaused = site
+        ? s.disabledSites.some(d => site === d || site.endsWith('.' + d))
+        : false
+
+    container.innerHTML = `
+    <div class="settings-view fade-in-up">
+      <h3 class="settings-title">Settings</h3>
+
+      <label class="settings-row">
+        <span class="settings-copy">
+          <span>Checkout prompt</span>
+          <small>Offer to auto-apply the best code at checkout</small>
+        </span>
+        <input type="checkbox" id="autoApplyToggle" class="settings-switch" ${s.autoApply ? 'checked' : ''}/>
+      </label>
+
+      ${
+          site
+              ? `<label class="settings-row">
+        <span class="settings-copy">
+          <span>Pause on ${escHtml(site)}</span>
+          <small>Don't show the prompt on this site</small>
+        </span>
+        <input type="checkbox" id="siteToggle" class="settings-switch" ${sitePaused ? 'checked' : ''}/>
+      </label>`
+              : ''
+      }
+
+      <div id="savingsSummary"></div>
+
+      <a id="accountLink" class="account-link" href="${caramelUrl('profile')}" target="_blank" rel="noopener noreferrer" style="display:none;">Manage account →</a>
+
+      <button id="backBtn" class="back-btn" type="button">← Back</button>
+    </div>`
+
+    renderSavingsSummary()
+
+    const autoApplyToggle = document.getElementById('autoApplyToggle')
+    if (autoApplyToggle)
+        autoApplyToggle.addEventListener('change', e => {
+            caramelSetSettings({ autoApply: e.target.checked })
+        })
+
+    const siteToggle = document.getElementById('siteToggle')
+    if (siteToggle && site)
+        siteToggle.addEventListener('change', async e => {
+            const cur = await caramelGetSettings()
+            const rest = cur.disabledSites.filter(d => d !== site)
+            caramelSetSettings({
+                disabledSites: e.target.checked ? [...rest, site] : rest,
+            })
+        })
+
+    currentBrowser.storage.sync.get(['token'], res => {
+        const link = document.getElementById('accountLink')
+        if (link && res?.token) link.style.display = 'inline-block'
+    })
+
+    const backBtn = document.getElementById('backBtn')
+    if (backBtn && typeof backFn === 'function')
+        backBtn.addEventListener('click', backFn)
+}
+
+/* Header gear → in-popup settings (works for guests too — the checkout
+   prompt toggle matters most to signed-out users). */
+function wireSettingsGear(backFn, domain) {
+    const gear = document.getElementById('settingsIcon')
+    if (!gear) return
+    gear.style.display = 'block'
+    gear.onclick = () => renderSettingsView(backFn, domain)
+}
+
 /* ------------------------------------------------------------ */
 /*  Bootstrap                                                   */
 /* ------------------------------------------------------------ */
@@ -111,7 +268,7 @@ async function initPopup() {
                     if (coupons?.length) {
                         await renderCouponsView(coupons, user, domain)
                     } else {
-                        renderUnsupportedSite(user)
+                        renderUnsupportedSite(user, domain)
                     }
                     return
                 }
@@ -173,7 +330,7 @@ async function getActiveTabDomainRecord() {
 /* ------------------------------------------------------------ */
 /*  Unsupported-site view                                       */
 /* ------------------------------------------------------------ */
-function renderUnsupportedSite(user) {
+function renderUnsupportedSite(user, domain) {
     const container = document.getElementById('auth-container')
 
     container.innerHTML = `
@@ -220,17 +377,19 @@ function renderUnsupportedSite(user) {
   `
 
     /* wiring */
+    wireSettingsGear(() => renderUnsupportedSite(user, domain), domain)
+
     const loginToggle = document.getElementById('loginToggleBtn')
     if (loginToggle)
         loginToggle.addEventListener('click', () =>
-            renderSignInPrompt(() => renderUnsupportedSite(user)),
+            renderSignInPrompt(() => renderUnsupportedSite(user, domain)),
         )
 
     const logout = document.getElementById('logoutBtn')
     if (logout)
         logout.addEventListener('click', () => {
             currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                renderUnsupportedSite(null),
+                renderUnsupportedSite(null, domain),
             )
         })
 }
@@ -382,9 +541,10 @@ async function handleSocialSignIn(provider) {
         // Small delay to ensure storage is fully persisted
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Only call initPopup if popup is still open
-        if (document.visibilityState === 'visible') {
-            initPopup()
+        // Checkout-modal logins notify the originating tab and close;
+        // toolbar-popup logins re-render (only if still open).
+        if (CARAMEL_CALLER_ID || document.visibilityState === 'visible') {
+            afterLoginSuccess()
         }
     } catch (err) {
         console.error('OAuth error:', err)
@@ -597,7 +757,9 @@ function renderSignInPrompt(backFn) {
             const { token, username, image } = await res.json()
             const user = { username, image }
 
-            currentBrowser.storage.sync.set({ token, user }, () => initPopup())
+            currentBrowser.storage.sync.set({ token, user }, () =>
+                afterLoginSuccess(),
+            )
         } catch (err) {
             errorBox.textContent = `Login failed: ${err.message}`
             errorBox.style.display = 'block'
@@ -625,16 +787,13 @@ function renderProfileCard(user) {
         </div>
         <button id="logoutBtn" class="coupons-logout-button">Logout</button>
       </div>
+      <div id="savingsSummary"></div>
       <p class="profile-signed-in-note">You're signed in — coupons appear automatically at checkout.</p>
     </div>
   `
 
-    const settingsIcon = document.getElementById('settingsIcon')
-    if (settingsIcon) {
-        settingsIcon.style.display = 'block'
-        settingsIcon.onclick = () =>
-            window.open(caramelUrl('profile'), '_blank')
-    }
+    wireSettingsGear(() => renderProfileCard(user))
+    renderSavingsSummary()
 
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
@@ -673,6 +832,8 @@ function renderCouponsView(coupons, user, domain) {
         <div class="coupons-profile-info">${headerLeft}</div>
         ${headerRight}
       </div>
+
+      <div id="savingsSummary"></div>
 
       <h3 class="coupon-header">Coupons for ${escHtml(domain)}</h3>
 
@@ -773,15 +934,11 @@ function renderCouponsView(coupons, user, domain) {
     /* save callback for login back-button */
     const selfCallback = () => renderCouponsView(coupons, user, domain)
 
-    /* Settings gear (header): visible whenever a user is signed in — this is
-       the main signed-in view, not just the no-tab profile card. */
-    const settingsIcon = document.getElementById('settingsIcon')
-    if (settingsIcon) {
-        settingsIcon.style.display = user ? 'block' : 'none'
-        if (user)
-            settingsIcon.onclick = () =>
-                window.open(caramelUrl('profile'), '_blank')
-    }
+    /* Settings gear (header): in-popup settings, guests included. */
+    wireSettingsGear(selfCallback, domain)
+
+    /* lifetime savings banner (renders only when there's history) */
+    renderSavingsSummary()
 
     /* logout */
     const logoutBtn = document.getElementById('logoutBtn')

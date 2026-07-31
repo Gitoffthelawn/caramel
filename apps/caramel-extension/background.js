@@ -68,6 +68,83 @@ function keepAlive() {
 
 keepAlive()
 
+/* --------------------------------------------------  toolbar badge
+ * Shows how many coupons exist for the site in the active tab, so the
+ * user knows to open Caramel before they reach checkout. Counts come
+ * from the public coupons endpoint (limit=1 — only `total` is read),
+ * cached per domain so tab switching doesn't refetch. */
+const BADGE_CACHE_TTL_MS = 10 * 60 * 1000
+const _badgeCounts = new Map() // domain -> { count, ts }
+
+try {
+    currentBrowser.action.setBadgeBackgroundColor({ color: '#ea6925' })
+    if (currentBrowser.action.setBadgeTextColor)
+        currentBrowser.action.setBadgeTextColor({ color: '#ffffff' })
+} catch {
+    /* badge styling unsupported — counts still render */
+}
+
+function _setBadge(tabId, count) {
+    const text = count > 0 ? (count > 99 ? '99+' : String(count)) : ''
+    try {
+        currentBrowser.action.setBadgeText({ tabId, text })
+    } catch {
+        /* tab gone before the count arrived */
+    }
+}
+
+async function _couponCountFor(domain) {
+    const hit = _badgeCounts.get(domain)
+    if (hit && Date.now() - hit.ts < BADGE_CACHE_TTL_MS) return hit.count
+    const url = new URL(caramelUrl('api/coupons'))
+    url.searchParams.set('site', domain)
+    url.searchParams.set('limit', '1')
+    let count = 0
+    try {
+        const r = await fetchWithTimeout(url.toString())
+        if (r.ok) {
+            const json = await r.json()
+            count =
+                typeof json.total === 'number'
+                    ? json.total
+                    : (json.coupons || []).length
+        }
+    } catch {
+        // Offline/unreachable — treat as no badge, retry after TTL.
+    }
+    _badgeCounts.set(domain, { count, ts: Date.now() })
+    return count
+}
+
+async function updateBadgeForTab(tabId, tabUrl) {
+    if (!tabId || !tabUrl || !/^https?:/.test(tabUrl)) {
+        _setBadge(tabId, 0)
+        return
+    }
+    let domain
+    try {
+        domain = new URL(tabUrl).hostname.replace(/^www\./, '')
+    } catch {
+        _setBadge(tabId, 0)
+        return
+    }
+    const count = await _couponCountFor(domain)
+    _setBadge(tabId, count)
+}
+
+currentBrowser.tabs.onActivated.addListener(({ tabId }) => {
+    currentBrowser.tabs.get(tabId, tab => {
+        if (currentBrowser.runtime.lastError || !tab) return
+        updateBadgeForTab(tabId, tab.url || '')
+    })
+})
+currentBrowser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // Fire on navigation commit (URL change) and on load completion —
+    // covers SPA address-bar updates that never re-"complete".
+    if (!changeInfo.url && changeInfo.status !== 'complete') return
+    updateBadgeForTab(tabId, tab.url || '')
+})
+
 currentBrowser.runtime.onMessage.addListener(
     (message, sender, sendResponse) => {
         if (!message || typeof message.action !== 'string') return

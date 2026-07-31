@@ -126,6 +126,14 @@ async function insertCaramelPrompt(domainRecord) {
         _caramelPromptInFlight
     )
         return
+    // User preference gate (popup settings): auto-apply off, or this site
+    // paused → no passive prompt. Popup-initiated applies bypass this.
+    if (!(await caramelPromptAllowed(location.hostname))) return
+    if (
+        document.getElementById('caramel-small-prompt') ||
+        _caramelPromptInFlight
+    )
+        return
     _caramelPromptInFlight = true
     let made
     try {

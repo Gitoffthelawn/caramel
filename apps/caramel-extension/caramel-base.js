@@ -112,7 +112,103 @@ if (typeof recordTiming === 'undefined') {
 // oxlint-disable-next-line no-unused-vars
 const CARAMEL_ALLOWED_ORIGINS = new Set([
     'https://grabcaramel.com',
+    'https://www.grabcaramel.com',
     ...(_isDevInstall()
-        ? ['http://localhost:58300', 'https://dev.grabcaramel.com']
+        ? ['http://localhost:58000', 'https://dev.grabcaramel.com']
         : []),
 ])
+
+/* --------------------------------------------------  user settings */
+// One storage.sync object so preferences roam with the browser profile.
+// Shape: { autoApply: boolean, disabledSites: string[] } — read through
+// this helper only, so defaults live in exactly one place.
+const CARAMEL_SETTINGS_KEY = 'caramel_settings'
+// Cross-file content-script/popup reads — per-file analysis can't see them.
+// oxlint-disable-next-line no-unused-vars
+function caramelGetSettings() {
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.sync.get([CARAMEL_SETTINGS_KEY], res => {
+                const s = (res && res[CARAMEL_SETTINGS_KEY]) || {}
+                resolve({
+                    autoApply: s.autoApply !== false,
+                    disabledSites: Array.isArray(s.disabledSites)
+                        ? s.disabledSites
+                        : [],
+                })
+            })
+        } catch {
+            resolve({ autoApply: true, disabledSites: [] })
+        }
+    })
+}
+// oxlint-disable-next-line no-unused-vars
+async function caramelSetSettings(patch) {
+    const cur = await caramelGetSettings()
+    const next = Object.assign({}, cur, patch)
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.sync.set(
+                { [CARAMEL_SETTINGS_KEY]: next },
+                () => resolve(next),
+            )
+        } catch {
+            resolve(next)
+        }
+    })
+}
+// Should the passive checkout prompt appear on this host? False when the
+// user turned auto-apply off globally or paused this site. The popup's
+// explicit "apply coupons" action deliberately does NOT go through this.
+// oxlint-disable-next-line no-unused-vars
+async function caramelPromptAllowed(host) {
+    const s = await caramelGetSettings()
+    if (!s.autoApply) return false
+    const h = String(host || '')
+        .toLowerCase()
+        .replace(/^www\./, '')
+    return !s.disabledSites.some(d => h === d || h.endsWith('.' + d))
+}
+
+/* --------------------------------------------------  savings history */
+// Local (not synced — can exceed sync quotas) list of confirmed savings,
+// newest first, capped. Read by the popup's "you've saved" summary.
+const CARAMEL_SAVINGS_KEY = 'caramel_savings'
+const CARAMEL_SAVINGS_MAX = 50
+// oxlint-disable-next-line no-unused-vars
+function caramelGetSavings() {
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.local.get([CARAMEL_SAVINGS_KEY], res => {
+                const arr = res && res[CARAMEL_SAVINGS_KEY]
+                resolve(Array.isArray(arr) ? arr : [])
+            })
+        } catch {
+            resolve([])
+        }
+    })
+}
+// entry: { domain, code, amount, currency, t } — amount must be a real
+// measured saving (> 0); applied-but-unmeasured codes are not recorded.
+// oxlint-disable-next-line no-unused-vars
+async function caramelRecordSaving(entry) {
+    if (!entry || !(entry.amount > 0)) return
+    const list = await caramelGetSavings()
+    list.unshift({
+        domain: String(entry.domain || ''),
+        code: String(entry.code || ''),
+        amount: Math.round(entry.amount * 100) / 100,
+        currency: String(entry.currency || 'USD'),
+        t: entry.t || Date.now(),
+    })
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.local.set(
+                { [CARAMEL_SAVINGS_KEY]: list.slice(0, CARAMEL_SAVINGS_MAX) },
+                resolve,
+            )
+        } catch {
+            resolve()
+        }
+    })
+}

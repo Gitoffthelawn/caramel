@@ -189,6 +189,15 @@ async function startCheckoutDetection() {
             sessionStorage.removeItem('caramel_applied')
             const st = JSON.parse(raw)
             if (st && st.code && Date.now() - (st.t || 0) < 120000) {
+                // Discount-link wins reload the page before extension
+                // storage can be written safely — record the saving here,
+                // on the fresh document, from the sessionStorage handoff.
+                caramelRecordSaving({
+                    domain: location.hostname,
+                    code: st.code,
+                    amount: st.saved || 0,
+                    currency: st.currency || 'USD',
+                })
                 let amount = st.saved || 0
                 let msg = null
                 if (st.currency && st.currency !== 'USD' && amount > 0) {
