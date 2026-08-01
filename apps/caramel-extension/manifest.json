@@ -25,7 +25,7 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["index.html", "supported.json", "assets/*"],
+            "resources": ["index.html", "assets/*"],
             "matches": ["<all_urls>"]
         }
     ],

@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Caramel - Trusted Honey Alternative",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "description": "Open‑source coupon extension that auto‑applies deals without selling data or hijacking commissions.",
     "browser_specific_settings": {
         "gecko": {
@@ -16,11 +16,16 @@
         "192": "/icons/192.png",
         "512": "/icons/512.png"
     },
-    "permissions": ["tabs", "activeTab", "storage", "alarms", "management"],
+    "permissions": ["tabs", "activeTab", "storage", "alarms"],
     "host_permissions": [
-        "https://www.amazon.com/*",
+        "https://*.amazon.com/*",
         "https://*.ebay.com/*",
         "https://*.codecademy.com/*",
+        "https://*.bestbuy.com/*",
+        "https://*.target.com/*",
+        "https://*.walmart.com/*",
+        "https://*.nike.com/*",
+        "https://*.adidas.com/*",
         "https://*.grabcaramel.com/*",
         "http://localhost:58000/*",
         "https://accounts.google.com/*",
@@ -28,16 +33,23 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["index.html", "supported.json", "assets/*"],
+            "resources": ["index.html", "assets/*"],
             "matches": ["<all_urls>"]
         }
     ],
     "content_scripts": [
         {
             "matches": [
-                "https://www.amazon.com/*",
+                "https://*.amazon.com/*",
                 "https://*.ebay.com/*",
-                "https://*.codecademy.com/*"
+                "https://*.codecademy.com/*",
+                "https://*.bestbuy.com/*",
+                "https://*.target.com/*",
+                "https://*.walmart.com/*",
+                "https://*.nike.com/*",
+                "https://*.adidas.com/*",
+                "https://*.grabcaramel.com/*",
+                "http://localhost:58000/*"
             ],
             "js": [
                 "coupon-constants.generated.js",
