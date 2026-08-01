@@ -20,11 +20,12 @@ import { describe, expect, it } from 'vitest'
 // (documented so the next agent doesn't "helpfully" force them together):
 //   * version           — Chrome and Firefox stores carry independent version
 //                          numbers; release-extension.yml bumps them separately.
-//   * permissions        — Chrome uses `identity`; Firefox uses `alarms` +
-//                          `management` (MV3 background/permission model differs).
+//   * permissions        — Chrome additionally holds `identity` (popup OAuth
+//                          via launchWebAuthFlow); the rest is shared.
 //   * host_permissions    — Chrome requests broad `https://*/*`; Firefox review
-//                          policy favours the narrow per-store list.
-//   * content_scripts.matches — broad (Chrome) vs the explicit store list (FF).
+//                          policy favours the narrow per-store + relay-origin list.
+//   * content_scripts.matches — broad (Chrome) vs the explicit store list plus
+//                          the grabcaramel.com/localhost web-relay origins (FF).
 //   * content_scripts.css — `caramel-content.css` is Chrome-only.
 //   * content_security_policy — Chrome-only key.
 //   * background          — `service_worker` (Chrome MV3) vs `scripts` (FF MV3).

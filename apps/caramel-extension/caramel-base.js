@@ -83,6 +83,11 @@ if (typeof log === 'undefined') {
         : () => {}
 }
 if (typeof recordTiming === 'undefined') {
+    // Apply-flow debug telemetry (coupon-apply.js / coupon-fetch.js call
+    // this). No in-extension reader — inspected manually via storage on dev
+    // installs — so the log is capped to the newest entries at write time
+    // (same policy as CARAMEL_SAVINGS_MAX) instead of growing forever.
+    const CARAMEL_TIMINGS_MAX = 50
     var recordTiming = (event, meta = {}) => {
         try {
             const entry = { event, t: performance.now(), meta }
@@ -94,7 +99,9 @@ if (typeof recordTiming === 'undefined') {
                 currentBrowser.storage.local.get(['caramel_timings'], res => {
                     const arr = (res && res.caramel_timings) || []
                     arr.push(entry)
-                    currentBrowser.storage.local.set({ caramel_timings: arr })
+                    currentBrowser.storage.local.set({
+                        caramel_timings: arr.slice(-CARAMEL_TIMINGS_MAX),
+                    })
                 })
             }
         } catch {
