@@ -249,6 +249,11 @@ async function initPopup() {
             const token = res?.token || null
             const user = res?.user || null
 
+            // Fire the session check in PARALLEL with the coupon fetch below —
+            // it must never add latency to the coupon render. A dead session
+            // re-renders logged-out once the 401 lands.
+            if (token) validateStoredSession(token, user)
+
             // Wrap the whole render: a fetch failure (backend down / offline) must
             // show an honest error state with a retry, NEVER leave the popup blank.
             try {
@@ -283,6 +288,40 @@ async function initPopup() {
             }
         })
     })
+}
+
+/* Validates the stored session token against GET /api/extension/me. The
+   stored token used to be trusted forever — a revoked/expired session kept
+   showing a signed-in popup. Only a REAL 401 signs the user out (storage
+   cleared, views re-rendered logged-out via initPopup); network failures
+   and 5xx keep the session — offline must never log the user out. A 200
+   refreshes the stored user {username, image} when the profile changed. */
+function validateStoredSession(token, storedUser) {
+    fetch(caramelUrl('api/extension/me'), {
+        headers: { Authorization: `Bearer ${token}` },
+    })
+        .then(async res => {
+            if (res.status === 401) {
+                currentBrowser.storage.sync.remove(['token', 'user'], () =>
+                    initPopup(),
+                )
+                return
+            }
+            if (!res.ok) return // backend hiccup — not a sign-out signal
+            const data = await res.json().catch(() => null)
+            if (!data) return
+            const fresh = { username: data.username, image: data.image }
+            if (
+                !storedUser ||
+                storedUser.username !== fresh.username ||
+                storedUser.image !== fresh.image
+            ) {
+                currentBrowser.storage.sync.set({ user: fresh }, () => {})
+            }
+        })
+        .catch(() => {
+            /* offline/unreachable — keep the stored session */
+        })
 }
 
 /* Network/backend failure state — keeps the popup from rendering blank when the

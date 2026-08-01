@@ -32,6 +32,38 @@ function fetchWithTimeout(url, opts = {}) {
     )
 }
 
+/* --------------------------------------------------  session bearer
+ * Popup login stores the session token in storage.sync (`token`). Every
+ * caramel API call attaches it as `Authorization: Bearer` so the backend
+ * can tie coupon fetches and outcome reports to the account. The token is
+ * read fresh per request — the MV3 service worker restarts constantly, so
+ * a module-global cache would silently go stale (or start empty) after a
+ * restart. Signed-out users fetch exactly as before (no header). */
+function getStoredToken() {
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.sync.get(['token'], res => {
+                if (currentBrowser.runtime.lastError) {
+                    resolve(null)
+                    return
+                }
+                resolve(res?.token || null)
+            })
+        } catch {
+            resolve(null)
+        }
+    })
+}
+
+async function fetchCaramelApi(url, opts = {}) {
+    const token = await getStoredToken()
+    if (!token) return fetchWithTimeout(url, opts)
+    return fetchWithTimeout(url, {
+        ...opts,
+        headers: { ...opts.headers, Authorization: `Bearer ${token}` },
+    })
+}
+
 function isServiceWorkerContext() {
     return (
         typeof ServiceWorkerGlobalScope !== 'undefined' &&
@@ -72,7 +104,9 @@ keepAlive()
  * Shows how many coupons exist for the site in the active tab, so the
  * user knows to open Caramel before they reach checkout. Counts come
  * from the public coupons endpoint (limit=1 — only `total` is read),
- * cached per domain so tab switching doesn't refetch. */
+ * cached per domain so tab switching doesn't refetch. Deliberately
+ * anonymous (fetchWithTimeout, no bearer): it's a public aggregate that
+ * fires on every tab switch, nothing user-scoped to gain. */
 const BADGE_CACHE_TTL_MS = 10 * 60 * 1000
 const _badgeCounts = new Map() // domain -> { count, ts }
 
@@ -168,7 +202,7 @@ currentBrowser.runtime.onMessage.addListener(
         } else if (message.action === 'keepAlive') {
             sendResponse({ status: 'alive' }) // Respond to the message
         } else if (message.action === 'classifyCart') {
-            fetchWithTimeout(caramelUrl('api/classify-cart'), {
+            fetchCaramelApi(caramelUrl('api/classify-cart'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(message.signals || {}),
@@ -198,7 +232,7 @@ currentBrowser.runtime.onMessage.addListener(
                     url: url.toString(),
                     t: Date.now(),
                 })
-            fetchWithTimeout(url.toString())
+            fetchCaramelApi(url.toString())
                 .then(async r => {
                     if (!r.ok) return { error: `HTTP ${r.status}` }
                     const json = await r.json()
@@ -217,13 +251,13 @@ currentBrowser.runtime.onMessage.addListener(
             // errors are logged, never surfaced — a report must not break checkout.
             // A "worked" outcome also bumps the public usage counter.
             const { id, outcome, storeReason } = message
-            fetchWithTimeout(caramelUrl(`api/coupons/${id}/report`), {
+            fetchCaramelApi(caramelUrl(`api/coupons/${id}/report`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ outcome, storeReason }),
             }).catch(err => console.error('reportOutcome error', err))
             if (outcome === 'worked') {
-                fetchWithTimeout(caramelUrl('api/coupons/increment'), {
+                fetchCaramelApi(caramelUrl('api/coupons/increment'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id }),
@@ -233,7 +267,7 @@ currentBrowser.runtime.onMessage.addListener(
             return true
         } else if (message.action === 'fetchSupportedStores') {
             const url = caramelUrl('api/extension/supported-stores')
-            fetchWithTimeout(url)
+            fetchCaramelApi(url)
                 .then(async r => {
                     if (!r.ok) return { error: `HTTP ${r.status}` }
                     return r.json()
