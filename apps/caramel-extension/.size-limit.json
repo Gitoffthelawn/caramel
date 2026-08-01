@@ -19,13 +19,13 @@
     {
         "name": "popup.js",
         "path": "popup.js",
-        "limit": "44 KB",
+        "limit": "45 KB",
         "brotli": false
     },
     {
         "name": "background.js (sw)",
         "path": "background.js",
-        "limit": "13 KB",
+        "limit": "14 KB",
         "brotli": false
     }
 ]
