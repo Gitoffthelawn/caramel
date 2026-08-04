@@ -130,12 +130,12 @@ const doctoredConfig = () => ({
  *  all), and a catch-all page route also intercepts chrome-extension:// loads —
  *  including the stylesheet every injected surface awaits — which stalls the UI
  *  and looks exactly like a product bug. */
+const REPORTS_KEY = '__caramel_test_reports'
 const stubApi = (sw, config) =>
     sw.evaluate(
-        ([cfg, coupons]) => {
+        ([cfg, coupons, reportsKey]) => {
             if (globalThis.__caramelStubbed) return
             globalThis.__caramelStubbed = true
-            globalThis.__caramelReports = []
             const realFetch = globalThis.fetch
             const json = body =>
                 Promise.resolve(
@@ -144,19 +144,43 @@ const stubApi = (sw, config) =>
                         headers: { 'Content-Type': 'application/json' },
                     }),
                 )
+            // Recorded in storage, NOT on a worker global: an idle MV3 worker
+            // is killed and restarted, and the discount-link path reloads the
+            // page mid-flow. A global would make "the report never fired" and
+            // "the worker was recycled" look identical, which is exactly the
+            // distinction this suite has to be able to draw.
+            //
+            // Appends are SERIALIZED. reportOutcome fires its report and its
+            // increment back to back, so two concurrent read-modify-writes both
+            // read the empty list and the second overwrites the first — which
+            // reads as "the report never fired" and sent me chasing a product
+            // bug that was this recorder's own race.
+            let queue = Promise.resolve()
+            const record = entry => {
+                queue = queue.then(
+                    () =>
+                        new Promise(done =>
+                            chrome.storage.local.get([reportsKey], res => {
+                                const list = res?.[reportsKey] || []
+                                list.push(entry)
+                                chrome.storage.local.set(
+                                    { [reportsKey]: list },
+                                    done,
+                                )
+                            }),
+                        ),
+                )
+            }
             globalThis.fetch = (input, init) => {
                 const u = String(typeof input === 'string' ? input : input.url)
                 if (u.includes('/api/extension/supported-stores'))
                     return json({ supported: [cfg] })
                 if (/\/api\/coupons\/[^/]+\/report/.test(u)) {
-                    globalThis.__caramelReports.push({
-                        kind: 'report',
-                        body: init?.body || '',
-                    })
+                    record({ kind: 'report', body: init?.body || '' })
                     return json({ ok: true })
                 }
                 if (u.includes('/api/coupons/increment')) {
-                    globalThis.__caramelReports.push({ kind: 'increment' })
+                    record({ kind: 'increment' })
                     return json({ ok: true })
                 }
                 if (u.includes('/api/coupons'))
@@ -164,10 +188,16 @@ const stubApi = (sw, config) =>
                 return realFetch(input, init)
             }
         },
-        [config, COUPONS],
+        [config, COUPONS, REPORTS_KEY],
     )
 
-async function runScenario({ name, behaviour, doctor = false, assert }) {
+async function runScenario({
+    name,
+    behaviour,
+    doctor = false,
+    cart = null,
+    assert,
+}) {
     console.log(`\n=== ${name} ===`)
     const ctx = await chromium.launchPersistentContext(
         mkdtempSync(join(tmpdir(), 'caramel-guard-')),
@@ -183,18 +213,46 @@ async function runScenario({ name, behaviour, doctor = false, assert }) {
         },
     )
     try {
-        // Scoped to the store origin only — see stubApi's note.
-        await ctx.route(`https://${STORE}/**`, route =>
-            /\/cart\.js(\?|$)/.test(route.request().url())
-                ? // Not a Shopify-class cart, so the discount-link capability
-                  // probe misses and the DOM form path runs.
-                  route.fulfill({ status: 404, body: 'not found' })
-                : route.fulfill({
-                      status: 200,
-                      contentType: 'text/html; charset=utf-8',
-                      body: pageHtml(behaviour),
-                  }),
-        )
+        /* Server-side cart state for the discount-link scenarios. coupon-apply
+         * detects that strategy by CAPABILITY, not by store list: /cart.js must
+         * answer with {token, total_price, item_count} and /discount/{code}
+         * must attach the code to the session. Scenarios without a `cart` 404
+         * the probe, which is how every non-Shopify store answers, and the DOM
+         * form path runs instead. */
+        const cartState = cart ? { ...cart.initial } : null
+        const discountsSeen = []
+
+        await ctx.route(`https://${STORE}/**`, route => {
+            const url = new URL(route.request().url())
+            if (/^\/cart\.js$/.test(url.pathname)) {
+                return cartState
+                    ? route.fulfill({
+                          status: 200,
+                          contentType: 'application/json',
+                          body: JSON.stringify(cartState),
+                      })
+                    : route.fulfill({ status: 404, body: 'not found' })
+            }
+            const discount = url.pathname.match(/^\/discount\/(.+)$/)
+            if (discount && cartState) {
+                const code = decodeURIComponent(discount[1])
+                discountsSeen.push(code)
+                // Only the winning code moves the session's total, exactly as
+                // the real endpoint behaves: a later code replaces an earlier.
+                if (code === cart.winner)
+                    cartState.total_price = cart.discounted
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'text/html; charset=utf-8',
+                    body: 'ok',
+                })
+            }
+            return route.fulfill({
+                status: 200,
+                contentType: 'text/html; charset=utf-8',
+                body: pageHtml(behaviour),
+            })
+        })
 
         const config = doctor ? doctoredConfig() : STORE_CONFIG
         let sw =
@@ -280,7 +338,11 @@ async function runScenario({ name, behaviour, doctor = false, assert }) {
                 ),
         )
         const reports = await sw.evaluate(
-            () => globalThis.__caramelReports || [],
+            key =>
+                new Promise(res =>
+                    chrome.storage.local.get([key], r => res(r?.[key] || [])),
+                ),
+            REPORTS_KEY,
         )
 
         console.log(`  [modal] ${modal.slice(0, 200)}`)
@@ -288,12 +350,25 @@ async function runScenario({ name, behaviour, doctor = false, assert }) {
             `  [page ] orderPlaced=${state.orderPlaced} applyClicks=${state.applyClicks} codes=${JSON.stringify(state.codesSeen)}`,
         )
         console.log(`  [saved] ${JSON.stringify(savings)}`)
+        if (cartState)
+            console.log(
+                `  [cart ] total=${cartState.total_price} discountsTried=${JSON.stringify(discountsSeen)}`,
+            )
         check(
             'no page errors during the flow',
             errors.length === 0,
             errors.slice(0, 2).join(' | '),
         )
-        assert({ modal, state, savings, logs, reports, check })
+        assert({
+            modal,
+            state,
+            savings,
+            logs,
+            reports,
+            cartState,
+            discountsSeen,
+            check,
+        })
     } finally {
         await ctx.close()
     }
@@ -436,6 +511,110 @@ const SCENARIOS = [
             )
             check(
                 'blames NO coupon when the checkout said nothing',
+                !reports.some(r => r.kind === 'report'),
+                JSON.stringify(reports.map(r => r.kind)),
+            )
+        },
+    },
+    /* The discount-link strategy is the path MOST supported stores actually
+     * take — a Shopify-class checkout whose Apply button is isTrusted-gated, so
+     * the DOM form is deaf and coupon-apply falls back to /discount/{code} plus
+     * live /cart.js totals. It also owns the only reload in the flow: a win
+     * reloads the page so the store's own UI shows the discount, and the result
+     * modal is re-shown on the fresh document from a sessionStorage handoff.
+     * None of that had ever been exercised. */
+    {
+        name: 'S6 discount-link strategy — the DOM form is never touched',
+        behaviour: 'silent', // the form would do nothing even if it were used
+        cart: {
+            initial: {
+                token: 'c1-test-token',
+                total_price: 12000,
+                item_count: 2,
+                currency: 'USD',
+                items: [],
+            },
+            winner: 'SECOND10',
+            discounted: 10800,
+        },
+        assert: ({ modal, state, savings, discountsSeen, reports, check }) => {
+            check(
+                'probes codes over the discount endpoint',
+                discountsSeen.length > 0,
+                JSON.stringify(discountsSeen),
+            )
+            check(
+                'never falls back to the deaf DOM form',
+                state.applyClicks === 0,
+                `${state.applyClicks} apply click(s)`,
+            )
+            check(
+                'stops at the code that moved the cart',
+                discountsSeen[discountsSeen.length - 1] === 'SECOND10',
+                JSON.stringify(discountsSeen),
+            )
+            check(
+                'survives its own reload and re-shows the result',
+                /12\.00/.test(modal),
+                modal.slice(0, 120),
+            )
+            check(
+                'banks the cents-accurate $12.00',
+                savings.length === 1 &&
+                    Math.abs(savings[0]?.amount - 12) < 0.01,
+                JSON.stringify(savings),
+            )
+            check(
+                'credits the winning code, not the first one tried',
+                savings[0]?.code === 'SECOND10',
+                JSON.stringify(savings),
+            )
+            check(
+                'fires the "worked" report before the reload unloads us',
+                reports.some(
+                    r => r.kind === 'report' && /worked/.test(r.body || ''),
+                ),
+                JSON.stringify(reports.map(r => r.kind)),
+            )
+        },
+    },
+    {
+        name: 'S7 discount-link strategy — no code moves the total',
+        behaviour: 'silent',
+        cart: {
+            initial: {
+                token: 'c2-test-token',
+                total_price: 12000,
+                item_count: 2,
+                currency: 'USD',
+                items: [],
+            },
+            winner: null, // nothing works
+            discounted: 12000,
+        },
+        assert: ({ modal, state, savings, discountsSeen, reports, check }) => {
+            check(
+                'tries every code it was given',
+                discountsSeen.length === COUPONS.length,
+                JSON.stringify(discountsSeen),
+            )
+            check(
+                'does not then also grind the DOM form',
+                state.applyClicks === 0,
+                `${state.applyClicks} apply click(s)`,
+            )
+            check(
+                'hands the codes over to copy instead',
+                /SAVE12/.test(modal),
+                modal.slice(0, 120),
+            )
+            check(
+                'banks nothing',
+                savings.length === 0,
+                JSON.stringify(savings),
+            )
+            check(
+                'blames no coupon — a silent cart is not a rejection',
                 !reports.some(r => r.kind === 'report'),
                 JSON.stringify(reports.map(r => r.kind)),
             )

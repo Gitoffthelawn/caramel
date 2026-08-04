@@ -26,6 +26,33 @@ To check the packaged output rather than the source tree:
 pnpm build && CARAMEL_EXT_DIR=./dist pnpm test:guards
 ```
 
+## How the extension gets tested
+
+Three tiers, deliberately not overlapping:
+
+| Tier                 | Covers                                                                                                    | Cannot cover                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `pnpm test` (vitest) | Pure logic, DOM helpers, verdict/savings math, manifest and package invariants                            | Anything needing layout, a service worker, OAuth |
+| `pnpm test:guards`   | The real content-script bundle in real Chromium: apply loop, both strategies, the injected UI, the guards | Real sign-in, a real store's live markup         |
+| `pnpm test:e2e`      | The extension against a locally-booted `caramel-app` with a real Postgres                                 | Store-side behaviour                             |
+
+The guards suite runs **both** apply strategies, which are genuinely different code paths: the DOM form (config selectors, Magento-class) and the discount-link capability path (`/cart.js` + `/discount/{code}`, Shopify-class — the one most supported stores take, and the only path that reloads the page mid-flow).
+
+### Interactive debugging with an agent
+
+For anything the suites structurally can't reach — real Google/Apple sign-in, `chrome.identity.launchWebAuthFlow`, clicking the actual toolbar icon, poking at a live store — use the **`chrome-devtools` MCP server**, registered at user scope:
+
+```
+npx -y chrome-devtools-mcp@1.6.0 --categoryExtensions=true --experimentalIncludeAllPages=true
+```
+
+`--categoryExtensions` is **off by default**; it unlocks `install_extension`, `list_extensions`, `reload_extension`, `trigger_extension_action` and `uninstall_extension`. Two constraints worth knowing before you plan around it:
+
+- It only works over a **pipe connection**, so the server launches its own Chrome. `--browserUrl` / `--wsEndpoint` / `--autoConnect` are unsupported until Chrome 149. That is a feature here: it uses its own profile (`~/.cache/chrome-devtools-mcp/chrome-profile`) and can never touch your personal Chrome or the shared Stealth master profile.
+- OAuth needs headed mode (the default) and a **stable extension ID**, since the callback lands on `https://<extension-id>.chromiumapp.org/*`.
+
+Anything you discover that way belongs back in `scripts/test-guards.mjs` as a scenario — the MCP is for exploration, not for coverage.
+
 ## Byte budgets
 
 `.size-limit.json` caps each bundle. The injected content-script budget moved 106 → 124 → **126 KB** on 2026-08-04: first for the bad-config safety guards (`4c7466a..4660064`), then for the multi-price post-apply total read and the shadow-CSS fetch timeout. All of it is correctness code proved necessary in a real browser — raise the budget rather than trim it, and say why here.
