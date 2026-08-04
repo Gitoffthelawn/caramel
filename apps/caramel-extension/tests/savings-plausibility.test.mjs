@@ -270,3 +270,93 @@ describe('dom-utils.js — order-completing controls are refused', () => {
         expect(globalThis.caramelIsForbiddenControl(undefined)).toBe(false)
     })
 })
+
+// --- removing a coupon must never remove the user's items -------------------
+// removeAppliedCoupon runs BETWEEN failed codes (up to 8x a run). Its generic
+// fallback is hardcoded in the extension, not supplied by config, so it is the
+// default on every store that doesn't set couponRemove. Three of its selectors
+// name no coupon context at all — on a cart page they equally match
+// "Remove item".
+
+describe('coupon-apply.js — remove-coupon never targets a cart line item', () => {
+    const CART = `
+        <ul class="cart-items">
+          <li class="line-item">Silk pyjama top
+            <button aria-label="Remove item">x</button></li>
+          <li class="line-item">Slippers
+            <button aria-label="Remove item">x</button></li>
+        </ul>
+        <div class="promo-block">
+          <input id="promo" value="SAVE10" />
+          <div class="applied-coupon"><button aria-label="Remove">x</button></div>
+        </div>`
+
+    let clicked
+
+    beforeEach(() => {
+        document.body.innerHTML = CART
+        clicked = []
+        for (const b of document.querySelectorAll('button')) {
+            b.addEventListener('click', e =>
+                clicked.push(e.currentTarget.getAttribute('aria-label')),
+            )
+        }
+        globalThis._isVisible = () => true
+    })
+
+    it('clicks the coupon-scoped remove, not the last "Remove item" on the page', async () => {
+        await globalThis.removeAppliedCoupon({ couponInput: '#promo' })
+        expect(clicked).toEqual(['Remove'])
+        expect(clicked).not.toContain('Remove item')
+    })
+
+    it('does not touch line items when the coupon block has no remove button', async () => {
+        document.querySelector('.applied-coupon').remove()
+
+        const removed = await globalThis.removeAppliedCoupon({
+            couponInput: '#promo',
+        })
+
+        // No coupon-area remove exists, so the line-item buttons must be left
+        // alone — it falls back to clearing the input instead.
+        expect(clicked).toEqual([])
+        expect(document.getElementById('promo').value).toBe('')
+        expect(removed).toBe(true)
+    })
+
+    it('never clicks a bare unscoped "Remove", even inside the promo block', async () => {
+        // The unscoped tier is gone on purpose. A line item's bare "Remove" and
+        // a coupon's bare "Remove" are identical in label AND in DOM shape on a
+        // shallow cart — two proximity guards were measured and neither could
+        // separate them. So an unscoped match is never clicked at all; the
+        // store's config must name it via `couponRemove` to be actionable.
+        document.querySelector('.applied-coupon').outerHTML =
+            '<button aria-label="Remove">x</button>'
+        for (const b of document.querySelectorAll('button')) {
+            b.addEventListener('click', e =>
+                clicked.push(e.currentTarget.getAttribute('aria-label')),
+            )
+        }
+        clicked.length = 0
+
+        await globalThis.removeAppliedCoupon({ couponInput: '#promo' })
+        expect(clicked).toEqual([])
+        expect(document.getElementById('promo').value).toBe('')
+    })
+
+    it('DOES click an unscoped remove when the store config names it explicitly', async () => {
+        // Per-store `couponRemove` is a deliberate decision, not a blind
+        // default — so it is honoured even though it is unscoped.
+        document.querySelector('.applied-coupon').outerHTML =
+            '<button id="cpnRemove" aria-label="Remove">x</button>'
+        document
+            .getElementById('cpnRemove')
+            .addEventListener('click', () => clicked.push('config-remove'))
+
+        await globalThis.removeAppliedCoupon({
+            couponInput: '#promo',
+            couponRemove: '#cpnRemove',
+        })
+        expect(clicked).toEqual(['config-remove'])
+    })
+})

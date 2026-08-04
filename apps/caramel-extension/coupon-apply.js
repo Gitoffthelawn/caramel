@@ -7,10 +7,36 @@ const GENERIC_APPLIED_SELECTORS =
     '[class*="coupon-applied" i], [class*="discount-applied" i], ' +
     '[class*="cart-coupon-list" i] li, [class*="applied-coupon" i], ' +
     '[class*="coupon-list-item" i], [class*="redeemed" i]'
-const GENERIC_REMOVE_SELECTORS =
+// Remove-button fallbacks, in DESCENDING order of confidence. Kept as two
+// tiers rather than one comma-joined selector on purpose: a single selector is
+// resolved in DOCUMENT order, so a vague match could outrank a precise one just
+// by sitting lower on the page.
+//
+// Tier 1 is self-scoping — every selector names a coupon container, so a match
+// is a coupon remove button by construction.
+const GENERIC_REMOVE_SELECTORS_SCOPED =
     '[class*="cart-coupon-list" i] li button, [class*="coupon-list-item" i] button, ' +
-    '[class*="applied-coupon" i] button, [aria-label*="Remove" i], ' +
-    '[aria-label*="Delete" i], button[title*="Remove" i]'
+    '[class*="applied-coupon" i] button'
+// There is deliberately NO unscoped tier. It used to exist —
+//   [aria-label*="Remove" i], [aria-label*="Delete" i], button[title*="Remove" i]
+// — naming no coupon context whatsoever, so on a cart page it matched line-item
+// remove buttons just as well as a coupon's. Since removeAppliedCoupon runs
+// BETWEEN failed codes (up to 8x a run) on every store that doesn't set
+// `couponRemove`, a wrong pick there silently empties the user's cart.
+//
+// Two proximity guards were tried and MEASURED, both failed: walking up from the
+// button reaches <body> on a shallow cart, and walking up from the input reaches
+// the shared summary container. Neither separates the two, because a line item's
+// bare "Remove" and a coupon's bare "Remove" are genuinely identical in DOM
+// shape and label. A text deny-list catches "Remove item" but not a bare
+// "Remove".
+//
+// So the guess is gone rather than refined. When nothing coupon-scoped matches,
+// removeAppliedCoupon falls through to clearing the input — the cost is a
+// coupon that may stack on the next attempt (a missed discount), instead of a
+// deleted cart. If a store genuinely needs a remove button we can't scope, that
+// belongs in its config's `couponRemove`, where it is a deliberate per-store
+// decision rather than a blind default for every store.
 const GENERIC_ERROR_TEXT_RE =
     /\b(invalid|expired|not\s+(valid|applicable|eligible)|limited\s+to|cannot\s+be\s+(applied|redeemed)|doesn'?t\s+apply|no\s+eligible|enter\s+a\s+valid|nicht|ungültig)\b/i
 
@@ -18,7 +44,7 @@ function findAppliedSelector(rec) {
     return rec.successIndicator || GENERIC_APPLIED_SELECTORS
 }
 function findRemoveSelector(rec) {
-    return rec.couponRemove || GENERIC_REMOVE_SELECTORS
+    return rec.couponRemove || GENERIC_REMOVE_SELECTORS_SCOPED
 }
 
 // Set value on a (possibly React-controlled) input + fire input/change events.
@@ -37,11 +63,13 @@ function setInputValue(input, code) {
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
 async function removeAppliedCoupon(rec) {
-    // Prefer per-config remove; fall back to generic.
+    // Prefer per-config remove; fall back to the coupon-SCOPED generics.
     const sel = findRemoveSelector(rec)
+    const usable = b =>
+        _isVisible(b) && !b.disabled && !caramelIsForbiddenControl(b)
     // qAll (not raw querySelectorAll) so an XPath couponRemove selector is
     // evaluated correctly instead of throwing a SyntaxError that aborts removal.
-    const candidates = qAll(sel).filter(b => _isVisible(b) && !b.disabled)
+    const candidates = qAll(sel).filter(usable)
     if (candidates.length) {
         // The newest applied coupon is usually rendered last → click last one.
         const btn = candidates[candidates.length - 1]
@@ -50,6 +78,7 @@ async function removeAppliedCoupon(rec) {
         log('Removed applied coupon via', sel)
         return true
     }
+    log('removeAppliedCoupon: no coupon-scoped remove button — clearing input')
     // Last resort: clear the input. Some sites tie this to "remove".
     const input = qOne(rec.couponInput)
     if (input && input.value) {

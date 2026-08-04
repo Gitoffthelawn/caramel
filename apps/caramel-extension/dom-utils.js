@@ -60,7 +60,7 @@ function waitForVisible(sel, timeout = 3000) {
  * A coupon apply button is never called "Pay now" or "Place order", so this
  * cannot swallow a legitimate target. */
 const CARAMEL_FORBIDDEN_CONTROL_RE =
-    /\b(place\s+(your\s+)?order|pay\s+(now|today)|complete\s+(your\s+)?(order|purchase)|submit\s+order|confirm\s+(and\s+pay|order|purchase)|buy\s+now|proceed\s+to\s+(pay|checkout)|checkout\s+now|delete\s+account|remove\s+(item|all))\b/i
+    /\b(place\s+(your\s+)?order|pay\s+(now|today)|complete\s+(your\s+)?(order|purchase)|submit\s+order|confirm\s+(and\s+pay|order|purchase)|buy\s+now|proceed\s+to\s+(pay|checkout)|checkout\s+now|delete\s+account)\b|\b(remove|delete)\s+(this\s+)?(item|product|line|all|address|card|everything|from\s+(bag|cart|basket|order))\b/i
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
