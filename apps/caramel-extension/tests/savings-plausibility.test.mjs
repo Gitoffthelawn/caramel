@@ -164,3 +164,43 @@ describe('coupon-runner.js — a claimed saving must fit inside the cart', () =>
         expect(recordedSavings).toHaveLength(1)
     })
 })
+
+// --- scraped codes are dirty strings ---------------------------------------
+// A code is typed into the store's input verbatim and handed to the clipboard
+// verbatim. Whitespace the scraper carried over turns a working code into a
+// store rejection, which the trust loop then records against the coupon.
+
+describe('coupon-fetch.js — scraped codes are normalised before use', () => {
+    it('strips surrounding whitespace, newlines and zero-width characters', () => {
+        const clean = globalThis._caramelCleanCodes([
+            { code: '  SAVE10\n' },
+            { code: '\u200bWELCOME20\ufeff' },
+            { code: 'NBSP\u00a0END' },
+            { code: 'ALREADYFINE' },
+        ])
+        expect(clean.map(c => c.code)).toEqual([
+            'SAVE10',
+            'WELCOME20',
+            'NBSP END', // internal space preserved — some stores issue these
+            'ALREADYFINE',
+        ])
+    })
+
+    it('drops codes that are empty once cleaned, and leaves the array otherwise intact', async () => {
+        const clean = globalThis._caramelCleanCodes([
+            { code: '   ' },
+            { code: '\u200b' },
+            { code: 'REAL5', title: 'keeps its other fields' },
+        ])
+        expect(clean).toHaveLength(1)
+        expect(clean[0]).toMatchObject({
+            code: 'REAL5',
+            title: 'keeps its other fields',
+        })
+    })
+
+    it('passes a non-array through untouched (cold cache / fetch failure)', () => {
+        expect(globalThis._caramelCleanCodes(null)).toBeNull()
+        expect(globalThis._caramelCleanCodes(undefined)).toBeUndefined()
+    })
+})

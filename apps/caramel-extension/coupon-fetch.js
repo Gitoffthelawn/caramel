@@ -53,6 +53,35 @@ async function fetchCoupons(site, kw, category) {
 // from the app's src/lib/coupons.ts.
 const RESTRICTED_STATUSES = new Set(window.CaramelCoupons.RESTRICTED_STATUSES)
 
+/* Coupon codes are SCRAPED, so they arrive with whatever the source page had
+ * around them — trailing newlines, non-breaking spaces, zero-width characters.
+ * The apply path writes the string into the store's input verbatim, so an
+ * unclean code is typed unclean, the store rejects it, and that rejection is
+ * reported back as a genuine coupon failure — teaching the trust loop the wrong
+ * thing about a code that was fine. It also breaks the manual Copy button,
+ * which hands the same string to the user's clipboard.
+ *
+ * Normalises once, here, so every consumer (apply loop, manual list, copy
+ * button) sees the same clean value. Internal spaces are LEFT ALONE — a few
+ * stores really do issue codes containing them. Codes left empty are dropped;
+ * an empty code can only ever waste an attempt. */
+function _caramelCleanCodes(list) {
+    if (!Array.isArray(list)) return list
+    return list
+        .map(c => {
+            if (!c || typeof c.code !== 'string') return c
+            const code = c.code
+                // zero-width chars + BOM: invisible on screen, fatal to an
+                // exact match. Escaped so the class stays reviewable in diff.
+                .replace(/[\u200b-\u200d\ufeff]/g, '')
+                // any unicode space (incl. \u00a0) or control char -> plain
+                .replace(/[\s\u00a0]+/g, ' ')
+                .trim()
+            return code === c.code ? c : { ...c, code }
+        })
+        .filter(c => !c || typeof c.code !== 'string' || c.code.length > 0)
+}
+
 async function classifyCartCategory() {
     try {
         const cs = window.CaramelCartSignals
@@ -102,7 +131,7 @@ async function getCoupons(rec) {
 
     // 1) Use the codes already fetched at detection time (cached) — falls back
     //    to a fresh fetch if the cache is cold. Avoids a double network call.
-    const list = await getCachedCodes(rec)
+    const list = _caramelCleanCodes(await getCachedCodes(rec))
 
     // 2) Only classify the cart if any returned coupon is flagged as restricted
     //    — that's when the category meaningfully helps the user decide.
