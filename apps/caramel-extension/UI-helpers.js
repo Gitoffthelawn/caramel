@@ -36,23 +36,40 @@ const CARAMEL_HOST_CSS = {
 if (typeof _caramelShadowCssPromise === 'undefined') {
     var _caramelShadowCssPromise = null
 }
+/* Every injected surface AWAITS this before appending itself, so a fetch that
+ * never settles isn't a missing stylesheet — it's an extension that silently
+ * never appears at all. A rejection already falls back loudly; a hang couldn't
+ * reach that path. Bounded, and the cached promise is dropped on timeout so a
+ * later surface can still get the real CSS. */
+const CARAMEL_UI_CSS_TIMEOUT_MS = 4000
 function _caramelGetShadowCss() {
     if (!_caramelShadowCssPromise) {
-        _caramelShadowCssPromise = (async () => {
-            const grab = async file => {
-                const res = await fetch(currentBrowser.runtime.getURL(file))
-                if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`)
-                return res.text()
-            }
-            const [tokens, ui] = await Promise.all([
+        const grab = async file => {
+            const res = await fetch(currentBrowser.runtime.getURL(file))
+            if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`)
+            return res.text()
+        }
+        const mine = Promise.race([
+            Promise.all([
                 grab('assets/tokens.css'),
                 grab('assets/content-ui.css'),
-            ])
-            return tokens.replace(/:root/g, ':host, :root') + '\n' + ui
-        })().catch(err => {
+            ]).then(
+                ([tokens, ui]) =>
+                    tokens.replace(/:root/g, ':host, :root') + '\n' + ui,
+            ),
+            new Promise(resolve =>
+                setTimeout(() => {
+                    log('CONTENT_UI_CSS_TIMEOUT')
+                    if (_caramelShadowCssPromise === mine)
+                        _caramelShadowCssPromise = null
+                    resolve(CARAMEL_UI_FALLBACK_CSS)
+                }, CARAMEL_UI_CSS_TIMEOUT_MS),
+            ),
+        ]).catch(err => {
             log('CONTENT_UI_CSS_LOAD_FAILED', { error: String(err) })
             return CARAMEL_UI_FALLBACK_CSS
         })
+        _caramelShadowCssPromise = mine
     }
     return _caramelShadowCssPromise
 }

@@ -1,6 +1,6 @@
 [
     {
-        "name": "content-scripts (injected) [124KB budget: 106->124 on 2026-08-04 for the bad-config safety guards, 4c7466a..4660064]",
+        "name": "content-scripts (injected)",
         "path": [
             "coupon-constants.generated.js",
             "cart-signals.js",
@@ -13,7 +13,7 @@
             "UI-helpers.js",
             "inject.js"
         ],
-        "limit": "124 KB",
+        "limit": "126 KB",
         "brotli": false
     },
     {
