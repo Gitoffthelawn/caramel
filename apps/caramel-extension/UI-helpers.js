@@ -407,7 +407,10 @@ async function showFinalModal(
     )
         .filter(c => c && c.code)
         .map((c, i) => ({ c, i })) // index keeps the sort stable
-        .sort((a, b) => (a.c.rejected ? 1 : 0) - (b.c.rejected ? 1 : 0) || a.i - b.i)
+        .sort(
+            (a, b) =>
+                (a.c.rejected ? 1 : 0) - (b.c.rejected ? 1 : 0) || a.i - b.i,
+        )
         .map(x => x.c)
         .slice(0, 8)
     const hasManual = manualCodes.length > 0
