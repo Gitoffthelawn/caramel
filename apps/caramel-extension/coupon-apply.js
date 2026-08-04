@@ -272,6 +272,9 @@ async function applyCoupon(code, rec) {
         const original = hasPriceCfg
             ? getPrice(rec.priceContainer, { returnLargest: true })
             : NaN
+        // EVERY number the container held before we touched it — the post-apply
+        // read below needs to know which prices are new (see its comment).
+        const originalPrices = hasPriceCfg ? _caramelLastPrices.slice() : []
 
         // Snapshot DOM signals BEFORE we apply, so we can compare after.
         const appliedSel = findAppliedSelector(rec)
@@ -412,7 +415,35 @@ async function applyCoupon(code, rec) {
         let newTotal = NaN
         let priceDropped = false
         if (hasPriceCfg) {
-            newTotal = getPrice(rec.priceContainer, { returnLargest: true })
+            const afterLargest = getPrice(rec.priceContainer, {
+                returnLargest: true,
+            })
+            const afterPrices = _caramelLastPrices.slice()
+            /* The post-apply total is the number that actually MOVED, not the
+             * biggest number in the box. `returnLargest` answers a different
+             * question, and it is the wrong one the moment the price container
+             * also holds an MSRP strikethrough or a "$500 off" banner: that
+             * number never changes, so it wins `returnLargest` both before and
+             * after, `priceDropped` reads false, and the discount measures as
+             * exactly zero. The user is then told their total "hasn't changed
+             * yet — it may need a minimum spend" while the cart on screen went
+             * from $120.00 to $108.00, and the $12 is never banked. Proved in a
+             * real browser on naturepedic's live config (tests/…-multi-price).
+             *
+             * caramelBaselineFor already stops a stray big number from
+             * OVERstating a saving; this is the mirror defect — the same stray
+             * number silently UNDERstating one to zero.
+             *
+             * A candidate must be BOTH below the pre-apply reading AND absent
+             * from the pre-apply set: a static second line (shipping, a fee)
+             * that was always there is not a discounted total, and treating it
+             * as one would declare success on a code that did nothing. The
+             * largest qualifying candidate is taken — the most conservative
+             * one, since a higher total yields a smaller claimed saving. */
+            const moved = afterPrices.filter(
+                p => !isNaN(p) && p < original && !originalPrices.includes(p),
+            )
+            newTotal = moved.length ? Math.max(...moved) : afterLargest
             priceDropped = !isNaN(newTotal) && newTotal < original
         }
         // Success rules (in priority order):
