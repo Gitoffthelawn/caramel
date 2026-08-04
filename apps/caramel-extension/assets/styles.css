@@ -8,9 +8,17 @@ body {
     overflow: hidden; /* Keep extension popup from scrolling */
 }
 body {
-    /* Fluid: full popup width up to the classic 420px cap, so narrow
-       viewports (Firefox overflow menu, small windows) never clip. */
-    width: min(420px, 100vw);
+    /* NEVER size the popup with viewport units. A browser-action popup is
+       sized FROM its content, so `vw` is circular: Chrome lays out with a
+       tiny initial viewport, `100vw` resolves to that, the body shrinks to
+       match, and the popup never recovers — it renders as a ~35px column,
+       320-600px tall, filled with --cm-bg. In dark mode that reads as a
+       plain black rectangle (reported 2026-08-04; was `min(420px, 100vw)`).
+       A definite width gives Chrome something to measure; `max-width: 100%`
+       resolves against <html>, not the viewport, so narrow hosts (Firefox's
+       overflow menu) still clamp instead of clipping. */
+    width: 420px;
+    max-width: 100%;
     /* Size the popup to its content (Chrome grows/shrinks the popup to fit the
        body) so short lists don't waste space and long lists get room — the
        coupon list caps its own height and scrolls. min-height keeps empty/error
