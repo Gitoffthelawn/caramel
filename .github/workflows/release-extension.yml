@@ -118,9 +118,15 @@ jobs:
         env:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      # `brew trust` is required since Homebrew started refusing --HEAD
+      # formulae from third-party taps: on 2026-07-13 this step failed with
+      # "Refusing to load formula ittybittyapps/appstoreconnect-cli/... from
+      # untrusted tap", which took the whole Safari/iOS release down. The trust
+      # call is the remedy Homebrew's own error message prescribes.
       - name: Install App Store Connect CLI
         run: |
           brew tap ittybittyapps/appstoreconnect-cli
+          brew trust ittybittyapps/appstoreconnect-cli
           brew install --HEAD appstoreconnect-cli
       - name: Get latest versions for macOS and iOS and bump
         id: get_versions
