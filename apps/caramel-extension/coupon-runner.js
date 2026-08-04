@@ -210,7 +210,14 @@ async function startApplyingCoupons(rec) {
     const original = hasPriceCfg
         ? getPrice(rec.priceContainer, { returnLargest: true })
         : NaN
+    // Snapshot EVERY price the container held, not just the largest — the
+    // saving is measured against the tightest of these (caramelBaselineFor).
+    const originalPrices = hasPriceCfg ? _caramelLastPrices.slice() : []
     let bestSave = 0
+    // Set when a code demonstrably worked but the measured amount was not
+    // believable (see the plausibility gate below) — keeps the "needs a minimum
+    // spend" copy off a cart whose total DID move.
+    let bestSaveUnmeasurable = false
     let bestCode = null
     let bestId = null // coupon id paired with bestCode, for the trust-loop report
     let lastStoreReason = null // last real error text the store showed us
@@ -286,12 +293,39 @@ async function startApplyingCoupons(rec) {
 
         if (res.success) {
             // Real success — keep this code applied, stop here.
+            // Measure against the most conservative baseline the page supports
+            // rather than the largest number in the container. A config's
+            // price selector is routinely too broad — it catches an MSRP
+            // strikethrough or a "save up to $500" banner alongside the real
+            // total — and `original - newTotal` would then invent a headline
+            // figure the user never received. caramelBaselineFor picks the
+            // smallest price seen that is still >= the new total, which can
+            // never overstate the discount. NaN (nothing qualifies, e.g. the
+            // total went UP) means claim no figure at all.
+            const baseline = hasPriceCfg
+                ? caramelBaselineFor(res.newTotal, originalPrices)
+                : NaN
             const diff =
-                hasPriceCfg && !isNaN(res.newTotal)
-                    ? original - res.newTotal
+                hasPriceCfg && !isNaN(res.newTotal) && !isNaN(baseline)
+                    ? baseline - res.newTotal
                     : 0
+            const believable = diff > 0
+            if (hasPriceCfg && !isNaN(original) && baseline !== original) {
+                log('AUTO_INSERT_BASELINE_NARROWED', {
+                    code,
+                    largestSeen: original,
+                    baselineUsed: baseline,
+                    newTotal: res.newTotal,
+                    reason: 'price container held more than one number — used the tightest defensible baseline',
+                })
+            }
             log(`✓ ${code} saved ${diff || '(unknown — no priceContainer)'}`)
-            bestSave = diff
+            bestSave = believable ? diff : 0
+            // Worked, but no defensible baseline existed (the total didn't drop
+            // below anything the container showed). Don't invent a number — and
+            // don't blame a minimum spend either.
+            bestSaveUnmeasurable =
+                hasPriceCfg && !isNaN(res.newTotal) && isNaN(baseline)
             bestCode = code
             bestId = coupons[i].id
             break
@@ -358,18 +392,30 @@ async function startApplyingCoupons(rec) {
             t: performance.now(),
         })
         reportOutcome(bestId, 'worked')
-        // Feed the popup's savings history — measured wins only. The DOM
-        // path reads bare numbers off the page, so the currency is the
-        // same "$" presentation the final modal uses.
-        caramelRecordSaving({
-            domain: location.hostname,
-            code: bestCode,
-            amount: bestSave,
-            currency: 'USD',
-        })
+        // Feed the popup's savings history — measured wins ONLY. bestSave is 0
+        // both when there was no price config and when the measurement failed
+        // the plausibility gate; neither is a figure worth banking, and a run
+        // of 0s would dilute the user's lifetime total.
+        if (bestSave > 0) {
+            // The DOM path reads bare numbers off the page, so the currency is
+            // the same "$" presentation the final modal uses.
+            caramelRecordSaving({
+                domain: location.hostname,
+                code: bestCode,
+                amount: bestSave,
+                currency: 'USD',
+            })
+        }
         // A committed code that didn't move a READABLE total is usually a
         // threshold promo (min-spend) — say so instead of a bare "applied".
-        const zeroEffect = hasPriceCfg && !isNaN(original) && !(bestSave > 0)
+        // But NOT when the total did move and we simply couldn't trust the
+        // number: telling that user "it hasn't changed the total yet" is a
+        // plain lie about their own cart.
+        const zeroEffect =
+            hasPriceCfg &&
+            !isNaN(original) &&
+            !(bestSave > 0) &&
+            !bestSaveUnmeasurable
         showFinalModal(
             bestSave,
             bestCode,

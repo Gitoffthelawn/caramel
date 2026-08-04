@@ -156,6 +156,7 @@ function getPrice(selector, { returnLargest } = {}) {
         log('getPrice: no price found')
         return NaN
     }
+    if (returnLargest) _caramelLastPrices = prices.slice()
     const idx = returnLargest ? prices.indexOf(Math.max(...prices)) : 0
     // Remember the symbol that came with the price we actually returned, so
     // the savings we report back are denominated in the SAME currency the
@@ -170,6 +171,33 @@ function getPrice(selector, { returnLargest } = {}) {
 // price has been read.
 if (typeof _caramelLastCurrency === 'undefined') {
     var _caramelLastCurrency = '$'
+}
+
+// EVERY price parsed out of the container on the last returnLargest read, not
+// just the winner. A checkout panel routinely shows several ($42.00 total, a
+// "$500 off" banner, an MSRP strikethrough) and the config can't tell us which
+// is the order total — so the caller keeps the full set and picks the most
+// conservative baseline it can defend. See caramelBaselineFor().
+if (typeof _caramelLastPrices === 'undefined') {
+    var _caramelLastPrices = []
+}
+
+/* The tightest cart baseline consistent with an observed post-discount total:
+ * the SMALLEST price seen in the container that is still >= `newTotal`.
+ *
+ * Taking the LARGEST number (what getPrice must do to find an order total) is
+ * what lets a stray "$500 off" banner masquerade as the cart's original price
+ * and turn a real $4.20 discount into a $462.20 headline. Choosing the smallest
+ * candidate at or above the new total can never OVERSTATE a saving: any larger
+ * candidate would have to be a number the discount didn't actually come off.
+ *
+ * Returns NaN when nothing qualifies (e.g. the total went UP) — the caller then
+ * claims no figure at all. */
+// oxlint-disable-next-line no-unused-vars
+function caramelBaselineFor(newTotal, prices = _caramelLastPrices) {
+    if (typeof newTotal !== 'number' || isNaN(newTotal)) return NaN
+    const candidates = (prices || []).filter(p => !isNaN(p) && p >= newTotal)
+    return candidates.length ? Math.min(...candidates) : NaN
 }
 // Consumed by UI-helpers.js when rendering a measured saving.
 // oxlint-disable-next-line no-unused-vars
