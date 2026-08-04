@@ -171,7 +171,13 @@ async function startApplyingCoupons(rec) {
     let _box = pickBestMatch(rec.couponInput)
     if ((!_box || !_isVisible(_box)) && rec.showInput) {
         const _toggle = pickBestMatch(rec.showInput, _box)
-        if (_toggle) {
+        if (caramelIsForbiddenControl(_toggle)) {
+            // Same refusal as the apply path: a reveal-toggle selector that
+            // resolved to the checkout's own order button must never be driven.
+            log('AUTO_INSERT_REFUSED_CONTROL', {
+                reason: 'showInput selector resolved to an order-completing control',
+            })
+        } else if (_toggle) {
             _toggle.click()
             try {
                 await waitForVisible(rec.couponInput, 2500)

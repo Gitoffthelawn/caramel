@@ -166,7 +166,11 @@ async function applyCoupon(code, rec) {
         /* 1] dismiss popup if present */
         if (rec.dismissButton) {
             const btn = qOne(rec.dismissButton)
-            if (btn) {
+            if (caramelIsForbiddenControl(btn)) {
+                log('AUTO_INSERT_REFUSED_CONTROL', {
+                    reason: 'dismiss selector resolved to an order-completing control',
+                })
+            } else if (btn) {
                 btn.click()
                 await sleep(180)
                 log('Popup dismissed')
@@ -185,7 +189,11 @@ async function applyCoupon(code, rec) {
         let input = pickBestMatch(rec.couponInput)
         if ((!input || !_isVisible(input)) && rec.showInput) {
             const showBtn = pickBestMatch(rec.showInput, input)
-            if (showBtn) {
+            if (caramelIsForbiddenControl(showBtn)) {
+                log('AUTO_INSERT_REFUSED_CONTROL', {
+                    reason: 'showInput selector resolved to an order-completing control',
+                })
+            } else if (showBtn) {
                 showBtn.click()
                 try {
                     await waitForVisible(rec.couponInput, 3000)
@@ -204,6 +212,24 @@ async function applyCoupon(code, rec) {
             }
         }
         const applyBtn = pickBestMatch(rec.couponSubmit, input)
+        // Refuse to drive a control that completes the order. A config whose
+        // apply selector resolved here is wrong, and clicking it would spend
+        // the user's money instead of saving it — treat it as no button at all.
+        if (caramelIsForbiddenControl(applyBtn)) {
+            log('AUTO_INSERT_REFUSED_CONTROL', {
+                code,
+                reason: 'apply selector resolved to an order-completing control',
+                label: (applyBtn.innerText || applyBtn.value || '').slice(
+                    0,
+                    60,
+                ),
+            })
+            log('AUTO_INSERT_ATTEMPT_END', code, {
+                success: false,
+                elapsed: performance.now() - attemptStart,
+            })
+            return { success: false, applied: false }
+        }
         if (!input || !_isVisible(input) || !applyBtn) {
             log('Input / apply button missing or hidden')
             log('AUTO_INSERT_ATTEMPT_END', code, {

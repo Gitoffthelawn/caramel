@@ -204,3 +204,69 @@ describe('coupon-fetch.js — scraped codes are normalised before use', () => {
         expect(globalThis._caramelCleanCodes(undefined)).toBeUndefined()
     })
 })
+
+// --- the extension must never drive a checkout's own order button -----------
+// pickBestMatch falls back to "first visible match on the page", so an
+// over-broad apply/showInput selector can resolve to "Place your order". The
+// apply path dispatches a full pointer+click sequence, which such a button
+// accepts. A wrong config must cost a missed discount, never a real purchase.
+
+describe('dom-utils.js — order-completing controls are refused', () => {
+    const forbidden = [
+        'Place your order',
+        'Place order',
+        'Pay now',
+        'Complete purchase',
+        'Complete your order',
+        'Submit order',
+        'Confirm and pay',
+        'Buy now',
+        'Proceed to checkout',
+        'Remove item',
+    ]
+    const allowed = [
+        'Apply',
+        'Apply promo code',
+        'Apply discount',
+        'Have a promo code?',
+        'Submit',
+        'Add code',
+        'Enter code',
+    ]
+
+    const el = (text, attrs = {}) => {
+        const n = document.createElement('button')
+        n.textContent = text
+        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v)
+        return n
+    }
+
+    it.each(forbidden)('refuses %s', label => {
+        expect(globalThis.caramelIsForbiddenControl(el(label))).toBe(true)
+    })
+
+    it.each(allowed)('allows a real coupon control: %s', label => {
+        expect(globalThis.caramelIsForbiddenControl(el(label))).toBe(false)
+    })
+
+    it('also inspects aria-label, value, name and id — not just visible text', () => {
+        expect(
+            globalThis.caramelIsForbiddenControl(
+                el('', { 'aria-label': 'Place your order' }),
+            ),
+        ).toBe(true)
+        expect(
+            globalThis.caramelIsForbiddenControl(el('', { id: 'pay-now' })),
+        ).toBe(true)
+        expect(
+            globalThis.caramelIsForbiddenControl(
+                el('', { name: 'submit-order' }),
+            ),
+        ).toBe(true)
+    })
+
+    it('treats a missing element as not-forbidden (callers handle null themselves)', () => {
+        expect(globalThis.caramelIsForbiddenControl(null)).toBe(false)
+        expect(globalThis.caramelIsForbiddenControl(undefined)).toBe(false)
+    })
+})

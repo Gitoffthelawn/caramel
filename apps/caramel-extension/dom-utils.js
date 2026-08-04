@@ -46,6 +46,40 @@ function waitForVisible(sel, timeout = 3000) {
 //      in the same block as the promo input; unrelated accordions don't;
 //   2. otherwise prefer a VISIBLE match;
 //   3. otherwise fall back to the first match.
+/* Controls the extension must NEVER activate, whatever a config says.
+ *
+ * pickBestMatch falls back to "first visible match on the page" when nothing
+ * sits near the coupon input. That is the right call for a promo toggle, but it
+ * means a stale or over-broad apply/showInput selector (`button[type=submit]`
+ * and friends) can resolve to the checkout's own order-completing control — and
+ * the apply path dispatches a FULL pointer+click sequence, which such buttons
+ * happily accept. A wrong config should cost the user a missed discount, never
+ * an order placed with their saved payment method.
+ *
+ * Matched on the control's visible label and its accessible/name attributes.
+ * A coupon apply button is never called "Pay now" or "Place order", so this
+ * cannot swallow a legitimate target. */
+const CARAMEL_FORBIDDEN_CONTROL_RE =
+    /\b(place\s+(your\s+)?order|pay\s+(now|today)|complete\s+(your\s+)?(order|purchase)|submit\s+order|confirm\s+(and\s+pay|order|purchase)|buy\s+now|proceed\s+to\s+(pay|checkout)|checkout\s+now|delete\s+account|remove\s+(item|all))\b/i
+// Called from other split content-script files (cross-file content-script
+// call — oxlint's per-file analysis can't see it).
+// oxlint-disable-next-line no-unused-vars
+function caramelIsForbiddenControl(el) {
+    if (!el) return false
+    const parts = [
+        el.innerText || el.textContent || '',
+        el.getAttribute?.('aria-label') || '',
+        el.value || '',
+        el.getAttribute?.('name') || '',
+        el.id || '',
+    ]
+    // id/name attributes spell the same words with separators ("pay-now",
+    // "submit_order"), so flatten those to spaces before matching.
+    return CARAMEL_FORBIDDEN_CONTROL_RE.test(
+        parts.join(' ').replace(/[-_]+/g, ' '),
+    )
+}
+
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
