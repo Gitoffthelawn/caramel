@@ -216,6 +216,11 @@ async function startApplyingCoupons(rec) {
     let lastStoreReason = null // last real error text the store showed us
     let lastFailId = null // coupon id paired with lastStoreReason
     const triedCodes = []
+    // Codes the store turned down IN ITS OWN WORDS. The manual fallback sinks
+    // these below the untried ones so we never lead with codes the user just
+    // watched fail. Only real rejection text counts — a timeout or a silent
+    // checkout says nothing about the code.
+    const rejectedCodes = new Set()
     // Pattern-based early-exit: if the checkout gives ZERO feedback (no applied
     // row, no error text) for the first couple of codes, it isn't accepting our
     // injected input at all — stop probing instead of freezing the page ~10s ×
@@ -312,6 +317,7 @@ async function startApplyingCoupons(rec) {
         ) {
             lastStoreReason = res.errorMsg
             lastFailId = coupons[i].id // pair the reason with its coupon
+            rejectedCodes.add(code)
         }
         if (res.committed) {
             await removeAppliedCoupon(rec)
@@ -398,7 +404,9 @@ async function startApplyingCoupons(rec) {
                 ? `The store said: “${String(lastStoreReason).slice(0, 140)}” — copy a code below to try it manually.`
                 : null,
             false,
-            coupons,
+            coupons.map(c =>
+                rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
+            ),
         )
     }
 }

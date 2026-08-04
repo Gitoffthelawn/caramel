@@ -150,14 +150,44 @@ function getPrice(selector, { returnLargest } = {}) {
     }
 
     const regex = /(?:[A-Z]{1,3}\s?)?[$£€]\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g
-    const prices = (el.innerText.match(regex) || []).map(t =>
-        parseFloat(t.replace(/[^0-9.]/g, '')),
-    )
+    const tokens = el.innerText.match(regex) || []
+    const prices = tokens.map(t => parseFloat(t.replace(/[^0-9.]/g, '')))
     if (!prices.length) {
         log('getPrice: no price found')
         return NaN
     }
-    return returnLargest ? Math.max(...prices) : prices[0]
+    const idx = returnLargest ? prices.indexOf(Math.max(...prices)) : 0
+    // Remember the symbol that came with the price we actually returned, so
+    // the savings we report back are denominated in the SAME currency the
+    // cart is priced in. Reporting "$8.00" for an £8.00 saving is a bug the
+    // user can see, and a config can't be trusted to tell us the currency.
+    const sym = tokens[idx].match(/[$£€]/)
+    if (sym) _caramelLastCurrency = sym[0]
+    return prices[idx]
+}
+
+// Guarded `var` (re-injection convention). Defaults to '$' until a real
+// price has been read.
+if (typeof _caramelLastCurrency === 'undefined') {
+    var _caramelLastCurrency = '$'
+}
+// Consumed by UI-helpers.js when rendering a measured saving.
+// oxlint-disable-next-line no-unused-vars
+function caramelCurrencySymbol() {
+    return _caramelLastCurrency || '$'
+}
+
+/* Set the symbol explicitly when the currency is known from data rather than
+ * from a price we just parsed — the post-reload handoff (store-detect.js)
+ * restores a saving recorded BEFORE the reload, so no price has been read in
+ * this page yet and the parsed value would still be the '$' default. */
+// oxlint-disable-next-line no-unused-vars
+function caramelSetCurrencySymbol(sym) {
+    if (typeof sym === 'string' && /^[$£€]$/.test(sym)) {
+        _caramelLastCurrency = sym
+        return true
+    }
+    return false
 }
 
 /* --------------------------------------------------  selector helper

@@ -96,6 +96,21 @@ getDomainRecord.cache = null
 // `target.com` ⊂ `evil-target.com.attacker.net` — which would apply the wrong
 // store's selectors to an unrelated site. Require a label boundary (start, '.'
 // or '-') so only genuine same-site hosts match.
+// Hyphen-joined checkout hosts are real (`secure-athleta.gap.com` serves
+// `athleta.gap.com`'s checkout) but a bare "any prefix + '-'" rule also lets
+// an ATTACKER-registered `evil-target.com` inherit `target.com`'s selectors
+// and coupons. Every genuine hyphen host in the catalog is a known checkout
+// prefix in front of a domain that already has its own subdomain, so require
+// BOTH: an allow-listed prefix label, and a domain of 3+ labels. That admits
+// every real case (`secure-{athleta,oldnavy,bananarepublic,…}.<brand>.<tld>`)
+// while `evil-target.com` → `target.com` (2 labels, unknown prefix) is out.
+const HYPHEN_CHECKOUT_PREFIXES = new Set([
+    'secure',
+    'checkout',
+    'www',
+    'shop',
+    'store',
+])
 function _hostMatchesDomain(host, domain) {
     if (!host || !domain) return false
     host = String(host).toLowerCase()
@@ -105,7 +120,12 @@ function _hostMatchesDomain(host, domain) {
     if (i <= 0) return false
     if (host.slice(i) !== domain) return false
     const sep = host[i - 1]
-    return sep === '.' || sep === '-'
+    if (sep === '.') return true
+    if (sep !== '-') return false
+    return (
+        HYPHEN_CHECKOUT_PREFIXES.has(host.slice(0, i - 1)) &&
+        domain.split('.').length >= 3
+    )
 }
 
 /* --------------------------------------------------  checkout detector */
@@ -201,16 +221,29 @@ async function startCheckoutDetection() {
                 let amount = st.saved || 0
                 let msg = null
                 if (st.currency && st.currency !== 'USD' && amount > 0) {
-                    // The built-in savings line renders "$X" — mislabels
-                    // non-USD stores. Present the correctly-formatted amount
-                    // through the applied-code presentation instead.
+                    // No price has been read on this freshly-reloaded page, so
+                    // tell the UI the currency the saving was recorded in.
+                    // Only then does the headline amount render as "£8.00".
+                    let symbolKnown = false
                     try {
-                        const fmt = new Intl.NumberFormat(undefined, {
+                        const sym = new Intl.NumberFormat(undefined, {
                             style: 'currency',
                             currency: st.currency,
-                        }).format(amount)
-                        msg = `Code ${st.code} saved you ${fmt} — it's applied to your order.`
-                        amount = 0
+                        })
+                            .formatToParts(amount)
+                            .find(p => p.type === 'currency')?.value
+                        symbolKnown = caramelSetCurrencySymbol(sym)
+                        if (!symbolKnown) {
+                            // Symbol we can't render in the headline (e.g.
+                            // "CA$", "R$"). Fall back to the applied-code
+                            // presentation, which states the formatted amount
+                            // in words rather than mislabelling it as "$".
+                            msg = `Code ${st.code} saved you ${new Intl.NumberFormat(
+                                undefined,
+                                { style: 'currency', currency: st.currency },
+                            ).format(amount)} — it's applied to your order.`
+                            amount = 0
+                        }
                     } catch {
                         /* unknown currency code — fall back to $ */
                     }

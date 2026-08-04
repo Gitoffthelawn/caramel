@@ -332,6 +332,35 @@ async function caramelCopyText(text) {
     }
 }
 
+// Currency of the cart the saving was measured against (dom-utils records it
+// when it reads the price). Tolerates the helper being absent — this file is
+// loaded standalone in unit tests.
+function caramelSavingsCurrency() {
+    try {
+        return typeof caramelCurrencySymbol === 'function'
+            ? caramelCurrencySymbol()
+            : '$'
+    } catch {
+        return '$'
+    }
+}
+
+/* A scraped coupon title is UNTRUSTED copy. Titles advertising a zero
+ * discount ("Score 0% off with coupon code") are worse than no title: the
+ * user reads the offer as worthless and skips a code that may well work.
+ * Drop those rather than invent a replacement claim — the code alone is
+ * honest. The extension must stay presentable on bad data; fixing the row
+ * upstream is a separate, slower job. */
+function _caramelUsableTitle(title) {
+    if (typeof title !== 'string') return ''
+    const t = title.trim()
+    if (!t) return ''
+    // "0% off", "0.00% off", "$0 off", "£0.00 off" — any zero-value claim.
+    if (/(^|[^\d.])0+(\.0+)?\s*%/.test(t)) return ''
+    if (/[$£€]\s?0+(\.0+)?([^\d]|$)/.test(t)) return ''
+    return t
+}
+
 // Called from coupon-runner.js + store-detect.js (cross-file, see
 // insertCaramelPrompt).
 // oxlint-disable-next-line no-unused-vars
@@ -367,10 +396,19 @@ async function showFinalModal(
     // Manual fallback: auto-apply found nothing but codes exist — checkouts
     // that ignore synthetic clicks (isTrusted) still take a hand-pasted
     // code, so offer a copy list.
+    //
+    // Codes the store REJECTED IN ITS OWN WORDS (runner sets `rejected`) sink
+    // to the bottom and say so. They stay listed — a store's "invalid" is
+    // sometimes just our synthetic input not registering, so hiding them could
+    // bury a code that works when pasted by hand — but leading with the codes
+    // the user just watched fail reads as if we learned nothing.
     const manualCodes = (
         !isSuccess && Array.isArray(couponList) ? couponList : []
     )
         .filter(c => c && c.code)
+        .map((c, i) => ({ c, i })) // index keeps the sort stable
+        .sort((a, b) => (a.c.rejected ? 1 : 0) - (b.c.rejected ? 1 : 0) || a.i - b.i)
+        .map(x => x.c)
         .slice(0, 8)
     const hasManual = manualCodes.length > 0
 
@@ -388,14 +426,20 @@ async function showFinalModal(
         )
 
     // Build the secondary message based on which state we landed in.
+    // PLAIN TEXT ONLY — this string is escaped once at render, so nothing
+    // here may pre-escape or embed markup (it would double-encode). Callers
+    // reach `message` through the sessionStorage handoff, which the host page
+    // can write, so it is untrusted by definition.
     let finalMessage
     if (savedMoney) {
-        finalMessage = `We found a coupon that saves you $${savingsAmount.toFixed(2)}!`
+        // The amount is the modal's headline now — repeating it here read as
+        // the same sentence twice.
+        finalMessage = 'We tried every code and applied the best one.'
     } else if (appliedCode) {
         // Caller message (threshold hints, non-USD) beats the generic line.
         finalMessage =
             message ||
-            `Code ${esc(code)} is applied to your cart — review the discount before you check out.`
+            `Code ${code} is applied to your cart — review the discount before you check out.`
     } else if (hasManual) {
         // Caller message = the REAL reason, not a generic "didn't stick".
         finalMessage =
@@ -424,10 +468,16 @@ async function showFinalModal(
     const manualBlock = hasManual
         ? `<div class="caramel-manual-list">${manualCodes
               .map(
-                  c => `<div class="caramel-manual-row">
+                  c => `<div class="caramel-manual-row${c.rejected ? ' caramel-manual-row-rejected' : ''}">
 <div class="caramel-manual-info">
 <div class="caramel-manual-code">${esc(c.code)}</div>
-${c.title ? `<div class="caramel-manual-title">${esc(c.title)}</div>` : ''}
+${
+    c.rejected
+        ? '<div class="caramel-manual-title caramel-manual-rejected">Store rejected this one</div>'
+        : _caramelUsableTitle(c.title)
+          ? `<div class="caramel-manual-title">${esc(_caramelUsableTitle(c.title))}</div>`
+          : ''
+}
 </div>
 <button class="caramel-manual-copy" data-code="${esc(c.code)}">Copy</button>
 </div>`,
@@ -435,21 +485,32 @@ ${c.title ? `<div class="caramel-manual-title">${esc(c.title)}</div>` : ''}
               .join('')}</div>`
         : ''
 
+    // Success states group the outcome into ONE panel so the amount reads as
+    // the headline and the code sits under it as a ticket. `.caramel-final-code`
+    // keeps the code as its FIRST <span> — the label is a sibling, never a span
+    // inside it (tests resolve the code via `.caramel-final-code span`).
+    const winBlock = isSuccess
+        ? `<div class="caramel-final-win">
+${
+    savedMoney
+        ? `<div class="caramel-final-eyebrow">You saved</div>
+<p class="caramel-final-savings">${esc(caramelSavingsCurrency())}${savingsAmount.toFixed(2)}</p>`
+        : ''
+}
+<div class="caramel-final-codewrap">
+<div class="caramel-final-eyebrow caramel-final-eyebrow-sm">Code</div>
+<p class="caramel-final-code"><span>${esc(code)}</span></p>
+</div>
+${savedMoney ? '' : `<p class="caramel-final-hint">Discount visible in your cart.</p>`}
+</div>`
+        : ''
+
     modal.innerHTML = `
 <div class="caramel-final-logo"><img src="${logoUrl}" alt="Caramel Logo" /></div>
 <h2>${heading}</h2>
-<p class="caramel-final-msg">${finalMessage}</p>
+<p class="caramel-final-msg">${esc(finalMessage)}</p>
 ${manualBlock}
-${
-    isSuccess
-        ? `<p class="caramel-final-code">Code: <span>${esc(code)}</span></p>
-${
-    savedMoney
-        ? `<p class="caramel-final-savings">You saved $${savingsAmount.toFixed(2)}!</p>`
-        : `<p class="caramel-final-hint">Discount visible in your cart.</p>`
-}`
-        : ''
-}
+${winBlock}
 <button id="caramel-final-ok-btn">${isSignIn ? 'Sign In' : hasManual ? 'Done' : 'Proceed to Checkout'}</button>
 `
 
