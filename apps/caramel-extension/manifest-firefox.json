@@ -18,15 +18,7 @@
     },
     "permissions": ["tabs", "activeTab", "storage", "alarms"],
     "host_permissions": [
-        "https://*.amazon.com/*",
-        "https://*.ebay.com/*",
-        "https://*.codecademy.com/*",
-        "https://*.bestbuy.com/*",
-        "https://*.target.com/*",
-        "https://*.walmart.com/*",
-        "https://*.nike.com/*",
-        "https://*.adidas.com/*",
-        "https://*.grabcaramel.com/*",
+        "https://*/*",
         "http://localhost:58000/*",
         "https://accounts.google.com/*",
         "https://appleid.apple.com/*"
@@ -39,20 +31,11 @@
     ],
     "content_scripts": [
         {
-            "matches": [
-                "https://*.amazon.com/*",
-                "https://*.ebay.com/*",
-                "https://*.codecademy.com/*",
-                "https://*.bestbuy.com/*",
-                "https://*.target.com/*",
-                "https://*.walmart.com/*",
-                "https://*.nike.com/*",
-                "https://*.adidas.com/*",
-                "https://*.grabcaramel.com/*",
-                "http://localhost:58000/*"
-            ],
+            "matches": ["https://*/*"],
+            "css": ["caramel-content.css"],
             "js": [
                 "coupon-constants.generated.js",
+                "cart-signals.js",
                 "caramel-base.js",
                 "dom-utils.js",
                 "store-detect.js",
