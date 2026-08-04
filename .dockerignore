@@ -20,6 +20,7 @@ out
 
 # Internal, gitignored-local archives — secrecy forward-rule (DESIGN.md §2(k))
 audit
+.playwright-mcp
 apps/caramel-app/scripts/internal
 
 # VCS / editor / OS

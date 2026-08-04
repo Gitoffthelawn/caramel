@@ -608,6 +608,25 @@ async function handleSocialSignIn(provider) {
     }
 }
 
+// Popup OAuth needs identity.launchWebAuthFlow, which Firefox deliberately
+// ships without (manifest-firefox.json has no `identity` permission — see
+// the per-browser differences header in manifest-sync.test.ts). Capability
+// check, not UA sniffing.
+function popupOAuthSupported() {
+    const identity = currentBrowser.identity || currentBrowser.chrome?.identity
+    return !!(identity && identity.launchWebAuthFlow)
+}
+
+// OAuth fallback for browsers without popup OAuth (issue #139): open the
+// website's login page in a tab; once the user signs in there, the
+// website→extension session relay (coupon-runner.js caramel-ext-hello ↔
+// ExtensionSessionRelay.tsx) lands the session in storage.sync, so the
+// popup is signed in on its next open.
+function openWebsiteSignIn() {
+    currentBrowser.tabs.create({ url: caramelUrl('login') })
+    window.close()
+}
+
 /* ------------------------------------------------------------ */
 /*  Login prompt                                                */
 /* ------------------------------------------------------------ */
@@ -636,6 +655,12 @@ function renderSignInPrompt(backFn) {
           <span>Sign in with Apple</span>
         </button>
       </div>
+
+      ${
+          popupOAuthSupported()
+              ? ''
+              : '<p class="oauth-note">Sign-in opens grabcaramel.com; the extension picks it up automatically.</p>'
+      }
 
       <div class="oauth-divider">
         <span>or</span>
@@ -743,14 +768,18 @@ function renderSignInPrompt(backFn) {
     if (googleSignInBtn) {
         googleSignInBtn.disabled = false
         googleSignInBtn.addEventListener('click', () =>
-            handleSocialSignIn('google'),
+            popupOAuthSupported()
+                ? handleSocialSignIn('google')
+                : openWebsiteSignIn(),
         )
     }
 
     if (appleSignInBtn) {
         appleSignInBtn.disabled = false
         appleSignInBtn.addEventListener('click', () =>
-            handleSocialSignIn('apple'),
+            popupOAuthSupported()
+                ? handleSocialSignIn('apple')
+                : openWebsiteSignIn(),
         )
     }
 

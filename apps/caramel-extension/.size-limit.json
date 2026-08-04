@@ -19,7 +19,7 @@
     {
         "name": "popup.js",
         "path": "popup.js",
-        "limit": "45 KB",
+        "limit": "46 KB",
         "brotli": false
     },
     {

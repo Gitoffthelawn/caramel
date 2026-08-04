@@ -314,6 +314,15 @@ body {
     height: 18px;
 }
 
+/* Shown only when popup OAuth is unavailable (Firefox — no identity
+   permission) and the buttons fall back to website sign-in + relay. */
+.oauth-note {
+    margin: 8px 0 0;
+    text-align: center;
+    color: var(--cm-text-muted);
+    font-size: var(--cm-text-xs);
+}
+
 .oauth-divider {
     display: flex;
     align-items: center;
