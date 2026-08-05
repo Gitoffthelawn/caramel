@@ -75,10 +75,12 @@ const stubBackend = (exchange = { ok: true, body: {} }) => {
     }
 }
 
-const clickGoogle = async () => {
-    document.getElementById('googleSignInBtn').click()
+const clickProvider = async id => {
+    document.getElementById(id).click()
     for (let i = 0; i < 8; i++) await new Promise(r => setTimeout(r, 20))
 }
+const clickGoogle = () => clickProvider('googleSignInBtn')
+const clickApple = () => clickProvider('appleSignInBtn')
 
 beforeEach(async () => {
     lastExchange = null
@@ -146,6 +148,77 @@ describe('popup OAuth — the success path', () => {
         expect(
             document.getElementById('loginErrorMessage').textContent,
         ).toMatch(/access_denied/)
+    })
+
+    // Apple had NO success-path coverage at all — only cancel and the website
+    // fallback. Its server half is genuinely different from Google's (an
+    // intermediate form_post hop, a base64 {r,s} state envelope, identity read
+    // out of a JWT instead of a userinfo call), and the live leg cannot be
+    // driven here because no Apple ID is available. What the EXTENSION owes
+    // that flow is still pinnable, and it is what these cover.
+    it('sends provider=apple, so the backend picks the Apple exchange and not Google', async () => {
+        withIdentity('https://ext-id.chromiumapp.org/?code=APPLE_CODE&state=S')
+        stubBackend({
+            ok: true,
+            body: {
+                token: 'apple-token',
+                username: 'a@example.com',
+                image: null,
+            },
+        })
+
+        await clickApple()
+
+        expect(lastExchange, 'the exchange request was made').not.toBeNull()
+        expect(lastExchange.body).toMatchObject({
+            provider: 'apple',
+            code: 'APPLE_CODE',
+            state: 'S',
+            redirectUri: 'https://ext-id.chromiumapp.org/',
+        })
+    })
+
+    it('persists an Apple session even though Apple never returns an avatar', async () => {
+        // Apple is requested with scope=email only, so the server sets name to
+        // null and there is no picture claim — image is ALWAYS null here. The
+        // popup must store that cleanly rather than treating it as a failure.
+        withIdentity('https://ext-id.chromiumapp.org/?code=C&state=S')
+        stubBackend({
+            ok: true,
+            body: {
+                token: 'apple-token',
+                username: 'relay@privaterelay.appleid.com',
+                image: null,
+            },
+        })
+
+        await clickApple()
+
+        expect(syncData.token).toBe('apple-token')
+        expect(syncData.user).toEqual({
+            username: 'relay@privaterelay.appleid.com',
+            image: null,
+        })
+    })
+
+    it("surfaces Apple's unverified-email refusal instead of a generic failure", async () => {
+        // The server refuses to mint a session when Apple does not vouch for
+        // the email (403). That reason is actionable, so it must reach the
+        // user verbatim rather than becoming "please try again".
+        withIdentity('https://ext-id.chromiumapp.org/?code=C&state=S')
+        stubBackend({
+            ok: false,
+            body: {
+                error: 'Your Apple email address is not verified. Please verify it with Apple and try again.',
+            },
+        })
+
+        await clickApple()
+
+        expect(syncData.token).toBeUndefined()
+        expect(
+            document.getElementById('loginErrorMessage').textContent,
+        ).toMatch(/not verified/i)
     })
 
     it("surfaces the backend's own reason when the exchange is rejected, and stays signed out", async () => {
