@@ -42,12 +42,30 @@ function fetchWithTimeout(url, opts = {}) {
 function getStoredToken() {
     return new Promise(resolve => {
         try {
-            currentBrowser.storage.sync.get(['token'], res => {
+            // READ-ONLY twin of caramel-base.js's caramelGetSession(). The
+            // session lives in storage.LOCAL so the credential does not roam
+            // via Chrome Sync; sync is still read as a fallback for installs
+            // that predate that move. This worker cannot load caramel-base.js
+            // (service worker, no `window`), hence the deliberate duplicate —
+            // but only the READ, so the migration write stays in one place:
+            // the popup or a content script performs it the first time either
+            // runs, which is immediately in any real session.
+            currentBrowser.storage.local.get(['token'], local => {
                 if (currentBrowser.runtime.lastError) {
                     resolve(null)
                     return
                 }
-                resolve(res?.token || null)
+                if (local?.token) {
+                    resolve(local.token)
+                    return
+                }
+                currentBrowser.storage.sync.get(['token'], synced => {
+                    if (currentBrowser.runtime.lastError) {
+                        resolve(null)
+                        return
+                    }
+                    resolve(synced?.token || null)
+                })
             })
         } catch {
             resolve(null)

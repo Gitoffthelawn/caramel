@@ -479,7 +479,7 @@ if (!window.__caramel_listeners_bound) {
     window.addEventListener('message', ev => {
         if (!CARAMEL_ALLOWED_ORIGINS.has(ev.origin)) return
         if (ev.data?.token) {
-            currentBrowser.storage.sync.set(
+            caramelSetSession(
                 {
                     token: ev.data.token,
                     user: {
@@ -503,8 +503,8 @@ if (!window.__caramel_listeners_bound) {
         CARAMEL_ALLOWED_ORIGINS.has(location.origin)
     ) {
         try {
-            currentBrowser.storage.sync.get(['token'], res => {
-                if (!res?.token) {
+            caramelGetSession().then(({ token }) => {
+                if (!token) {
                     window.postMessage(
                         { type: 'caramel-ext-hello' },
                         location.origin,

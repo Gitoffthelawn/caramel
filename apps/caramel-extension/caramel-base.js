@@ -125,6 +125,90 @@ const CARAMEL_ALLOWED_ORIGINS = new Set([
         : []),
 ])
 
+/* --------------------------------------------------  session storage */
+// The bearer we get from /api/extension/login and the OAuth exchange IS a full
+// website session token, not an extension-scoped one. It belongs in
+// storage.LOCAL: Chrome Sync replicates storage.sync to Google's servers and
+// back down to every Chrome profile signed into the same Google account, so a
+// credential kept there roams far past the machine that signed in — one
+// borrowed laptop with the same Chrome profile inherits a live session.
+// Settings above stay in sync deliberately; preferences SHOULD roam, a
+// credential should not.
+//
+// Reads migrate transparently: anything already in sync (every user who
+// installed before this change) is copied to local and deleted from sync the
+// next time it is read, so nobody gets silently logged out and the roamed copy
+// stops being replicated. background.js has a read-only twin of this fallback —
+// it is a service worker and cannot load this file.
+const CARAMEL_SESSION_KEYS = ['token', 'user']
+
+// Cross-file content-script/popup reads — per-file analysis can't see them.
+// oxlint-disable-next-line no-unused-vars
+function caramelGetSession() {
+    return new Promise(resolve => {
+        try {
+            currentBrowser.storage.local.get(CARAMEL_SESSION_KEYS, local => {
+                if (local?.token) {
+                    resolve({ token: local.token, user: local.user || null })
+                    return
+                }
+                // Pre-migration install: adopt the synced credential, then stop
+                // syncing it. Best-effort — a storage error must not sign
+                // anyone out, so the session is returned either way.
+                currentBrowser.storage.sync.get(
+                    CARAMEL_SESSION_KEYS,
+                    synced => {
+                        if (!synced?.token) {
+                            resolve({ token: null, user: null })
+                            return
+                        }
+                        const adopted = {
+                            token: synced.token,
+                            user: synced.user || null,
+                        }
+                        currentBrowser.storage.local.set(adopted, () => {
+                            currentBrowser.storage.sync.remove(
+                                CARAMEL_SESSION_KEYS,
+                                () => resolve(adopted),
+                            )
+                        })
+                    },
+                )
+            })
+        } catch {
+            resolve({ token: null, user: null })
+        }
+    })
+}
+
+// oxlint-disable-next-line no-unused-vars
+function caramelSetSession(session, done) {
+    const cb = typeof done === 'function' ? done : () => {}
+    try {
+        currentBrowser.storage.local.set(
+            { token: session.token, user: session.user || null },
+            () =>
+                // Clear any pre-migration synced copy in the same breath, so a
+                // fresh login never leaves the old roaming credential behind.
+                currentBrowser.storage.sync.remove(CARAMEL_SESSION_KEYS, cb),
+        )
+    } catch {
+        cb()
+    }
+}
+
+// oxlint-disable-next-line no-unused-vars
+function caramelClearSession(done) {
+    const cb = typeof done === 'function' ? done : () => {}
+    try {
+        currentBrowser.storage.local.remove(CARAMEL_SESSION_KEYS, () =>
+            currentBrowser.storage.sync.remove(CARAMEL_SESSION_KEYS, cb),
+        )
+    } catch {
+        cb()
+    }
+}
+
 /* --------------------------------------------------  user settings */
 // One storage.sync object so preferences roam with the browser profile.
 // Shape: { autoApply: boolean, disabledSites: string[] } — read through

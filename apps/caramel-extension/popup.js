@@ -190,9 +190,9 @@ async function renderSettingsView(backFn, domain) {
             })
         })
 
-    currentBrowser.storage.sync.get(['token'], res => {
+    caramelGetSession().then(({ token }) => {
         const link = document.getElementById('accountLink')
-        if (link && res?.token) link.style.display = 'inline-block'
+        if (link && token) link.style.display = 'inline-block'
     })
 
     const backBtn = document.getElementById('backBtn')
@@ -241,13 +241,13 @@ async function initPopup() {
     }
 
     // Wrapped in a Promise so initPopup() itself doesn't resolve until the
-    // chosen render state has actually been painted (storage.sync.get is a
-    // chrome-callback API, not natively awaitable) — the DOMContentLoaded
+    // chosen render state has actually been painted (the storage APIs are
+    // chrome-callback based, not natively awaitable) — the DOMContentLoaded
     // bootstrap above depends on that to know when the loader can come down.
     await new Promise(resolve => {
-        currentBrowser.storage.sync.get(['token', 'user'], async res => {
-            const token = res?.token || null
-            const user = res?.user || null
+        caramelGetSession().then(async session => {
+            const token = session?.token || null
+            const user = session?.user || null
 
             // Fire the session check in PARALLEL with the coupon fetch below —
             // it must never add latency to the coupon render. A dead session
@@ -302,9 +302,7 @@ function validateStoredSession(token, storedUser) {
     })
         .then(async res => {
             if (res.status === 401) {
-                currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                    initPopup(),
-                )
+                caramelClearSession(() => initPopup())
                 return
             }
             if (!res.ok) return // backend hiccup — not a sign-out signal
@@ -316,7 +314,9 @@ function validateStoredSession(token, storedUser) {
                 storedUser.username !== fresh.username ||
                 storedUser.image !== fresh.image
             ) {
-                currentBrowser.storage.sync.set({ user: fresh }, () => {})
+                // Profile only — the token is untouched, so write it beside
+                // the session in local rather than back into sync.
+                currentBrowser.storage.local.set({ user: fresh }, () => {})
             }
         })
         .catch(() => {
@@ -334,9 +334,8 @@ function validateStoredSession(token, storedUser) {
    is logged rather than swallowed, because a revoke that quietly never
    happened is precisely the bug this function exists to fix. */
 function signOutAndRevoke(after) {
-    currentBrowser.storage.sync.get(['token'], stored => {
-        const clearLocal = () =>
-            currentBrowser.storage.sync.remove(['token', 'user'], after)
+    caramelGetSession().then(stored => {
+        const clearLocal = () => caramelClearSession(after)
         const token = stored?.token
         if (!token) {
             clearLocal()
@@ -608,7 +607,7 @@ async function handleSocialSignIn(provider) {
 
         // Store token and user data using Promise wrapper to ensure completion
         await new Promise((resolve, reject) => {
-            currentBrowser.storage.sync.set({ token, user }, () => {
+            caramelSetSession({ token, user }, () => {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message))
                     return
@@ -877,9 +876,7 @@ function renderSignInPrompt(backFn) {
             const { token, username, image } = await res.json()
             const user = { username, image }
 
-            currentBrowser.storage.sync.set({ token, user }, () =>
-                afterLoginSuccess(),
-            )
+            caramelSetSession({ token, user }, () => afterLoginSuccess())
         } catch (err) {
             errorBox.textContent = `Login failed: ${err.message}`
             errorBox.style.display = 'block'

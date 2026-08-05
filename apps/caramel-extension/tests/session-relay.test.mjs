@@ -33,8 +33,13 @@ beforeAll(() => {
     })
 
     installChromeStub()
+    // The relayed session is stored in storage.LOCAL (it is a full website
+    // session token and must not roam via Chrome Sync). Both areas answer an
+    // empty read, so the extension still considers itself session-less and
+    // sends the hello that starts the relay.
+    globalThis.chrome.storage.local.get = (_keys, cb) => cb({})
     globalThis.chrome.storage.sync.get = (_keys, cb) => cb({})
-    globalThis.chrome.storage.sync.set = (items, cb) => {
+    globalThis.chrome.storage.local.set = (items, cb) => {
         stored = items
         if (cb) cb()
     }

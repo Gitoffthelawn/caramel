@@ -1,5 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
+import {
+    backStorageArea,
+    loadExtensionSource,
+    loadExtensionSources,
+} from './_load.mjs'
 
 // Pins the popup's session validation: a stored token is no longer trusted
 // forever. initPopup() fires GET /api/extension/me with the bearer IN
@@ -53,21 +57,16 @@ beforeAll(() => {
             cb(undefined)
         }
     }
-    globalThis.currentBrowser.storage.sync.get = (_keys, cb) =>
-        cb({ ...syncData })
-    globalThis.currentBrowser.storage.sync.set = (items, cb) => {
-        Object.assign(syncData, items)
-        if (cb) cb()
-    }
-    globalThis.currentBrowser.storage.sync.remove = (keys, cb) => {
-        for (const key of keys) delete syncData[key]
-        if (cb) cb()
-    }
     ;({ initPopup } = loadExtensionSource('popup.js', ['initPopup']))
 })
 
 beforeEach(() => {
+    // The session lives in storage.LOCAL; sync gets its own empty object so
+    // the pre-migration sweep inside caramelSetSession/ClearSession cannot
+    // delete out of the same store the session was just written to.
     syncData = { token: 'tok-1', user: { username: 'caramel-fan', image: '' } }
+    backStorageArea('local', syncData)
+    backStorageArea('sync', {})
     meInit = null
     // Only the /me probe goes through fetch here (coupons ride the
     // sendMessage transport above); each test sets meResponse.

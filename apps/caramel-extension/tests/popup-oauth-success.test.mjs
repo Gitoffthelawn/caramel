@@ -1,5 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
+import {
+    backStorageArea,
+    loadExtensionSource,
+    loadExtensionSources,
+} from './_load.mjs'
 
 // The OAuth SUCCESS path — everything the extension does once the provider
 // hands back a callback URL. Until now this was the only auth path with no
@@ -84,16 +88,13 @@ const clickApple = () => clickProvider('appleSignInBtn')
 
 beforeEach(async () => {
     lastExchange = null
+    // The session is written to storage.LOCAL now, and the write also sweeps
+    // the same keys out of sync to retire any pre-migration roaming copy. The
+    // two areas therefore need SEPARATE backing objects — sharing one lets
+    // that sweep delete the token the write just stored.
     syncData = {}
-    globalThis.currentBrowser.storage.sync.get = (_k, cb) => cb({ ...syncData })
-    globalThis.currentBrowser.storage.sync.set = (items, cb) => {
-        Object.assign(syncData, items)
-        if (cb) cb()
-    }
-    globalThis.currentBrowser.storage.sync.remove = (keys, cb) => {
-        for (const k of [].concat(keys)) delete syncData[k]
-        if (cb) cb()
-    }
+    backStorageArea('local', syncData)
+    backStorageArea('sync', {})
     await renderSignInPrompt()
 })
 

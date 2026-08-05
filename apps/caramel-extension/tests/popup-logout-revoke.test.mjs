@@ -55,13 +55,17 @@ beforeAll(() => {
             cb(undefined)
         }
     }
-    globalThis.currentBrowser.storage.sync.get = (_keys, cb) =>
+    // The session lives in storage.LOCAL, so that is the area whose removal
+    // marks "the user is signed out on this device" — instrument it, and let
+    // sync (which only ever holds a pre-migration leftover) stay empty and
+    // silent so it cannot pollute the ordering assertions below.
+    globalThis.currentBrowser.storage.local.get = (_keys, cb) =>
         cb({ ...syncData })
-    globalThis.currentBrowser.storage.sync.set = (items, cb) => {
+    globalThis.currentBrowser.storage.local.set = (items, cb) => {
         Object.assign(syncData, items)
         if (cb) cb()
     }
-    globalThis.currentBrowser.storage.sync.remove = (keys, cb) => {
+    globalThis.currentBrowser.storage.local.remove = (keys, cb) => {
         requests.push({ removedAt: requests.length, keys: [].concat(keys) })
         for (const key of [].concat(keys)) delete syncData[key]
         if (cb) cb()
@@ -158,16 +162,17 @@ describe('popup logout — revoking the session, not just forgetting it', () => 
             join(dirname(fileURLToPath(import.meta.url)), '..', 'popup.js'),
             'utf8',
         )
-        const clears =
-            src.match(/storage\.sync\.remove\(\s*\[\s*'token'/g) ?? []
-        // Exactly two legitimate sites remain:
-        //   1. signOutAndRevoke's own clearLocal, after the revoke.
-        //   2. validateStoredSession's 401 branch — that token is ALREADY dead
-        //      server-side, so there is nothing left to revoke.
+        // Every token-clearing site in the popup now goes through
+        // caramelClearSession(), which owns BOTH storage areas (local for the
+        // session, sync only to sweep a pre-migration leftover). A raw
+        // storage.*.remove of 'token' back in here would mean some path
+        // re-implemented the clear — and so also skipped the revoke, or left
+        // the roaming copy behind in sync.
         expect(
-            clears,
-            'a third token-clearing site means some logout path skips revocation',
-        ).toHaveLength(2)
+            src.match(/storage\.(sync|local)\.remove\(\s*\[\s*'token'/g),
+            'a logout path clears the session directly instead of via caramelClearSession',
+        ).toBeNull()
         expect(src).toContain('function signOutAndRevoke(')
+        expect(src).toContain('caramelClearSession(')
     })
 })

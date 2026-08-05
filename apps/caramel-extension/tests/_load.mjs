@@ -55,6 +55,34 @@ let onMessageListeners = []
  * exception to "everything is a no-op": they record real listeners so
  * tests can retrieve and invoke them (see getOnMessageListeners()).
  */
+/**
+ * Backs one storage area with a real object, so a test can assert on what the
+ * code actually stored instead of on which API it called.
+ *
+ * Worth having in one place: the session (token + user) moved from
+ * storage.sync to storage.LOCAL so the credential stops roaming via Chrome
+ * Sync, and every suite that had hand-stubbed `sync` went red at once. Suites
+ * that back the area instead of the call keep working across that kind of
+ * move. Pass the SAME object for 'local' and 'sync' when a test wants one
+ * merged view of storage.
+ */
+export function backStorageArea(area, data = {}) {
+    const target = globalThis.currentBrowser ?? globalThis.chrome
+    const store = target.storage[area]
+    store.get = (_keys, cb) => {
+        if (typeof cb === 'function') cb({ ...data })
+    }
+    store.set = (items, cb) => {
+        Object.assign(data, items)
+        if (typeof cb === 'function') cb()
+    }
+    store.remove = (keys, cb) => {
+        for (const key of [].concat(keys)) delete data[key]
+        if (typeof cb === 'function') cb()
+    }
+    return data
+}
+
 export function installChromeStub() {
     const stub = makeChromeStub()
 
