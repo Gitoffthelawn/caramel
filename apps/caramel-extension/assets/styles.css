@@ -470,8 +470,17 @@ body {
        (overflow:hidden) and clips the header / list bottom. Adapts to the
        popup viewport; the list scrolls internally for long lists.
        overscroll-behavior:contain stops macOS rubber-band scroll-chaining.
-       Fixed cap (popup is content-sized now): ~3 cards, then scroll. */
-    max-height: 360px;
+       Fixed cap (popup is content-sized now): ~3 cards, then scroll.
+
+       320, not 360: everything stacked above the list inside body's 600px
+       ceiling — header, profile row, SAVINGS BANNER, list heading — measures
+       ~279px once a user has banked a saving, so a 360px list overflowed the
+       card by ~39px. body is overflow:hidden, so that surplus wasn't merely
+       ugly: the last coupon was sliced mid-card and the bottom of the scroll
+       viewport sat below the popup, permanently unreachable. The banner is
+       the newest of those blocks, which is exactly how a cap that once fit
+       stopped fitting. tests/popup-sizing.test.mjs pins the arithmetic. */
+    max-height: 320px;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;

@@ -52,6 +52,28 @@ describe('popup sizing', () => {
         expect(bodyRule()).not.toMatch(/\d\s*(d|s|l)?v(w|h|min|max)\b/)
     })
 
+    it('caps the coupon list so the card cannot overflow the popup body', () => {
+        // The list is the only growable block in the coupons view; everything
+        // above it inside body's 600px ceiling — header, profile row, savings
+        // banner, list heading — measures ~279px once the user has banked a
+        // saving. A 360px cap therefore overflowed by ~39px, and because body
+        // is overflow:hidden the last coupon was sliced mid-card with the
+        // bottom of the scroll viewport pushed below the popup entirely.
+        // Measured live at 320px: card bottom 582.6 vs container 584. The
+        // banner was added AFTER the cap was chosen, which is precisely how a
+        // number that once fit stopped fitting — so pin the arithmetic.
+        const BODY_MAX = 600
+        const CHROME_ABOVE_AND_BELOW_LIST = 279
+        const m = css.match(/\.coupon-list\s*\{[\s\S]*?\}/)
+        expect(m, '.coupon-list rule exists').not.toBeNull()
+        const cap = Number(
+            m[0]
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .match(/max-height:\s*(\d+)px/)[1],
+        )
+        expect(cap + CHROME_ABOVE_AND_BELOW_LIST).toBeLessThanOrEqual(BODY_MAX)
+    })
+
     it('still clamps on a narrow host instead of clipping', () => {
         // Firefox's overflow menu is narrower than 420px; max-width resolves
         // against <html>, which is safe, where a vw-based cap is not.
