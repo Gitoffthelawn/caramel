@@ -435,6 +435,13 @@ function renderUnsupportedSite(user, domain) {
 
 /* ------------------------------------------------------------ */
 /*  OAuth Social Sign-In Handler                                */
+/* The ways an engine says "the user closed the sign-in window". Chrome sends
+ * "The user did not approve access."; others word it as a cancellation. Kept
+ * broad on purpose — mislabelling a real failure as a cancel is far cheaper
+ * than telling someone who just clicked X that sign-in FAILED. */
+const CARAMEL_OAUTH_CANCEL_RE =
+    /did not approve|cancell?ed|closed by (the )?user/i
+
 /* ------------------------------------------------------------ */
 async function handleSocialSignIn(provider) {
     const errorBox = document.getElementById('loginErrorMessage')
@@ -442,9 +449,14 @@ async function handleSocialSignIn(provider) {
     const appleBtn = document.getElementById('appleSignInBtn')
     const button = provider === 'google' ? googleBtn : appleBtn
 
-    // Disable button and show loading state
+    // Disable BOTH providers, label only the one that was clicked. Disabling
+    // just the clicked button let a second click start a queued flow behind
+    // the first: both buttons read "Redirecting..." while exactly one window
+    // existed, so the UI described a state the browser was not in. Only one
+    // launchWebAuthFlow can be in flight, so the other provider is genuinely
+    // unavailable until this one settles — say so by disabling it.
+    for (const b of [googleBtn, appleBtn]) if (b) b.disabled = true
     if (button) {
-        button.disabled = true
         const span = button.querySelector('span')
         if (span) {
             span.textContent = 'Redirecting...'
@@ -588,15 +600,27 @@ async function handleSocialSignIn(provider) {
     } catch (err) {
         console.error('OAuth error:', err)
 
-        // Show error message
+        // Closing the provider window is a CANCEL, not a failure. Chrome
+        // REJECTS launchWebAuthFlow in that case rather than resolving
+        // undefined, so the `!finalCallbackUrl` guard above never runs here
+        // and its friendly copy was dead code — what users actually saw was
+        // Chrome's own third-person string, "OAuth sign-in failed: The user
+        // did not approve access.", which reads like the app broke and blames
+        // them for it. Recognise the cancel shapes and speak plainly. The
+        // guard above stays: it covers engines that resolve undefined instead.
         if (errorBox) {
-            errorBox.textContent = `OAuth sign-in failed: ${err.message}`
+            errorBox.textContent = CARAMEL_OAUTH_CANCEL_RE.test(
+                err?.message || '',
+            )
+                ? 'Sign-in was cancelled.'
+                : `OAuth sign-in failed: ${err.message}`
             errorBox.style.display = 'block'
         }
 
-        // Re-enable button
+        // Re-enable BOTH providers — the other one was disabled for the
+        // duration of this attempt and must not stay stuck.
+        for (const b of [googleBtn, appleBtn]) if (b) b.disabled = false
         if (button) {
-            button.disabled = false
             const span = button.querySelector('span')
             if (span) {
                 span.textContent =
