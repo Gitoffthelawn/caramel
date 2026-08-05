@@ -17,12 +17,7 @@
         "512": "/icons/512.png"
     },
     "permissions": ["tabs", "activeTab", "storage", "alarms"],
-    "host_permissions": [
-        "https://*/*",
-        "http://localhost:58000/*",
-        "https://accounts.google.com/*",
-        "https://appleid.apple.com/*"
-    ],
+    "host_permissions": ["https://*/*"],
     "web_accessible_resources": [
         {
             "resources": ["index.html", "assets/*"],

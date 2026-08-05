@@ -14,6 +14,10 @@
 const CARAMEL_X_ICON =
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>'
 
+// Upper bound on the manual copy list. 20 = the per-store limit background.js
+// asks the API for, so in practice this shows everything we fetched.
+const CARAMEL_MANUAL_LIST_MAX = 20
+
 // Functional-minimum styles used ONLY when the stylesheet fetch fails.
 const CARAMEL_UI_FALLBACK_CSS =
     '.cm-scrim{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,12,10,.5)}' +
@@ -49,22 +53,33 @@ function _caramelGetShadowCss() {
             if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`)
             return res.text()
         }
+        // The budget timer MUST be cancelled once the real CSS settles.
+        // Racing without cancelling still fires the callback 4s later on
+        // every surface: it logged a TIMEOUT that never happened (masking a
+        // real CSS failure behind routine noise) and dropped a healthy cached
+        // promise, forcing every later surface to refetch. The packaged
+        // assets are local, so the race is won in single-digit ms even on
+        // Slow 3G — every one of those logs was false.
+        let timer
+        const real = Promise.all([
+            grab('assets/tokens.css'),
+            grab('assets/content-ui.css'),
+        ]).then(
+            ([tokens, ui]) =>
+                tokens.replace(/:root/g, ':host, :root') + '\n' + ui,
+        )
         const mine = Promise.race([
-            Promise.all([
-                grab('assets/tokens.css'),
-                grab('assets/content-ui.css'),
-            ]).then(
-                ([tokens, ui]) =>
-                    tokens.replace(/:root/g, ':host, :root') + '\n' + ui,
-            ),
-            new Promise(resolve =>
-                setTimeout(() => {
+            // .finally, not .then: a genuine rejection must still reach the
+            // .catch below (and still log LOAD_FAILED) with the timer cleared.
+            real.finally(() => clearTimeout(timer)),
+            new Promise(resolve => {
+                timer = setTimeout(() => {
                     log('CONTENT_UI_CSS_TIMEOUT')
                     if (_caramelShadowCssPromise === mine)
                         _caramelShadowCssPromise = null
                     resolve(CARAMEL_UI_FALLBACK_CSS)
-                }, CARAMEL_UI_CSS_TIMEOUT_MS),
-            ),
+                }, CARAMEL_UI_CSS_TIMEOUT_MS)
+            }),
         ]).catch(err => {
             log('CONTENT_UI_CSS_LOAD_FAILED', { error: String(err) })
             return CARAMEL_UI_FALLBACK_CSS
@@ -429,7 +444,10 @@ async function showFinalModal(
                 (a.c.rejected ? 1 : 0) - (b.c.rejected ? 1 : 0) || a.i - b.i,
         )
         .map(x => x.c)
-        .slice(0, 8)
+        // Matches the API's own per-store fetch limit, so the list shows every
+        // code we have rather than a second, tighter cap on top of the
+        // attempt cap. The list scrolls; hiding codes helps nobody.
+        .slice(0, CARAMEL_MANUAL_LIST_MAX)
     const hasManual = manualCodes.length > 0
 
     const esc = s =>
@@ -454,7 +472,13 @@ async function showFinalModal(
     if (savedMoney) {
         // The amount is the modal's headline now — repeating it here read as
         // the same sentence twice.
-        finalMessage = 'We tried every code and applied the best one.'
+        //
+        // NOT "we tried every code and applied the best one": the apply loop
+        // STOPS at the first code that moves the total (coupon-runner.js) and
+        // caps at MAX_ATTEMPTS anyway, so on a store with 20 codes that
+        // sentence was false twice over — it neither tried them all nor
+        // compared them to pick a best. Claim only what actually happened.
+        finalMessage = 'We found a code that works and applied it for you.'
     } else if (appliedCode) {
         // Caller message (threshold hints, non-USD) beats the generic line.
         finalMessage =

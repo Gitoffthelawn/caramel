@@ -239,6 +239,20 @@ function caramelCurrencySymbol() {
     return _caramelLastCurrency || '$'
 }
 
+/* ISO code for the symbol we actually parsed off the page, for the savings
+ * HISTORY. The modal renders the symbol, but the popup totals the history per
+ * currency through Intl.NumberFormat (popup.js:81-98), which needs a code —
+ * and banking every DOM-path win as 'USD' silently added £ and € savings into
+ * the dollar bucket, overstating a non-US user's lifetime total.
+ * '$' stays USD: a bare dollar sign can't distinguish USD/CAD/AUD, and USD is
+ * the safest reading of an unqualified '$'. The discount-link path doesn't use
+ * this — /cart.js hands it a real ISO code. */
+// Consumed by coupon-runner.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelCurrencyCode() {
+    return { '£': 'GBP', '€': 'EUR' }[_caramelLastCurrency] || 'USD'
+}
+
 /* Set the symbol explicitly when the currency is known from data rather than
  * from a price we just parsed — the post-reload handoff (store-detect.js)
  * restores a saving recorded BEFORE the reload, so no price has been read in

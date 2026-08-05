@@ -208,8 +208,13 @@ async function startApplyingCoupons(rec) {
         return
     }
 
-    // Cap attempts to a reasonable number to limit runtime
+    // Cap ATTEMPTS to limit runtime — but keep every fetched code for the
+    // manual fallback list. Truncating the shared array meant the codes we
+    // never got around to trying were also never offered to the user: on a
+    // store with 20 codes, 12 of them vanished from a modal whose whole job is
+    // "here are codes you can paste yourself".
     const MAX_ATTEMPTS = 8
+    const allCoupons = coupons
     if (coupons.length > MAX_ATTEMPTS) coupons = coupons.slice(0, MAX_ATTEMPTS)
 
     const hasPriceCfg = !!rec.priceContainer
@@ -403,13 +408,15 @@ async function startApplyingCoupons(rec) {
         // the plausibility gate; neither is a figure worth banking, and a run
         // of 0s would dilute the user's lifetime total.
         if (bestSave > 0) {
-            // The DOM path reads bare numbers off the page, so the currency is
-            // the same "$" presentation the final modal uses.
+            // The currency the PRICE PARSER actually saw, not a hardcoded USD:
+            // the modal already renders £/€ correctly, so banking the history
+            // as dollars made the popup's lifetime total disagree with the
+            // figure the same user had just been shown.
             caramelRecordSaving({
                 domain: location.hostname,
                 code: bestCode,
                 amount: bestSave,
-                currency: 'USD',
+                currency: caramelCurrencyCode(),
             })
         }
         // A committed code that didn't move a READABLE total is usually a
@@ -456,7 +463,7 @@ async function startApplyingCoupons(rec) {
                 ? `The store said: “${String(lastStoreReason).slice(0, 140)}” — copy a code below to try it manually.`
                 : null,
             false,
-            coupons.map(c =>
+            allCoupons.map(c =>
                 rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
             ),
         )

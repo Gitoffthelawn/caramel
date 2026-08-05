@@ -47,6 +47,27 @@ describe('manifest parity', () => {
         )
     })
 
+    it('never ships a localhost/http host permission to real users', () => {
+        // A packed build asking for a dev server on the user's own machine
+        // widens the store install prompt and lets the released extension talk
+        // to whatever is listening on that port. The local origin belongs to
+        // the e2e suite, which grants it to its temp copy
+        // (scripts/test-extension.mjs) — never to the shipped manifest.
+        for (const m of [CHROME, FIREFOX]) {
+            for (const host of m.host_permissions || []) {
+                expect(host).not.toMatch(/^http:\/\//)
+                expect(host).not.toContain('localhost')
+                expect(host).not.toContain('127.0.0.1')
+            }
+        }
+    })
+
+    it('grants the same host permissions in both manifests', () => {
+        expect([...(FIREFOX.host_permissions || [])].sort()).toEqual(
+            [...(CHROME.host_permissions || [])].sort(),
+        )
+    })
+
     it('keeps cart-signals.js first, ahead of everything that reads it', () => {
         // coupon-fetch.js's classifyCartCategory() degrades to null when
         // window.CaramelCartSignals is absent, so dropping this file costs the

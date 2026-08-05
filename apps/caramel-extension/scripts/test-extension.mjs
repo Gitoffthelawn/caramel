@@ -93,11 +93,30 @@ function stagePatchedExtensionCopy() {
         writeFileSync(filePath, source.replace(DEV_BASE_URL_SEAM, PATCHED_SEAM))
     }
 
+    // The shipped manifest grants ONLY https://*/* — a packed extension has no
+    // business asking users for access to a localhost dev server (it widens
+    // the Web Store install prompt and lets the released build talk to
+    // whatever is listening on that port on the user's machine). The local
+    // origin is a property of THIS SUITE, so the suite grants it to its own
+    // copy, exactly like the base-URL rewrite above.
+    const manifestPath = path.join(dest, 'manifest.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.host_permissions.includes(`${API_BASE}/*`)) {
+        throw new Error(
+            `[test] ${API_BASE}/* is in the SHIPPED manifest — it must exist only in this test copy; remove it from manifest.json`,
+        )
+    }
+    manifest.host_permissions.push(`${API_BASE}/*`)
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 4))
+
     console.log(
         `[test] ⚠️ LOADING A PATCHED TEST COPY of the extension (${dest})`,
     )
     console.log(
         `[test]    dev base URL rewritten -> ${API_BASE} in: ${FILES_WITH_BASE_URL_SEAM.join(', ')} (copy only; shipped code untouched)`,
+    )
+    console.log(
+        `[test]    host permission ${API_BASE}/* granted to the copy only`,
     )
     return dest
 }
