@@ -75,6 +75,15 @@ button{padding:8px 14px}
     // resolves to — the shape that made a real $12 discount measure as zero.
     behaviour === 'msrp-banner' ? ' <s>$500.00</s>' : ''
 }</span></div>
+${
+    // late-reveal: the promo entry is NOT in the DOM at load — a user action
+    // inserts it later, the way Shopify Checkout One's collapsed order summary
+    // behaves (proven live on 100percentpure.com, 2026-08-05). Every other
+    // behaviour ships the block statically, exactly as before.
+    behaviour === 'late-reveal'
+        ? `<button id="reveal-promo">Show order summary</button>
+<div id="promo-slot"></div>
+<template id="promo-tpl">
 <div class="discount">
   <div id="block-discount-heading" role="button">Apply Promo Code</div>
   <form id="discount-coupon-form">
@@ -84,6 +93,17 @@ button{padding:8px 14px}
     <div id="applied-slot"></div>
   </form>
 </div>
+</template>`
+        : `<div class="discount">
+  <div id="block-discount-heading" role="button">Apply Promo Code</div>
+  <form id="discount-coupon-form">
+    <input type="text" id="coupon_code" name="coupon_code" placeholder="Enter code"/>
+    <button type="button" data-action="apply-coupon">Apply Discount</button>
+    <div class="message-error"></div>
+    <div id="applied-slot"></div>
+  </form>
+</div>`
+}
 <button id="place-order-btn" aria-label="Place Order">Place Order</button>
 <script>
 window.__orderPlaced = false
@@ -93,29 +113,40 @@ const BEHAVIOUR = ${JSON.stringify(behaviour)}
 document.getElementById('place-order-btn').addEventListener('click', () => {
     window.__orderPlaced = true
 })
-document.getElementById('block-discount-heading').addEventListener('click', () => {
-    document.getElementById('discount-coupon-form').classList.add('open')
-})
-document.querySelector('[data-action="apply-coupon"]').addEventListener('click', () => {
-    window.__applyClicks++
-    const code = document.getElementById('coupon_code').value
-    window.__codesSeen.push(code)
-    if (BEHAVIOUR === 'silent') return
-    if (BEHAVIOUR === 'reject-all') {
+function bindPromo() {
+    document.getElementById('block-discount-heading').addEventListener('click', () => {
+        document.getElementById('discount-coupon-form').classList.add('open')
+    })
+    document.querySelector('[data-action="apply-coupon"]').addEventListener('click', () => {
+        window.__applyClicks++
+        const code = document.getElementById('coupon_code').value
+        window.__codesSeen.push(code)
+        if (BEHAVIOUR === 'silent') return
+        if (BEHAVIOUR === 'reject-all') {
+            setTimeout(() => {
+                const err = document.querySelector('.message-error')
+                err.textContent = 'The coupon code "' + code + '" is not valid.'
+                err.classList.add('on')
+            }, 250)
+            return
+        }
+        // The first code works. Only the total moves; an MSRP stays put.
         setTimeout(() => {
-            const err = document.querySelector('.message-error')
-            err.textContent = 'The coupon code "' + code + '" is not valid.'
-            err.classList.add('on')
-        }, 250)
-        return
-    }
-    // The first code works. Only the total moves; an MSRP stays put.
-    setTimeout(() => {
-        document.getElementById('total-num').textContent = '108.00'
-        document.getElementById('applied-slot').innerHTML =
-            '<button type="button" data-action="cancel-coupon">Cancel Coupon</button>'
-    }, 300)
-})
+            document.getElementById('total-num').textContent = '108.00'
+            document.getElementById('applied-slot').innerHTML =
+                '<button type="button" data-action="cancel-coupon">Cancel Coupon</button>'
+        }, 300)
+    })
+}
+if (BEHAVIOUR === 'late-reveal') {
+    document.getElementById('reveal-promo').addEventListener('click', () => {
+        document.getElementById('promo-slot').appendChild(
+            document.getElementById('promo-tpl').content.cloneNode(true))
+        bindPromo()
+    })
+} else {
+    bindPromo()
+}
 </script></body></html>`
 
 /** The real config with one deliberate lie: the apply selector resolved to the
@@ -196,6 +227,7 @@ async function runScenario({
     behaviour,
     doctor = false,
     cart = null,
+    lateReveal = false,
     assert,
 }) {
     console.log(`\n=== ${name} ===`)
@@ -292,12 +324,25 @@ async function runScenario({
             await page.reload({ waitUntil: 'domcontentloaded' })
         }
 
+        if (lateReveal) {
+            // isCheckout waits 3s for the configured selectors, and the
+            // re-detect observer is debounced — give both room to have
+            // definitively NOT fired before calling the page dark.
+            await page.waitForTimeout(7000)
+            check(
+                'stays dark while the promo entry is not in the DOM',
+                !(await page.$('#caramel-small-prompt')),
+            )
+            await page.click('#reveal-promo')
+        }
         await page.waitForSelector('#caramel-small-prompt', {
             state: 'attached',
             timeout: 30_000,
         })
         check(
-            'prompt appears on a supported checkout',
+            lateReveal
+                ? 'prompt appears the moment the promo entry is inserted'
+                : 'prompt appears on a supported checkout',
             true,
             doctor ? 'doctored config' : 'production config',
         )
@@ -618,6 +663,45 @@ const SCENARIOS = [
                 !reports.some(r => r.kind === 'report'),
                 JSON.stringify(reports.map(r => r.kind)),
             )
+        },
+    },
+    /* Found live via the chrome-devtools MCP on 100percentpure.com
+     * (2026-08-05): Checkout One renders the discount input inside a COLLAPSED
+     * order summary, so at load the configured selectors match nothing and the
+     * page must stay dark — no prompt over a checkout the user can't see a
+     * promo box on. Expanding the summary inserts the field, and the re-detect
+     * MutationObserver has to surface the prompt then, on the same document,
+     * with no navigation. That expand-then-prompt flow ended in a real $9.00
+     * saving the store's own UI confirmed — this pins the path that won it. */
+    {
+        name: 'S8 late reveal — promo entry inserted after load',
+        behaviour: 'late-reveal',
+        lateReveal: true,
+        assert: ({ modal, state, savings, reports, check }) => {
+            check(
+                'runs the full apply flow on the late field',
+                state.applyClicks > 0,
+                `${state.applyClicks} apply click(s)`,
+            )
+            check(
+                'reports the true $12.00 saving',
+                /12\.00/.test(modal),
+                modal.slice(0, 90),
+            )
+            check(
+                'banks exactly one measured saving',
+                savings.length === 1 &&
+                    Math.abs(savings[0]?.amount - 12) < 0.01,
+                JSON.stringify(savings),
+            )
+            check(
+                'fires the "worked" trust-loop report',
+                reports.some(
+                    r => r.kind === 'report' && /worked/.test(r.body || ''),
+                ),
+                JSON.stringify(reports.map(r => r.kind)),
+            )
+            check('never touches the order button', state.orderPlaced === false)
         },
     },
 ]

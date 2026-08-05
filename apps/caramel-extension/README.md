@@ -36,7 +36,7 @@ Three tiers, deliberately not overlapping:
 | `pnpm test:guards`   | The real content-script bundle in real Chromium: apply loop, both strategies, the injected UI, the guards | Real sign-in, a real store's live markup         |
 | `pnpm test:e2e`      | The extension against a locally-booted `caramel-app` with a real Postgres                                 | Store-side behaviour                             |
 
-The guards suite runs **both** apply strategies, which are genuinely different code paths: the DOM form (config selectors, Magento-class) and the discount-link capability path (`/cart.js` + `/discount/{code}`, Shopify-class — the one most supported stores take, and the only path that reloads the page mid-flow).
+The guards suite runs **both** apply strategies, which are genuinely different code paths: the DOM form (config selectors, Magento-class) and the discount-link capability path (`/cart.js` + `/discount/{code}`, Shopify-class — the one most supported stores take, and the only path that reloads the page mid-flow). It also pins late-reveal re-detection (S8): a checkout whose promo entry is inserted only after a user action must stay dark until then and prompt the moment the field appears — the exact shape of Shopify Checkout One's collapsed order summary, where this flow won a store-confirmed $9.00 live on 100percentpure.com (2026-08-05).
 
 ### Interactive debugging with an agent
 
