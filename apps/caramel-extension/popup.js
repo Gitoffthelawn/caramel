@@ -324,6 +324,36 @@ function validateStoredSession(token, storedUser) {
         })
 }
 
+/* Signs the user out for REAL: revokes the session server-side, then clears
+   local storage. Logout used to be storage-only, so the bearer it forgot kept
+   authenticating for the rest of its 7-day life and nothing in the product
+   could kill it — a token captured before logout still worked after.
+
+   The local clear runs whether or not the revoke succeeded: someone offline
+   pressing "log out" must still be logged out on this device. But the failure
+   is logged rather than swallowed, because a revoke that quietly never
+   happened is precisely the bug this function exists to fix. */
+function signOutAndRevoke(after) {
+    currentBrowser.storage.sync.get(['token'], stored => {
+        const clearLocal = () =>
+            currentBrowser.storage.sync.remove(['token', 'user'], after)
+        const token = stored?.token
+        if (!token) {
+            clearLocal()
+            return
+        }
+        fetch(caramelUrl('api/extension/session'), {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => {
+                if (!res.ok) log('LOGOUT_REVOKE_REJECTED', res.status)
+            })
+            .catch(err => log('LOGOUT_REVOKE_UNREACHABLE', err?.message))
+            .finally(clearLocal)
+    })
+}
+
 /* Network/backend failure state — keeps the popup from rendering blank when the
    coupon API is unreachable. Offers a retry that re-runs the whole init. */
 function renderLoadError() {
@@ -427,9 +457,7 @@ function renderUnsupportedSite(user, domain) {
     const logout = document.getElementById('logoutBtn')
     if (logout)
         logout.addEventListener('click', () => {
-            currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                renderUnsupportedSite(null, domain),
-            )
+            signOutAndRevoke(() => renderUnsupportedSite(null, domain))
         })
 }
 
@@ -890,7 +918,7 @@ function renderProfileCard(user) {
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
-            currentBrowser.storage.sync.remove(['token', 'user'], initPopup)
+            signOutAndRevoke(initPopup)
         })
 }
 
@@ -1036,9 +1064,7 @@ function renderCouponsView(coupons, user, domain) {
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
-            currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                renderSignInPrompt(selfCallback),
-            )
+            signOutAndRevoke(() => renderSignInPrompt(selfCallback))
         })
 
     /* login toggle (guest) */
