@@ -15,6 +15,7 @@ import { loadExtensionSource, loadExtensionSources } from './_load.mjs'
 let initPopup
 let syncData
 let meResponse
+let meInit
 
 const flush = async () => {
     for (let i = 0; i < 5; i++) {
@@ -67,15 +68,41 @@ beforeAll(() => {
 
 beforeEach(() => {
     syncData = { token: 'tok-1', user: { username: 'caramel-fan', image: '' } }
+    meInit = null
     // Only the /me probe goes through fetch here (coupons ride the
     // sendMessage transport above); each test sets meResponse.
-    globalThis.fetch = async url => {
+    globalThis.fetch = async (url, init) => {
         expect(String(url)).toContain('/api/extension/me')
+        meInit = init ?? {}
         return meResponse
     }
 })
 
 describe('popup.js initPopup — stored-token validation via /api/extension/me', () => {
+    // /api/extension/me is declared `auth: 'session'`, and better-auth's
+    // session gate accepts a website COOKIE as readily as a bearer token. That
+    // is only harmless because this probe never sends one: the popup runs on a
+    // chrome-extension:// origin and fetch defaults to credentials:'same-origin',
+    // so a signed-in website session is not attached to a cross-origin call.
+    //
+    // Verified in a real browser (2026-08-05): with a session cookie present on
+    // the API domain, the outgoing request carried the bearer and no Cookie
+    // header, and a 401 still signed the user out.
+    //
+    // Adding credentials:'include' here would silently break that — a revoked
+    // extension token would keep passing on the website's cookie and the popup
+    // could never sign anyone out. So pin the absence.
+    it('authenticates with the bearer token ALONE and never opts into sending cookies', async () => {
+        meResponse = { ok: true, status: 200, json: async () => ({}) }
+
+        await initPopup()
+        await flush()
+
+        expect(meInit, 'the /me probe was made').not.toBeNull()
+        expect(meInit.headers?.Authorization).toBe('Bearer tok-1')
+        expect(meInit.credentials).toBeUndefined()
+    })
+
     it('a token the backend 401s clears token+user from storage and re-renders the logged-out variant', async () => {
         meResponse = { ok: false, status: 401 }
         await initPopup()
