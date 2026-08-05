@@ -750,7 +750,7 @@ function renderSignInPrompt(backFn) {
           </div>
         </div>
 
-        <button type="submit" class="login-button">Login</button>
+        <button type="submit" class="login-button">Log in</button>
       </form>
 
       <div id="resendVerificationContainer" style="display:none; text-align:center; margin-top:12px;">
@@ -902,7 +902,7 @@ function renderProfileCard(user) {
           <img src="${escHtml(avatar)}" class="coupons-profile-image" alt="avatar"/>
           <span class="coupons-user-label">@${escHtml(user.username)}</span>
         </div>
-        <button id="logoutBtn" class="coupons-logout-button">Logout</button>
+        <button id="logoutBtn" class="coupons-logout-button">Log out</button>
       </div>
       <div id="savingsSummary"></div>
       <p class="profile-signed-in-note">You're signed in — coupons appear automatically at checkout.</p>
@@ -940,8 +940,8 @@ function renderCouponsView(coupons, user, domain) {
       `
 
     const headerRight = user
-        ? '<button id="logoutBtn" class="coupons-logout-button">Logout</button>'
-        : '<button id="loginToggleBtn" class="coupons-logout-button">Login</button>'
+        ? '<button id="logoutBtn" class="coupons-logout-button">Log out</button>'
+        : '<button id="loginToggleBtn" class="coupons-logout-button">Log in</button>'
 
     container.innerHTML = `
     <div class="coupons-profile-card fade-in-up">
