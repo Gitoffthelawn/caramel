@@ -4,6 +4,7 @@ import { attachSignals } from '@/lib/couponSignals'
 import { listStoreCoupons } from '@/lib/couponsRepo'
 import { BASE_URL } from '@/lib/env.client'
 import { jsonLdString } from '@/lib/jsonLd'
+import { resolveStoreDomain } from '@/lib/storeDomain'
 import type { Coupon } from '@/types/coupon'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
@@ -20,21 +21,13 @@ function safeDecode(value: string): string {
     }
 }
 
+// Registrable domain via the Public Suffix List. The previous local
+// "last two labels" helper turned /coupons/mymemory.co.uk into an indexable
+// page for a fictional store called "co.uk", listing another brand's codes
+// under the H1 "Best co.uk coupon codes today" — 230 store pages did this.
+// Empty string keeps this file's existing "not a store" contract.
 function getBaseDomain(raw: string): string {
-    let hostname = raw.trim()
-    try {
-        const u = new URL(
-            hostname.startsWith('http') ? hostname : `https://${hostname}`,
-        )
-        hostname = u.hostname
-    } catch {
-        // fallback to raw slug
-    }
-    // Strip anything that isn't a valid hostname character so injection
-    // attempts through the URL slug can't smuggle SQL patterns downstream.
-    if (!/^[a-z0-9.-]+$/i.test(hostname)) return ''
-    const parts = hostname.split('.')
-    return parts.length > 2 ? parts.slice(-2).join('.') : hostname
+    return resolveStoreDomain(raw) ?? ''
 }
 
 type StoreParams = { store: string }
