@@ -29,6 +29,45 @@ function reportOutcome(id, outcome, storeReason) {
     }
 }
 
+/* The discount already sitting on the cart when we arrived, if any.
+ *
+ * Reads the platform cart payload probeCartJson() already returns — the data
+ * was always there, just never consulted, which is why a run could report
+ * "nothing worked" over the top of a live discount. Returns
+ * { code, amountText } or null.
+ *
+ * `discount_codes` entries carry `applicable` on newer carts; treat a missing
+ * flag as applicable (older payloads omit it) but require a real amount, so a
+ * code that is attached-but-worthless never gets announced as a saving.
+ */
+function _existingCartDiscount(cart) {
+    if (!cart) return null
+    const money = minor => {
+        const value = Number(minor) / 100
+        try {
+            return new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: cart.currency || 'USD',
+            }).format(value)
+        } catch {
+            return `${value.toFixed(2)} ${cart.currency || 'USD'}`
+        }
+    }
+    const codes = Array.isArray(cart.discount_codes) ? cart.discount_codes : []
+    for (const entry of codes) {
+        const amount = Number(entry?.amount)
+        if (!entry?.code || !(amount > 0)) continue
+        if (entry.applicable === false) continue
+        return {
+            code: String(entry.code).toUpperCase(),
+            amountText: money(amount),
+        }
+    }
+    // Cart-level discount with no code we can name (automatic discount): worth
+    // nothing to say "code X is applied", so stay quiet rather than guess.
+    return null
+}
+
 async function startApplyingCoupons(rec) {
     log('=== Starting coupon flow ===')
     if (!rec) {
@@ -157,8 +196,37 @@ async function startApplyingCoupons(rec) {
             tried: linkCodes.map(c => c.code),
             t: performance.now(),
         })
-        // None of the codes moved the total — hand them over to copy instead
-        // of also grinding the (deaf) DOM form.
+        // None of the codes BEAT the baseline. That is not the same as "nothing
+        // worked", and saying so when the cart already carries a discount is
+        // the most dangerous thing this flow can tell a user.
+        //
+        // Seen twice on real stores (2026-08-05), both with the discount
+        // printed on screen behind our own modal: goodr.com holding
+        // BOLDERBOULDER15 at -$8.00, and 1thrive.com holding JESS20 at -$20.00
+        // that WE had just won. In both cases the modal read "Auto-apply didn't
+        // stick this time. Copy a code and paste it in the store's promo box"
+        // and offered the already-applied code as the first thing to copy.
+        // Following that advice is what actually costs the money: pasting
+        // another code into a Shopify promo box REPLACES the live one. The tool
+        // never dropped the discount itself — it just told the user to.
+        const existing = _existingCartDiscount(_cart0)
+        if (existing) {
+            // Drop the live code from the copy list: offering it is what makes
+            // "paste one of these" a losing move.
+            const others = coupons.filter(
+                c => String(c.code).toUpperCase() !== existing.code,
+            )
+            showFinalModal(
+                0,
+                null,
+                `${existing.code} is already applied and saving you ${existing.amountText} — we checked ${linkCodes.length} other code${linkCodes.length === 1 ? '' : 's'} and none beat it.`,
+                false,
+                others,
+            )
+            return
+        }
+        // Genuinely no discount on the cart — hand the codes over to copy
+        // instead of also grinding the (deaf) DOM form.
         showFinalModal(0, null, null, false, coupons)
         return
     }
