@@ -836,6 +836,52 @@ async function startApplyingCoupons(rec, options) {
     }
 }
 
+/* Announce ourselves to grabcaramel.com so a visitor already signed in there
+ * doesn't have to sign in again in the extension.
+ *
+ * It used to be one hello, sent the moment storage answered "no token". That
+ * loses a race it cannot see: the page's side of the handshake is a React
+ * component (ExtensionSessionRelay), and its `message` listener only exists once
+ * React has hydrated. A content script at document_idle regularly beats
+ * hydration — on a cold load, a slow connection, or simply a heavy page — and a
+ * hello sent before anyone is listening is a hello nobody answers. The page
+ * already covers the OTHER half of this race (it replays a hello it heard before
+ * the session query resolved), so the gap is exactly the case where we spoke
+ * first: the user signs in on the website, comes back to a store, and the
+ * extension still believes it is signed out.
+ *
+ * So say it a few times, and stop the instant it works. We are the side that can
+ * tell: the listener above writes the token as soon as the page answers, so a
+ * token in storage IS the acknowledgement. Bounded tightly — this is a courtesy
+ * handshake on our own origin, not a retry loop worth spending a page's life on.
+ */
+const CARAMEL_HELLO_TRIES = 5
+const CARAMEL_HELLO_GAP_MS = 600
+// Bound at module-eval time below; exported for the suite.
+// oxlint-disable-next-line no-unused-vars
+async function caramelAnnounceToWebsite() {
+    for (let i = 0; i < CARAMEL_HELLO_TRIES; i++) {
+        let token = null
+        try {
+            token = (await caramelGetSession())?.token || null
+        } catch {
+            // Storage unavailable — we could never tell whether it worked, so
+            // stop rather than shout into the page on a loop.
+            return
+        }
+        if (token) {
+            if (i > 0) log('EXT_HELLO_ANSWERED', { attempt: i })
+            return
+        }
+        window.postMessage({ type: 'caramel-ext-hello' }, location.origin)
+        if (i + 1 < CARAMEL_HELLO_TRIES) await sleep(CARAMEL_HELLO_GAP_MS)
+    }
+    log('EXT_HELLO_UNANSWERED', {
+        tries: CARAMEL_HELLO_TRIES,
+        reason: 'nobody on the page answered — the visitor is most likely signed out there',
+    })
+}
+
 /* --------------------------------------------------  listeners
  * Guard: register once per realm. Without this, SPA re-injections stack
  * duplicate listeners → double-fires, memory leaks. */
@@ -857,10 +903,11 @@ if (!window.__caramel_listeners_bound) {
             )
         }
     })
-    // Website→extension sign-in relay: on our own site, when the extension
-    // has no session yet, announce ourselves — a signed-in page answers
-    // with a token (accepted by the listener above, allowlisted origins
-    // only). One hello per page load; the page mints at most once.
+    // Website→extension sign-in relay: on our own site, when the extension has
+    // no session yet, announce ourselves — a signed-in page answers with a token
+    // (accepted by the listener above, allowlisted origins only). The page mints
+    // at most once; see caramelAnnounceToWebsite for why we say it more than
+    // once.
     // typeof guard: unlike the deferred listener above, this runs at
     // module-eval time, and the vitest harness evals each file separately
     // (cross-file top-level consts aren't visible there — see _load.mjs).
@@ -868,18 +915,7 @@ if (!window.__caramel_listeners_bound) {
         typeof CARAMEL_ALLOWED_ORIGINS !== 'undefined' &&
         CARAMEL_ALLOWED_ORIGINS.has(location.origin)
     ) {
-        try {
-            caramelGetSession().then(({ token }) => {
-                if (!token) {
-                    window.postMessage(
-                        { type: 'caramel-ext-hello' },
-                        location.origin,
-                    )
-                }
-            })
-        } catch {
-            /* storage unavailable — skip the handshake */
-        }
+        caramelAnnounceToWebsite()
     }
 
     currentBrowser.runtime.onMessage.addListener((req, _s, send) => {
