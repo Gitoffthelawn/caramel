@@ -111,11 +111,40 @@ const HYPHEN_CHECKOUT_PREFIXES = new Set([
     'shop',
     'store',
 ])
+/* A Shopify store's own checkout can live on its <shop>.myshopify.com host
+ * rather than on the brand domain. 5starnutritionusa.com does exactly this
+ * (QA sweep 2026-08-05): the shopper adds $44.99, hits checkout, lands on
+ * 5starnutritionusa.myshopify.com — and the extension goes dark at the one
+ * moment it matters, because the config's domain is the brand host and no
+ * suffix rule connects the two. No coupon fetch happens at all.
+ *
+ * Matched on the shop LABEL equalling the config domain's first label, which
+ * is how a store's myshopify host is named when it maps to its brand domain.
+ * Deliberately narrow: the suffix is the fixed, Shopify-owned `myshopify.com`,
+ * so this cannot be used to inherit another store's config the way a bare
+ * "any prefix" rule could — nobody can register `target.myshopify.com` and
+ * become target.com without Shopify handing them that shop name.
+ *
+ * Stores whose shop name does NOT match their brand label (naturepedic's is
+ * `0vjjgk-zp.myshopify.com`) are not helped by this and still need their own
+ * catalogue row; this fixes the aligned majority, not every case.
+ */
+const CARAMEL_SHOPIFY_HOST_SUFFIX = '.myshopify.com'
+function _shopifyShopHostMatches(host, domain) {
+    if (!host.endsWith(CARAMEL_SHOPIFY_HOST_SUFFIX)) return false
+    const shop = host.slice(0, -CARAMEL_SHOPIFY_HOST_SUFFIX.length)
+    // One label only: `a.b.myshopify.com` is not a shop host.
+    if (!shop || shop.includes('.')) return false
+    const brandLabel = domain.split('.')[0]
+    return !!brandLabel && shop === brandLabel
+}
+
 function _hostMatchesDomain(host, domain) {
     if (!host || !domain) return false
     host = String(host).toLowerCase()
     domain = String(domain).toLowerCase()
     if (host === domain) return true
+    if (_shopifyShopHostMatches(host, domain)) return true
     const i = host.length - domain.length
     if (i <= 0) return false
     if (host.slice(i) !== domain) return false
