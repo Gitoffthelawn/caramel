@@ -83,7 +83,16 @@ module.exports = [
         // The standing recommendation is unchanged and now overdue: price
         // MINIFIED bytes. Until an owner takes that call, a raise here is the
         // honest move and a silent one still is not.
-        limit: '232 KB',
+        //
+        // 2026-08-06 — 232 → 233 KB. `_caramelUsableTitle` now drops a claim
+        // whose amount fell out of the scrape (100percentpure ships LASHES as
+        // "Get off with code"). The fix plus its comment ran 174 B over after
+        // four rounds of trimming prose elsewhere in the file, which is the
+        // clearest statement yet that this gate is measuring the wrong bytes:
+        // an afternoon can be spent shaving sentences to fit a budget whose
+        // stated purpose is bounding CODE that runs on every store page.
+        // Measured 232.17 kB.
+        limit: '233 KB',
         brotli: false,
     },
     {
