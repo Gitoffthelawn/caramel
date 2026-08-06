@@ -203,10 +203,33 @@ describe('isCheckout — cart intent the path does not spell out', () => {
         expect(await isCheckout()).toBe(true)
     })
 
+    // The verb alternation was written from the two stores in front of us and
+    // stopped there. chomps.com and drsquatch.com both answer /cart with a
+    // redirect to /?viewcart=true, and "view" is the plainest verb in the set —
+    // the one a store reaches for first. chomps has 15 codes in the catalogue
+    // and showed the shopper nothing on its own cart page.
+    it('opens on a "view" verb, run together with the noun', async () => {
+        setPath('/?viewcart=true')
+
+        expect(await isCheckout()).toBe(true)
+    })
+
+    it('opens on the separated spellings of that same verb', async () => {
+        for (const url of ['/?view-cart=1', '/?view_basket=true']) {
+            setPath(url)
+            expect(await isCheckout(), url).toBe(true)
+        }
+    })
+
     it('stays shut when the flag is switched OFF', async () => {
         // `?cart=false` / `?open_cart=0` is the store telling us the drawer is
         // closed. Reading the key and ignoring its value would invert that.
-        for (const url of ['/?cart=false', '/?open_cart=0', '/?cart=']) {
+        for (const url of [
+            '/?cart=false',
+            '/?open_cart=0',
+            '/?cart=',
+            '/?viewcart=false',
+        ]) {
             setPath(url)
             expect(await isCheckout(), url).toBe(false)
             expect(probeCalls, url).toBe(0)

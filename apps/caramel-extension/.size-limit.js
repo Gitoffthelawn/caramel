@@ -104,7 +104,26 @@ module.exports = [
         // where the old path-only rule saw an ordinary home page and the
         // shopper got silence on a store we hold codes for. Measured
         // 238.97 kB.
-        limit: '239 KB',
+        //
+        // 2026-08-06 — 239 → 249 KB. The restore step was destroying the
+        // discount it existed to protect: measured live on harney.com, the
+        // shopper's own HARNEY10 survived all eight probes, the re-apply killed
+        // it (the /discount endpoint appends, and re-sending an attached code
+        // demotes it), and `restored: true` was asserted from the REQUEST
+        // succeeding while the same log line carried the undiscounted total.
+        // The fix is three helpers in coupon-runner.js — ask whether a NAMED
+        // code is still live, clear-then-send when a restore is genuinely
+        // needed, and gate the "already applied and saving you" sentence on the
+        // money being back — plus a third modal branch for the outcome that
+        // previously had no honest wording at all (their code gone, unrecovered).
+        // ~3.5 kB of that is code; the rest is the harney measurement, stated
+        // once in coupon-apply.js and cross-referenced. A first trimming pass
+        // bought 0.7 kB; going further would delete the store-by-store numbers,
+        // which the 232→233 KB note above already ruled the worse trade.
+        // Measured 247.99 kB — the extra kB over that is deliberate headroom,
+        // not slack: 248 left ten bytes, which turns the next comment edit into
+        // a build failure that says nothing true about bundle weight.
+        limit: '249 KB',
         brotli: false,
     },
     {

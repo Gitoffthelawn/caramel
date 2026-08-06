@@ -185,9 +185,16 @@ const CARAMEL_CART_PATH_RE =
  * different hat) is still out of bounds; a rule about URL shape holds for every
  * store that writes its URL that way.
  *
+ * `view` earns its place the same way the rest did: chomps.com and
+ * drsquatch.com both answer /cart with a redirect to `/?viewcart=true`
+ * (measured 2026-08-06). The alternation had been written from the two stores
+ * in front of us at the time and stopped there, so the plainest verb of the set
+ * was the one missing — chomps carries 15 catalogue codes and the extension was
+ * silent on its own cart page.
+ *
  * Anchored at both ends so `?discart=1` or `?cartoon=1` cannot ride in. */
 const CARAMEL_CART_INTENT_PARAM_RE =
-    /^(?:(?:open|show|toggle)[-_]?)?(?:cart|basket|minicart)(?:[-_]?(?:drawer|panel|modal|flyout))?$/i
+    /^(?:(?:open|show|toggle|view)[-_]?)?(?:cart|basket|minicart)(?:[-_]?(?:drawer|panel|modal|flyout))?$/i
 
 /* Values that mean the flag is OFF. The key alone is not the signal — a store
  * that writes ?cart=false is telling us the drawer is closed. */
