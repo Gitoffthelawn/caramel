@@ -36,11 +36,17 @@ const CARAMEL_UI_FALLBACK_CSS =
 // and the discount rate, the only thing a shopper is scanning for, was the part
 // that got cut. Our copy is English; it is LTR text regardless of the page it
 // lands on. Set on the HOST so every surface inherits it before any rule runs.
+// `display:block !important` is the one declaration here that is not layout.
+// A shadow host has no light-DOM children, so it matches `:empty`, and themes
+// that hide empty containers hide US: 1thrive.com rendered the prompt 0x0 with
+// display:none while every log said it worked (measured 2026-08-06 with the
+// extension loaded). Full account and the pins: tests/host-survives-page-css.
+
 const CARAMEL_OVERLAY_HOST_CSS =
-    'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;direction:ltr;'
+    'display:block !important;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;direction:ltr;'
 const CARAMEL_HOST_CSS = {
     'caramel-small-prompt':
-        'position:fixed;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));z-index:2147483646;width:min(88vw,300px);cursor:pointer;outline:none;direction:ltr;',
+        'display:block !important;position:fixed;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));z-index:2147483646;width:min(88vw,300px);cursor:pointer;outline:none;direction:ltr;',
     'caramel-testing-overlay': CARAMEL_OVERLAY_HOST_CSS,
     'caramel-final-overlay': CARAMEL_OVERLAY_HOST_CSS,
 }
