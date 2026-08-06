@@ -245,6 +245,40 @@ async function startApplyingCoupons(rec) {
     // every code. Checks DOM *signals*, never the config's content.
     const EARLY_PROBE = 2
     let sawSignal = false
+    let loggedUnobservable = false
+
+    // Could we SEE an outcome on this page even if one happened?
+    //
+    // The early exit below reads "no signal after 2 codes" as "this checkout is
+    // ignoring our input". That is only a fair reading if we were in a position
+    // to notice a signal in the first place. On a store whose config has no
+    // priceContainer (or one that no longer matches), every attempt measures
+    // newTotal = NaN, no success/error element exists to watch, and the run
+    // quits after 2 of 20 codes blaming the store.
+    //
+    // Measured on bombas.com (QA sweep 2026-08-05): it gave up after DRESSED20
+    // and FITZ with "checkout not accepting injection", and the code NATE —
+    // 4th in its own list, badged "Verified" in its own popup — was then
+    // applied BY HAND in the same field seconds later for a real -$11.10. The
+    // checkout was accepting injection perfectly well; we simply could not read
+    // the result and blamed the store for our own blindness.
+    //
+    // So blindness must not masquerade as evidence. When no observation channel
+    // works here, keep going — the wall-clock budget above is the backstop that
+    // stops this becoming an unbounded grind — and log a reason that names OUR
+    // limitation, so nothing downstream scores a working store as broken.
+    const canObserveOutcome = () => {
+        if (
+            rec.priceContainer &&
+            Number.isFinite(
+                getPrice(rec.priceContainer, { returnLargest: true }),
+            )
+        )
+            return true
+        for (const sel of [rec.successIndicator, rec.errorIndicator])
+            if (sel && qAll(sel).length) return true
+        return false
+    }
 
     // Wall-clock backstop. The no-signal early-exit above can't help a checkout
     // that stays *responsive* — one that hands back a real "invalid code" error
@@ -376,12 +410,25 @@ async function startApplyingCoupons(rec) {
         // us — keep going. Zero signal after EARLY_PROBE codes means it isn't.
         if (res.committed || res.errorMsg) sawSignal = true
         if (!sawSignal && i + 1 >= EARLY_PROBE) {
-            log('AUTO_INSERT_EARLY_EXIT', {
-                tried: i + 1,
-                reason: 'no cart signal — checkout not accepting injection',
-                t: performance.now(),
-            })
-            break
+            if (canObserveOutcome()) {
+                log('AUTO_INSERT_EARLY_EXIT', {
+                    tried: i + 1,
+                    reason: 'no cart signal — checkout not accepting injection',
+                    t: performance.now(),
+                })
+                break
+            }
+            // Blind, not ignored — see canObserveOutcome. Keep trying the
+            // remaining codes under the wall-clock budget rather than quitting
+            // on evidence we were never able to gather.
+            if (!loggedUnobservable) {
+                loggedUnobservable = true
+                log('AUTO_INSERT_UNOBSERVABLE', {
+                    tried: i + 1,
+                    reason: 'cannot read this checkout (no usable price or success/error selector) — continuing rather than blaming the store',
+                    t: performance.now(),
+                })
+            }
         }
         await waitUntilReady(rec)
         await sleep(160) // tiny visual pause between tries

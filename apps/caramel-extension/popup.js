@@ -398,6 +398,54 @@ async function getActiveTabDomainRecord() {
 /* ------------------------------------------------------------ */
 /*  Unsupported-site view                                       */
 /* ------------------------------------------------------------ */
+/* Is this domain one we actually cover?
+ *
+ * "We have no codes for this store right now" and "we don't cover this store"
+ * are different facts, and the view below used to render both as the latter.
+ * A QA sweep on 2026-08-05 found huel.com — fully supported, with a complete
+ * apply config — being told "No coupons for this site yet… see the ones we
+ * support", with a button sending the user to a list containing the very store
+ * they were standing on. Sampling 100 supported domains put roughly 1 in 8 in
+ * that state, because the popup branched on coupons.length alone and never
+ * consulted the supported-store list.
+ *
+ * Resolved asynchronously AFTER the view paints: this is a terminal state and
+ * the honest wording is worth a moment's wait, but not at the cost of leaving
+ * the popup blank while a network call completes.
+ */
+function caramelDomainIsSupported(domain) {
+    return new Promise(resolve => {
+        if (!domain) return resolve(false)
+        const host = String(domain)
+            .toLowerCase()
+            .replace(/^www\./, '')
+        try {
+            currentBrowser.runtime.sendMessage(
+                { action: 'fetchSupportedStores' },
+                resp => {
+                    // A failed lookup must not assert either fact — fall back
+                    // to the neutral copy rather than guessing.
+                    if (currentBrowser.runtime.lastError || !resp || resp.error)
+                        return resolve(false)
+                    const list = Array.isArray(resp.supported)
+                        ? resp.supported
+                        : []
+                    resolve(
+                        list.some(entry => {
+                            const d = String(entry?.domain || entry || '')
+                                .toLowerCase()
+                                .replace(/^www\./, '')
+                            return d && (host === d || host.endsWith('.' + d))
+                        }),
+                    )
+                },
+            )
+        } catch {
+            resolve(false)
+        }
+    })
+}
+
 function renderUnsupportedSite(user, domain) {
     const container = document.getElementById('auth-container')
 
@@ -411,11 +459,12 @@ function renderUnsupportedSite(user, domain) {
         </svg>
       </div>
 
-      <h3>No coupons for this site yet</h3>
-      <p>We're adding new stores all the time — see the ones we support.</p>
+      <h3 id="noCouponsHeading">No coupons for this site yet</h3>
+      <p id="noCouponsBody">We're adding new stores all the time — see the ones we support.</p>
 
       <div class="no-coupons-actions">
         <a
+          id="supportedStoresLink"
           href="${caramelUrl('supported-stores')}"
           class="supported-sites-btn"
           target="_blank"
@@ -445,6 +494,22 @@ function renderUnsupportedSite(user, domain) {
   `
 
     /* wiring */
+    // Tell the truth once we know it: a store we DO cover but have no live
+    // codes for gets its own wording, and loses the "see the stores we
+    // support" link — that link's whole premise is that this store isn't on
+    // the list. Purely additive: if the lookup fails or the store really is
+    // unsupported, the copy painted above stands unchanged.
+    caramelDomainIsSupported(domain).then(supported => {
+        if (!supported) return
+        const heading = document.getElementById('noCouponsHeading')
+        const body = document.getElementById('noCouponsBody')
+        const link = document.getElementById('supportedStoresLink')
+        if (!heading || !body) return
+        heading.textContent = 'No working codes right now'
+        body.textContent = `We cover ${domain}, but none of our codes for it are working at the moment. We'll keep looking.`
+        if (link) link.remove()
+    })
+
     wireSettingsGear(() => renderUnsupportedSite(user, domain), domain)
 
     const loginToggle = document.getElementById('loginToggleBtn')
