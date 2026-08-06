@@ -1061,6 +1061,38 @@ async function caramelAnnounceToWebsite() {
     })
 }
 
+/* URLs detection has already been answered for, seeded with the one the
+ * document loaded at (inject.js runs detection there, and re-running it for the
+ * same URL is pure duplication). A store that rewrites its address bar in a
+ * loop must not cost a run per rewrite.
+ *
+ * Guarded `var`, not `const`: re-injection safety, and the test harness evals
+ * each source file in its own call where only var/function survive
+ * (tests/_load.mjs). */
+if (typeof _caramelEvaluatedUrls === 'undefined') {
+    var _caramelEvaluatedUrls = new Set([location.href])
+}
+
+/* The address bar moved. Re-ask whether we can help here.
+ *
+ * Detection is not idempotent-by-accident — it re-reads the URL, the referrer
+ * and the live cart, which is the whole point: the answer genuinely changes
+ * when a store rewrites /?open_cart=true to /. Its own re-entry guards hold
+ * (insertCaramelPrompt refuses a second pill, the mutation observer refuses a
+ * second install), so a re-run adds a decision, not a duplicate.
+ *
+ * Returns whether it re-ran, so the test can tell a decision from a no-op. */
+function caramelHandleUrlChanged(url) {
+    const seen = String(url || '')
+    if (!seen || _caramelEvaluatedUrls.has(seen)) return false
+    _caramelEvaluatedUrls.add(seen)
+    log('URL_CHANGED_REDETECT', { url: seen })
+    startCheckoutDetection().catch(err =>
+        logError('re-detection after URL change failed', err),
+    )
+    return true
+}
+
 /* --------------------------------------------------  listeners
  * Guard: register once per realm. Without this, SPA re-injections stack
  * duplicate listeners → double-fires, memory leaks. */
@@ -1109,6 +1141,11 @@ if (!window.__caramel_listeners_bound) {
                     logError('apply flow error', err)
                     hideTestingModal()
                 })
+            send({ success: true })
+            return false
+        }
+        if (req.action === 'caramelUrlChanged') {
+            caramelHandleUrlChanged(req.url)
             send({ success: true })
             return false
         }

@@ -92,7 +92,19 @@ module.exports = [
         // an afternoon can be spent shaving sentences to fit a budget whose
         // stated purpose is bounding CODE that runs on every store page.
         // Measured 232.17 kB.
-        limit: '233 KB',
+        //
+        // 2026-08-06 — 233 → 239 KB, two behaviour changes in one evening
+        // pass. Console silence: the dev-gated logError in caramel-base.js,
+        // because three raw console.error calls were printing into STORES'
+        // consoles on shoppers' machines (pinned by
+        // tests/console-silence.test.mjs). Cart-intent signal: store-detect's
+        // gate now opens on the URL SHAPES that drawer-cart stores actually
+        // write — measured live: allbirds 302s /cart to /?openCartDrawer=true
+        // and toms navigates it to /?open_cart=true then rewrites to bare / —
+        // where the old path-only rule saw an ordinary home page and the
+        // shopper got silence on a store we hold codes for. Measured
+        // 238.97 kB.
+        limit: '239 KB',
         brotli: false,
     },
     {
@@ -104,7 +116,14 @@ module.exports = [
     {
         name: 'background.js (sw)',
         path: 'background.js',
-        limit: '15 KB',
+        // 2026-08-06 — 15 → 17 KB, first raise for this budget: the worker
+        // gained its own storage-recording logError (it cannot share
+        // caramel-base.js — separate context) and the tabs.onUpdated body
+        // became a named, tested function that re-arms detection when an SPA
+        // rewrites the URL. Measured 16.17 kB. Same standing note as above:
+        // the honest fix is pricing minified bytes, and that call is the
+        // owner's.
+        limit: '17 KB',
         brotli: false,
     },
 ]

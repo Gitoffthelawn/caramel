@@ -216,12 +216,30 @@ currentBrowser.tabs.onActivated.addListener(({ tabId }) => {
         updateBadgeForTab(tabId, tab.url || '')
     })
 })
-currentBrowser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+function _caramelOnTabUpdated(tabId, changeInfo, tab) {
     // Fire on navigation commit (URL change) and on load completion —
     // covers SPA address-bar updates that never re-"complete".
     if (!changeInfo.url && changeInfo.status !== 'complete') return
     updateBadgeForTab(tabId, tab.url || '')
-})
+    if (!changeInfo.url) return
+    // A same-document rewrite can move the shopper into a cart without the
+    // content script running again or firing anything it can hear — a store
+    // that sends /cart to /?open_cart=true and then rewrites that away leaves
+    // the page it already evaluated looking like an ordinary home page. This
+    // listener is the only place in the extension that sees the address bar
+    // change, so it tells the page.
+    currentBrowser.tabs
+        .sendMessage(tabId, {
+            action: 'caramelUrlChanged',
+            url: changeInfo.url,
+        })
+        // Every tab in the browser reaches here, and most have no content
+        // script of ours to receive this (other origins, chrome:// pages, tabs
+        // open since before the install). That rejection is the ordinary case,
+        // not a failure — and it is the only one swallowed here.
+        ?.catch(() => {})
+}
+currentBrowser.tabs.onUpdated.addListener(_caramelOnTabUpdated)
 
 currentBrowser.runtime.onMessage.addListener(
     (message, sender, sendResponse) => {
