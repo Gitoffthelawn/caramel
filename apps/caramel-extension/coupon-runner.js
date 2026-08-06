@@ -231,6 +231,38 @@ async function startApplyingCoupons(rec) {
         return
     }
 
+    // Nothing to discount? Say so, and don't spend the user's time or the
+    // merchant's goodwill finding out.
+    //
+    // Observed on eddiebauer.com (2026-08-05): the prompt appeared on a cart
+    // reading "Your cart is empty / Total $0.00", clicking it ran the full loop
+    // for ~23 SECONDS, submitted two live codes to the merchant against zero
+    // items, and then told the user to paste a code into an empty cart. From
+    // the merchant's side that is indistinguishable from code-guessing traffic,
+    // on every user who lands on an empty cart page. The extension's own
+    // diagnosis was wrong too — it logged "no cart signal — checkout not
+    // accepting injection", blaming a store that was behaving perfectly.
+    //
+    // Two independent signals, because the platforms differ: the cart payload
+    // when probeCartJson() works (Shopify-class), and a readable total of zero
+    // otherwise. `returnLargest` matters — it is the ORDER TOTAL, so a $0.00
+    // reading means every number in the summary is zero, not just one line.
+    // cricut.com and clarks.com already stay quiet on an empty cart, so this
+    // aligns the rest of the fleet with behaviour users already get elsewhere.
+    const emptyCart =
+        (_cart0 && _cart0.item_count === 0) ||
+        (rec.priceContainer &&
+            getPrice(rec.priceContainer, { returnLargest: true }) === 0)
+    if (emptyCart) {
+        log('AUTO_INSERT_STOP', { result: 'empty-cart', t: performance.now() })
+        showFinalModal(
+            0,
+            null,
+            "Your cart is empty — add something and we'll find you a code.",
+        )
+        return
+    }
+
     // Before pretending to "try" codes, confirm the promo box is actually
     // reachable on this page. If the config's selectors don't match (stale
     // config, or the box lives on a later checkout step), say so honestly and
