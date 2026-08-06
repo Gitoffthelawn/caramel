@@ -146,6 +146,19 @@ button:focus {
     top: -8px;
     right: -8px;
 }
+/* The final card scrolls (max-height + overflow-y), so a × hanging outside it
+ * would be clipped by its own scroll box. Sits inside, level with the logo. */
+#caramel-final-close {
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--cm-text-secondary);
+}
+#caramel-final-close:hover {
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+}
 
 /* ---- Shared overlay scrim ----
  * The HOST (#caramel-testing-overlay / #caramel-final-overlay) is the

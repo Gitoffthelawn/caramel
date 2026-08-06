@@ -27,11 +27,20 @@ const CARAMEL_UI_FALLBACK_CSS =
 // Host positioning, applied INLINE — the authoritative cross-browser source
 // (Firefox's manifest ships no content css; caramel-content.css repeats
 // these as Chrome's light-DOM backup — keep in sync).
+//
+// `direction:ltr` is load-bearing, not cosmetic. `direction` is an INHERITED
+// property and inheritance crosses into shadow DOM, so on an RTL storefront our
+// surfaces silently flipped: measured on mango.com/ae (QA sweep 2026-08-06), the
+// coupon descriptions ellipsised at their visual LEFT — which is the logical
+// end under RTL — so "20% off orders over $50" rendered as "…orders over $50"
+// and the discount rate, the only thing a shopper is scanning for, was the part
+// that got cut. Our copy is English; it is LTR text regardless of the page it
+// lands on. Set on the HOST so every surface inherits it before any rule runs.
 const CARAMEL_OVERLAY_HOST_CSS =
-    'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;'
+    'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;direction:ltr;'
 const CARAMEL_HOST_CSS = {
     'caramel-small-prompt':
-        'position:fixed;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));z-index:2147483646;width:min(88vw,300px);cursor:pointer;outline:none;',
+        'position:fixed;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));z-index:2147483646;width:min(88vw,300px);cursor:pointer;outline:none;direction:ltr;',
     'caramel-testing-overlay': CARAMEL_OVERLAY_HOST_CSS,
     'caramel-final-overlay': CARAMEL_OVERLAY_HOST_CSS,
 }
@@ -591,13 +600,28 @@ ${savedMoney ? '' : `<p class="caramel-final-hint">Discount visible in your cart
 </div>`
         : ''
 
+    /* "Proceed to Checkout" is a promise, and it was the ONLY control on this
+     * card. On an empty cart (eddiebauer.com, QA sweep 2026-08-05) the modal
+     * read "Heads up / Your cart is empty" above a button telling the shopper
+     * to go and check out, while covering the store's own "Continue shopping"
+     * link. Offer the checkout only when something is actually on the cart to
+     * check out with; otherwise the button is just the way out. */
+    const primaryLabel = isSignIn
+        ? 'Sign In'
+        : isSuccess
+          ? 'Proceed to Checkout'
+          : hasManual
+            ? 'Done'
+            : 'Got it'
+
     modal.innerHTML = `
+<button id="caramel-final-close" class="cm-close-fab" title="Close" aria-label="Close">${CARAMEL_X_ICON}</button>
 <div class="caramel-final-logo"><img src="${logoUrl}" alt="Caramel Logo" /></div>
 <h2>${heading}</h2>
 <p class="caramel-final-msg">${esc(finalMessage)}</p>
 ${manualBlock}
 ${winBlock}
-<button id="caramel-final-ok-btn">${isSignIn ? 'Sign In' : hasManual ? 'Done' : 'Proceed to Checkout'}</button>
+<button id="caramel-final-ok-btn">${primaryLabel}</button>
 `
 
     scrim.appendChild(modal)
@@ -628,6 +652,23 @@ ${winBlock}
                 btn.classList.remove('is-copied')
             }, 1600)
         })
+    })
+
+    /* Three ways out, because there used to be one.
+     *
+     * This card is full-viewport and sits over whatever the shopper was doing.
+     * Esc worked; nothing else did. A phone has no Esc key, so on eddiebauer's
+     * empty cart the only reachable control was a button labelled "Proceed to
+     * Checkout" — the shopper's way out of an empty-cart notice was to be sent
+     * to checkout. Tapping the dimmed area is the gesture everyone already
+     * tries, and the × matches the one on the prompt and the testing modal.
+     *
+     * Only the scrim itself closes: a click that lands on the card (copying a
+     * code, hitting the button) has the card as its target and must not. */
+    const closeX = modal.querySelector('#caramel-final-close')
+    if (closeX) closeX.addEventListener('click', closeFinal)
+    scrim.addEventListener('click', ev => {
+        if (ev.target === scrim) closeFinal()
     })
 
     // Close on the primary button; Esc closes too (keyboard).
