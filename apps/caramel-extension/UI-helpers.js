@@ -580,7 +580,7 @@ ${
 ${
     savedMoney
         ? `<div class="caramel-final-eyebrow">You saved</div>
-<p class="caramel-final-savings">${esc(caramelSavingsCurrency())}${savingsAmount.toFixed(2)}</p>`
+<p class="caramel-final-savings">${esc(caramelSavingsCurrency())}${/[A-Za-z]$/.test(caramelSavingsCurrency()) ? ' ' : ''}${savingsAmount.toFixed(2)}</p>`
         : ''
 }
 <div class="caramel-final-codewrap">

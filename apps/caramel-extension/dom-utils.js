@@ -289,7 +289,99 @@ async function waitUntilReady(rec, timeout = 2000) {
     })
 }
 
-/* --------------------------------------------------  price grabber */
+/* --------------------------------------------------  price grabber
+ *
+ * Money on a page, in the shapes the world actually writes it.
+ *
+ * The old reader required one of $ £ € IMMEDIATELY BEFORE the digits, and then
+ * parsed by stripping everything except [0-9.]. That reads the United States,
+ * the UK, and nowhere else. Measured against live storefronts during the QA
+ * sweep (2026-08-05/06):
+ *
+ *   "Zwischensumme: 565.89 ت"  motoin.de      → no match, "getPrice: no price
+ *                                               found" on a real €565 basket
+ *   "AED 949.00"               mango.com/ae   → no match
+ *   "DT 445.00 → DT 356.00"    rag-bone.com   → no match; a genuine 20% win
+ *                                               was applied and the shopper was
+ *                                               never told the number
+ *   "3,49 €"                   rosegal.com    → no match
+ *   "1.234,56 €"               German         → also MIS-PARSED to 1.234 by the
+ *                                               old strip — a 1000x understatement
+ *
+ * Every continental-European locale writes the symbol after the number with a
+ * comma decimal, so the product's headline feature — "you saved X" — silently
+ * degraded to "review the discount before you check out" across all of them.
+ *
+ * A currency MARKER is still required (before or after), so a bare "2" from
+ * "Qty 2" or a size can never be read as money. Letter codes must be uppercase
+ * (USD, AED, CHF, DT, RM) or one of the few well-known lowercase/other-script
+ * ones — that is what keeps "Save 10" and "Total 5" from parsing as prices.
+ */
+const CARAMEL_CURRENCY_SYMBOLS = '$£€¥₹₩₪₺₽฿₫₴₦₱﷼¢ت'
+// Lowercase or non-Latin markers common enough to be worth naming explicitly.
+// Uppercase codes are matched by shape instead (see the pattern below).
+const CARAMEL_CURRENCY_WORDS = ['kr', 'zł', 'Kč', 'Ft', 'lei', 'zt', 'руб']
+const _caramelMarkerAlt = [
+    `[${CARAMEL_CURRENCY_SYMBOLS}]`,
+    String.raw`\b[A-Z]{2,4}\$?`, // USD, AED, CHF, DT, RM, CA$, R$
+    CARAMEL_CURRENCY_WORDS.map(w =>
+        w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    ).join('|'),
+].join('|')
+// Digits with either grouping convention: 1,234.56 / 1.234,56 / 1 234,56.
+const _caramelNumberPart = String.raw`\d{1,3}(?:[.,   ]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`
+const _caramelMoneyRe = new RegExp(
+    `(?:(${_caramelMarkerAlt})\\s?(${_caramelNumberPart}))|(?:(${_caramelNumberPart})\\s?(${_caramelMarkerAlt}))`,
+    'g',
+)
+
+/* Turn one matched number string into a Number, working out which separator is
+ * the decimal one. Both conventions appear on real carts and guessing wrong is
+ * a factor-of-1000 error in the direction of understating a saving.
+ *   both separators → the LAST one is the decimal ("1.234,56", "1,234.56")
+ *   one separator, 3 trailing digits → thousands ("1.234" = 1234, "1,234" = 1234)
+ *   one separator, 1-2 trailing digits → decimal ("89,99", "356.00")
+ */
+// Consumed by the matcher below and pinned directly by tests.
+// oxlint-disable-next-line no-unused-vars
+function caramelParseMoneyNumber(raw) {
+    if (typeof raw !== 'string') return NaN
+    const text = raw.replace(/[   ]/g, '')
+    const lastDot = text.lastIndexOf('.')
+    const lastComma = text.lastIndexOf(',')
+    let decimalAt = -1
+    if (lastDot >= 0 && lastComma >= 0) {
+        decimalAt = Math.max(lastDot, lastComma)
+    } else if (lastDot >= 0 || lastComma >= 0) {
+        const only = Math.max(lastDot, lastComma)
+        if (text.length - only - 1 !== 3) decimalAt = only
+    }
+    const digitsOnly = s => s.replace(/\D/g, '')
+    const whole =
+        decimalAt >= 0 ? digitsOnly(text.slice(0, decimalAt)) : digitsOnly(text)
+    const frac = decimalAt >= 0 ? digitsOnly(text.slice(decimalAt + 1)) : ''
+    if (!whole && !frac) return NaN
+    return Number(`${whole || '0'}.${frac || '0'}`)
+}
+
+/* Every money amount in a block of text, newest-first order preserved, as
+ * { value, marker }. The marker is whatever currency mark sat with it. */
+// Consumed by getPrice; pinned directly by tests.
+// oxlint-disable-next-line no-unused-vars
+function caramelFindMoney(text) {
+    if (typeof text !== 'string' || !text) return []
+    const out = []
+    _caramelMoneyRe.lastIndex = 0
+    let m
+    while ((m = _caramelMoneyRe.exec(text)) !== null) {
+        const marker = m[1] || m[4] || ''
+        const number = m[2] || m[3] || ''
+        const value = caramelParseMoneyNumber(number)
+        if (!isNaN(value)) out.push({ value, marker })
+    }
+    return out
+}
+
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
@@ -304,21 +396,19 @@ function getPrice(selector, { returnLargest } = {}) {
         return NaN
     }
 
-    const regex = /(?:[A-Z]{1,3}\s?)?[$£€]\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g
-    const tokens = el.innerText.match(regex) || []
-    const prices = tokens.map(t => parseFloat(t.replace(/[^0-9.]/g, '')))
+    const tokens = caramelFindMoney(el.innerText)
+    const prices = tokens.map(t => t.value)
     if (!prices.length) {
         log('getPrice: no price found')
         return NaN
     }
     if (returnLargest) _caramelLastPrices = prices.slice()
     const idx = returnLargest ? prices.indexOf(Math.max(...prices)) : 0
-    // Remember the symbol that came with the price we actually returned, so
+    // Remember the marker that came with the price we actually returned, so
     // the savings we report back are denominated in the SAME currency the
     // cart is priced in. Reporting "$8.00" for an £8.00 saving is a bug the
     // user can see, and a config can't be trusted to tell us the currency.
-    const sym = tokens[idx].match(/[$£€]/)
-    if (sym) _caramelLastCurrency = sym[0]
+    if (tokens[idx].marker) _caramelLastCurrency = tokens[idx].marker
     return prices[idx]
 }
 
@@ -371,7 +461,15 @@ function caramelCurrencySymbol() {
 // Consumed by coupon-runner.js (cross-file content-script call).
 // oxlint-disable-next-line no-unused-vars
 function caramelCurrencyCode() {
-    return { '£': 'GBP', '€': 'EUR' }[_caramelLastCurrency] || 'USD'
+    const marker = _caramelLastCurrency
+    const mapped = { '£': 'GBP', '€': 'EUR', '¥': 'JPY', '₹': 'INR' }[marker]
+    if (mapped) return mapped
+    // A marker the page wrote as letters IS the code the store uses (AED, CHF,
+    // DT). Pass it through rather than banking it as dollars: the popup totals
+    // per currency and falls back to "89.00 DT" for anything Intl can't format,
+    // which is honest, where calling it USD would not be.
+    if (typeof marker === 'string' && /^[A-Z]{2,4}$/.test(marker)) return marker
+    return 'USD'
 }
 
 /* Set the symbol explicitly when the currency is known from data rather than
