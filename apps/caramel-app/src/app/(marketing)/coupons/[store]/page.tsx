@@ -67,9 +67,23 @@ export async function generateMetadata({
     const storeParam = typeof store === 'string' ? safeDecode(store) : ''
     const base = getBaseDomain(storeParam)
     if (!storeParam || !base) {
+        /* A slug that resolves to no registrable domain is not a store at all,
+         * and this route still answers 200 for it (the body renders the honest
+         * empty state rather than 404ing). That is the soft-404 bloat the
+         * zero-coupon rule below exists to keep out of the index — only more so,
+         * because there is no store here to have coupons in the first place.
+         *
+         * It only became reachable when getBaseDomain moved to the Public Suffix
+         * List: the old "last two labels" helper always returned SOMETHING, so
+         * this branch was effectively dead and inherited no robots directive.
+         * Caught by e2e/seo-a11y.spec.ts, which asks for /coupons/…-zz.example —
+         * a slug the PSL correctly refuses, since `.example` is reserved and
+         * cannot be registered. `follow` stays on for the same reason it does
+         * below: the links off the page are still worth crawling. */
         return {
             title: 'Coupons | Caramel',
             description: 'Find coupons and promo codes on Caramel.',
+            robots: { index: false, follow: true },
         }
     }
     // Declaring `openGraph` below REPLACES the root layout's object wholesale
