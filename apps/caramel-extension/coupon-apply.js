@@ -244,10 +244,19 @@ async function applyCoupon(code, rec) {
         // Refuse to drive a control that completes the order. A config whose
         // apply selector resolved here is wrong, and clicking it would spend
         // the user's money instead of saving it — treat it as no button at all.
-        if (caramelIsForbiddenControl(applyBtn)) {
+        //
+        // The label test alone is not enough. A button reading "Apply Discount"
+        // that is the checkout form's own submit control places the order with
+        // an entirely innocent label, so the form it would submit is checked
+        // too. Refusing costs a discount; not refusing costs an order.
+        const applyBtnUnsafeForm =
+            applyBtn && caramelFormSubmitIsUnsafe(applyBtn)
+        if (caramelIsForbiddenControl(applyBtn) || applyBtnUnsafeForm) {
             log('AUTO_INSERT_REFUSED_CONTROL', {
                 code,
-                reason: 'apply selector resolved to an order-completing control',
+                reason: applyBtnUnsafeForm
+                    ? 'apply selector sits in a form that carries payment details or an order control'
+                    : 'apply selector resolved to an order-completing control',
                 label: (applyBtn.innerText || applyBtn.value || '').slice(
                     0,
                     60,
@@ -326,16 +335,30 @@ async function applyCoupon(code, rec) {
             }
             applyBtn.click()
         }
-        // Always dispatch Enter on the input — harmless when no submit handler,
-        // but lets sites that listen to keydown="Enter" pick it up.
-        input.dispatchEvent(
-            new KeyboardEvent('keydown', {
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13,
-                bubbles: true,
-            }),
-        )
+        // Dispatch Enter on the input for sites that listen to keydown="Enter"
+        // instead of a click. This used to be unconditional and described as
+        // "harmless when no submit handler" — it is not. Enter submits the form
+        // the input lives in, and the guard above only ever inspected elements
+        // we were about to CLICK, so a coupon selector that had drifted onto a
+        // field inside the checkout's own order form placed the order without
+        // tripping a single refusal (QA sweep 2026-08-05, order placed once per
+        // code). Enter is the one action here whose target is a form rather
+        // than an element, so it gets the form check.
+        if (caramelFormSubmitIsUnsafe(input)) {
+            log('AUTO_INSERT_REFUSED_CONTROL', {
+                code,
+                reason: 'coupon input sits in a form that carries payment details or an order control — Enter not dispatched',
+            })
+        } else {
+            input.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    bubbles: true,
+                }),
+            )
+        }
 
         /* 4] wait for result — smart waiter: poll DOM up to 4s for the
              FIRST observable signal (success row appears OR error region

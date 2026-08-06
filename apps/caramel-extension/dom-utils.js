@@ -58,26 +58,105 @@ function waitForVisible(sel, timeout = 3000) {
  *
  * Matched on the control's visible label and its accessible/name attributes.
  * A coupon apply button is never called "Pay now" or "Place order", so this
- * cannot swallow a legitimate target. */
+ * cannot swallow a legitimate target.
+ *
+ * Vocabulary scope: manifest.json matches https://*./* — every locale, not just
+ * English — so the order verbs cover the languages our store list actually
+ * reaches. Cart destruction ("empty cart") and session destruction ("log out")
+ * are here for the same reason order placement is: a stale selector that
+ * resolves to one costs the user their cart or their session, and the QA sweep
+ * on 2026-08-05 clicked all three. */
 const CARAMEL_FORBIDDEN_CONTROL_RE =
-    /\b(place\s+(your\s+)?order|pay\s+(now|today)|complete\s+(your\s+)?(order|purchase)|submit\s+order|confirm\s+(and\s+pay|order|purchase)|buy\s+now|proceed\s+to\s+(pay|checkout)|checkout\s+now|delete\s+account)\b|\b(remove|delete)\s+(this\s+)?(item|product|line|all|address|card|everything|from\s+(bag|cart|basket|order))\b/i
+    /\b(place\s+(your\s+)?order|pay\s+(now|today)|complete\s+(your\s+)?(order|purchase)|submit\s+order|confirm\s+(and\s+pay|order|purchase)|buy\s+now|proceed\s+to\s+(pay|checkout)|checkout\s+now|delete\s+account)\b|\b(remove|delete)\s+(this\s+)?(item|product|line|all|address|card|everything|from\s+(bag|cart|basket|order))\b|\b(empty|clear)\s+(your\s+)?(cart|bag|basket|trolley)\b|\b(log|sign)\s*out\b|\b(jetzt\s+kaufen|kauf(en)?\s+abschlie(ss|ß)en|zahlungspflichtig\s+bestellen|bestellung\s+abschicken|commander(\s+et\s+payer)?|payer\s+maintenant|valider\s+(la\s+)?commande|realizar\s+(el\s+)?pedido|comprar\s+ahora|pagar\s+ahora|finalizar\s+(la\s+)?compra|acquista\s+ora|procedi\s+al\s+pagamento)\b/i
+
+/* Every string a sighted or assistive-tech user would read as this control's
+ * label. The guard used to read five properties; the QA sweep placed real
+ * orders through three labelling patterns none of them covered — an icon
+ * button labelled by <img alt>, by aria-labelledby, or by title=. Those are
+ * not exotic: they are the three standard ways to label a button that shows
+ * only an icon, which is exactly what checkout "pay" buttons often are. */
+function _caramelControlLabelParts(el) {
+    const parts = [
+        el.innerText || el.textContent || '',
+        el.getAttribute?.('aria-label') || '',
+        el.getAttribute?.('title') || '',
+        el.value || '',
+        el.getAttribute?.('name') || '',
+        el.id || '',
+    ]
+    // aria-labelledby points at the element(s) holding the real label.
+    const labelledBy = el.getAttribute?.('aria-labelledby') || ''
+    for (const id of labelledBy.split(/\s+/).filter(Boolean)) {
+        try {
+            const ref = el.ownerDocument?.getElementById(id)
+            if (ref) parts.push(ref.innerText || ref.textContent || '')
+        } catch {
+            /* a malformed id is not a reason to skip the rest */
+        }
+    }
+    // An icon button's only human-readable text is often its image's alt.
+    try {
+        for (const img of el.querySelectorAll?.('img[alt], svg title') || [])
+            parts.push(img.getAttribute?.('alt') || img.textContent || '')
+    } catch {
+        /* ditto */
+    }
+    return parts
+}
+
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
 function caramelIsForbiddenControl(el) {
     if (!el) return false
-    const parts = [
-        el.innerText || el.textContent || '',
-        el.getAttribute?.('aria-label') || '',
-        el.value || '',
-        el.getAttribute?.('name') || '',
-        el.id || '',
-    ]
     // id/name attributes spell the same words with separators ("pay-now",
     // "submit_order"), so flatten those to spaces before matching.
     return CARAMEL_FORBIDDEN_CONTROL_RE.test(
-        parts.join(' ').replace(/[-_]+/g, ' '),
+        _caramelControlLabelParts(el).join(' ').replace(/[-_]+/g, ' '),
     )
+}
+
+/* Fields that mean "submitting this form spends money". Matched on the
+ * autocomplete tokens the HTML spec defines for payment instruments, plus the
+ * name/id shapes checkouts use when they don't set autocomplete. */
+const CARAMEL_PAYMENT_FIELD_SEL =
+    'input[autocomplete^="cc-"], input[name*="cardnumber" i], input[name*="card_number" i], input[name*="cvv" i], input[name*="cvc" i], input[id*="cardnumber" i], input[id*="cardNumber"]'
+
+/* Would activating this control submit something other than the coupon?
+ *
+ * The label guard above asks "is this element an order button". That is not
+ * enough, because two proven order-placement paths never touch a labelled
+ * order button at all: an apply button of type="submit" sitting inside the
+ * checkout's own <form>, and the unconditional Enter keydown, which submits
+ * whatever form the coupon input happens to live in. In both the element we
+ * inspect is innocent ("Apply Discount") and the FORM is the danger.
+ *
+ * So this guards the ACTION rather than the element: a form carrying payment
+ * credentials, or containing a control the label guard would refuse, is a form
+ * we must never submit. A correctly-configured store is unaffected — Magento's
+ * #discount-coupon-form and WooCommerce's .checkout_coupon are their own forms
+ * and contain neither. */
+// oxlint-disable-next-line no-unused-vars
+function caramelFormSubmitIsUnsafe(el) {
+    let form = null
+    try {
+        form = el?.form || el?.closest?.('form') || null
+    } catch {
+        return false
+    }
+    // No owning form means there is no implicit submission to worry about.
+    if (!form) return false
+    try {
+        if (form.querySelector(CARAMEL_PAYMENT_FIELD_SEL)) return true
+        for (const control of form.querySelectorAll(
+            'button, input[type="submit"], input[type="button"], input[type="image"], [role="button"]',
+        ))
+            if (caramelIsForbiddenControl(control)) return true
+    } catch {
+        /* an unreadable form is not evidence of safety, but it is also not
+           evidence of danger — fall through to the caller's other checks */
+    }
+    return false
 }
 
 // Called from other split content-script files (cross-file content-script
