@@ -114,6 +114,10 @@ async function startApplyingCoupons(rec) {
             await updateTestingModal(i + 1, linkCodes.length, code)
             _markTriedCode(code)
             const after = await applyViaDiscountLink(code)
+            // A null result means the request failed or the cart became
+            // unreadable — we learned nothing about this code, so don't leave
+            // it blacklisted for the rest of the session (see _unmarkTriedCode).
+            if (!after) _unmarkTriedCode(code)
             if (after && after.total_price < _cart0.total_price) {
                 const saved = (_cart0.total_price - after.total_price) / 100
                 log('AUTO_INSERT_STOP', {
@@ -306,6 +310,17 @@ async function startApplyingCoupons(rec) {
 
         _markTriedCode(code)
         const res = await applyCoupon(code, rec)
+
+        // Did this attempt prove ANYTHING about this code? An applied row, the
+        // store's own error text, or a total we could actually read all count.
+        // None of them means we learned nothing — most often because the config
+        // has no usable priceContainer, or the cart is empty so no total can
+        // move — and a code we never really tested must not stay blacklisted
+        // for the rest of the session. See _unmarkTriedCode for the two live
+        // cases ($11.25 and $11.10) this cost real users.
+        if (!res.committed && !res.errorMsg && !Number.isFinite(res.newTotal)) {
+            _unmarkTriedCode(code)
+        }
 
         // Late-total safety net: some checkouts (erincondren-class) flash their
         // error region a beat BEFORE the order total re-renders, so applyCoupon

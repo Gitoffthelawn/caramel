@@ -569,6 +569,35 @@ function _markTriedCode(code) {
         /* storage unavailable — worst case a reload retries codes */
     }
 }
+// Release a code marked at attempt start whose attempt then produced NO
+// evidence — no applied row, no store error, no readable total.
+//
+// Marking at start is right (see above), but leaving the mark on an attempt
+// that proved nothing turns a momentary blindness into a permanent blacklist
+// for the rest of the tab's session, and _untried in coupon-runner.js filters
+// those codes out of the manual copy list too. So the user loses the code in
+// BOTH directions.
+//
+// Measured twice on 2026-08-05, independently. toms.com: TOMS15 won a verified
+// -$11.25 earlier in the day; on a later run the cart probe fell back to the
+// DOM form, both attempts read newTotal NaN, and the user was told "didn't
+// stick" with TOMS15 offered as the code to paste by hand — then a re-run
+// logged SKIP_TRIED and could never reach it again. bombas.com: NATE, badged
+// "Verified" in our own popup and worth a real -$11.10, vanished from the
+// auto-apply queue AND the copy list, leaving 16 unevidenced codes in its
+// place. Same mechanism burns codes tried against an EMPTY cart, where no
+// total can move by definition.
+// oxlint-disable-next-line no-unused-vars
+function _unmarkTriedCode(code) {
+    try {
+        const m = _getTriedCodes()
+        if (!(code in m)) return
+        delete m[code]
+        sessionStorage.setItem(CARAMEL_TRIED_KEY, JSON.stringify(m))
+    } catch {
+        /* storage unavailable — the mark was best-effort anyway */
+    }
+}
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
