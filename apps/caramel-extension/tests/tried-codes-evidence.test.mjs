@@ -39,16 +39,38 @@ beforeEach(() => {
 
 /** The runner's rule for "this attempt proved nothing about the code". */
 const provedNothing = res =>
-    !res.committed && !res.errorMsg && !Number.isFinite(res.newTotal)
+    !res.committed &&
+    !(res.errorMsg && res.errorIsNew) &&
+    !Number.isFinite(res.newTotal)
 
 describe('tried-code memory only remembers attempts that proved something', () => {
     it('still remembers a code the store actually rejected', () => {
         // The whole point of the memory: a genuine rejection must not be
         // re-ground on the next run.
         _markTriedCode('DEADCODE')
-        const res = { committed: false, errorMsg: 'That code is not valid.' }
+        const res = {
+            committed: false,
+            errorMsg: 'That code is not valid.',
+            errorIsNew: true,
+        }
         expect(provedNothing(res)).toBe(false)
         expect('DEADCODE' in _getTriedCodes()).toBe(true)
+    })
+
+    it('releases a code whose only "error" was the page’s own furniture', () => {
+        // mango.com/ae: the quote was the promo field's LABEL. Believing it
+        // costs the shopper the code in the copy list too — the same loss the
+        // toms/bombas cases proved, arriving through a different door.
+        _markTriedCode('PROMO10')
+        const res = {
+            committed: false,
+            errorMsg: 'رمز ترويجي',
+            errorIsNew: false,
+            newTotal: NaN,
+        }
+        expect(provedNothing(res)).toBe(true)
+        _unmarkTriedCode('PROMO10')
+        expect('PROMO10' in _getTriedCodes()).toBe(false)
     })
 
     it('still remembers a code that committed a row', () => {

@@ -106,6 +106,9 @@ beforeEach(() => {
             newTotal: 80,
             committed: true,
             errorMsg: 'Not valid for these items',
+            // The store said it BECAUSE of this attempt — see
+            // tests/store-said-attribution.test.mjs for what that gate means.
+            errorIsNew: true,
         }
     }
 })
@@ -130,6 +133,9 @@ describe('cleanup never removes a discount we did not add', () => {
             newTotal: 80,
             committed: true,
             errorMsg: 'Not valid for these items',
+            // The store said it BECAUSE of this attempt — see
+            // tests/store-said-attribution.test.mjs for what that gate means.
+            errorIsNew: true,
         })
 
         await startApplyingCoupons(REC)

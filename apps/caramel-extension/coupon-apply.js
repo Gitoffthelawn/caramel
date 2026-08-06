@@ -202,6 +202,61 @@ function snapshotErrorState(rec) {
     }
 }
 
+/* Everything the coupon area already said BEFORE we submitted anything.
+ *
+ * We show the shopper the store's own words — “The store said: …” — and that
+ * sentence has to be TRUE. On mango.com/ae (QA sweep 2026-08-06) it wasn't: the
+ * modal read “The store said: رمز ترويجي”, which is not a rejection at all. It
+ * is the field's LABEL, "Promotional code", sitting above the box the whole
+ * time. Putting a store's furniture in its mouth as a verdict is worse than
+ * saying nothing, because the shopper has no way to tell the difference and
+ * walks away believing the store refused them.
+ *
+ * 38 of our configs carry the bare `[class*="error"]` pattern, so this is not
+ * one store's problem — any element the config happens to hit can be quoted.
+ * The test that no static label can pass: it has to be text that was NOT on the
+ * page a moment ago. Detection is unchanged (`errorMsg` still drives the
+ * success rules and the no-signal early-exit) — only ATTRIBUTION is gated, so a
+ * misfiring selector costs us a quote, never a wrong verdict.
+ *
+ * Both regions the detector reads are captured: every errorIndicator match, and
+ * the ancestor chain around the input that the generic branch walks.
+ */
+function _caramelCouponAreaText(rec) {
+    // innerText to match what the detector reads, textContent when there is no
+    // innerText to read: `[class*="error"]` can land on an SVG or another
+    // non-HTML node, where innerText is undefined and the snapshot would
+    // silently remember nothing at all.
+    const textOf = el => (el?.innerText ?? el?.textContent) || ''
+    const parts = []
+    if (rec?.errorIndicator) {
+        for (const el of qAll(rec.errorIndicator)) parts.push(textOf(el))
+    }
+    let scope = pickBestMatch(rec?.couponInput)?.parentElement
+    for (let d = 0; d < 5 && scope; d++) {
+        parts.push(textOf(scope))
+        scope = scope.parentElement
+    }
+    return _caramelNormalizeQuote(parts.join('   '))
+}
+
+function _caramelNormalizeQuote(text) {
+    return String(text || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+}
+
+/* Is this quote the store's answer to US, or something it was already saying? */
+// Called from other split content-script files (cross-file content-script
+// call — oxlint's per-file analysis can't see it).
+// oxlint-disable-next-line no-unused-vars
+function caramelQuoteIsAttributable(quote, priorText) {
+    const q = _caramelNormalizeQuote(quote)
+    if (!q) return false
+    return !_caramelNormalizeQuote(priorText).includes(q)
+}
+
 const ERROR_WORDS_RE =
     /\b(invalid|expired|not valid|doesn'?t apply|cannot be applied|cannot apply|already used|no longer|reached the limit|minimum|coupon code is required|wrong code)\b/i
 
@@ -366,6 +421,7 @@ async function applyCoupon(code, rec) {
         const appliedSel = findAppliedSelector(rec)
         const beforeAppliedNodes = caramelAcceptedRowCount(appliedSel)
         const errorBaseline = snapshotErrorState(rec)
+        const priorAreaText = _caramelCouponAreaText(rec)
 
         /* 3] fill & apply — choose method dynamically:
              a) if applyBtn === input → auto-validate on input event
@@ -512,6 +568,16 @@ async function applyCoupon(code, rec) {
             stuck = stuckCount > beforeAppliedNodes
         }
         const errorMsg = detectCouponError(rec, errorBaseline, code)
+        // Quotable only if the store said it BECAUSE of us (see
+        // _caramelCouponAreaText). Detection above is deliberately untouched.
+        const errorIsNew = caramelQuoteIsAttributable(errorMsg, priorAreaText)
+        if (errorMsg && !errorIsNew) {
+            log('AUTO_INSERT_ERROR_NOT_ATTRIBUTABLE', {
+                code,
+                text: String(errorMsg).slice(0, 140),
+                reason: 'this text was already on the page before we submitted — it is the store’s furniture, not its verdict',
+            })
+        }
         let newTotal = NaN
         let priceDropped = false
         if (hasPriceCfg) {
@@ -572,7 +638,7 @@ async function applyCoupon(code, rec) {
             errorMsg,
             elapsed,
         })
-        return { success, newTotal, committed, errorMsg }
+        return { success, newTotal, committed, errorMsg, errorIsNew }
     } catch (err) {
         console.error('applyCoupon error', err)
         log('AUTO_INSERT_ATTEMPT_END', code, {
@@ -586,7 +652,14 @@ async function applyCoupon(code, rec) {
             error: String(err),
             elapsed: performance.now() - attemptStart,
         })
-        return { success: false, committed: false, errorMsg: String(err) }
+        // errorIsNew stays false: this is OUR exception text (a TypeError, a
+        // selector that threw), and it was never something the store said.
+        return {
+            success: false,
+            committed: false,
+            errorMsg: String(err),
+            errorIsNew: false,
+        }
     }
 }
 

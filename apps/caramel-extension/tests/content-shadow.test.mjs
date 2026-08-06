@@ -238,9 +238,9 @@ describe('UI-helpers.js — Shadow DOM hosts (Phase 3)', () => {
         expect(dead[0].textContent).not.toContain('40% off')
         // …while an untried row keeps its title
         expect(order.indexOf('FRESH1')).toBe(0)
-        expect(
-            root.querySelector('.caramel-manual-row').textContent,
-        ).toContain('20% off')
+        expect(root.querySelector('.caramel-manual-row').textContent).toContain(
+            '20% off',
+        )
     })
 
     it('final-modal focus trap engages on Tab (cycles within the shadow root, never the page)', async () => {

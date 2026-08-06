@@ -533,7 +533,17 @@ async function startApplyingCoupons(rec) {
         // move — and a code we never really tested must not stay blacklisted
         // for the rest of the session. See _unmarkTriedCode for the two live
         // cases ($11.25 and $11.10) this cost real users.
-        if (!res.committed && !res.errorMsg && !Number.isFinite(res.newTotal)) {
+        //
+        // "The store's own error text" means text we can attribute to THIS
+        // attempt. A label that was already on the page (see errorIsNew) proves
+        // nothing about the code, so it must not be what keeps the code
+        // blacklisted out of the copy list for the rest of the session.
+        const saidSomething = !!res.errorMsg && !!res.errorIsNew
+        if (
+            !res.committed &&
+            !saidSomething &&
+            !Number.isFinite(res.newTotal)
+        ) {
             _unmarkTriedCode(code)
         }
 
@@ -621,9 +631,17 @@ async function startApplyingCoupons(rec) {
         })
         // Keep the store's own words (login-required, min-spend, expired…) so
         // the final modal can say the REAL reason instead of a generic line.
+        //
+        // `errorIsNew` is what makes “The store said” honest: text that was
+        // already on the page before we submitted is the store's furniture, not
+        // its answer (mango.com/ae quoted us the promo field's LABEL). All three
+        // consequences hang off this one belief — the quote, the ✗ badge on the
+        // code, and the 'failed' verdict we teach the trust loop — so none of
+        // them may run on evidence we can't attribute to our own attempt.
         if (
             res.errorMsg &&
             typeof res.errorMsg === 'string' &&
+            res.errorIsNew &&
             !/timeout/i.test(res.errorMsg)
         ) {
             lastStoreReason = res.errorMsg
@@ -643,7 +661,10 @@ async function startApplyingCoupons(rec) {
         }
         // A committed row or an error message means the checkout IS reacting to
         // us — keep going. Zero signal after EARLY_PROBE codes means it isn't.
-        if (res.committed || res.errorMsg) sawSignal = true
+        // Text that was already on the page is not a reaction, so it can't hold
+        // the early-exit open: that is how a dead checkout used to keep us
+        // grinding all 8 codes.
+        if (res.committed || (res.errorMsg && res.errorIsNew)) sawSignal = true
         if (!sawSignal && i + 1 >= EARLY_PROBE) {
             if (canObserveOutcome()) {
                 log('AUTO_INSERT_EARLY_EXIT', {
