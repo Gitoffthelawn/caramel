@@ -266,13 +266,57 @@ async function caramelPromptAllowed(host) {
 // newest first, capped. Read by the popup's "you've saved" summary.
 const CARAMEL_SAVINGS_KEY = 'caramel_savings'
 const CARAMEL_SAVINGS_MAX = 50
+
+/* Whose saving is this?
+ *
+ * The history is a shopping record — store names, codes, amounts — and it used
+ * to be one undifferentiated device-wide list. Log out and hand the laptop to
+ * someone else, and they read your last fifty purchases in the popup. Nobody
+ * signs out expecting that.
+ *
+ * Entries recorded while signed in are stamped with the account, and only that
+ * account sees them again. Entries recorded signed OUT carry no stamp and stay
+ * visible to whoever is using the browser — they were earned by this device,
+ * with nobody logged in, and hiding them would mean a guest's own savings
+ * vanish for no reason they could name.
+ *
+ * Nothing is ever deleted. Signing in therefore keeps the history you built as
+ * a guest, and signing out simply puts your account's entries away.
+ */
+function _caramelSavingsOwner(entry) {
+    return entry && typeof entry.u === 'string' && entry.u ? entry.u : null
+}
+function _caramelSavingsVisibleTo(list, username) {
+    const me = username || null
+    return (Array.isArray(list) ? list : []).filter(e => {
+        const owner = _caramelSavingsOwner(e)
+        return owner === null || owner === me
+    })
+}
+/* Reads the history as the CURRENT identity sees it. Pass `{ all: true }` only
+ * where every entry is genuinely wanted (the record itself, never the UI). */
 // oxlint-disable-next-line no-unused-vars
-function caramelGetSavings() {
+function caramelGetSavings(options) {
+    const wantAll = !!(options && options.all)
     return new Promise(resolve => {
         try {
             currentBrowser.storage.local.get([CARAMEL_SAVINGS_KEY], res => {
                 const arr = res && res[CARAMEL_SAVINGS_KEY]
-                resolve(Array.isArray(arr) ? arr : [])
+                const list = Array.isArray(arr) ? arr : []
+                if (wantAll) {
+                    resolve(list)
+                    return
+                }
+                caramelGetSession()
+                    .then(session =>
+                        resolve(
+                            _caramelSavingsVisibleTo(
+                                list,
+                                session?.user?.username || null,
+                            ),
+                        ),
+                    )
+                    .catch(() => resolve(_caramelSavingsVisibleTo(list, null)))
             })
         } catch {
             resolve([])
@@ -284,13 +328,19 @@ function caramelGetSavings() {
 // oxlint-disable-next-line no-unused-vars
 async function caramelRecordSaving(entry) {
     if (!entry || !(entry.amount > 0)) return
-    const list = await caramelGetSavings()
+    // The WHOLE list, not the visible slice: reading through the identity
+    // filter here would drop everyone else's entries on the next write.
+    const list = await caramelGetSavings({ all: true })
+    const session = await caramelGetSession().catch(() => null)
+    const owner = session?.user?.username || null
     list.unshift({
         domain: String(entry.domain || ''),
         code: String(entry.code || ''),
         amount: Math.round(entry.amount * 100) / 100,
         currency: String(entry.currency || 'USD'),
         t: entry.t || Date.now(),
+        // Absent for a signed-out saving — see _caramelSavingsVisibleTo.
+        ...(owner ? { u: owner } : {}),
     })
     return new Promise(resolve => {
         try {

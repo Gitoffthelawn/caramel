@@ -332,8 +332,20 @@ function validateStoredSession(token, storedUser) {
    The local clear runs whether or not the revoke succeeded: someone offline
    pressing "log out" must still be logged out on this device. But the failure
    is logged rather than swallowed, because a revoke that quietly never
-   happened is precisely the bug this function exists to fix. */
-function signOutAndRevoke(after) {
+   happened is precisely the bug this function exists to fix.
+
+   `button`, when given, is the control the user pressed. The revoke is a real
+   network round-trip, and on a slow connection the popup sat there looking
+   dead: nothing changed, so the natural response is to press "Log out" again,
+   firing a second revoke of a token the first call is already killing. Say
+   what's happening and stop taking further presses. */
+function signOutAndRevoke(after, button) {
+    if (button) {
+        if (button.disabled) return // already signing out
+        button.disabled = true
+        button.dataset.caramelBusy = '1'
+        button.textContent = 'Signing out…'
+    }
     caramelGetSession().then(stored => {
         const clearLocal = () => caramelClearSession(after)
         const token = stored?.token
@@ -521,7 +533,7 @@ function renderUnsupportedSite(user, domain) {
     const logout = document.getElementById('logoutBtn')
     if (logout)
         logout.addEventListener('click', () => {
-            signOutAndRevoke(() => renderUnsupportedSite(null, domain))
+            signOutAndRevoke(() => renderUnsupportedSite(null, domain), logout)
         })
 }
 
@@ -980,7 +992,7 @@ function renderProfileCard(user) {
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
-            signOutAndRevoke(initPopup)
+            signOutAndRevoke(initPopup, logoutBtn)
         })
 }
 
@@ -1126,7 +1138,7 @@ function renderCouponsView(coupons, user, domain) {
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
-            signOutAndRevoke(() => renderSignInPrompt(selfCallback))
+            signOutAndRevoke(() => renderSignInPrompt(selfCallback), logoutBtn)
         })
 
     /* login toggle (guest) */
