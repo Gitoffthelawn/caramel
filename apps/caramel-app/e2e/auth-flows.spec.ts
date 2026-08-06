@@ -226,6 +226,40 @@ test.describe('Auth Flows — Signup', () => {
     })
 })
 
+// The two tests below assert on text, and text that only exists after
+// hydration is a race the runner wins or loses depending on load. This one
+// failed CI twice in a day on commits that touched no app code at all, because
+// /verify read its params with useSearchParams() and Next served the Suspense
+// fallback — "Loading..." and nothing else — until the bundle arrived.
+//
+// The params are read on the server now, so the copy is in the HTML. Asserting
+// that with JavaScript OFF is what keeps it that way: a future edit that moves
+// the read back into the client cannot pass this, however fast the runner is.
+test.describe('Auth Flows — Verify Page, before any JavaScript runs', () => {
+    test.use({ javaScriptEnabled: false })
+
+    test('the signup message is server-rendered, not hydrated in', async ({
+        page,
+    }) => {
+        await page.goto('/verify?signup=success')
+
+        await expect(
+            page.getByText(/we've sent a verification email/i),
+        ).toBeVisible()
+        await expect(page.getByText(/didn't receive it/i)).toBeVisible()
+    })
+
+    test('so is the message for someone arriving without params', async ({
+        page,
+    }) => {
+        await page.goto('/verify')
+
+        await expect(
+            page.getByText(/please verify your email address/i),
+        ).toBeVisible()
+    })
+})
+
 test.describe('Auth Flows — Verify Page', () => {
     test('verify page after signup shows correct messaging', async ({
         page,

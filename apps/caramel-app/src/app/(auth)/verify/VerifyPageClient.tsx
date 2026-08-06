@@ -4,23 +4,24 @@ import { authClient } from '@/lib/auth/client'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 const inputClasses =
     'w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 transition focus:border-caramel focus:outline-none focus:ring-2 focus:ring-caramel/30 dark:border-gray-600 dark:bg-darkBg dark:text-gray-100 dark:placeholder:text-gray-500'
 
-export default function VerifyPageClient() {
+export default function VerifyPageClient({
+    signup,
+    error,
+}: {
+    signup?: string
+    error?: string
+}) {
     const [email, setEmail] = useState('')
     const [resendingEmail, setResendingEmail] = useState(false)
-    const searchParams = useSearchParams()
-    const isNewSignup = searchParams.get('signup') === 'success'
+    const isNewSignup = signup === 'success'
 
     useEffect(() => {
-        const error = searchParams.get('error')
-        const signup = searchParams.get('signup')
-
         // Small delay to ensure Toaster is ready
         const timer = setTimeout(() => {
             if (signup === 'success') {
@@ -41,7 +42,7 @@ export default function VerifyPageClient() {
         }, 100)
 
         return () => clearTimeout(timer)
-    }, [searchParams])
+    }, [signup, error])
 
     const handleResendVerification = async () => {
         if (!email) {
