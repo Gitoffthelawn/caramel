@@ -331,19 +331,23 @@ ${noLoading ? '' : loadingHTML}`
     host.__caramelPrevFocus = prevFocus
     document.body.appendChild(host)
 
-    // Let the user bail out — never trap them behind the overlay.
+    /* Let the user bail out — never trap them behind the overlay.
+     *
+     * `_caramelCancelled` is a variable in this document, and a form-POST apply
+     * ends this document: on a cart that navigates per code, a run now continues
+     * on the next page (caramelBeginRun), so "stop" has to be written somewhere
+     * that survives the reload or the shopper's ✕ would be undone by the very
+     * navigation they were trying to stop. */
+    const _cancel = () => {
+        _caramelCancelled = true
+        caramelCancelRun()
+        hideTestingModal()
+    }
     const _close = root.querySelector('#caramel-testing-close')
-    if (_close)
-        _close.addEventListener('click', () => {
-            _caramelCancelled = true
-            hideTestingModal()
-        })
+    if (_close) _close.addEventListener('click', _cancel)
     // Esc cancels — on `document` so it works with focus on the page too.
     const onKey = e => {
-        if (e.key === 'Escape') {
-            _caramelCancelled = true
-            hideTestingModal()
-        }
+        if (e.key === 'Escape') _cancel()
     }
     host.__caramelOnKey = onKey
     document.addEventListener('keydown', onKey)

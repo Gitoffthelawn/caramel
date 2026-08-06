@@ -68,8 +68,12 @@ function _existingCartDiscount(cart) {
     return null
 }
 
-async function startApplyingCoupons(rec) {
+async function startApplyingCoupons(rec, options) {
     log('=== Starting coupon flow ===')
+    // A resumed run is the SAME click continuing on a new page, so the overlay
+    // says so — "Applying Coupons…" appearing on its own after a reload reads
+    // like the extension started itself.
+    const resumed = !!options?.resumed
     if (!rec) {
         // No store config (unsupported host / lookup failed). Degrade cleanly
         // instead of throwing mid-flow behind the overlay.
@@ -79,7 +83,7 @@ async function startApplyingCoupons(rec) {
     }
     log('AUTO_INSERT_START', { domain: rec.domain, t: performance.now() })
     _caramelCancelled = false
-    await showTestingModal()
+    await showTestingModal(resumed ? 'Still checking codes…' : '')
 
     let coupons
     try {
@@ -411,6 +415,13 @@ async function startApplyingCoupons(rec) {
     const allCoupons = coupons
     if (coupons.length > MAX_ATTEMPTS) coupons = coupons.slice(0, MAX_ATTEMPTS)
 
+    // From here on a submit may navigate, which ends this document mid-loop.
+    // Opening the run record now is what lets the next page pick the loop back
+    // up instead of leaving the shopper to click the pill again per code (see
+    // caramelBeginRun). Deliberately NOT opened on the discount-link path
+    // above: that one measures every code on this page and never hands off.
+    caramelBeginRun()
+
     const hasPriceCfg = !!rec.priceContainer
     const original = hasPriceCfg
         ? getPrice(rec.priceContainer, { returnLargest: true })
@@ -689,6 +700,12 @@ async function startApplyingCoupons(rec) {
         await waitUntilReady(rec)
         await sleep(160) // tiny visual pause between tries
     }
+
+    // The loop finished on THIS page rather than navigating away mid-attempt,
+    // so whatever happens next is a result, not a hop. Close the run before any
+    // of the terminal branches below: a record left open would let an unrelated
+    // later navigation resume a chain that already had its answer.
+    caramelEndRun()
 
     if (_caramelCancelled) {
         log('AUTO_INSERT_STOP', { result: 'cancelled', t: performance.now() })

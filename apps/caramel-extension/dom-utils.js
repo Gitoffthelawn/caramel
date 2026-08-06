@@ -644,6 +644,120 @@ function caramelTakePendingSubmit(maxAgeMs = 120000) {
     }
 }
 
+/* --------------------------------------------------  run continuity
+ *
+ * One click should test more than one code.
+ *
+ * On a classic form-POST cart, submitting a promo code is a full page load, so
+ * exactly ONE code gets tried per click and the shopper has to press the pill
+ * again for the next one. motoin.de and proaudiostar.com both work this way:
+ * with 20 codes in the list that is 20 clicks and 20 page reloads, each one
+ * ~10 seconds, to do what takes a single click on a Shopify cart. Nobody
+ * finishes that. The codes at the bottom of the list are effectively unreachable
+ * — which is where the untried ones are, because the sink puts them there.
+ *
+ * The record below carries a run across those navigations so the loop picks
+ * itself up on the new page. It is deliberately small and strictly bounded, and
+ * every bound exists to answer the same question: this submits real codes to a
+ * real merchant without the shopper clicking again, so what stops it?
+ *
+ *   · it only ever exists because the shopper clicked — nothing else writes it
+ *   · CARAMEL_RUN_MAX_HOPS caps how many navigations one click may cause
+ *   · CARAMEL_RUN_MAX_AGE_MS caps the whole chain in wall-clock time
+ *   · each hop consumes at least one code from the tried-set, which also
+ *     survives the navigation, so a chain cannot revisit the same code
+ *   · cancelling (× or Esc) writes the flag that ends it, because
+ *     _caramelCancelled itself does not survive a page load
+ *   · the caller additionally refuses to continue on a page with no coupon box
+ *
+ * sessionStorage for the same reasons as the pending-submit record above:
+ * per-tab, per-origin, and it dies with the tab.
+ */
+const CARAMEL_RUN_KEY = 'caramel_run'
+const CARAMEL_RUN_MAX_HOPS = 6
+const CARAMEL_RUN_MAX_AGE_MS = 180000
+// Consumed by coupon-runner.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelBeginRun() {
+    try {
+        if (sessionStorage.getItem(CARAMEL_RUN_KEY)) return
+        sessionStorage.setItem(
+            CARAMEL_RUN_KEY,
+            JSON.stringify({ hops: 0, t: Date.now() }),
+        )
+    } catch {
+        /* storage blocked — the run simply won't continue past a navigation */
+    }
+}
+// Consumed by store-detect.js + UI-helpers.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelEndRun() {
+    try {
+        sessionStorage.removeItem(CARAMEL_RUN_KEY)
+    } catch {
+        /* storage blocked — the hop and age caps still bound the chain */
+    }
+}
+/* Claims the next hop of an in-flight run, or returns null if there isn't one
+ * to claim. Writing the increment here (rather than at the call site) is what
+ * makes the cap hold even if a caller returns early afterwards. */
+// Consumed by store-detect.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelClaimRunHop() {
+    let raw = null
+    try {
+        raw = sessionStorage.getItem(CARAMEL_RUN_KEY)
+    } catch {
+        return null
+    }
+    if (!raw) return null
+    let run = null
+    try {
+        run = JSON.parse(raw)
+    } catch {
+        caramelEndRun()
+        return null
+    }
+    if (!run || run.cancelled) {
+        caramelEndRun()
+        return null
+    }
+    const hops = Number(run.hops) || 0
+    const startedAt = Number(run.t) || 0
+    if (hops >= CARAMEL_RUN_MAX_HOPS) {
+        caramelEndRun()
+        return null
+    }
+    if (!(Date.now() - startedAt < CARAMEL_RUN_MAX_AGE_MS)) {
+        caramelEndRun()
+        return null
+    }
+    try {
+        sessionStorage.setItem(
+            CARAMEL_RUN_KEY,
+            JSON.stringify({ hops: hops + 1, t: startedAt }),
+        )
+    } catch {
+        return null
+    }
+    return { hops: hops + 1, remaining: CARAMEL_RUN_MAX_HOPS - (hops + 1) }
+}
+/* The × and Esc set _caramelCancelled, which dies with the document. A chain
+ * spans documents, so "stop" has to be written down. */
+// Consumed by UI-helpers.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelCancelRun() {
+    try {
+        if (!sessionStorage.getItem(CARAMEL_RUN_KEY)) return
+        sessionStorage.setItem(
+            CARAMEL_RUN_KEY,
+            JSON.stringify({ hops: CARAMEL_RUN_MAX_HOPS, t: 0, cancelled: 1 }),
+        )
+    } catch {
+        /* storage blocked — the caps remain the backstop */
+    }
+}
+
 /* --------------------------------------------------  selector helper
  * Configs may store either a CSS selector or an XPath expression. The agent
  * picks whichever uniquely identifies the element on each store. Detect by

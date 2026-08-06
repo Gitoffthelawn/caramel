@@ -299,6 +299,49 @@ async function tryInitialize() {
  * Returns true when it handled the page (a modal is up), false to continue with
  * normal checkout detection.
  */
+/* Pick the loop back up on the page the store navigated us to.
+ *
+ * A submit on a classic form-POST cart is a page load, so one click tests one
+ * code. motoin.de and proaudiostar.com both behave this way: 20 codes means 20
+ * clicks and 20 reloads, and nobody gets to the bottom of that list — which is
+ * exactly where the untried codes sit.
+ *
+ * The bounds that make this safe to do without asking again live on the run
+ * record itself (hops, wall-clock, cancellation — see caramelBeginRun). Two more
+ * are this function's own, because they are about the page we landed on rather
+ * than the run:
+ *
+ *   · a coupon box has to be HERE. The shopper may have navigated themselves,
+ *     and continuing on a product page would submit codes into nothing while
+ *     spending the chain's budget on it.
+ *   · there has to be a code we have not already tried, or the next hop is a
+ *     guaranteed no-op that still costs a reload.
+ */
+async function _caramelContinueRun(rec) {
+    if (!rec) return false
+    const box = pickBestMatch(rec.couponInput)
+    const toggle = rec.showInput ? pickBestMatch(rec.showInput) : null
+    if (!box && !toggle) return false
+    let codes = []
+    try {
+        codes = await getCachedCodes(rec)
+    } catch {
+        return false
+    }
+    const tried = _getTriedCodes()
+    const untried = (codes || []).filter(c => c && c.code && !(c.code in tried))
+    if (!untried.length) return false
+    const hop = caramelClaimRunHop()
+    if (!hop) return false
+    log('AUTO_INSERT_RUN_CONTINUES', {
+        hop: hop.hops,
+        remaining: hop.remaining,
+        untried: untried.length,
+    })
+    await startApplyingCoupons(rec, { resumed: true })
+    return true
+}
+
 async function _resumePendingSubmit() {
     const pending = caramelTakePendingSubmit()
     if (!pending) return false
@@ -322,6 +365,8 @@ async function _resumePendingSubmit() {
     })
 
     if (measured) {
+        // Won — the chain has its answer and must not continue.
+        caramelEndRun()
         reportOutcome(pending.id, 'worked')
         caramelRecordSaving({
             domain: location.hostname,
@@ -353,6 +398,11 @@ async function _resumePendingSubmit() {
      */
     const verdict = caramelPostNavigationVerdict(rec, pending.code)
     const said = verdict ? `The store said: “${verdict.slice(0, 140)}”. ` : ''
+
+    // That code didn't win, and on this kind of cart every code costs a page
+    // load. Carry the run on rather than making the shopper click per code.
+    if (await _caramelContinueRun(rec)) return true
+    caramelEndRun()
 
     if (Number.isFinite(now)) {
         // We could read the total and it did not move.
