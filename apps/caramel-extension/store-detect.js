@@ -136,10 +136,15 @@ async function isCheckout() {
     // non-checkout pages, and some configs point showInput at site-wide
     // controls — the prompt belongs only where the user can actually see a
     // way to enter a code. Same semantics as the re-detection observer.
+    //
+    // caramelCouponAnchors rather than a raw visibility scan: a selector that
+    // matches hundreds of visible elements is not describing a promo box, and
+    // answering "yes, a checkout" from one puts the prompt on every page of the
+    // site (see its comment for the measured case).
     const anyVisible = () =>
         [rec.couponInput, rec.showInput]
             .filter(Boolean)
-            .some(sel => qAll(sel).some(_isVisible))
+            .some(sel => caramelCouponAnchors(sel).length > 0)
     if (anyVisible()) return true
     // Only wait on the selectors the config actually provides — a bare
     // `${null},${null}`/`,${x}` compound is a wasted 3s wait (or a thrown
@@ -260,7 +265,6 @@ async function startCheckoutDetection() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return // not a supported store — don't observe at all
     let scheduled = false
-    const _vis = _isVisible
     const recheck = () => {
         scheduled = false
         // Don't re-prompt if the prompt is already up or we're mid-apply.
@@ -272,8 +276,14 @@ async function startCheckoutDetection() {
             return
         // Require the coupon box (or its reveal toggle) to be VISIBLE, not just
         // present — so a hidden, pre-rendered cart drawer doesn't pop the prompt
-        // before the user actually opens the cart.
-        if (_vis(qOne(rec.couponInput)) || _vis(qOne(rec.showInput))) {
+        // before the user actually opens the cart. Over-broad selectors are
+        // rejected here on the same terms as isCheckout(): this observer runs on
+        // every DOM mutation, so a selector matching hundreds of elements would
+        // otherwise re-summon the prompt across the whole site.
+        if (
+            caramelCouponAnchors(rec.couponInput).length > 0 ||
+            caramelCouponAnchors(rec.showInput).length > 0
+        ) {
             // Only prompt if we actually have codes for this store (no empty
             // intercept). getCachedCodes is cached, so this is cheap.
             getCachedCodes(rec).then(codes => {

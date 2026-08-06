@@ -159,6 +159,48 @@ function caramelFormSubmitIsUnsafe(el) {
     return false
 }
 
+/* The most visible matches a coupon selector can have and still plausibly be
+ * pointing at a coupon control.
+ *
+ * A promo input or its reveal toggle is ONE element. Configs legitimately list
+ * a few alternatives ("#a, .b, [c]") and themes sometimes render a mobile and a
+ * desktop copy, so a handful is normal — a live audit of the served catalogue
+ * puts real configs at 1-3 visible matches. Anything past this is not a promo
+ * box under any reading. */
+const CARAMEL_MAX_COUPON_ANCHORS = 8
+
+/* Visible elements a coupon selector resolves to, or [] if the selector is so
+ * broad it cannot be describing a coupon control.
+ *
+ * Checkout detection asks "is a way to enter a code visible here?". A config
+ * whose showInput contains a clause like `button:has(> *)` answers yes on
+ * literally every page of the site — measured live on mejuri.com at 389 visible
+ * matches on a category page, 48 on the homepage (QA sweep 2026-08-05). Today
+ * that store is saved only by having no coupons in the database; the first code
+ * scraped for it would put the prompt on every product and category page.
+ *
+ * Treating over-broad as NO match is the safe direction: a selector this loose
+ * carries no information about where the promo box is, so acting on it means
+ * guessing, and pickBestMatch's "first visible match in document order"
+ * fallback would then be picking an arbitrary button on the page. Losing the
+ * prompt on a misconfigured store costs a discount; keeping it costs the user a
+ * prompt that follows them around the whole site and an apply flow aimed at
+ * whatever element happened to sort first. */
+// oxlint-disable-next-line no-unused-vars
+function caramelCouponAnchors(sel) {
+    if (!sel) return []
+    const visible = qAll(sel).filter(_isVisible)
+    if (visible.length > CARAMEL_MAX_COUPON_ANCHORS) {
+        log('CARAMEL_SELECTOR_TOO_BROAD', {
+            sel: String(sel).slice(0, 120),
+            visible: visible.length,
+            max: CARAMEL_MAX_COUPON_ANCHORS,
+        })
+        return []
+    }
+    return visible
+}
+
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
