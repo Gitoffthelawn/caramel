@@ -461,6 +461,30 @@ function caramelDomainIsSupported(domain) {
 function renderUnsupportedSite(user, domain) {
     const container = document.getElementById('auth-container')
 
+    /* Three different facts used to arrive at the same sentence.
+     *
+     * "No coupons for this site yet" is a claim ABOUT A SITE, and this view is
+     * also where the popup lands when there is no site at all — opened on a new
+     * tab, a PDF, a settings page, anywhere we cannot read a URL. A first-time
+     * user's most likely first act is clicking the toolbar icon before going
+     * shopping, and what they got was a verdict about a store they were not
+     * standing in. (The third case, "we cover this store but nothing is working
+     * right now", is resolved asynchronously below.)
+     *
+     * It is also the only place the popup can say what Caramel IS. Nothing in
+     * this extension ever explains itself — QA's first-time users had to infer
+     * the product from a pill that appears on a checkout — and the moment
+     * someone opens it with no store in front of them is exactly when that
+     * sentence is useful rather than in the way.
+     */
+    const noSite = !domain
+    const heading = noSite
+        ? 'Ready when you are'
+        : 'No coupons for this site yet'
+    const body = noSite
+        ? 'Caramel finds coupon codes and tries them for you at checkout. Open a store’s cart and we’ll take it from there.'
+        : 'We’re adding new stores all the time — see the ones we support.'
+
     container.innerHTML = `
     <div class="no-coupons-view fade-in-up">
       <div class="empty-illu" aria-hidden="true">
@@ -471,8 +495,8 @@ function renderUnsupportedSite(user, domain) {
         </svg>
       </div>
 
-      <h3 id="noCouponsHeading">No coupons for this site yet</h3>
-      <p id="noCouponsBody">We're adding new stores all the time — see the ones we support.</p>
+      <h3 id="noCouponsHeading">${heading}</h3>
+      <p id="noCouponsBody">${body}</p>
 
       <div class="no-coupons-actions">
         <a
@@ -513,12 +537,12 @@ function renderUnsupportedSite(user, domain) {
     // unsupported, the copy painted above stands unchanged.
     caramelDomainIsSupported(domain).then(supported => {
         if (!supported) return
-        const heading = document.getElementById('noCouponsHeading')
-        const body = document.getElementById('noCouponsBody')
+        const headingEl = document.getElementById('noCouponsHeading')
+        const bodyEl = document.getElementById('noCouponsBody')
         const link = document.getElementById('supportedStoresLink')
-        if (!heading || !body) return
-        heading.textContent = 'No working codes right now'
-        body.textContent = `We cover ${domain}, but none of our codes for it are working at the moment. We'll keep looking.`
+        if (!headingEl || !bodyEl) return
+        headingEl.textContent = 'No working codes right now'
+        bodyEl.textContent = `We cover ${domain}, but none of our codes for it are working at the moment. We'll keep looking.`
         if (link) link.remove()
     })
 
