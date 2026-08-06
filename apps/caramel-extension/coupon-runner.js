@@ -140,11 +140,42 @@ async function startApplyingCoupons(rec) {
             via: 'discount-link',
             total: _cart0.total_price,
         })
-        const linkCodes = coupons.slice(0, 8)
+        /* Try them best-first, and keep the BEST result rather than the first
+         * one that moves anything.
+         *
+         * The loop used to stop at the first code that beat the baseline by any
+         * amount. On personalabs.com (2026-08-06) that took $1.35 on a $135
+         * cart and declared "Savings Found", while flash35 — in the same list —
+         * gave $47.25 by hand seconds later on the identical cart. The pill
+         * promises "the best code"; this is what makes that sentence true.
+         *
+         * Affordable only here: each probe is a ~0.5s network call whose result
+         * is the cart's real total, so the comparison is measured rather than
+         * guessed. The DOM path still stops at its first win, because there each
+         * attempt costs ~10s and removing a working code to shop around risks
+         * ending with nothing.
+         *
+         * The winner may be the discount the shopper ARRIVED with: probing
+         * replaces whatever is on the cart, so a code of theirs that beats
+         * everything we hold has to be put back at the end, by name.
+         */
+        const linkCodes = caramelRankByValue(coupons, _cart0.total_price).slice(
+            0,
+            8,
+        )
+        const arrivedWith = _existingCartDiscount(_cart0)
+        let bestTotal = _cart0.total_price
+        let bestCode = null
+        let bestId = null
+        let bestCurrency = _cart0.currency
         for (let i = 0; i < linkCodes.length; i++) {
             if (_caramelCancelled) {
+                // Stopping mid-probe leaves whichever code we tried last on the
+                // cart. If the shopper had their own, hand it back before we go.
+                if (arrivedWith) await applyViaDiscountLink(arrivedWith.code)
                 log('AUTO_INSERT_STOP', {
                     result: 'cancelled',
+                    restored: arrivedWith ? arrivedWith.code : null,
                     t: performance.now(),
                 })
                 return
@@ -157,38 +188,67 @@ async function startApplyingCoupons(rec) {
             // unreadable — we learned nothing about this code, so don't leave
             // it blacklisted for the rest of the session (see _unmarkTriedCode).
             if (!after) _unmarkTriedCode(code)
-            if (after && after.total_price < _cart0.total_price) {
-                const saved = (_cart0.total_price - after.total_price) / 100
-                log('AUTO_INSERT_STOP', {
-                    result: 'applied',
-                    via: 'discount-link',
-                    bestCode: code,
-                    bestSave: saved,
-                    t: performance.now(),
-                })
-                // Dispatch the "worked" trust-loop report BEFORE the reload
-                // below unloads the page (the POST is already in flight by then).
-                reportOutcome(id, 'worked')
-                // Reload so the page's own UI shows the applied discount
-                // (tag + new total), then re-show our result on the fresh
-                // document — sessionStorage survives same-tab reloads and is
-                // per-origin, so the handoff can't leak across sites.
-                try {
-                    sessionStorage.setItem(
-                        'caramel_applied',
-                        JSON.stringify({
-                            code,
-                            saved,
-                            currency: after.currency,
-                            t: Date.now(),
-                        }),
-                    )
-                } catch {
-                    /* storage blocked — the discount is still applied */
-                }
-                location.reload()
-                return
+            if (after && after.total_price < bestTotal) {
+                bestTotal = after.total_price
+                bestCode = code
+                bestId = id
+                bestCurrency = after.currency || bestCurrency
             }
+        }
+        if (bestCode) {
+            const saved = (_cart0.total_price - bestTotal) / 100
+            // The cart currently carries whichever code we probed LAST. Put the
+            // winner back before we tell anyone about it, and confirm from the
+            // cart itself rather than assuming the re-apply took.
+            const confirmed = await applyViaDiscountLink(bestCode)
+            if (!confirmed || confirmed.total_price > bestTotal) {
+                log('AUTO_INSERT_REAPPLY_UNCONFIRMED', {
+                    code: bestCode,
+                    expected: bestTotal,
+                    got: confirmed ? confirmed.total_price : null,
+                })
+            }
+            log('AUTO_INSERT_STOP', {
+                result: 'applied',
+                via: 'discount-link',
+                bestCode,
+                bestSave: saved,
+                considered: linkCodes.length,
+                t: performance.now(),
+            })
+            // Dispatch the "worked" trust-loop report BEFORE the reload below
+            // unloads the page (the POST is already in flight by then).
+            reportOutcome(bestId, 'worked')
+            // Reload so the page's own UI shows the applied discount (tag + new
+            // total), then re-show our result on the fresh document —
+            // sessionStorage survives same-tab reloads and is per-origin, so the
+            // handoff can't leak across sites.
+            try {
+                sessionStorage.setItem(
+                    'caramel_applied',
+                    JSON.stringify({
+                        code: bestCode,
+                        saved,
+                        currency: confirmed?.currency || bestCurrency,
+                        t: Date.now(),
+                    }),
+                )
+            } catch {
+                /* storage blocked — the discount is still applied */
+            }
+            location.reload()
+            return
+        }
+        // Nothing we hold beat what the shopper already had. Probing replaced
+        // their code on the cart, so put it back — leaving them worse off than
+        // before we ran is the one outcome this flow must never produce.
+        if (arrivedWith) {
+            const restored = await applyViaDiscountLink(arrivedWith.code)
+            log('AUTO_INSERT_RESTORED_EXISTING', {
+                code: arrivedWith.code,
+                restored: !!restored,
+                total: restored ? restored.total_price : null,
+            })
         }
         log('AUTO_INSERT_STOP', {
             result: 'none',
@@ -209,7 +269,7 @@ async function startApplyingCoupons(rec) {
         // Following that advice is what actually costs the money: pasting
         // another code into a Shopify promo box REPLACES the live one. The tool
         // never dropped the discount itself — it just told the user to.
-        const existing = _existingCartDiscount(_cart0)
+        const existing = arrivedWith
         if (existing) {
             // Drop the live code from the copy list: offering it is what makes
             // "paste one of these" a losing move.

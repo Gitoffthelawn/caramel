@@ -82,6 +82,49 @@ function _caramelCleanCodes(list) {
         .filter(c => !c || typeof c.code !== 'string' || c.code.length > 0)
 }
 
+/* What a coupon is plausibly worth on THIS cart, in the cart's own money.
+ *
+ * The API gives every coupon a `discount_type` (PERCENTAGE / CASH / SAVE) and a
+ * `discount_amount`. Nothing consumed them, so codes were attempted in whatever
+ * order the API returned — and the apply loop stops at the first one that moves
+ * the total. On personalabs.com (QA sweep 2026-08-06) that meant taking TREAT22
+ * for $1.35 on a $135 cart while flash35 — sitting in the SAME list — gave
+ * $47.25 when applied by hand seconds later on the identical cart.
+ *
+ * This is an estimate from metadata we know can lie (TREAT22 advertised 30% and
+ * delivered 1%), so it is used ONLY to choose what to try first. Nothing is ever
+ * reported to the shopper from it; every figure they see is still measured off
+ * their own cart. A percentage is capped at 100 and a cash amount at the cart
+ * total, because neither can take off more than the cart holds.
+ */
+// Cross-file content-script call — per-file analysis can't see it.
+// oxlint-disable-next-line no-unused-vars
+function caramelEstimatedValue(coupon, totalMinor) {
+    const amount = Number(coupon?.discount_amount)
+    if (!Number.isFinite(amount) || amount <= 0) return 0
+    const total = Number.isFinite(totalMinor) && totalMinor > 0 ? totalMinor : 0
+    const type = String(coupon?.discount_type || '').toUpperCase()
+    if (type === 'PERCENTAGE') {
+        const pct = Math.min(amount, 100) / 100
+        return total ? pct * total : amount
+    }
+    // CASH / SAVE are already an amount of money; minor units to match the cart.
+    const cash = amount * 100
+    return total ? Math.min(cash, total) : amount
+}
+
+/* Best-first ordering. Stable, so codes we can't value keep their original
+ * order — an unvalued coupon is unknown, not worthless, and sinking it below a
+ * known-tiny one would be its own way of losing money. */
+// Cross-file content-script call — per-file analysis can't see it.
+// oxlint-disable-next-line no-unused-vars
+function caramelRankByValue(list, totalMinor) {
+    return (Array.isArray(list) ? list : [])
+        .map((c, i) => ({ c, i, v: caramelEstimatedValue(c, totalMinor) }))
+        .sort((a, b) => b.v - a.v || a.i - b.i)
+        .map(x => x.c)
+}
+
 async function classifyCartCategory() {
     try {
         const cs = window.CaramelCartSignals
