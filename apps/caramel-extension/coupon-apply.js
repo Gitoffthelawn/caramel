@@ -43,6 +43,40 @@ const GENERIC_ERROR_TEXT_RE =
 function findAppliedSelector(rec) {
     return rec.successIndicator || GENERIC_APPLIED_SELECTORS
 }
+
+/* A row matching the applied-coupon selector that says, in words, that the
+ * coupon was NOT applied.
+ *
+ * The success test is "a new row appeared where applied coupons live". On
+ * allposters.com (QA sweep 2026-08-05) the rows that appeared read
+ * "25% Off Everything*  Not Applied ✕" — the checkout's own rejection notice,
+ * rendered inside the very container applied coupons use. We counted two of
+ * them as two successes and told the shopper "✓ Coupon Applied / Discount
+ * visible in your cart" over a total that had not moved by a cent, with the
+ * store's red "Not Applied" printed beside our modal.
+ *
+ * So read the row before believing it. This only ever REMOVES a success
+ * signal, never invents one: a row that says nothing is still counted, exactly
+ * as before. */
+const CARAMEL_REJECTED_ROW_RE = new RegExp(
+    String.raw`\bnot\s+applied\b|\bnicht\s+angewendet\b|\bnon\s+appliqué`,
+    'i',
+)
+function caramelRowReadsRejected(el) {
+    if (!el) return false
+    const text = (el.innerText || el.textContent || '').trim().slice(0, 300)
+    if (!text) return false
+    return (
+        CARAMEL_REJECTED_ROW_RE.test(text) || GENERIC_ERROR_TEXT_RE.test(text)
+    )
+}
+/* Applied-coupon rows that don't declare themselves rejected. Used for BOTH
+ * the before and after counts, so the comparison stays like-for-like. */
+// Cross-file content-script call — per-file analysis can't see it.
+// oxlint-disable-next-line no-unused-vars
+function caramelAcceptedRowCount(sel) {
+    return qAll(sel).filter(el => !caramelRowReadsRejected(el)).length
+}
 function findRemoveSelector(rec) {
     return rec.couponRemove || GENERIC_REMOVE_SELECTORS_SCOPED
 }
@@ -330,7 +364,7 @@ async function applyCoupon(code, rec) {
 
         // Snapshot DOM signals BEFORE we apply, so we can compare after.
         const appliedSel = findAppliedSelector(rec)
-        const beforeAppliedNodes = qAll(appliedSel).length
+        const beforeAppliedNodes = caramelAcceptedRowCount(appliedSel)
         const errorBaseline = snapshotErrorState(rec)
 
         /* 3] fill & apply — choose method dynamically:
@@ -469,12 +503,12 @@ async function applyCoupon(code, rec) {
         //                 stale text that defeats errorMsg-based detection.
         //   - errorMsg  = error text appeared near input
         //   - savings   = price actually dropped
-        const afterAppliedNodes = qAll(appliedSel).length
+        const afterAppliedNodes = caramelAcceptedRowCount(appliedSel)
         const committed = afterAppliedNodes > beforeAppliedNodes
         let stuck = false
         if (committed) {
             await sleep(1200)
-            const stuckCount = qAll(appliedSel).length
+            const stuckCount = caramelAcceptedRowCount(appliedSel)
             stuck = stuckCount > beforeAppliedNodes
         }
         const errorMsg = detectCouponError(rec, errorBaseline, code)

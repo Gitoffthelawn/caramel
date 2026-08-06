@@ -459,7 +459,9 @@ async function startApplyingCoupons(rec) {
         // price config, so invalid codes (no row) add no time.
         if (!res.success && hasPriceCfg && !isNaN(original)) {
             const appliedNow = () =>
-                qAll(findAppliedSelector(rec)).some(el => _isVisible(el))
+                qAll(findAppliedSelector(rec)).some(
+                    el => _isVisible(el) && !caramelRowReadsRejected(el),
+                )
             if (appliedNow()) {
                 for (let t = 0; t < 4; t++) {
                     await sleep(400)
@@ -609,23 +611,45 @@ async function startApplyingCoupons(rec) {
                 currency: caramelCurrencyCode(),
             })
         }
-        // A committed code that didn't move a READABLE total is usually a
-        // threshold promo (min-spend) — say so instead of a bare "applied".
-        // But NOT when the total did move and we simply couldn't trust the
-        // number: telling that user "it hasn't changed the total yet" is a
-        // plain lie about their own cart.
+        /* A code that didn't move a READABLE total is not a code we can call
+         * applied.
+         *
+         * The old copy here headlined "✓ Coupon Applied / Discount visible in
+         * your cart" and explained the flat total as a minimum spend that
+         * hadn't kicked in "yet". On allposters.com (QA sweep 2026-08-05) all
+         * three statements were false at once: the total was identical before,
+         * after, and after a reload; the promo box was empty; and the store had
+         * printed its actual reason next to our modal — promo codes cannot be
+         * combined with the sitewide promo the cart already had. We turned a
+         * flat rejection into "success, pending", under a Proceed to Checkout
+         * button.
+         *
+         * The measurement is the same; only the claim changes. We say what we
+         * did and what we saw, name the store's reason when it gave one, and
+         * point the shopper at their own order summary rather than asserting a
+         * discount is riding along. A minimum spend is offered as a
+         * possibility, not as the explanation. */
         const zeroEffect =
             hasPriceCfg &&
             !isNaN(original) &&
             !(bestSave > 0) &&
             !bestSaveUnmeasurable
-        showFinalModal(
-            bestSave,
-            bestCode,
-            zeroEffect
-                ? `Code ${bestCode} is on your cart but hasn't changed the total yet — it may need a minimum spend to kick in.`
-                : null,
-        )
+        if (zeroEffect) {
+            const reason = lastStoreReason
+                ? ` The store said: “${String(lastStoreReason).slice(0, 140)}”.`
+                : ''
+            showFinalModal(
+                0,
+                null,
+                `We put ${bestCode} into the promo box, but your total didn't change.${reason} It may need a minimum spend, or the store may not combine it with a discount you already have — check your order summary before you check out.`,
+                false,
+                allCoupons.map(c =>
+                    rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
+                ),
+            )
+        } else {
+            showFinalModal(bestSave, bestCode)
+        }
     } else {
         log('AUTO_INSERT_STOP', {
             result: 'none',
