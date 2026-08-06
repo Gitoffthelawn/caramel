@@ -40,19 +40,29 @@ function reportOutcome(id, outcome, storeReason) {
  * flag as applicable (older payloads omit it) but require a real amount, so a
  * code that is attached-but-worthless never gets announced as a saving.
  */
+/* An amount in the cart payload's own money, formatted for a human.
+ *
+ * The cart carries its currency, so amounts measured off it are formatted from
+ * that rather than from the DOM price parser's last reading (which may never
+ * have run on the link path) or a hardcoded dollar sign.
+ */
+function _caramelCartMoney(cart, minor) {
+    const value = Number(minor) / 100
+    const currency = cart?.currency || 'USD'
+    try {
+        return new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency,
+        }).format(value)
+    } catch {
+        // An unknown/garbage currency code makes Intl throw rather than guess.
+        return `${value.toFixed(2)} ${currency}`
+    }
+}
+
 function _existingCartDiscount(cart) {
     if (!cart) return null
-    const money = minor => {
-        const value = Number(minor) / 100
-        try {
-            return new Intl.NumberFormat(undefined, {
-                style: 'currency',
-                currency: cart.currency || 'USD',
-            }).format(value)
-        } catch {
-            return `${value.toFixed(2)} ${cart.currency || 'USD'}`
-        }
-    }
+    const money = minor => _caramelCartMoney(cart, minor)
     const codes = Array.isArray(cart.discount_codes) ? cart.discount_codes : []
     for (const entry of codes) {
         const amount = Number(entry?.amount)
@@ -211,6 +221,12 @@ async function startApplyingCoupons(rec, options) {
          * prevent, reintroduced by the fix for a different problem.
          */
         let confirmed = null
+        // Kept when the re-apply loses it: this is the one code we WATCHED work,
+        // and it must not disappear into the bottom of the copy list (every
+        // probed code is marked tried, and the sink puts tried codes last — so
+        // without this the single proven code would be the hardest one to find).
+        let lostWinner = null
+        let lostWinnerSave = ''
         if (bestCode) {
             confirmed = await applyViaDiscountLink(bestCode)
             if (!confirmed || confirmed.total_price >= _cart0.total_price) {
@@ -222,6 +238,11 @@ async function startApplyingCoupons(rec, options) {
                     got: confirmed ? confirmed.total_price : null,
                     reason: 'the winning code did not go back on the cart — reporting no win rather than a saving we cannot see',
                 })
+                lostWinner = bestCode
+                lostWinnerSave = _caramelCartMoney(
+                    _cart0,
+                    _cart0.total_price - bestTotal,
+                )
                 bestCode = null
                 confirmed = null
             } else if (confirmed.total_price > bestTotal) {
@@ -297,6 +318,32 @@ async function startApplyingCoupons(rec, options) {
         // Following that advice is what actually costs the money: pasting
         // another code into a Shopify promo box REPLACES the live one. The tool
         // never dropped the discount itself — it just told the user to.
+        /* A code we watched work, that then wouldn't stay on. Lead with it.
+         *
+         * It is the single most useful thing on this card — we measured it — and
+         * the default ordering would bury it: every probed code is marked tried,
+         * and the sink deliberately puts tried codes last. So it goes first, by
+         * name, with the amount it produced, and the shopper is told plainly
+         * what happened rather than being handed a silent list. */
+        if (lostWinner) {
+            const first = coupons.filter(
+                c => String(c.code).toUpperCase() === lostWinner.toUpperCase(),
+            )
+            const rest = coupons.filter(
+                c => String(c.code).toUpperCase() !== lostWinner.toUpperCase(),
+            )
+            const theirs = arrivedWith
+                ? ` We've put your ${arrivedWith.code} back on the cart.`
+                : ''
+            showFinalModal(
+                0,
+                null,
+                `${lostWinner} took ${lostWinnerSave} off when we tested it, but the store wouldn't keep it on your cart.${theirs} It's first in the list below — worth pasting in by hand.`,
+                false,
+                [...first, ...caramelSinkTriedCodes(rest)],
+            )
+            return
+        }
         const existing = arrivedWith
         if (existing) {
             // Drop the live code from the copy list: offering it is what makes

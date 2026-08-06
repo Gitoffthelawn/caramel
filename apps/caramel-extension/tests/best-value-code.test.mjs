@@ -282,6 +282,28 @@ describe('what we report is what ended up on the cart', () => {
         expect(finalModalCalls[0][4]?.length).toBeGreaterThan(0)
     })
 
+    it('leads with the code it watched work, not buries it', async () => {
+        // Every probed code is marked tried, and the sink puts tried codes
+        // last — so without this the single PROVEN code would be the hardest
+        // one on the card to find.
+        reapplyReturns(null)
+
+        await startApplyingCoupons(REC)
+
+        expect(finalModalCalls[0][4][0].code).toBe('FLASH35')
+    })
+
+    it('says what happened to it, and what it was worth', async () => {
+        reapplyReturns(null)
+
+        await startApplyingCoupons(REC)
+
+        const message = finalModalCalls[0][2]
+        expect(message).toMatch(/FLASH35/)
+        expect(message).toMatch(/47\.25/)
+        expect(message).toMatch(/wouldn’t keep it|wouldn't keep it/)
+    })
+
     it('claims no win when the code lands but saves nothing', async () => {
         reapplyReturns(cart(BASE))
 
