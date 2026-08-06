@@ -338,7 +338,17 @@ async function _caramelContinueRun(rec) {
         remaining: hop.remaining,
         untried: untried.length,
     })
-    await startApplyingCoupons(rec, { resumed: true })
+    try {
+        await startApplyingCoupons(rec, { resumed: true })
+    } catch (e) {
+        // A throw here would leave the shopper behind an "Applying…" overlay
+        // with nothing coming. Take the overlay down and report false, so the
+        // caller falls through to telling them what happened to the code we
+        // already submitted. The hop stays spent — we did try.
+        log('AUTO_INSERT_RESUME_FAILED', { error: String(e) })
+        hideTestingModal()
+        return false
+    }
     return true
 }
 

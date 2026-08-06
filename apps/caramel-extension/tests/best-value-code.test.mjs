@@ -247,6 +247,60 @@ describe('the winner is the best measured total, not the first that moves', () =
     })
 })
 
+describe('what we report is what ended up on the cart', () => {
+    // Shopping around introduced this risk and has to carry it. The winner is
+    // put back with one more request, and that request can fail — a rate limit,
+    // a code the store accepts only once, an expiry landing mid-run. Announcing
+    // `bestTotal` regardless would report a saving that is no longer there: the
+    // same false claim the measured-total rule exists to prevent, walked back in
+    // through the fix for a different problem.
+    const reapplyReturns = result => {
+        let seen = 0
+        globalThis.applyViaDiscountLink = async code => {
+            linkCalls.push(code)
+            // Two probes, then the re-apply.
+            if (++seen > 2) return result
+            return carts[code] ?? null
+        }
+    }
+
+    it('claims no win when the winner would not go back on', async () => {
+        reapplyReturns(null)
+
+        await startApplyingCoupons(REC)
+
+        expect(applied()).toBeNull()
+        expect(outcomeCalls).toEqual([])
+    })
+
+    it('hands the codes over instead of leaving a dead end', async () => {
+        reapplyReturns(null)
+
+        await startApplyingCoupons(REC)
+
+        expect(finalModalCalls[0][0]).toBe(0)
+        expect(finalModalCalls[0][4]?.length).toBeGreaterThan(0)
+    })
+
+    it('claims no win when the code lands but saves nothing', async () => {
+        reapplyReturns(cart(BASE))
+
+        await startApplyingCoupons(REC)
+
+        expect(applied()).toBeNull()
+    })
+
+    it('reports the smaller amount when the re-apply lands for less', async () => {
+        // The cart is the authority, not the probe that came before it.
+        reapplyReturns(cart(BASE - 1000))
+
+        await startApplyingCoupons(REC)
+
+        expect(applied().code).toBe('FLASH35')
+        expect(applied().saved).toBeCloseTo(10, 2)
+    })
+})
+
 describe('a discount the shopper arrived with is never left off the cart', () => {
     beforeEach(() => {
         // They walked in with MEMBER50 already applied and worth more than

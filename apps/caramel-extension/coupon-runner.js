@@ -199,19 +199,43 @@ async function startApplyingCoupons(rec, options) {
                 bestCurrency = after.currency || bestCurrency
             }
         }
+        /* The cart currently carries whichever code we probed LAST, so the
+         * winner has to go back on before anyone is told about it — and what we
+         * then report is what the cart says AFTER that, not what we hoped for.
+         *
+         * Shopping around introduced this risk and has to carry it: the re-apply
+         * is one more request, and it can fail (rate limit, a code the store
+         * accepts once, an expiry that lands mid-run). Reporting `bestTotal`
+         * regardless would announce a saving that is no longer on the cart —
+         * exactly the class of false claim the measured-total rule exists to
+         * prevent, reintroduced by the fix for a different problem.
+         */
+        let confirmed = null
         if (bestCode) {
-            const saved = (_cart0.total_price - bestTotal) / 100
-            // The cart currently carries whichever code we probed LAST. Put the
-            // winner back before we tell anyone about it, and confirm from the
-            // cart itself rather than assuming the re-apply took.
-            const confirmed = await applyViaDiscountLink(bestCode)
-            if (!confirmed || confirmed.total_price > bestTotal) {
-                log('AUTO_INSERT_REAPPLY_UNCONFIRMED', {
+            confirmed = await applyViaDiscountLink(bestCode)
+            if (!confirmed || confirmed.total_price >= _cart0.total_price) {
+                // Nothing is riding on the cart now. Say so rather than claim a
+                // win, and let the no-win branch below hand over the codes.
+                log('AUTO_INSERT_REAPPLY_LOST', {
                     code: bestCode,
                     expected: bestTotal,
                     got: confirmed ? confirmed.total_price : null,
+                    reason: 'the winning code did not go back on the cart — reporting no win rather than a saving we cannot see',
+                })
+                bestCode = null
+                confirmed = null
+            } else if (confirmed.total_price > bestTotal) {
+                // It landed, but for less than it did on the probe. The cart is
+                // the authority; report what is actually on it.
+                log('AUTO_INSERT_REAPPLY_SMALLER', {
+                    code: bestCode,
+                    expected: bestTotal,
+                    got: confirmed.total_price,
                 })
             }
+        }
+        if (bestCode) {
+            const saved = (_cart0.total_price - confirmed.total_price) / 100
             log('AUTO_INSERT_STOP', {
                 result: 'applied',
                 via: 'discount-link',
@@ -233,7 +257,7 @@ async function startApplyingCoupons(rec, options) {
                     JSON.stringify({
                         code: bestCode,
                         saved,
-                        currency: confirmed?.currency || bestCurrency,
+                        currency: confirmed.currency || bestCurrency,
                         t: Date.now(),
                     }),
                 )

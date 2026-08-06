@@ -258,6 +258,25 @@ describe('picking the loop back up after the store navigated', () => {
         expect(finalModalCalls).toHaveLength(1)
     })
 
+    it('still tells the shopper something if the resumed run throws', async () => {
+        // Otherwise they are left behind an "Applying…" overlay with nothing
+        // coming — the silence this whole handoff exists to end.
+        let hidden = false
+        globalThis.hideTestingModal = () => {
+            hidden = true
+        }
+        globalThis.startApplyingCoupons = async () => {
+            throw new Error('boom')
+        }
+        caramelBeginRun()
+        caramelMarkPendingSubmit('SALE20', 'c1', [])
+
+        await startCheckoutDetection()
+
+        expect(hidden).toBe(true)
+        expect(finalModalCalls).toHaveLength(1)
+    })
+
     it('ends the chain the moment a code wins', async () => {
         // A measured drop is the answer; there is nothing left to chain for.
         const el = document.createElement('div')
