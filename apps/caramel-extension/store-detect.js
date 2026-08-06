@@ -231,6 +231,17 @@ async function isCheckout() {
         }
     }
     if (anyVisible()) return true
+    // A promo box the shopper can open in one tap is not a hidden box — it is a
+    // closed drawer. Offering help there is the whole point; the apply flow
+    // opens the same disclosure before it types (see caramelDisclosureFor for
+    // the two stores that measured this, one of them at 1440 wide).
+    const _hiddenBox = rec.couponInput ? pickBestMatch(rec.couponInput) : null
+    if (_hiddenBox && caramelDisclosureFor(_hiddenBox)) {
+        log('CHECKOUT_VIA_DISCLOSURE', {
+            reason: 'the promo box is present behind a disclosure the shopper can open',
+        })
+        return true
+    }
     return await _platformCartUsable()
 }
 

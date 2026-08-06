@@ -387,6 +387,77 @@ function caramelSetCurrencySymbol(sym) {
     return false
 }
 
+/* --------------------------------------------------  disclosure reveal
+ *
+ * The control that would reveal a promo box the shopper cannot currently see,
+ * found from the box itself rather than from a per-store selector.
+ *
+ * "Visible" is the right test for whether to offer help — themes ship dead
+ * coupon markup on pages that have no checkout. But it conflates two very
+ * different situations: markup that is hidden because it is inert, and markup
+ * hidden behind a disclosure the shopper can open in one tap. The QA sweep on
+ * 2026-08-05 measured what the second costs:
+ *
+ *   - allbirds.com on a phone: Shopify collapses the order summary into a bar,
+ *     and the discount field lives inside it. 30s on the cart drawer and 30s at
+ *     checkout produced nothing; expanding the summary produced the prompt
+ *     within the same second. An A/B/A across three reloads (1440 shows, 390
+ *     doesn't, 1440 shows) confirmed it, and 900/700/500 were silent too — so
+ *     this is small laptops and split screens as well as phones.
+ *   - allposters.com at 1440: promo box behind "+ Add a Promo Code". Same
+ *     signature — in the DOM, not visible, no prompt for 25s, prompt the moment
+ *     the section was opened.
+ *
+ * Configs can already name that toggle (`showInput`), and stores that carry one
+ * work fine; most simply never got one. This finds the toggle generically, from
+ * the standard disclosure vocabulary, and is deliberately narrow: the control
+ * must govern an ANCESTOR of the coupon input the config itself names, must be
+ * visible, must not already be expanded, and must pass the order-button guard.
+ * When nothing matches it returns null and behaviour is exactly as before.
+ */
+const CARAMEL_MAX_DISCLOSURE_DEPTH = 6
+// Consumed by store-detect.js and coupon-runner.js (cross-file calls).
+// oxlint-disable-next-line no-unused-vars
+function caramelDisclosureFor(el) {
+    // Only ever for a box the shopper CAN'T see. A visible box needs no reveal.
+    if (!el || _isVisible(el)) return null
+    const usable = c =>
+        c &&
+        _isVisible(c) &&
+        c.getAttribute?.('aria-expanded') !== 'true' &&
+        !caramelIsForbiddenControl(c)
+    let node = el
+    for (let up = 0; up < CARAMEL_MAX_DISCLOSURE_DEPTH && node; up++) {
+        node = node.parentElement
+        if (!node) break
+        // Native disclosure: <details> closed, <summary> opens it.
+        if (node.tagName === 'DETAILS' && !node.open) {
+            const summary = node.querySelector('summary')
+            if (usable(summary)) return summary
+        }
+        // ARIA disclosure: some control elsewhere on the page names this
+        // container in aria-controls. That is the pattern both measured stores
+        // use, and it is how a screen-reader user finds the same toggle.
+        if (node.id) {
+            let controllers = []
+            try {
+                const id =
+                    typeof CSS !== 'undefined' && CSS.escape
+                        ? CSS.escape(node.id)
+                        : node.id
+                controllers = Array.from(
+                    document.querySelectorAll(`[aria-controls="${id}"]`),
+                )
+            } catch {
+                /* an id we can't express as a selector — try the next ancestor */
+            }
+            const toggle = controllers.find(usable)
+            if (toggle) return toggle
+        }
+    }
+    return null
+}
+
 /* --------------------------------------------------  navigation handoff
  *
  * Submitting a promo code on a classic (non-SPA) checkout is a form POST: the

@@ -57,6 +57,9 @@ beforeAll(() => {
 beforeEach(() => {
     document.body.innerHTML =
         '<input id="promo" /><button id="apply">Apply</button>'
+    // A cart page unless a test says otherwise — the checkout-surface rule
+    // below keys off the URL.
+    window.history.replaceState({}, '', '/cart')
     globalThis._caramelCancelled = false
     finalModalCalls = []
     appliedCodes = []
@@ -128,6 +131,49 @@ describe('coupon-runner.js — an empty cart is named, not ground through', () =
 
         expect(appliedCodes).toEqual([])
         expect(finalModalCalls[0][2] ?? '').toMatch(/cart is empty/i)
+    })
+
+    it('does not believe the storefront payload once the shopper is IN the checkout', async () => {
+        // The regression this guard caused, reproduced exactly (bombas.com,
+        // 2026-08-06): Shopify moves the items into the checkout session, so
+        // /cart.js on shop.<brand>.com answers "0 items" for a cart that is
+        // plainly full — the store's own summary read "Total USD $70.50" one
+        // inch from our modal. We told the shopper their cart was empty and
+        // never attempted NATE, the one code our popup badges "✓ Verified",
+        // worth $11.10 by hand on that same cart.
+        // Driven by the checkout URL rather than the host, because jsdom won't
+        // let a test move hosts; the live page matches both
+        // (shop.bombas.com/checkouts/c/…) and either alone is enough.
+        window.history.replaceState({}, '', '/checkouts/c/abc123')
+        globalThis.probeCartJson = async () => ({
+            item_count: 0,
+            total_price: 0,
+            currency: 'USD',
+        })
+        // The config's price selector doesn't match this checkout, so the DOM
+        // says nothing either way — "unknown" must not read as "empty".
+        setTotalText('')
+
+        await startApplyingCoupons({ ...REC, priceContainer: undefined })
+
+        expect(finalModalCalls[0]?.[2] ?? '').not.toMatch(/cart is empty/i)
+        expect(appliedCodes).toEqual(['FIFTEENOFF', 'TENOFF'])
+    })
+
+    it('lets a readable total overrule a payload that says empty', async () => {
+        // Same disagreement, the other way round: whatever the payload thinks,
+        // a total the shopper can read is money in the cart.
+        globalThis.probeCartJson = async () => ({
+            item_count: 0,
+            total_price: 0,
+            currency: 'USD',
+        })
+        setTotalText('Total $70.50')
+
+        await startApplyingCoupons(REC)
+
+        expect(finalModalCalls[0]?.[2] ?? '').not.toMatch(/cart is empty/i)
+        expect(appliedCodes).toEqual(['FIFTEENOFF', 'TENOFF'])
     })
 
     it('still runs normally on a cart that HAS something in it', async () => {

@@ -249,10 +249,34 @@ async function startApplyingCoupons(rec) {
     // reading means every number in the summary is zero, not just one line.
     // cricut.com and clarks.com already stay quiet on an empty cart, so this
     // aligns the rest of the fleet with behaviour users already get elsewhere.
+    //
+    // BUT the payload describes the STOREFRONT cart, and once a shopper is
+    // inside the checkout it no longer describes what they are buying: Shopify
+    // moves the items into the checkout session, so /cart.js on shop.<brand>.com
+    // answers "0 items" for a cart that is plainly full. Measured on
+    // bombas.com (2026-08-06): a $55.50 cart, one item, the store's own summary
+    // reading "Total USD $70.50" one inch from our modal — and we told the
+    // shopper their cart was empty and stopped, never attempting NATE, the one
+    // code our own popup badges "✓ Verified" and which was worth $11.10 by hand.
+    // Telling someone their full cart is empty is worse than the grind this
+    // guard exists to prevent, so the payload is not consulted there.
+    //
+    // And neither signal may overrule the other: a claim this absolute needs
+    // BOTH to be either empty or silent. Where they disagree, we simply carry
+    // on and try codes, which is the recoverable mistake.
+    const onCheckoutSurface =
+        /\/checkouts?\//i.test(location.pathname) ||
+        /^shop\./i.test(location.hostname)
+    const domTotal = rec.priceContainer
+        ? getPrice(rec.priceContainer, { returnLargest: true })
+        : NaN
+    const domSaysEmpty = Number.isFinite(domTotal) && domTotal === 0
+    const domSaysFull = Number.isFinite(domTotal) && domTotal > 0
+    const payloadUsable = !!_cart0 && !onCheckoutSurface
+    const payloadSaysEmpty = payloadUsable && _cart0.item_count === 0
+    const payloadSaysFull = !!_cart0 && _cart0.item_count > 0
     const emptyCart =
-        (_cart0 && _cart0.item_count === 0) ||
-        (rec.priceContainer &&
-            getPrice(rec.priceContainer, { returnLargest: true }) === 0)
+        (payloadSaysEmpty && !domSaysFull) || (domSaysEmpty && !payloadSaysFull)
     if (emptyCart) {
         log('AUTO_INSERT_STOP', { result: 'empty-cart', t: performance.now() })
         showFinalModal(
@@ -273,8 +297,14 @@ async function startApplyingCoupons(rec) {
     // it via showInput up front so the whole loop runs against a box the user
     // can actually SEE, and wait for visibility, not mere presence.
     let _box = pickBestMatch(rec.couponInput)
-    if ((!_box || !_isVisible(_box)) && rec.showInput) {
-        const _toggle = pickBestMatch(rec.showInput, _box)
+    if (!_box || !_isVisible(_box)) {
+        // The config's own toggle first; failing that, the disclosure the page
+        // itself declares around the box (see caramelDisclosureFor — most
+        // configs never got a showInput, which is why phone checkouts went
+        // dark). Same click, same guards, either way.
+        const _toggle = rec.showInput
+            ? pickBestMatch(rec.showInput, _box)
+            : caramelDisclosureFor(_box)
         if (caramelIsForbiddenControl(_toggle)) {
             // Same refusal as the apply path: a reveal-toggle selector that
             // resolved to the checkout's own order button must never be driven.
