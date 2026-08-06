@@ -125,31 +125,92 @@ function caramelPromptTopFor(barBottom) {
     if (bottom > CARAMEL_PROMPT_MAX_DODGE) return CARAMEL_PROMPT_BASE_TOP
     return Math.round(bottom) + 12
 }
-/* The bottom edge of a bar pinned across the top of the viewport, or NaN.
+/* Is this element a bar the store has pinned across the top of the viewport?
  *
- * Probed at three points across the width because headers are not always one
- * element — a sticky announcement bar on the left half and a transparent nav on
- * the right is a common shape, and the lowest of them is the one we must clear.
+ * Each clause has a live counterexample behind it (all measured 2026-08-06 on
+ * cart pages at 1440 and 390), so none should go without a fresh measurement:
+ * hidden — allbirds and toms both park drawers up here; on-screen —
+ * 100percentpure holds panels at top:-300px; width — toms' cookie banner is
+ * pinned 90→266 at 45% wide, and reading THAT as a top bar blows the dodge
+ * budget and puts the prompt back at 20, on the header; dodgeable — a bar we
+ * cannot clear must not suppress one we can.
+ *
+ * No "is it a full-screen scrim" clause, though goodr's OneTrust filter is
+ * exactly that and is what broke the old probe: a scrim covers the viewport, so
+ * its bottom fails `dodgeable` already. The old bug was never that the scrim
+ * counted as a bar — it was that the scrim HID one.
+ *
+ * Takes a style and a rect rather than an element so the rule is testable where
+ * jsdom has no layout to produce either.
  */
+const CARAMEL_BAR_MIN_WIDTH_RATIO = 0.5
+function _caramelBarQualifies(style, rect, vw) {
+    if (!style || !rect) return false
+    if (style.position !== 'fixed' && style.position !== 'sticky') return false
+    if (style.visibility === 'hidden' || style.display === 'none') return false
+    if (Number(style.opacity) === 0) return false
+    if (!(rect.height > 0)) return false
+    if (!(rect.bottom > 0)) return false
+    if (rect.bottom > CARAMEL_PROMPT_MAX_DODGE) return false
+    if (vw && rect.width < vw * CARAMEL_BAR_MIN_WIDTH_RATIO) return false
+    return true
+}
+
+/* The bottom edge of the lowest bar pinned across the top, or NaN.
+ *
+ * This hit-tested three points at y=6 and walked up four ancestors until eight
+ * live carts (2026-08-06) showed both halves were wrong. A point probe sees
+ * only the TOPMOST element, so on goodr it returned the cookie scrim's 900px
+ * bottom, gave up, and left the prompt on a header ending at 90 — and probing
+ * the whole stack would not have saved it either, because at y=6 the only bar
+ * there is a 25px announcement strip and the header we collide with sits BELOW
+ * it, out of the sample. Worse, elementsFromPoint skips `pointer-events:none`,
+ * which is exactly how allbirds mounts its floating nav (0→152): no hit test at
+ * any depth can see it.
+ *
+ * So it enumerates. Storefront bars live near the top of the tree (deepest in
+ * the sample: 3), so a bounded breadth-first sweep of body's first levels found
+ * every one of them in 0.4–4.6ms, and the node cap holds that on a page unlike
+ * any measured. Lowest qualifying bar wins — no contiguity chain, because
+ * _caramelBarQualifies rejects strays by shape, and the chained version was the
+ * one that broke toms.
+ *
+ * Legacy → now: goodr 20→102, allbirds 20→164, 1thrive 20→140, cultbeauty@390
+ * 20→197 (one of the three stores this was WRITTEN for, still broken until
+ * today); tog24 188 and toms 127 unchanged.
+ */
+const CARAMEL_BAR_SCAN_DEPTH = 4
+const CARAMEL_BAR_SCAN_NODES = 400
 function caramelTopBarBottom() {
     try {
-        const w = window.innerWidth || 0
+        if (!document.body) return NaN
+        const vw = window.innerWidth || 0
         let lowest = NaN
-        for (const x of [w * 0.2, w * 0.5, w * 0.8]) {
-            let el = document.elementFromPoint(Math.round(x), 6)
-            for (let d = 0; d < 4 && el && el !== document.body; d++) {
-                const pos = getComputedStyle(el).position
-                if (pos === 'fixed' || pos === 'sticky') {
-                    const bottom = el.getBoundingClientRect().bottom
-                    if (!(lowest >= bottom)) lowest = bottom
-                    break
+        let budget = CARAMEL_BAR_SCAN_NODES
+        let level = [document.body]
+        for (
+            let depth = 0;
+            depth <= CARAMEL_BAR_SCAN_DEPTH && budget > 0;
+            depth++
+        ) {
+            const next = []
+            for (const parent of level) {
+                for (const el of parent.children) {
+                    if (budget <= 0) break
+                    budget -= 1
+                    next.push(el)
+                    const rect = el.getBoundingClientRect()
+                    const style = getComputedStyle(el)
+                    if (!_caramelBarQualifies(style, rect, vw)) continue
+                    if (!(lowest >= rect.bottom)) lowest = rect.bottom
                 }
-                el = el.parentElement
+                if (budget <= 0) break
             }
+            level = next
         }
         return lowest
     } catch {
-        // No layout engine, or a page that blocks the probe — keep the default.
+        // No layout engine, or a page that blocks the sweep — keep the default.
         return NaN
     }
 }

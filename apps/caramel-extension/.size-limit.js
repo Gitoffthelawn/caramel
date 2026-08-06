@@ -57,7 +57,20 @@ module.exports = [
         // absence silently deleted a shopper's live -$9.00), and crediting the
         // code the cart is honouring when it is one we probed. Measured
         // 226.71 kB.
-        limit: '227 KB',
+        //
+        // 2026-08-06 — 227 → 230 KB. The top-bar probe in UI-helpers.js became
+        // a bounded DOM sweep after eight live carts showed the old hit test
+        // could not see past a cookie scrim or into a `pointer-events:none`
+        // nav. Measured 229.68 kB.
+        //
+        // That is the THIRD raise in one day, all three for behaviour plus the
+        // measurements recorded beside it, and it is the signal the TODO above
+        // predicted: at ~1 KB of prose per fix this gate now tracks how much
+        // was explained, not how much runs. It is still doing its job — every
+        // raise here was a deliberate line in a diff — but the next person to
+        // hit it should price minified bytes instead of raising it a fourth
+        // time. That call is the owner's, per the note above.
+        limit: '230 KB',
         brotli: false,
     },
     {
