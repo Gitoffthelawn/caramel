@@ -202,9 +202,41 @@ async function _platformCartUsable() {
     return false
 }
 
+/* A store we hold codes for that has no config row of its own.
+ *
+ * `domain` is the only thing the apply flow needs from a record that isn't a
+ * selector — it is what fetches the codes (getCachedCodes). The discount-link
+ * path uses no selectors at all, and if the cart stops being readable the
+ * generic path already ends where it should: it reports that it couldn't find
+ * a promo box and hands the codes over to copy. So there is nothing to flag and
+ * nothing to special-case; a record carrying just the domain is the whole
+ * difference between helping here and staying silent. */
+function caramelConfiglessRecord(hostname) {
+    return { domain: hostname }
+}
+
 async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
-    if (!rec) return false
+    /* No config row is not the same as nothing we can do.
+     *
+     * _platformCartUsable already exists for configured stores whose selectors
+     * were written against the checkout and match nothing on the cart. The
+     * question it asks — can we read and drive this cart over the network? —
+     * has nothing to do with whether a config row exists, but it was unreachable
+     * without one, because of this early return.
+     *
+     * Sampled against the live catalogue on 2026-08-06: of 573 stores we hold
+     * coupons for, 209 (36%) have no config row. On a Shopify-class cart every
+     * one of those is a store where the discount-link path would work — probe
+     * /cart.js, apply /discount/{code}, measure the total again — and the
+     * shopper saw nothing at all. The popup lists the codes, but only if they
+     * think to open it; on the page itself the extension was silent, which is
+     * the defect the owner named.
+     *
+     * Still a high bar to appear: a cart-shaped URL, a readable cart with
+     * something in it, and codes for the domain (tryInitialize). A store with
+     * no codes, or a product page, is exactly as quiet as before. */
+    if (!rec) return await _platformCartUsable()
     // VISIBLE, not merely present: themes ship hidden coupon markup on
     // non-checkout pages, and some configs point showInput at site-wide
     // controls — the prompt belongs only where the user can actually see a
@@ -270,8 +302,12 @@ async function getCachedCodes(rec) {
 /* --------------------------------------------------  init hook */
 async function tryInitialize() {
     if (!(await isCheckout())) return
-    const rec = await getDomainRecord(location.hostname)
-    if (!rec) return
+    // isCheckout() has already answered yes. With no config row the only way it
+    // could have is the platform-cart capability check, so a stand-in record is
+    // enough to fetch codes and run the link path — no second probe needed.
+    const rec =
+        (await getDomainRecord(location.hostname)) ??
+        caramelConfiglessRecord(location.hostname)
     // Don't intercept a checkout we have no codes for — only show the prompt
     // when there's actually something to apply ("checkout without code → why the
     // intercept?"). The fetched list is cached for the apply step.

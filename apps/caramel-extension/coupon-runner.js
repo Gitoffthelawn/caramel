@@ -85,10 +85,39 @@ async function startApplyingCoupons(rec, options) {
     // like the extension started itself.
     const resumed = !!options?.resumed
     if (!rec) {
-        // No store config (unsupported host / lookup failed). Degrade cleanly
-        // instead of throwing mid-flow behind the overlay.
-        log('AUTO_INSERT_STOP', { result: 'no-domain-record' })
-        showFinalModal(0, null, "We don't have codes for this store yet.")
+        /* No store config (unsupported host / lookup failed). Degrade cleanly
+         * instead of throwing mid-flow behind the overlay.
+         *
+         * "We don't have codes for this store yet" was a claim about the
+         * CONFIG stated as a claim about the CATALOGUE, and the two disagree
+         * for 36% of the stores we hold coupons for (sampled 2026-08-06). A
+         * shopper on a store with fourteen live codes was told we had none —
+         * the one sentence that guarantees they never look again. Ask the
+         * catalogue before saying anything about it. */
+        let held = []
+        try {
+            held = _caramelCleanCodes(
+                await fetchCoupons(location.hostname, '', ''),
+            )
+        } catch {
+            // Offline or the API is down. Nothing to hand over, and no reason
+            // to claim the store has no codes — the message below is about us.
+            held = []
+        }
+        const have = Array.isArray(held) && held.length > 0
+        log('AUTO_INSERT_STOP', {
+            result: 'no-domain-record',
+            heldCodes: have ? held.length : 0,
+        })
+        showFinalModal(
+            0,
+            null,
+            have
+                ? "We can't fill in the promo box on this store yet — copy a code below and paste it in at checkout."
+                : "We don't have codes for this store yet.",
+            false,
+            have ? held : [],
+        )
         return
     }
     log('AUTO_INSERT_START', { domain: rec.domain, t: performance.now() })

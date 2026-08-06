@@ -118,11 +118,52 @@ describe('isCheckout — capability, not just configuration', () => {
         expect(probeCalls).toBe(0)
     })
 
-    it('never runs for a store we do not support', async () => {
-        setPath('/cart')
-        globalThis.getDomainRecord = async () => null
+    // A store with no config row at all used to return false here without even
+    // probing. That was the same mistake this file was written to fix, one
+    // level up: "we have no configuration for this host" answered as "there is
+    // nothing we can do for this shopper". Sampled against the live catalogue
+    // on 2026-08-06, 209 of 573 stores we hold coupons for (36%) have no config
+    // row — and on a readable cart the discount-link path needs none of it.
+    //
+    // What it costs is one same-origin GET of /cart.js on cart-shaped URLs of
+    // stores we may not cover. The store already knows the shopper is on its
+    // own cart page, and the checks below keep it off every other page.
+    describe('a store with no config row of its own', () => {
+        beforeEach(() => {
+            globalThis.getDomainRecord = async () => null
+        })
 
-        expect(await isCheckout()).toBe(false)
-        expect(probeCalls).toBe(0)
+        it('is helped anyway when its cart is readable and has something in it', async () => {
+            setPath('/cart')
+
+            expect(await isCheckout()).toBe(true)
+        })
+
+        it('is left alone when the platform has no cart to read', async () => {
+            setPath('/cart')
+            globalThis.probeCartJson = async () => null
+
+            expect(await isCheckout()).toBe(false)
+        })
+
+        it('is left alone when the cart is empty', async () => {
+            setPath('/cart')
+            globalThis.probeCartJson = async () => ({
+                token: 't',
+                total_price: 0,
+                item_count: 0,
+                currency: 'USD',
+            })
+
+            expect(await isCheckout()).toBe(false)
+        })
+
+        it('costs an ordinary page of it no request at all', async () => {
+            // The whole web has product pages. Only cart-shaped URLs may probe.
+            setPath('/products/leather-satchel')
+
+            expect(await isCheckout()).toBe(false)
+            expect(probeCalls).toBe(0)
+        })
     })
 })
