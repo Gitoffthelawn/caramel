@@ -23,6 +23,7 @@ let caramelPromptTopFor
 let _caramelUsableTitle
 let _caramelBarQualifies
 let caramelTopBarBottom
+let _caramelPageBanner
 
 beforeAll(() => {
     ;({
@@ -30,6 +31,7 @@ beforeAll(() => {
         _caramelUsableTitle,
         _caramelBarQualifies,
         caramelTopBarBottom,
+        _caramelPageBanner,
     } = loadExtensionSources(
         [
             'coupon-constants.generated.js',
@@ -46,6 +48,7 @@ beforeAll(() => {
             '_caramelUsableTitle',
             '_caramelBarQualifies',
             'caramelTopBarBottom',
+            '_caramelPageBanner',
         ],
     ))
 })
@@ -101,10 +104,12 @@ const el = ({
     visibility = 'visible',
     display = 'block',
     opacity = '1',
+    isBanner = false,
 }) => [
     { position, visibility, display, opacity },
     { top, bottom, width, height: bottom - top },
     VIEWPORT_WIDTH,
+    isBanner,
 ]
 
 describe('what counts as the store’s top bar', () => {
@@ -176,8 +181,7 @@ describe('what counts as the store’s top bar', () => {
         expect(_caramelBarQualifies(...el({ top: 0, bottom: 260 }))).toBe(false)
     })
 
-    it('ignores anything that scrolls away with the page', () => {
-        // A header that is not pinned leaves on its own; we are the fixed one.
+    it('ignores unpinned page content, which is most of a cart page', () => {
         for (const position of ['static', 'relative', 'absolute']) {
             expect(
                 _caramelBarQualifies(...el({ top: 0, bottom: 90, position })),
@@ -185,11 +189,92 @@ describe('what counts as the store’s top bar', () => {
         }
     })
 
+    it('counts an unpinned header, because we still land on it on arrival', () => {
+        // 100percentpure.com: a static <header> at 56→121 that the pill sat
+        // across — its logo and its search box. It scrolls away later; the
+        // moment that decides what a shopper thinks of us is before that.
+        expect(
+            _caramelBarQualifies(
+                ...el({
+                    top: 56,
+                    bottom: 121,
+                    position: 'static',
+                    isBanner: true,
+                }),
+            ),
+        ).toBe(true)
+    })
+
+    it('leaves a bar sitting below the pill alone', () => {
+        // cultbeauty.co.uk at 390 pins its header at 120→185. The pill occupies
+        // 20→101 and never reaches it, and an earlier version of this function
+        // moved anyway — 177px down the page, to dodge something it was not
+        // touching. Overlap is the whole question.
+        expect(_caramelBarQualifies(...el({ top: 120, bottom: 185 }))).toBe(
+            false,
+        )
+        expect(
+            _caramelBarQualifies(
+                ...el({
+                    top: 120,
+                    bottom: 185,
+                    position: 'static',
+                    isBanner: true,
+                }),
+            ),
+        ).toBe(false)
+    })
+
+    it('leaves a ribbon that ends above the pill alone', () => {
+        // A 14px announcement strip is already clear of a 20px offset.
+        expect(_caramelBarQualifies(...el({ top: 0, bottom: 14 }))).toBe(false)
+    })
+
     it('leaves the position untouched where there is no layout to measure', () => {
         // jsdom has none, and neither does a page that blocks the sweep. The
         // guarantee is that the fallback is the ORIGINAL placement, not a
         // half-computed one.
         expect(caramelPromptTopFor(caramelTopBarBottom())).toBe(20)
+    })
+})
+
+// Which <header> is THE header is a DOM question, not a layout one, so unlike
+// everything above it can be asked of jsdom directly.
+describe('picking the page’s own header out of a page full of headers', () => {
+    const html = markup => {
+        document.body.innerHTML = markup
+        return _caramelPageBanner()
+    }
+
+    it('takes the store header even with component headers behind it', () => {
+        // tog24.com's cart page carries five <header> elements. The first is
+        // the store's; the rest belong to a mini-cart, a form and a modal, and
+        // honouring the lowest of them moved the pill 57px for nothing.
+        const found = html(`
+            <header class="c-header">store</header>
+            <div class="shopify-section"><mini-cart><header class="c-model__header">cart</header></mini-cart></div>
+            <aside class="c-model"><header class="c-model__header">modal</header></aside>
+        `)
+        expect(found?.className).toBe('c-header')
+    })
+
+    it('accepts an explicit role=banner', () => {
+        expect(html('<div role="banner" id="b">x</div>')?.id).toBe('b')
+    })
+
+    it('declines when the first one is inside a sectioning element', () => {
+        // The spec's own rule for when <header> means role=banner. Finding
+        // nothing costs us a dodge; guessing wrong moves the pill onto a
+        // shopper's cart.
+        for (const wrapper of ['article', 'aside', 'main', 'nav', 'section']) {
+            expect(
+                html(`<${wrapper}><header>inner</header></${wrapper}>`),
+            ).toBeNull()
+        }
+    })
+
+    it('declines when the page has no header at all', () => {
+        expect(html('<div><p>just a cart</p></div>')).toBeNull()
     })
 })
 
