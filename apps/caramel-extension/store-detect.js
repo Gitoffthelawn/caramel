@@ -342,12 +342,24 @@ async function _resumePendingSubmit() {
     } catch {
         /* no code list to offer — the message below still stands on its own */
     }
+    /* The store usually answered on the page it sent us to.
+     *
+     * motoin.de prints “Dieser Gutschein ist abgelaufen” at the top of the fresh
+     * cart, and we were telling the shopper to go and check their order summary
+     * for themselves — asking them to work out something the merchant had
+     * already spelled out. Only a verdict we can attribute is quoted (it names
+     * our code, or it speaks in rejection vocabulary); see
+     * caramelPostNavigationVerdict for why comparison isn't available here.
+     */
+    const verdict = caramelPostNavigationVerdict(rec, pending.code)
+    const said = verdict ? `The store said: “${verdict.slice(0, 140)}”. ` : ''
+
     if (Number.isFinite(now)) {
         // We could read the total and it did not move.
         showFinalModal(
             0,
             null,
-            `We submitted ${pending.code} before the page reloaded, but your total hasn't changed — copy another code below to try it yourself.`,
+            `${said}We submitted ${pending.code} before the page reloaded, but your total hasn't changed — copy another code below to try it yourself.`,
             false,
             caramelSinkTriedCodes(
                 others.filter(
@@ -356,6 +368,16 @@ async function _resumePendingSubmit() {
                         pending.code.toUpperCase(),
                 ),
             ),
+        )
+    } else if (verdict) {
+        // The store told us why, so there is nothing for the shopper to go and
+        // check — say it, and move them on to the next code.
+        showFinalModal(
+            0,
+            null,
+            `${said}Copy another code below to try it yourself.`,
+            false,
+            caramelSinkTriedCodes(others),
         )
     } else {
         showFinalModal(

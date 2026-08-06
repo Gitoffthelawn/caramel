@@ -38,7 +38,13 @@ const GENERIC_REMOVE_SELECTORS_SCOPED =
 // belongs in its config's `couponRemove`, where it is a deliberate per-store
 // decision rather than a blind default for every store.
 const GENERIC_ERROR_TEXT_RE =
-    /\b(invalid|expired|not\s+(valid|applicable|eligible)|limited\s+to|cannot\s+be\s+(applied|redeemed)|doesn'?t\s+apply|no\s+eligible|enter\s+a\s+valid|nicht|ungültig)\b/i
+    /\b(invalid|expired|not\s+(valid|applicable|eligible)|limited\s+to|cannot\s+be\s+(applied|redeemed)|doesn'?t\s+apply|no\s+eligible|enter\s+a\s+valid|nicht|ungültig|abgelaufen|expiré|expirado|caducado)\b/i
+// `abgelaufen` / `expiré` / `expirado` / `caducado` are the same word as
+// "expired" in the four European languages our catalogue actually covers, and
+// each one is unambiguous — unlike the bare `nicht` above, they cannot appear in
+// ordinary storefront copy without meaning that something has run out. Added
+// when motoin.de's own expiry banner turned out to be unreadable to us
+// (tests/post-navigation-verdict.test.mjs).
 
 function findAppliedSelector(rec) {
     return rec.successIndicator || GENERIC_APPLIED_SELECTORS
@@ -311,6 +317,45 @@ function detectCouponError(rec, baseline, code) {
         }
         scope = scope.parentElement
     }
+    return null
+}
+
+/* The store's verdict on a code we submitted, read on the page it navigated to.
+ *
+ * Classic form-POST carts (motoin.de, proaudiostar.com) answer an applied code
+ * with a full page load, which destroys the content script mid-attempt. When we
+ * come back we have no before-picture to compare against, so the resume path
+ * fell back to “check your order summary to see whether it applied” — while
+ * motoin, one inch above that sentence, was printing “Dieser Gutschein ist
+ * abgelaufen”: the code had expired, and it had said so plainly.
+ *
+ * Attribution can't work by comparison here (there is no earlier state of this
+ * document to compare with), so it works by content instead, and only on
+ * evidence a label cannot fake: the text NAMES the code we just submitted, or it
+ * uses the vocabulary of a rejection. A promo field's label does neither.
+ */
+// Called from store-detect.js (cross-file content-script call — oxlint's
+// per-file analysis can't see it).
+// oxlint-disable-next-line no-unused-vars
+function caramelPostNavigationVerdict(rec, code) {
+    if (!rec) return null
+    const el = _firstVisibleErrorEl(rec)
+    if (!el || !_isVisible(el)) return null
+    const text = ((el.innerText ?? el.textContent) || '').trim()
+    if (!text) return null
+    const lower = text.toLowerCase()
+    const namesOurCode =
+        !!code && lower.includes(String(code).toLowerCase().trim())
+    // Both vocabularies, because they are complementary rather than layered:
+    // ERROR_WORDS_RE carries the reasons ("already used", "minimum"),
+    // GENERIC_ERROR_TEXT_RE the non-English rejections. A rejection in either
+    // counts as one.
+    if (
+        namesOurCode ||
+        ERROR_WORDS_RE.test(lower) ||
+        GENERIC_ERROR_TEXT_RE.test(lower)
+    )
+        return text
     return null
 }
 
