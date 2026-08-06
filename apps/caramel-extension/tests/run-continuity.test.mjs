@@ -145,6 +145,42 @@ describe('the run record', () => {
         expect(caramelClaimRunHop()).toBeNull()
     })
 
+    it('lets the shopper start again after they cancelled', () => {
+        // The cancelled record is a tombstone — hops pinned at the cap. Reading
+        // it as "a run is already in flight" would mean one × silenced
+        // continuation for the rest of the tab: press the pill again,
+        // deliberately, and you are back to one code per reload with no way out
+        // short of closing the tab. Pressing the pill IS the consent this runs
+        // on, so it starts a fresh run.
+        caramelBeginRun()
+        caramelCancelRun()
+
+        caramelBeginRun()
+
+        expect(runRecord().hops).toBe(0)
+        expect(caramelClaimRunHop().hops).toBe(1)
+    })
+
+    it('does not restart the clock on a run that is merely mid-flight', () => {
+        // The guard above must not become "every page reopens the run", which
+        // would make the hop cap meaningless.
+        caramelBeginRun()
+        caramelClaimRunHop()
+        caramelClaimRunHop()
+
+        caramelBeginRun()
+
+        expect(runRecord().hops).toBe(2)
+    })
+
+    it('starts clean over an unreadable record rather than building on it', () => {
+        sessionStorage.setItem('caramel_run', 'not json')
+
+        caramelBeginRun()
+
+        expect(runRecord().hops).toBe(0)
+    })
+
     it('does not resurrect a run that was never open', () => {
         // Cancelling with nothing in flight must not write a record that a
         // later page would then have to reason about.

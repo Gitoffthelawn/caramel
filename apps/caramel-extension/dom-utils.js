@@ -680,7 +680,27 @@ const CARAMEL_RUN_MAX_AGE_MS = 180000
 // oxlint-disable-next-line no-unused-vars
 function caramelBeginRun() {
     try {
-        if (sessionStorage.getItem(CARAMEL_RUN_KEY)) return
+        const raw = sessionStorage.getItem(CARAMEL_RUN_KEY)
+        if (raw) {
+            /* A run already in flight — this is a hop of it, not a new one, so
+             * the hop count and the clock carry on.
+             *
+             * Unless it was CANCELLED. That record is a tombstone: hops pinned
+             * at the cap so no continuation can claim one. Treating it as "in
+             * flight" would let a single × silence continuation for the rest of
+             * the tab — the shopper presses the pill again, deliberately, and
+             * gets the one-code-per-reload behaviour back with no way to
+             * recover short of closing the tab. Pressing the pill IS the
+             * consent this whole mechanism runs on, so it starts a fresh run. */
+            let cancelled = false
+            try {
+                cancelled = !!JSON.parse(raw)?.cancelled
+            } catch {
+                // Unreadable record: not something to build a chain on either.
+                cancelled = true
+            }
+            if (!cancelled) return
+        }
         sessionStorage.setItem(
             CARAMEL_RUN_KEY,
             JSON.stringify({ hops: 0, t: Date.now() }),
