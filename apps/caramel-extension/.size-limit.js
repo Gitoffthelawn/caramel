@@ -48,9 +48,16 @@ module.exports = [
         // they carry: the capability gate now opens for a store with codes and
         // no config row (store-detect.js), and the no-record branch asks the
         // catalogue before telling a shopper we hold nothing for their store
-        // (coupon-runner.js). Measured 222.52 kB; 223 leaves no slack, which is
-        // the point of a ratchet.
-        limit: '223 KB',
+        // (coupon-runner.js).
+        //
+        // 2026-08-06 — 223 → 227 KB. Both live-QA fixes land in coupon-runner:
+        // reading a discount the platform records in
+        // `cart_level_discount_applications` rather than on the code entry (the
+        // shape every real cart measured that day actually uses, and whose
+        // absence silently deleted a shopper's live -$9.00), and crediting the
+        // code the cart is honouring when it is one we probed. Measured
+        // 226.71 kB.
+        limit: '227 KB',
         brotli: false,
     },
     {
