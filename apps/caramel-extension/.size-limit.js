@@ -44,7 +44,13 @@ module.exports = [
             'UI-helpers.js',
             'inject.js',
         ],
-        limit: '219 KB',
+        // 2026-08-06 — 219 → 223 KB. Two behaviour changes plus the reasoning
+        // they carry: the capability gate now opens for a store with codes and
+        // no config row (store-detect.js), and the no-record branch asks the
+        // catalogue before telling a shopper we hold nothing for their store
+        // (coupon-runner.js). Measured 222.52 kB; 223 leaves no slack, which is
+        // the point of a ratchet.
+        limit: '223 KB',
         brotli: false,
     },
     {
