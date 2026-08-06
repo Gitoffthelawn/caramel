@@ -673,8 +673,12 @@ async function startApplyingCoupons(rec) {
                 null,
                 `We put ${bestCode} into the promo box, but your total didn't change.${reason} It may need a minimum spend, or the store may not combine it with a discount you already have — check your order summary before you check out.`,
                 false,
-                allCoupons.map(c =>
-                    rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
+                caramelSinkTriedCodes(
+                    allCoupons.map(c =>
+                        rejectedCodes.has(c.code)
+                            ? { ...c, rejected: true }
+                            : c,
+                    ),
                 ),
             )
         } else {
@@ -725,8 +729,10 @@ async function startApplyingCoupons(rec) {
             null,
             noWinMessage,
             false,
-            allCoupons.map(c =>
-                rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
+            caramelSinkTriedCodes(
+                allCoupons.map(c =>
+                    rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
+                ),
             ),
         )
     }

@@ -635,6 +635,33 @@ function _getTriedCodes() {
         return {}
     }
 }
+/* Order a copy-list so the codes we already spent an attempt on sit at the
+ * bottom.
+ *
+ * The manual list's whole job is "here is what to try yourself", and it was
+ * leading with the codes the shopper had just watched fail. On allbirds the
+ * progress bar counted through AFF-1023, FASTSHIP1023 and FLUFF and then
+ * offered those three first; on proaudiostar — where every attempt costs a full
+ * page reload — the list's first entry was LB15, the code the store had
+ * rejected by name thirty seconds earlier.
+ *
+ * Only the ORDER changes. Nothing is hidden (a code the store refused from our
+ * synthetic input can still work when pasted by hand) and nothing is labelled
+ * rejected that we don't have the store's own words for. */
+// Cross-file content-script call — per-file analysis can't see it.
+// oxlint-disable-next-line no-unused-vars
+function caramelSinkTriedCodes(list, tried) {
+    const seen = tried || _getTriedCodes() || {}
+    return (Array.isArray(list) ? list : [])
+        .map((c, i) => ({ c, i })) // index keeps the sort stable
+        .sort(
+            (a, b) =>
+                (a.c && seen[a.c.code] ? 1 : 0) -
+                    (b.c && seen[b.c.code] ? 1 : 0) || a.i - b.i,
+        )
+        .map(x => x.c)
+}
+
 function _markTriedCode(code) {
     // Marked at attempt START, not at verdict — a full-page-POST apply can
     // destroy this script before the verdict lands.

@@ -349,10 +349,12 @@ async function _resumePendingSubmit() {
             null,
             `We submitted ${pending.code} before the page reloaded, but your total hasn't changed — copy another code below to try it yourself.`,
             false,
-            others.filter(
-                c =>
-                    String(c && c.code).toUpperCase() !==
-                    pending.code.toUpperCase(),
+            caramelSinkTriedCodes(
+                others.filter(
+                    c =>
+                        String(c && c.code).toUpperCase() !==
+                        pending.code.toUpperCase(),
+                ),
             ),
         )
     } else {
@@ -361,7 +363,7 @@ async function _resumePendingSubmit() {
             null,
             `We submitted ${pending.code} just before the page reloaded — check your order summary to see whether it applied.`,
             false,
-            others,
+            caramelSinkTriedCodes(others),
         )
     }
     return true
