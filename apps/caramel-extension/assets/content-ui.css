@@ -245,6 +245,13 @@ button:focus {
 .caramel-final-modal {
     position: relative;
     box-sizing: border-box;
+    /* Column flex so the copy list can take whatever height the card has left
+     * over and the button stays put underneath it (see .caramel-manual-list).
+     * Children are full-width block-ish items either way; the visible change is
+     * that adjacent margins no longer collapse, which the spacing below already
+     * accounts for. */
+    display: flex;
+    flex-direction: column;
     background-color: var(--cm-surface);
     background-image: linear-gradient(
         180deg,
@@ -399,10 +406,29 @@ button:focus {
     outline-offset: 2px;
 }
 
-/* ---- Manual copy list ---- */
+/* ---- Manual copy list ----
+ * Takes whatever height the card has spare rather than a fixed 190px.
+ *
+ * 190px is about three and a half rows, so the list ALWAYS ended on a row
+ * sliced through the middle, sitting directly under a solid button — and
+ * because Chrome hides overlay scrollbars until you scroll, there was nothing
+ * on screen saying "there is more below". A half-drawn row with no scrollbar
+ * doesn't read as a scroll hint, it reads as a rendering bug. Meanwhile the
+ * card is allowed 88dvh and was using ~620px of a 900px viewport: on the very
+ * screens with the most room to show codes, six codes were shown as three.
+ *
+ * flex:1 with min-height:0 (without it a flex item refuses to shrink below its
+ * content) hands the list the leftover space, so tall viewports show more codes
+ * and short ones still show at least one — and the button, a sibling rather
+ * than something after the scroll box, stays reachable without scrolling in
+ * both cases. scrollbar-width makes the indicator permanent instead of
+ * on-scroll, which is what tells the shopper the list continues. */
 .caramel-manual-list {
-    max-height: 190px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cm-border) transparent;
     margin: 10px 0 2px;
     text-align: left;
 }
