@@ -226,12 +226,22 @@ async function isCheckout() {
      * without one, because of this early return.
      *
      * Sampled against the live catalogue on 2026-08-06: of 573 stores we hold
-     * coupons for, 209 (36%) have no config row. On a Shopify-class cart every
-     * one of those is a store where the discount-link path would work — probe
-     * /cart.js, apply /discount/{code}, measure the total again — and the
-     * shopper saw nothing at all. The popup lists the codes, but only if they
-     * think to open it; on the page itself the extension was silent, which is
-     * the defect the owner named.
+     * coupons for, 209 (36%) have no config row, and the shopper saw nothing at
+     * all on those. The popup lists their codes — it keys on the catalogue —
+     * but only if they think to open it; on the page itself the extension was
+     * silent, which is the defect the owner named.
+     *
+     * How many that actually rescues was MEASURED, not assumed, because the
+     * honest number is small: /cart.js was probed on 40 of those 209 domains
+     * and exactly ONE answered (tog24.com). Config-less stores are mostly
+     * config-less for a reason — airlines, restaurants, subscriptions, sites
+     * with no cart to read at all. So this is a narrow win on the platform
+     * stores hiding in that set, not a fix for 209 stores, and it should not be
+     * described as one.
+     *
+     * The broad half of the same defect is in coupon-runner's no-record branch,
+     * which told every one of those 209 stores' shoppers that we held no codes
+     * for a store we had codes for.
      *
      * Still a high bar to appear: a cart-shaped URL, a readable cart with
      * something in it, and codes for the domain (tryInitialize). A store with

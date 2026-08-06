@@ -16,6 +16,12 @@ import { loadExtensionSources } from './_load.mjs'
 // GET /discount/{code}, read the total again. So the flow now runs on a
 // stand-in record carrying only the domain.
 //
+// Scale, measured rather than claimed: /cart.js was probed on 40 of those 209
+// domains and one answered. Config-less stores are largely config-less because
+// there is no cart to read — airlines, restaurants, subscriptions. The apply
+// path below is therefore a narrow win; the wide one is the last group in this
+// file, where a store with codes was told it had none.
+//
 // Nothing special-cases that record. A guard was written to stop it falling
 // through to a DOM form with no selectors, and then measured against the code
 // rather than assumed: the generic path already ends correctly there, finding
