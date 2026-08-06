@@ -23,6 +23,32 @@ globalThis.CARAMEL_BASE_URL = _isDevInstall()
 const caramelUrl = path =>
     new URL(path, `${globalThis.CARAMEL_BASE_URL}/`).toString()
 
+// Same policy as `logError` in caramel-base.js, which the service worker
+// cannot share (separate context, no content-script files loaded here): a
+// packed install prints nothing anywhere, and the failure is still recorded
+// where a dev install can read it back. These reach only our own worker
+// console rather than a store's page, so the leak is smaller — but "quiet
+// unless it's my install" is worth being one rule instead of two.
+const CARAMEL_BG_ERRORS_MAX = 30
+const logError = (where, err) => {
+    try {
+        currentBrowser.storage?.local?.get(['caramel_bg_errors'], res => {
+            const arr = (res && res.caramel_bg_errors) || []
+            arr.push({
+                where,
+                message: String(err?.message || err).slice(0, 300),
+                t: Date.now(),
+            })
+            currentBrowser.storage.local.set({
+                caramel_bg_errors: arr.slice(-CARAMEL_BG_ERRORS_MAX),
+            })
+        })
+    } catch {
+        // recording is best-effort; never let it mask the original error
+    }
+    if (_isDevInstall()) console.error('Caramel:', where, err)
+}
+
 const FETCH_TIMEOUT_MS = 8000
 function fetchWithTimeout(url, opts = {}) {
     const ctrl = new AbortController()
@@ -231,7 +257,7 @@ currentBrowser.runtime.onMessage.addListener(
                 })
                 .then(resp => sendResponse(resp))
                 .catch(err => {
-                    console.error('classifyCart error', err)
+                    logError('classifyCart', err)
                     sendResponse({ error: String(err) })
                 })
 
@@ -273,13 +299,13 @@ currentBrowser.runtime.onMessage.addListener(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ outcome, storeReason }),
-            }).catch(err => console.error('reportOutcome error', err))
+            }).catch(err => logError('reportOutcome', err))
             if (outcome === 'worked') {
                 fetchCaramelApi(caramelUrl('api/coupons/increment'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id }),
-                }).catch(err => console.error('increment error', err))
+                }).catch(err => logError('increment', err))
             }
             sendResponse({ success: true })
             return true
@@ -292,7 +318,7 @@ currentBrowser.runtime.onMessage.addListener(
                 })
                 .then(resp => sendResponse(resp))
                 .catch(err => {
-                    console.error('fetchSupportedStores error', err)
+                    logError('fetchSupportedStores', err)
                     sendResponse({ supported: [], error: String(err) })
                 })
 
@@ -336,10 +362,7 @@ currentBrowser.runtime.onMessage.addListener(
                             : null
                         sendResponse({ domainRecord: null, url: hostname })
                     } catch (err) {
-                        console.error(
-                            'Error getting hostname from tab URL:',
-                            err,
-                        )
+                        logError('hostname from tab URL', err)
                         sendResponse({ domainRecord: null, url: null })
                     }
                 },

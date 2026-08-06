@@ -691,7 +691,7 @@ async function applyCoupon(code, rec) {
         })
         return { success, newTotal, committed, errorMsg, errorIsNew }
     } catch (err) {
-        console.error('applyCoupon error', err)
+        logError('applyCoupon error', err)
         log('AUTO_INSERT_ATTEMPT_END', code, {
             success: false,
             error: String(err),

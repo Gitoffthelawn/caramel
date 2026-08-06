@@ -430,7 +430,7 @@ async function insertCaramelPrompt(domainRecord) {
         }
         startApplyingCoupons(domainRecord).catch(err => {
             // A throw mid-flow must never leave the overlay trapping the page.
-            console.error('Caramel: apply flow error', err)
+            logError('apply flow error', err)
             hideTestingModal()
         })
         _dismiss()

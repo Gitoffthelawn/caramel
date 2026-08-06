@@ -1106,7 +1106,7 @@ if (!window.__caramel_listeners_bound) {
             getDomainRecord(location.hostname)
                 .then(rec => startApplyingCoupons(rec))
                 .catch(err => {
-                    console.error('Caramel: apply flow error', err)
+                    logError('apply flow error', err)
                     hideTestingModal()
                 })
             send({ success: true })
