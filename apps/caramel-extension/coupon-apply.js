@@ -243,7 +243,13 @@ function _caramelCouponAreaText(rec) {
         parts.push(textOf(scope))
         scope = scope.parentElement
     }
-    return _caramelNormalizeQuote(parts.join('   '))
+    // Joined with a sentinel, not a space: two adjacent chunks must not be
+    // able to form a phrase neither of them contained, or a store message
+    // that straddles the boundary would read as text we had seen before and
+    // get suppressed. A pilcrow survives the whitespace collapse below and,
+    // unlike the NUL that sat here until 2026-08-06, leaves the file as text
+    // its own repo's search tools will still open.
+    return _caramelNormalizeQuote(parts.join(' ¶ '))
 }
 
 function _caramelNormalizeQuote(text) {
