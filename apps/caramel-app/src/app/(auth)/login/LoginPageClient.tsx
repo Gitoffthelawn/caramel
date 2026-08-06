@@ -16,21 +16,37 @@ const labelClasses =
 const socialButtonClasses =
     'flex w-full items-center justify-center gap-3 rounded-lg border border-caramel/40 bg-white px-4 py-2.5 font-medium text-gray-700 transition hover:border-caramel hover:bg-caramel/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-caramel/50 dark:bg-darkBg dark:text-gray-200 dark:hover:bg-caramel/10'
 
-export default function LoginPageClient() {
+export default function LoginPageClient({
+    verified,
+    error,
+}: {
+    verified?: string
+    error?: string
+}) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [oauthLoading, setOauthLoading] = useState<string | null>(null)
-    const [showVerificationAlert, setShowVerificationAlert] = useState(false)
-    const [isTokenExpired, setIsTokenExpired] = useState(false)
     const router = useRouter()
 
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search)
-        const verified = urlParams.get('verified')
-        const error = urlParams.get('error')
+    /* Derived, not state: the alert is a function of the URL, and as state it
+     * could only ever appear one hydration + 100ms after the page did.
+     *
+     * These two are deliberately the same expression, which preserves exactly
+     * what the effect used to do — it set both flags in the one branch. The
+     * consequence is that the alert's other wording ("Email verification
+     * required" / "Verify Email Now") is currently unreachable, and that
+     * `?error=invalid_token` tells the shopper their link EXPIRED when it was
+     * rejected as invalid. TODO: decide which copy each error deserves; this
+     * change deliberately does not alter product copy while fixing a race.
+     */
+    const showVerificationAlert =
+        error === 'token_expired' || error === 'invalid_token'
+    const isTokenExpired = showVerificationAlert
 
-        // Small delay to ensure Toaster is ready
+    useEffect(() => {
+        // Toasts are client-only by nature, and the small delay is here to let
+        // the Toaster mount. Only the toast needs to wait now.
         const timer = setTimeout(() => {
             if (error === 'token_expired' || error === 'invalid_token') {
                 toast.error(
@@ -39,8 +55,6 @@ export default function LoginPageClient() {
                         duration: 5000,
                     },
                 )
-                setShowVerificationAlert(true)
-                setIsTokenExpired(true)
             } else if (verified === 'true' && !error) {
                 toast.success(
                     'Email verified successfully! You can now sign in.',
@@ -52,7 +66,7 @@ export default function LoginPageClient() {
         }, 100)
 
         return () => clearTimeout(timer)
-    }, [])
+    }, [verified, error])
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault()
