@@ -149,6 +149,42 @@ if (typeof _caramelPromptInFlight === 'undefined') {
     var _caramelPromptInFlight = false
 }
 
+/* "Not now" — remembered for this tab and origin.
+ *
+ * Dismissing used to remove the host and record nothing, which failed the user
+ * twice over. Removing the host is ITSELF a childList mutation inside the
+ * subtree store-detect.js's re-detection observer watches, so the observer woke,
+ * saw the coupon box still visible, saw no prompt, and put it straight back.
+ * Measured on 2026-08-05: gone at ~40ms, BACK at 116-438ms on a real store at
+ * phone size, three times running; a second dismissal stuck only because the
+ * observer had by then disconnected itself. It also came back on every reload.
+ *
+ * sessionStorage is the right lifetime: per-tab and per-origin, dies with the
+ * tab, so "not now" holds for this visit without becoming a silent permanent
+ * opt-out. The permanent version already exists and is explicit — "Pause on
+ * this site" in the popup settings.
+ *
+ * Both doors are gated on this one flag: insertCaramelPrompt is the only way a
+ * prompt reaches the page, so the observer needs no separate check.
+ */
+const CARAMEL_DISMISSED_KEY = 'caramel_prompt_dismissed'
+function caramelPromptDismissedHere() {
+    try {
+        return sessionStorage.getItem(CARAMEL_DISMISSED_KEY) === '1'
+    } catch {
+        // Storage blocked (some checkouts partition it) — better to show the
+        // prompt than to hide it forever on a flag we cannot read.
+        return false
+    }
+}
+function caramelMarkPromptDismissed() {
+    try {
+        sessionStorage.setItem(CARAMEL_DISMISSED_KEY, '1')
+    } catch {
+        /* worst case the prompt returns — the old behaviour */
+    }
+}
+
 // Called from store-detect.js — content_scripts share one global scope
 // (manifest order, no ES modules), so per-file analysis misses the call.
 // oxlint-disable-next-line no-unused-vars
@@ -158,6 +194,8 @@ async function insertCaramelPrompt(domainRecord) {
         _caramelPromptInFlight
     )
         return
+    // The user already said "not now" on this tab. Honour it.
+    if (caramelPromptDismissedHere()) return
     // User preference gate (popup settings): auto-apply off, or this site
     // paused → no passive prompt. Popup-initiated applies bypass this.
     if (!(await caramelPromptAllowed(location.hostname))) return
@@ -199,7 +237,11 @@ async function insertCaramelPrompt(domainRecord) {
 `
     root.appendChild(pill)
 
-    const _dismiss = () => {
+    // `remember` is false when the flow itself is taking the prompt down (the
+    // user clicked INTO it) — that is not a "no", and marking it would suppress
+    // the prompt for the rest of the tab.
+    const _dismiss = (remember = false) => {
+        if (remember) caramelMarkPromptDismissed()
         if (host.parentNode) document.body.removeChild(host)
     }
     const _activate = () => {
@@ -226,7 +268,7 @@ async function insertCaramelPrompt(domainRecord) {
         'click',
         event => {
             event.stopPropagation()
-            _dismiss()
+            _dismiss(true)
         },
     )
     host.addEventListener('click', _activate)
