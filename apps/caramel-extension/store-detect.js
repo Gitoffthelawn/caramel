@@ -158,6 +158,50 @@ function _hostMatchesDomain(host, domain) {
 }
 
 /* --------------------------------------------------  checkout detector */
+
+/* Does this URL name a cart or checkout? Generic across platforms — a word in
+ * the path, never a store-specific rule. Used only to decide whether a live
+ * cart probe is worth making, so a miss costs nothing but a missed probe.
+ * `bag` is deliberately absent: /collections/bag is a product category on a
+ * great many stores, and the prompt has no business appearing there. */
+const CARAMEL_CART_PATH_RE =
+    /(?:^|[/\-_])(cart|carts|basket|checkout|checkouts)(?:[/\-_?#]|$)/i
+
+/* Can we act here even though no promo box matched?
+ *
+ * The DOM check above asks whether the CONFIG matches this page. That is the
+ * wrong question on a platform whose cart we can read and drive over the
+ * network: the discount-link path (coupon-runner.js) needs no promo box at all,
+ * and applies codes perfectly well on pages where the config's selectors — very
+ * often written against the checkout, not the cart — match nothing.
+ *
+ * The 2026-08-05 QA sweep measured what that costs: roughly half the catalogue
+ * (~1,300 stores) carries a checkout-only coupon selector, so a shopper sitting
+ * on the cart page of a store WITH codes in our database sees nothing at all.
+ * Silence on a store that has coupons is the defect the owner named directly.
+ *
+ * So gate on CAPABILITY rather than configuration: a live cart with something
+ * in it means we can genuinely help here. Probed only on a cart-ish URL, so an
+ * ordinary product page never pays for the request.
+ */
+async function _platformCartUsable() {
+    if (!CARAMEL_CART_PATH_RE.test(location.pathname + location.search))
+        return false
+    try {
+        const cart = await probeCartJson()
+        if (cart && cart.item_count > 0) {
+            log('CHECKOUT_VIA_CART_PAYLOAD', {
+                items: cart.item_count,
+                reason: 'no promo box matched, but the platform cart is readable and non-empty',
+            })
+            return true
+        }
+    } catch (e) {
+        log('CART_PROBE_FAILED', { error: String(e) })
+    }
+    return false
+}
+
 async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
     if (!rec) return false
@@ -186,7 +230,8 @@ async function isCheckout() {
             log(e)
         }
     }
-    return anyVisible()
+    if (anyVisible()) return true
+    return await _platformCartUsable()
 }
 
 /* Coupon-availability cache — fetched once when a checkout is detected so we
