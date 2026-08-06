@@ -98,6 +98,62 @@ function _caramelGetShadowCss() {
     return _caramelShadowCssPromise
 }
 
+/* How far down the prompt has to start to clear the store's own top bar.
+ *
+ * The prompt is fixed 20px from the top-right and up to 300px wide, which on a
+ * phone is most of the width of the header. QA's first-time users kept hitting
+ * the consequences: at 390px it covered the Allbirds logo, on cultbeauty.co.uk
+ * it sat on top of "Earn Cult Status Points", and on motoin.de it landed ~20px
+ * from the store's OWN × so neither close button could be told from the other.
+ * Reading as "part of this website, in the way" is the worst first impression an
+ * injected surface can make.
+ *
+ * Measured rather than guessed, and only ever additive: find whatever is pinned
+ * across the top of the viewport, and start below it. If nothing is pinned there
+ * — or it is tall enough that dodging it would push us off-screen — the position
+ * is exactly what it was.
+ *
+ * Split from the DOM probe so the decision is testable without layout, which
+ * jsdom does not have.
+ */
+const CARAMEL_PROMPT_BASE_TOP = 20
+const CARAMEL_PROMPT_MAX_DODGE = 200
+function caramelPromptTopFor(barBottom) {
+    const bottom = Number(barBottom)
+    if (!Number.isFinite(bottom) || bottom <= CARAMEL_PROMPT_BASE_TOP)
+        return CARAMEL_PROMPT_BASE_TOP
+    if (bottom > CARAMEL_PROMPT_MAX_DODGE) return CARAMEL_PROMPT_BASE_TOP
+    return Math.round(bottom) + 12
+}
+/* The bottom edge of a bar pinned across the top of the viewport, or NaN.
+ *
+ * Probed at three points across the width because headers are not always one
+ * element — a sticky announcement bar on the left half and a transparent nav on
+ * the right is a common shape, and the lowest of them is the one we must clear.
+ */
+function caramelTopBarBottom() {
+    try {
+        const w = window.innerWidth || 0
+        let lowest = NaN
+        for (const x of [w * 0.2, w * 0.5, w * 0.8]) {
+            let el = document.elementFromPoint(Math.round(x), 6)
+            for (let d = 0; d < 4 && el && el !== document.body; d++) {
+                const pos = getComputedStyle(el).position
+                if (pos === 'fixed' || pos === 'sticky') {
+                    const bottom = el.getBoundingClientRect().bottom
+                    if (!(lowest >= bottom)) lowest = bottom
+                    break
+                }
+                el = el.parentElement
+            }
+        }
+        return lowest
+    } catch {
+        // No layout engine, or a page that blocks the probe — keep the default.
+        return NaN
+    }
+}
+
 /* Light-DOM host <div id=id> (inline positioning, no visuals) + OPEN shadow
  * root carrying the shared stylesheet. NOT appended — callers build into
  * `root`, wire listeners, then append the host, fully styled. */
@@ -222,6 +278,11 @@ async function insertCaramelPrompt(domainRecord) {
         _caramelPromptInFlight = false
     }
     const { host, root } = made
+    // Start below the store's own top bar when there is one (see
+    // caramelPromptTopFor). Overrides only the `top` from CARAMEL_HOST_CSS.
+    const _top = caramelPromptTopFor(caramelTopBarBottom())
+    if (_top !== CARAMEL_PROMPT_BASE_TOP)
+        host.style.top = `max(${_top}px, env(safe-area-inset-top))`
     host.setAttribute('role', 'button')
     host.setAttribute('tabindex', '0')
     host.setAttribute(
@@ -438,13 +499,27 @@ function caramelSavingsCurrency() {
  * Drop those rather than invent a replacement claim — the code alone is
  * honest. The extension must stay presentable on bad data; fixing the row
  * upstream is a separate, slower job. */
-function _caramelUsableTitle(title) {
+function _caramelUsableTitle(title, code) {
     if (typeof title !== 'string') return ''
     const t = title.trim()
     if (!t) return ''
     // "0% off", "0.00% off", "$0 off", "£0.00 off" — any zero-value claim.
     if (/(^|[^\d.])0+(\.0+)?\s*%/.test(t)) return ''
     if (/[$£€]\s?0+(\.0+)?([^\d]|$)/.test(t)) return ''
+    /* Scrapers pick up the column HEADING as often as the offer. cottonon.com
+     * (QA sweep 2026-08-06) shipped a whole list whose every title was the
+     * literal word "CODE"; other rows repeat the code back at you, or say
+     * "Coupon Code" under a row already headed by the code in bold. None of
+     * that is an offer — it is a second copy of the label the row already has,
+     * taking up the line where the discount should be. Dropping it leaves the
+     * code standing alone, which is honest and reads better than a placeholder.
+     * Fixing the rows upstream is a separate, slower job. */
+    const bare = t
+        .toUpperCase()
+        .replace(/[^A-Z0-9%]+/g, ' ')
+        .trim()
+    if (/^(COUPON|PROMO|DISCOUNT|VOUCHER)? ?(CODE|CODES)$/.test(bare)) return ''
+    if (code && bare === String(code).toUpperCase().trim()) return ''
     return t
 }
 
@@ -573,8 +648,8 @@ async function showFinalModal(
 ${
     c.rejected
         ? '<div class="caramel-manual-title caramel-manual-rejected">Store rejected this one</div>'
-        : _caramelUsableTitle(c.title)
-          ? `<div class="caramel-manual-title">${esc(_caramelUsableTitle(c.title))}</div>`
+        : _caramelUsableTitle(c.title, c.code)
+          ? `<div class="caramel-manual-title">${esc(_caramelUsableTitle(c.title, c.code))}</div>`
           : ''
 }
 </div>
