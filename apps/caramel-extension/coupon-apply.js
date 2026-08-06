@@ -57,12 +57,41 @@ function setInputValue(input, code) {
     input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-// Try to remove the most-recently-applied coupon. Returns true if a remove
-// button was clicked. Caller should wait for the cart to update.
+/* The text a remove button sits in — its own row, not the whole cart. Used
+ * only to tell OUR coupon's remove button apart from someone else's. */
+function _caramelRemoveRowText(btn) {
+    let node = btn
+    for (let up = 0; up < 3 && node; up++) {
+        node = node.parentElement
+        const text = (node?.innerText || node?.textContent || '').trim()
+        if (text) return text.toUpperCase().slice(0, 400)
+    }
+    return ''
+}
+
+/* Try to remove the coupon WE just applied. Returns true if a remove button was
+ * clicked. Caller should wait for the cart to update.
+ *
+ * `options.code` is the code this cleanup is for, and `options.hadPreExisting`
+ * says whether the cart already showed an applied discount before our run
+ * started. Both exist because of the same defect: this function used to click
+ * the LAST visible remove button, on the reasoning that the newest coupon
+ * renders last. On a cart where the shopper had already applied their own code,
+ * that reasoning is a coin flip — and losing it costs them real money on an
+ * action they never asked for.
+ *
+ * So: remove the row that names our code. If we can't find it and there WAS a
+ * discount on the cart before we arrived, remove nothing and say so. Leaving our
+ * own failed code sitting there is a far cheaper mistake than stripping theirs.
+ */
 // Called from other split content-script files (cross-file content-script
 // call — oxlint's per-file analysis can't see it).
 // oxlint-disable-next-line no-unused-vars
-async function removeAppliedCoupon(rec) {
+async function removeAppliedCoupon(rec, options) {
+    const ourCode = options?.code
+        ? String(options.code).trim().toUpperCase()
+        : null
+    const hadPreExisting = !!options?.hadPreExisting
     // Prefer per-config remove; fall back to the coupon-SCOPED generics.
     const sel = findRemoveSelector(rec)
     const usable = b =>
@@ -71,8 +100,22 @@ async function removeAppliedCoupon(rec) {
     // evaluated correctly instead of throwing a SyntaxError that aborts removal.
     const candidates = qAll(sel).filter(usable)
     if (candidates.length) {
-        // The newest applied coupon is usually rendered last → click last one.
-        const btn = candidates[candidates.length - 1]
+        let btn = ourCode
+            ? candidates.find(b =>
+                  _caramelRemoveRowText(b).includes(ourCode),
+              ) || null
+            : null
+        if (!btn && hadPreExisting) {
+            log('REMOVE_REFUSED_NOT_OURS', {
+                code: ourCode,
+                candidates: candidates.length,
+                reason: 'the cart already carried a discount when we arrived and no row names our code — removing one would take away the shopper’s own',
+            })
+            return false
+        }
+        // Nothing pre-existed, so anything applied here is ours. The newest
+        // coupon is usually rendered last.
+        if (!btn) btn = candidates[candidates.length - 1]
         btn.click()
         await sleep(600)
         log('Removed applied coupon via', sel)

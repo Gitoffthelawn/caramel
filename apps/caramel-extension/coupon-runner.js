@@ -328,6 +328,26 @@ async function startApplyingCoupons(rec) {
     // Snapshot EVERY price the container held, not just the largest — the
     // saving is measured against the tightest of these (caramelBaselineFor).
     const originalPrices = hasPriceCfg ? _caramelLastPrices.slice() : []
+
+    /* Was a discount already on this cart before we touched it?
+     *
+     * Two separate failures, one snapshot. The cleanup between codes clicks a
+     * remove button, and on a cart that already carried the shopper's OWN code
+     * it could take that away instead of ours — money removed by an action they
+     * never asked for. And the closing message told a shopper whose cart was
+     * already discounted that "auto-apply didn't stick", then offered codes to
+     * paste, which on many checkouts REPLACES the live discount. The
+     * discount-link path already learned this lesson against real carts
+     * (goodr -$8.00, 1thrive -$20.00); this is the same honesty for the path
+     * that drives the form. */
+    const preExistingDiscount = qAll(findAppliedSelector(rec)).some(el =>
+        _isVisible(el),
+    )
+    if (preExistingDiscount) {
+        log('AUTO_INSERT_PRE_EXISTING_DISCOUNT', {
+            reason: 'the cart already showed an applied discount before this run',
+        })
+    }
     let bestSave = 0
     // Set when a code demonstrably worked but the measured amount was not
     // believable (see the plausibility gate below) — keeps the "needs a minimum
@@ -519,7 +539,10 @@ async function startApplyingCoupons(rec) {
             rejectedCodes.add(code)
         }
         if (res.committed) {
-            await removeAppliedCoupon(rec)
+            await removeAppliedCoupon(rec, {
+                code,
+                hadPreExisting: preExistingDiscount,
+            })
         } else {
             const inp = pickBestMatch(rec.couponInput)
             if (inp && inp.value) {
@@ -623,12 +646,30 @@ async function startApplyingCoupons(rec) {
         // checkout rejected only because our synthetic click isn't trusted).
         // When the store told us WHY (login required, min spend, expired…),
         // repeat its own words — that's the honest, transparent version.
+        // A cart that arrived with a discount on it was NOT a failure, and the
+        // generic "didn't stick — paste one of these" line is actively
+        // dangerous there: on most checkouts pasting a second code replaces the
+        // live one, so following our advice is what costs the money.
+        const storeSaid = lastStoreReason
+            ? `The store said: “${String(lastStoreReason).slice(0, 140)}”`
+            : null
+        let noWinMessage = null
+        if (preExistingDiscount) {
+            // The warning outranks the usual "copy a code and paste it" advice
+            // even when the store gave a reason — that advice is the thing that
+            // costs the money here, so it must never appear over a live
+            // discount. The store's own words still lead when we have them.
+            noWinMessage =
+                `${storeSaid ? `${storeSaid} — but ` : ''}your cart already has a discount on it,` +
+                ` and none of the ${triedCodes.length} code${triedCodes.length === 1 ? '' : 's'} we tried beat it.` +
+                ` Pasting another may replace what you've got, so only swap if you want to.`
+        } else if (storeSaid) {
+            noWinMessage = `${storeSaid} — copy a code below to try it manually.`
+        }
         showFinalModal(
             0,
             null,
-            lastStoreReason
-                ? `The store said: “${String(lastStoreReason).slice(0, 140)}” — copy a code below to try it manually.`
-                : null,
+            noWinMessage,
             false,
             allCoupons.map(c =>
                 rejectedCodes.has(c.code) ? { ...c, rejected: true } : c,
