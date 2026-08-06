@@ -60,14 +60,49 @@ function _caramelCartMoney(cart, minor) {
     }
 }
 
+/* What a discount is worth, when the code entry doesn't say.
+ *
+ * `discount_codes` entries are NOT always `{code, amount, applicable}`. On the
+ * live carts measured 2026-08-06 — 100percentpure.com, goodr.com, tog24.com —
+ * every entry was `{code, applicable}` with no `amount` at all, and the money
+ * sat in `cart_level_discount_applications` keyed by `title`. Every fixture in
+ * this repo's tests carried an `amount`, so the shape mismatch was invisible
+ * here and total on a real store.
+ *
+ * Falls back to the cart's own `total_discount` only when this is the single
+ * applicable code, because then the whole discount is unambiguously its. */
+function _caramelDiscountAmountFor(cart, code, applicableCount) {
+    const apps = Array.isArray(cart?.cart_level_discount_applications)
+        ? cart.cart_level_discount_applications
+        : []
+    const wanted = String(code).toUpperCase()
+    for (const app of apps) {
+        const title = String(app?.title ?? '').toUpperCase()
+        const allocated = Number(app?.total_allocated_amount)
+        if (title === wanted && allocated > 0) return allocated
+    }
+    const total = Number(cart?.total_discount)
+    if (applicableCount === 1 && total > 0) return total
+    return 0
+}
+
 function _existingCartDiscount(cart) {
     if (!cart) return null
     const money = minor => _caramelCartMoney(cart, minor)
     const codes = Array.isArray(cart.discount_codes) ? cart.discount_codes : []
-    for (const entry of codes) {
-        const amount = Number(entry?.amount)
-        if (!entry?.code || !(amount > 0)) continue
-        if (entry.applicable === false) continue
+    const live = codes.filter(e => e?.code && e.applicable !== false)
+    for (const entry of live) {
+        // The entry's own amount when it has one; otherwise ask the cart. A
+        // code the store is honouring must not read as "worth nothing" just
+        // because this payload records the money somewhere else — that is what
+        // silently deleted a shopper's live -$9.00 BARGAINBUDDY and then
+        // offered them $0.00 codes to paste over it (QA, 100percentpure.com).
+        const stated = Number(entry.amount)
+        const amount =
+            stated > 0
+                ? stated
+                : _caramelDiscountAmountFor(cart, entry.code, live.length)
+        if (!(amount > 0)) continue
         return {
             code: String(entry.code).toUpperCase(),
             amountText: money(amount),
@@ -274,14 +309,58 @@ async function startApplyingCoupons(rec, options) {
                 )
                 bestCode = null
                 confirmed = null
-            } else if (confirmed.total_price > bestTotal) {
-                // It landed, but for less than it did on the probe. The cart is
-                // the authority; report what is actually on it.
-                log('AUTO_INSERT_REAPPLY_SMALLER', {
-                    code: bestCode,
-                    expected: bestTotal,
-                    got: confirmed.total_price,
-                })
+            } else {
+                /* The drop is real — but is it OUR code producing it?
+                 *
+                 * The confirmation checks the total, not the identity, and QA
+                 * caught the gap on 2 of 3 live wins (2026-08-06): the card
+                 * said "Code LAYAN" while 100percentpure's cart carried
+                 * `ATsxsb7x` with `LAYAN:false`, and said "26-10OFFTTWMH0"
+                 * while goodr's carried `26-10OFFLNREWZ`.
+                 *
+                 * Those two look identical and are not, and the money says to
+                 * treat them differently:
+                 *
+                 *   · A store that rewrites our code into a generated
+                 *     single-use one (LAYAN → ATsxsb7x) is still our win, and
+                 *     OUR code is the one the shopper can type again. Naming
+                 *     the generated string would be accurate and useless.
+                 *   · A cart honouring a DIFFERENT code WE PROBED means the
+                 *     re-apply never took and that other code is doing the
+                 *     work. Naming ours credits the wrong code and tells the
+                 *     shopper to expect one that is not applied.
+                 *
+                 * Telling them apart is possible only because we know exactly
+                 * what we sent. Nothing here touches the AMOUNT: that is still
+                 * read off the cart, so this can correct a name, never inflate
+                 * a saving. */
+                const honoured = _existingCartDiscount(confirmed)
+                const ours =
+                    honoured && honoured.code !== bestCode.toUpperCase()
+                        ? linkCodes.find(
+                              c =>
+                                  String(c.code).toUpperCase() ===
+                                  honoured.code,
+                          )
+                        : null
+                if (ours) {
+                    log('AUTO_INSERT_REAPPLY_OTHER_CODE', {
+                        named: bestCode,
+                        honoured: honoured.code,
+                        reason: 'the cart is honouring a different code we probed — crediting that one instead',
+                    })
+                    bestCode = ours.code
+                    bestId = ours.id
+                }
+                if (confirmed.total_price > bestTotal) {
+                    // It landed, but for less than it did on the probe. The
+                    // cart is the authority; report what is actually on it.
+                    log('AUTO_INSERT_REAPPLY_SMALLER', {
+                        code: bestCode,
+                        expected: bestTotal,
+                        got: confirmed.total_price,
+                    })
+                }
             }
         }
         if (bestCode) {

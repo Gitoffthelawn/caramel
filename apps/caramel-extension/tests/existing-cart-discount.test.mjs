@@ -106,6 +106,126 @@ describe('_existingCartDiscount', () => {
         ).toBe('JESS20')
     })
 
+    // Every fixture above carries `amount` on the discount_codes entry. No live
+    // Shopify cart measured on 2026-08-06 did: 100percentpure.com, goodr.com
+    // and tog24.com all returned `{code, applicable}` and put the money in
+    // `cart_level_discount_applications`. So this function reported "no
+    // discount" for a cart that plainly had one, and the tests above could
+    // never catch it — they pinned the fixture, not the platform.
+    //
+    // What that cost, measured on 100percentpure.com: the shopper arrived with
+    // BARGAINBUDDY live at -$9.00, `arrivedWith` came back null, the restore
+    // branch never ran, our probe replaced their code, and the card said
+    // "Auto-apply didn't stick — copy a code and paste it in" while listing
+    // codes worth $0.00 (HAIRCARE, GIFTMORE, COFFEE, SAVE15). Following that
+    // advice replaces a live discount with nothing. This is verbatim the
+    // failure the comment at the no-win branch says was fixed on 2026-08-05 —
+    // fixed for carts that state an amount, never fixed for carts that don't.
+    describe('a cart that records the money outside the code entry', () => {
+        // Shape copied from 100percentpure.com's /cart.js, 2026-08-06.
+        const REAL_CART = {
+            currency: 'USD',
+            total_price: 5100,
+            total_discount: 900,
+            discount_codes: [{ code: 'BARGAINBUDDY', applicable: true }],
+            cart_level_discount_applications: [
+                {
+                    title: 'BARGAINBUDDY',
+                    value_type: 'fixed_amount',
+                    total_allocated_amount: 900,
+                },
+            ],
+        }
+
+        it('finds the discount the shopper actually arrived with', () => {
+            const found = _existingCartDiscount(REAL_CART)
+
+            expect(found?.code).toBe('BARGAINBUDDY')
+            expect(found?.amountText).toContain('9.00')
+        })
+
+        it('matches the allocation by code even when several are applied', () => {
+            const found = _existingCartDiscount({
+                ...REAL_CART,
+                total_discount: 1400,
+                discount_codes: [
+                    { code: 'SHIPFREE', applicable: false },
+                    { code: 'BARGAINBUDDY', applicable: true },
+                ],
+                cart_level_discount_applications: [
+                    { title: 'OTHER', total_allocated_amount: 500 },
+                    { title: 'BARGAINBUDDY', total_allocated_amount: 900 },
+                ],
+            })
+
+            expect(found?.code).toBe('BARGAINBUDDY')
+            expect(found?.amountText).toContain('9.00')
+        })
+
+        it('falls back to the cart total only when one code could own it', () => {
+            const found = _existingCartDiscount({
+                currency: 'USD',
+                total_discount: 1200,
+                discount_codes: [{ code: 'SOLO', applicable: true }],
+            })
+
+            expect(found?.code).toBe('SOLO')
+            expect(found?.amountText).toContain('12.00')
+        })
+
+        it('will not hand one code the credit for two', () => {
+            // Two live codes and no per-code allocation: attributing the whole
+            // total to whichever came first would name a figure we cannot
+            // stand behind, and it is the figure the shopper is told.
+            expect(
+                _existingCartDiscount({
+                    currency: 'USD',
+                    total_discount: 1200,
+                    discount_codes: [
+                        { code: 'ONE', applicable: true },
+                        { code: 'TWO', applicable: true },
+                    ],
+                }),
+            ).toBeNull()
+        })
+
+        it('still ignores the seven dead codes a probe run leaves behind', () => {
+            // Measured on goodr.com: probing does not clear earlier entries,
+            // it only changes which one is applicable. The rejected ones must
+            // not be mistaken for the shopper's own discount.
+            const found = _existingCartDiscount({
+                currency: 'USD',
+                total_discount: 2400,
+                discount_codes: [
+                    { code: 'DWELL10', applicable: false },
+                    { code: 'DEMOTED', applicable: false },
+                    { code: 'BOLDERBOULDER15', applicable: true },
+                    { code: 'TRN', applicable: false },
+                ],
+                cart_level_discount_applications: [
+                    { title: 'BOLDERBOULDER15', total_allocated_amount: 2400 },
+                ],
+            })
+
+            expect(found?.code).toBe('BOLDERBOULDER15')
+        })
+
+        it('reports nothing when the platform allocated nothing', () => {
+            // tog24.com: codes attach, every one applicable:false, no money.
+            expect(
+                _existingCartDiscount({
+                    currency: 'USD',
+                    total_discount: 0,
+                    discount_codes: [
+                        { code: 'Summer15', applicable: false },
+                        { code: 'TIKTOK10', applicable: false },
+                    ],
+                    cart_level_discount_applications: [],
+                }),
+            ).toBeNull()
+        })
+    })
+
     it('survives a missing or malformed cart without throwing', () => {
         expect(_existingCartDiscount(null)).toBeNull()
         expect(_existingCartDiscount({})).toBeNull()
