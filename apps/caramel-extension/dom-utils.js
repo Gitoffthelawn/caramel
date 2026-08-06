@@ -1,4 +1,4 @@
-// owns: DOM visibility/wait helpers, price parsing, CSS/XPath query helpers (_isVisible, waitForVisible, pickBestMatch, waitForElement, waitForTextChange, waitUntilReady, getPrice, _isXPath, qOne, qAll)
+// owns: DOM visibility/wait helpers, price parsing, CSS/XPath query helpers, the mid-attempt navigation handoff (_isVisible, waitForVisible, pickBestMatch, waitForElement, waitForTextChange, waitUntilReady, getPrice, _isXPath, qOne, qAll, caramel{Mark,Clear,Take}PendingSubmit)
 // load after: caramel-base.js
 
 /* ---------- DOM waiters ---------- */
@@ -385,6 +385,94 @@ function caramelSetCurrencySymbol(sym) {
         return true
     }
     return false
+}
+
+/* --------------------------------------------------  navigation handoff
+ *
+ * Submitting a promo code on a classic (non-SPA) checkout is a form POST: the
+ * page navigates, the content script and every overlay it drew are destroyed
+ * mid-attempt, and everything the run knew dies with them. Measured on
+ * 1800petmeds.com (QA sweep 2026-08-05): THEO20 took a real $14.78 off the
+ * order and the user was told NOTHING for the ~180s they sat there — the fresh
+ * document just re-inserted the "Try Caramel Coupons" pill, as if the extension
+ * had never run. A win we actually delivered read as a dead feature.
+ *
+ * The discount-link path already survives its own (deliberate) reload through
+ * sessionStorage; this is the same handoff for the path that navigates without
+ * being asked. The crucial difference: this record carries only what we KNEW
+ * BEFORE submitting — the code, its id, and the prices then on the page — and
+ * never an outcome. At write time we genuinely do not know whether the code
+ * landed, so the next document measures that for itself
+ * (store-detect.js:_resumePendingSubmit). A record that guessed would put a
+ * fabricated saving in the user's history.
+ *
+ * These live here, in the leaf, rather than beside the apply loop: the writer
+ * (coupon-runner.js) and the reader (store-detect.js) are different files, and
+ * store-detect loads FIRST — sharing a key through a top-level const would
+ * depend on load order that doesn't hold.
+ *
+ * sessionStorage, like the tried-codes set: per-tab and per-origin, so a
+ * pending attempt can never surface on another site or in another tab, and it
+ * dies with the tab.
+ */
+const CARAMEL_PENDING_KEY = 'caramel_pending_submit'
+// Consumed by coupon-runner.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelMarkPendingSubmit(code, id, prices) {
+    try {
+        sessionStorage.setItem(
+            CARAMEL_PENDING_KEY,
+            JSON.stringify({
+                code,
+                id: id ?? null,
+                prices: (prices || []).filter(
+                    p => typeof p === 'number' && !isNaN(p),
+                ),
+                t: Date.now(),
+            }),
+        )
+    } catch {
+        /* storage blocked — we lose only the post-navigation report */
+    }
+}
+// Consumed by coupon-runner.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelClearPendingSubmit() {
+    try {
+        sessionStorage.removeItem(CARAMEL_PENDING_KEY)
+    } catch {
+        /* storage blocked — the freshness window bounds the damage */
+    }
+}
+/* Reads AND consumes the record: a pending attempt is reported once, on the
+ * document that follows it, or not at all. Returns null when there is nothing
+ * to resume or the record is stale/unreadable. */
+// Consumed by store-detect.js (cross-file content-script call).
+// oxlint-disable-next-line no-unused-vars
+function caramelTakePendingSubmit(maxAgeMs = 120000) {
+    let raw = null
+    try {
+        raw = sessionStorage.getItem(CARAMEL_PENDING_KEY)
+        if (raw) sessionStorage.removeItem(CARAMEL_PENDING_KEY)
+    } catch {
+        return null
+    }
+    if (!raw) return null
+    let st = null
+    try {
+        st = JSON.parse(raw)
+    } catch {
+        return null
+    }
+    if (!st || typeof st.code !== 'string' || !st.code) return null
+    // A record older than the window belongs to a visit the user has moved on
+    // from; announcing it over an unrelated page would be noise, not news.
+    if (!(Date.now() - (st.t || 0) < maxAgeMs)) return null
+    return {
+        code: st.code,
+        id: st.id ?? null,
+        prices: Array.isArray(st.prices) ? st.prices : [],
+    }
 }
 
 /* --------------------------------------------------  selector helper

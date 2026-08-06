@@ -223,6 +223,94 @@ async function tryInitialize() {
     if (codes.length) await insertCaramelPrompt(rec)
 }
 
+/* Finish an attempt the page interrupted by navigating (see
+ * caramelMarkPendingSubmit in dom-utils.js for the 1800petmeds case this
+ * exists for: a real $14.78 won, and 180 seconds of silence).
+ *
+ * The record says only which code was submitted and what the prices were
+ * beforehand. Whether it WORKED is measured here, on the page the store just
+ * served, so every outcome below is read off the live document:
+ *
+ *   total dropped        → a real, measured win: bank it and say so
+ *   total didn't drop    → say that plainly, and hand over the other codes
+ *   nothing readable     → say we can't tell, and point at the order summary
+ *
+ * The third case is the one worth being strict about. It is tempting to treat
+ * "we submitted a code and the page reloaded" as success — that is exactly how
+ * a tool starts claiming savings its user never got. Silence was the bug;
+ * inventing a number would be a worse one.
+ *
+ * Returns true when it handled the page (a modal is up), false to continue with
+ * normal checkout detection.
+ */
+async function _resumePendingSubmit() {
+    const pending = caramelTakePendingSubmit()
+    if (!pending) return false
+    const rec = await getDomainRecord(location.hostname)
+    const now =
+        rec && rec.priceContainer
+            ? getPrice(rec.priceContainer, { returnLargest: true })
+            : NaN
+    // Same tightest-defensible-baseline rule the in-page path uses, against the
+    // prices captured before the submit — it can never overstate a saving.
+    const baseline = caramelBaselineFor(now, pending.prices)
+    const saved =
+        Number.isFinite(now) && Number.isFinite(baseline) ? baseline - now : NaN
+    const measured = Number.isFinite(saved) && saved > 0
+
+    log('AUTO_INSERT_RESUMED', {
+        code: pending.code,
+        measured,
+        saved: measured ? saved : null,
+        readable: Number.isFinite(now),
+    })
+
+    if (measured) {
+        reportOutcome(pending.id, 'worked')
+        caramelRecordSaving({
+            domain: location.hostname,
+            code: pending.code,
+            amount: saved,
+            currency: caramelCurrencyCode(),
+        })
+        showFinalModal(saved, pending.code)
+        return true
+    }
+
+    // Not a win. Deliberately NOT reported as a coupon failure: the page
+    // navigating out from under us says nothing about the code, and the runner
+    // holds the same line — only the store's own rejection words count.
+    let others = []
+    try {
+        if (rec) others = await getCachedCodes(rec)
+    } catch {
+        /* no code list to offer — the message below still stands on its own */
+    }
+    if (Number.isFinite(now)) {
+        // We could read the total and it did not move.
+        showFinalModal(
+            0,
+            null,
+            `We submitted ${pending.code} before the page reloaded, but your total hasn't changed — copy another code below to try it yourself.`,
+            false,
+            others.filter(
+                c =>
+                    String(c && c.code).toUpperCase() !==
+                    pending.code.toUpperCase(),
+            ),
+        )
+    } else {
+        showFinalModal(
+            0,
+            null,
+            `We submitted ${pending.code} just before the page reloaded — check your order summary to see whether it applied.`,
+            false,
+            others,
+        )
+    }
+    return true
+}
+
 /* Entry point. Beyond the one-shot load check, KEEP WATCHING: on SPA / drawer-
    cart stores (allsaints and most SFCC/Shopify sites) the coupon field is
    injected only when the user opens the bag/cart — with no page navigation, so
@@ -289,6 +377,10 @@ async function startCheckoutDetection() {
     } catch {
         /* sessionStorage unavailable — continue with normal detection */
     }
+    // An attempt the store's own form POST cut short finishes here, on the page
+    // that replaced it — before tryInitialize can re-prompt as if nothing had
+    // happened, which is precisely what the user saw before.
+    if (await _resumePendingSubmit()) return
     await tryInitialize()
     if (window.__caramel_checkout_observer) return
     const rec = await getDomainRecord(location.hostname)

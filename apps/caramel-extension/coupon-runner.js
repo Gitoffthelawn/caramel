@@ -409,7 +409,12 @@ async function startApplyingCoupons(rec) {
         await updateTestingModal(i + 1, coupons.length, code)
 
         _markTriedCode(code)
+        // Written BEFORE the submit, because a submit that navigates never
+        // comes back here (see caramelMarkPendingSubmit). Cleared immediately
+        // after, so a normal attempt leaves nothing for the next page to read.
+        caramelMarkPendingSubmit(code, coupons[i].id, originalPrices)
         const res = await applyCoupon(code, rec)
+        caramelClearPendingSubmit()
 
         // Did this attempt prove ANYTHING about this code? An applied row, the
         // store's own error text, or a total we could actually read all count.
