@@ -123,7 +123,19 @@ module.exports = [
         // Measured 247.99 kB — the extra kB over that is deliberate headroom,
         // not slack: 248 left ten bytes, which turns the next comment edit into
         // a build failure that says nothing true about bundle weight.
-        limit: '249 KB',
+        // 2026-08-07 — 249 → 256 KB. The fleet-silence root-cause fix:
+        // caramelSendMessage in caramel-base.js (bounded worker waits +
+        // runtime.lastError read — the raw sendMessage form could hang the
+        // apply flow forever on an evicted worker), and store-detect's
+        // boundary now distinguishes "the API answered" from "we could not
+        // ask" (retry once, expired-cache fallback, STORE_LIST_FETCH_FAILED
+        // recorded) instead of rendering both as "unsupported store".
+        // Measured live: the worker's cold fetch of the 1.14 MB store list
+        // ran 6.7 s→>60 s against an 8 s abort, and the abort became an
+        // empty list — silence on every fresh install. ~2.5 kB is code; the
+        // rest is the measurement prose that stops the next edit undoing it.
+        // Measured 254.83 kB.
+        limit: '256 KB',
         brotli: false,
     },
     {
@@ -142,7 +154,12 @@ module.exports = [
         // rewrites the URL. Measured 16.17 kB. Same standing note as above:
         // the honest fix is pricing minified bytes, and that call is the
         // owner's.
-        limit: '17 KB',
+        // 2026-08-07 — 17 → 18 KB. Part of the fleet-silence fix: the bulk
+        // supported-stores fetch gets its own 30 s budget (fetchWithTimeout
+        // grew a per-call override; 8 s stays the default for small calls)
+        // plus one retry — the measured cold fetch is the slow one and the
+        // warm retry lands in seconds. Measured 17.55 kB.
+        limit: '18 KB',
         brotli: false,
     },
 ]

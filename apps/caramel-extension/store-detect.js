@@ -14,6 +14,13 @@
 const STORE_CACHE_KEY = 'caramel_supported_stores'
 const STORE_CACHE_PROD_TTL = 60 * 60 * 1000 // 1 hour
 const STORE_CACHE_DEV_TTL = 0 // bypass cache when loaded as unpacked dev extension
+// One retry, because the measured failure is a cold connection: the first
+// fetch of the bulk store list is the slow one and the retry lands quickly.
+const STORE_FETCH_ATTEMPTS = 2
+const STORE_FETCH_RETRY_DELAY_MS = 750
+// Must exceed background.js's FETCH_TIMEOUT_BULK_MS (30s) so we never abandon
+// a request the worker is still serving.
+const STORE_FETCH_MESSAGE_TIMEOUT_MS = 35000
 
 function _getCacheTtl() {
     return _isDevInstall() ? STORE_CACHE_DEV_TTL : STORE_CACHE_PROD_TTL
@@ -42,27 +49,56 @@ async function getDomainRecord(domain) {
             /* storage read failed, proceed to API */
         }
 
-        // Fetch fresh configs from the backend
+        // Fetch fresh configs from the backend.
+        //
+        // "The API answered with a list" and "we never reached the API" are
+        // different facts and must not collapse into the same one. They used
+        // to: any failure left the cache null, and a null cache reads as "this
+        // domain isn't supported" — visually identical to a store we don't
+        // cover. That is how a slow network became fleet-wide silence with
+        // nothing logged (2026-08-07).
+        //
+        // So a failure is retried once, then falls through to the expired
+        // cache below, and is recorded either way. An empty-but-successful
+        // answer is a real answer: it is not retried and not cached, which
+        // leaves the cache unpoisoned so a later call can still succeed.
         if (!getDomainRecord.cache) {
-            try {
-                const resp = await new Promise(res =>
-                    currentBrowser.runtime.sendMessage(
+            let failure = null
+            for (let attempt = 0; attempt < STORE_FETCH_ATTEMPTS; attempt++) {
+                if (attempt > 0) await sleep(STORE_FETCH_RETRY_DELAY_MS)
+                try {
+                    const resp = await caramelSendMessage(
                         { action: 'fetchSupportedStores' },
-                        res,
-                    ),
-                )
-                if (resp?.supported?.length) {
-                    getDomainRecord.cache = resp.supported
-                    currentBrowser.storage.local.set({
-                        [STORE_CACHE_KEY]: {
-                            data: resp.supported,
-                            ts: Date.now(),
-                        },
-                    })
-                    log('Loaded supported domains from API')
+                        STORE_FETCH_MESSAGE_TIMEOUT_MS,
+                    )
+                    // The worker reports its own fetch failures in-band rather
+                    // than by rejecting, so an `error` field is a failure too.
+                    if (resp?.error) {
+                        failure = String(resp.error)
+                        continue
+                    }
+                    failure = null
+                    if (resp?.supported?.length) {
+                        getDomainRecord.cache = resp.supported
+                        currentBrowser.storage.local.set({
+                            [STORE_CACHE_KEY]: {
+                                data: resp.supported,
+                                ts: Date.now(),
+                            },
+                        })
+                        log('Loaded supported domains from API')
+                    }
+                    break
+                } catch (e) {
+                    failure = String(e?.message || e)
                 }
-            } catch (e) {
-                log('fetchSupportedStores error', e)
+            }
+            if (failure) {
+                // Loud where we can read it: this is the difference between
+                // diagnosing a silent install in seconds and bisecting for a
+                // night.
+                logError('fetchSupportedStores', failure)
+                recordTiming('STORE_LIST_FETCH_FAILED', { error: failure })
             }
         }
 

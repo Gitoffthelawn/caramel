@@ -138,6 +138,86 @@ if (typeof logError === 'undefined') {
     }
 }
 
+/* --------------------------------------------------  worker messaging */
+// Every content-script call into the background worker used to be written as
+// `await new Promise(res => runtime.sendMessage(msg, res))`, which has two
+// failure modes that both end in SILENCE:
+//
+//   1. The MV3 worker is evicted mid-flight. Chrome closes the port without
+//      invoking sendResponse, the callback fires with `undefined` and sets
+//      runtime.lastError. Nobody read lastError, so `undefined` flowed on as
+//      if it were a reply and `resp?.coupons || []` became an empty list —
+//      indistinguishable from "this store has no coupons".
+//   2. Nothing answers at all. There was no timeout, so the promise never
+//      settled and the whole apply flow parked forever with no error.
+//
+// Measured on 2026-08-07: on a live cart the trail ended at
+// AUTO_INSERT_FETCHCOUPONS_START and no END line — either branch, no
+// diagnostics. This wrapper turns both into a rejection the caller can see.
+//
+// The budget must sit ABOVE the worker's own fetch budget, or we abandon a
+// request the worker is still legitimately serving. background.js defaults to
+// 8s per call, so 15s is the floor here; the bulk supported-stores call runs
+// on a 30s budget there and passes a correspondingly larger value.
+const CARAMEL_MESSAGE_TIMEOUT_MS = 15000
+
+// Called from other split content-script files (cross-file content-script
+// call — oxlint's per-file analysis can't see it).
+// oxlint-disable-next-line no-unused-vars
+function caramelSendMessage(message, timeoutMs) {
+    const budget = timeoutMs || CARAMEL_MESSAGE_TIMEOUT_MS
+    const action = message?.action || 'unknown'
+    return new Promise((resolve, reject) => {
+        let settled = false
+        const finish = fn => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            fn()
+        }
+        const timer = setTimeout(
+            () =>
+                finish(() =>
+                    reject(
+                        new Error(
+                            `caramel: no response to "${action}" within ${budget}ms`,
+                        ),
+                    ),
+                ),
+            budget,
+        )
+        try {
+            currentBrowser.runtime.sendMessage(message, resp => {
+                finish(() => {
+                    // Reading lastError is what makes an evicted worker
+                    // visible; leaving it unread also makes Chrome log it as
+                    // an unchecked error.
+                    const portError = currentBrowser.runtime.lastError
+                    if (portError) {
+                        reject(
+                            new Error(
+                                `caramel: "${action}" port closed — ${portError.message || portError}`,
+                            ),
+                        )
+                        return
+                    }
+                    if (resp === undefined) {
+                        reject(
+                            new Error(
+                                `caramel: "${action}" returned no response`,
+                            ),
+                        )
+                        return
+                    }
+                    resolve(resp)
+                })
+            })
+        } catch (err) {
+            finish(() => reject(err))
+        }
+    })
+}
+
 // Origins trusted to inject a login token via window.postMessage. The dev
 // origins are ONLY trusted on an unpacked dev install — in the packed Web Store
 // build a tab on dev.grabcaramel.com or a local server must NOT be able to write

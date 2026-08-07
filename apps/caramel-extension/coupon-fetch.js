@@ -14,12 +14,17 @@ async function fetchCoupons(site, kw, category) {
             Object.assign({}, meta, { t: performance.now() }),
         )
         recordTiming('AUTO_INSERT_FETCHCOUPONS_START', meta)
-        const resp = await new Promise(res =>
-            currentBrowser.runtime.sendMessage(
-                { action: 'fetchCoupons', site, kw, category },
-                res,
-            ),
-        )
+        // caramelSendMessage (caramel-base.js) bounds the wait and surfaces a
+        // closed port: the raw sendMessage form this replaced could hang the
+        // apply flow forever on an evicted worker — measured live 2026-08-07,
+        // the log ended at FETCHCOUPONS_START with no END and no error, and
+        // the shopper saw nothing on a store with coupons.
+        const resp = await caramelSendMessage({
+            action: 'fetchCoupons',
+            site,
+            kw,
+            category,
+        })
         if (resp?.error) {
             log('fetchCoupons background error', resp.error)
             recordTiming('AUTO_INSERT_FETCHCOUPONS_END', {
@@ -130,12 +135,13 @@ async function classifyCartCategory() {
         const cs = window.CaramelCartSignals
         if (!cs || typeof cs.collectCartSignals !== 'function') return null
         const signals = await cs.collectCartSignals()
-        const result = await new Promise(res =>
-            currentBrowser.runtime.sendMessage(
-                { action: 'classifyCart', signals },
-                res,
-            ),
-        )
+        // Bounded wait + closed-port detection; a rejection lands in this
+        // function's own catch and classification degrades to null, exactly
+        // like any other non-fatal classify error.
+        const result = await caramelSendMessage({
+            action: 'classifyCart',
+            signals,
+        })
         if (result && result.primary && !result.error) {
             log(
                 'Cart category:',

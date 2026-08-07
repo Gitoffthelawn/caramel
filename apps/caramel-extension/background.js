@@ -50,9 +50,22 @@ const logError = (where, err) => {
 }
 
 const FETCH_TIMEOUT_MS = 8000
-function fetchWithTimeout(url, opts = {}) {
+// One budget does not fit both shapes of call we make. The store list is a
+// bulk payload (~1.14 MB, 2670 stores) and the small JSON calls are a few KB.
+//
+// Measured 2026-08-07, same browser, same instant: an ordinary page fetched
+// the store list in ~620 ms while THIS service worker took 6.7 s on a warm
+// connection and over 60 s on its first, cold one — reproduced across two
+// runs. At 8 s the cold fetch aborted every time, and because an abort is
+// reported downstream as an empty list rather than an error, the extension
+// went silent on every store at once with nothing logged anywhere.
+//
+// So: keep 8 s as the default for the small calls, and give the bulk payload
+// room to actually arrive.
+const FETCH_TIMEOUT_BULK_MS = 30000
+function fetchWithTimeout(url, opts = {}, timeoutMs = FETCH_TIMEOUT_MS) {
     const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
     return fetch(url, { ...opts, signal: ctrl.signal }).finally(() =>
         clearTimeout(timer),
     )
@@ -99,13 +112,17 @@ function getStoredToken() {
     })
 }
 
-async function fetchCaramelApi(url, opts = {}) {
+async function fetchCaramelApi(url, opts = {}, timeoutMs = FETCH_TIMEOUT_MS) {
     const token = await getStoredToken()
-    if (!token) return fetchWithTimeout(url, opts)
-    return fetchWithTimeout(url, {
-        ...opts,
-        headers: { ...opts.headers, Authorization: `Bearer ${token}` },
-    })
+    if (!token) return fetchWithTimeout(url, opts, timeoutMs)
+    return fetchWithTimeout(
+        url,
+        {
+            ...opts,
+            headers: { ...opts.headers, Authorization: `Bearer ${token}` },
+        },
+        timeoutMs,
+    )
 }
 
 function isServiceWorkerContext() {
@@ -329,7 +346,15 @@ currentBrowser.runtime.onMessage.addListener(
             return true
         } else if (message.action === 'fetchSupportedStores') {
             const url = caramelUrl('api/extension/supported-stores')
-            fetchCaramelApi(url)
+            // The bulk payload gets the larger budget, and one retry: the
+            // measured cold-connection fetch is the slow one and the warm
+            // retry lands in a few seconds, so a single extra attempt is the
+            // difference between a silent install and a working one.
+            fetchCaramelApi(url, {}, FETCH_TIMEOUT_BULK_MS)
+                .catch(err => {
+                    logError('fetchSupportedStores retry', err)
+                    return fetchCaramelApi(url, {}, FETCH_TIMEOUT_BULK_MS)
+                })
                 .then(async r => {
                     if (!r.ok) return { error: `HTTP ${r.status}` }
                     return r.json()

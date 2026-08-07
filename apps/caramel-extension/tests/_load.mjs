@@ -103,6 +103,12 @@ export function installChromeStub() {
         }
     }
 
+    // Real Chrome leaves runtime.lastError UNDEFINED except inside a
+    // callback that failed. The permissive proxy would instead auto-create
+    // a truthy callable on first read, which code that checks lastError
+    // (caramel-base.js caramelSendMessage) would misread as a closed port.
+    stub.runtime.lastError = undefined
+
     const listeners = []
     stub.runtime.onMessage.addListener = fn => listeners.push(fn)
     stub.runtime.onMessage.removeListener = fn => {

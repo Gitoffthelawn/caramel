@@ -404,14 +404,13 @@ function renderLoadError() {
 
 /* background helper */
 async function getActiveTabDomainRecord() {
-    const resp = await new Promise(resolve => {
-        currentBrowser.runtime.sendMessage(
-            { action: 'getActiveTabDomainRecord' },
-            reply => resolve(reply), // will be undefined on error
-        )
-    })
-
-    return resp
+    try {
+        // Bounded wait + closed-port detection (caramel-base.js); the raw
+        // sendMessage form could park the popup on a never-arriving reply.
+        return await caramelSendMessage({ action: 'getActiveTabDomainRecord' })
+    } catch {
+        return undefined // same contract as before: undefined on error
+    }
 }
 
 /* ------------------------------------------------------------ */
