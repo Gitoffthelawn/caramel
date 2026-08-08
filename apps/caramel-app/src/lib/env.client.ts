@@ -17,6 +17,8 @@ const clientObjectSchema = z.object({
     NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
     NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: z.string().optional(),
     NEXT_PUBLIC_API_ENCRYPTION_ENABLED: z.string().optional(),
+    NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+    NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
 })
 
 export type ClientEnv = z.infer<typeof clientObjectSchema>
@@ -42,6 +44,8 @@ export function parseClientEnv(
             process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID,
         NEXT_PUBLIC_API_ENCRYPTION_ENABLED:
             process.env.NEXT_PUBLIC_API_ENCRYPTION_ENABLED,
+        NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+        NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     },
 ): ClientEnv {
     // All-optional schema — this never throws, so it's safe to eager-run in

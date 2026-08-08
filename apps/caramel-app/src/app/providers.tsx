@@ -2,6 +2,7 @@
 import ExtensionSessionRelay from '@/components/ExtensionSessionRelay'
 import Layout from '@/layouts/Layout/Layout'
 import { ThemeContext } from '@/lib/contexts'
+import { clientEnv } from '@/lib/env.client'
 import * as gtag from '@/lib/gtag'
 import Hotjar from '@hotjar/browser'
 import { usePathname } from 'next/navigation'
@@ -110,14 +111,14 @@ export default function Providers({ children }: { children: ReactNode }) {
 
     // PostHog product analytics — no-op unless NEXT_PUBLIC_POSTHOG_KEY is set,
     // so local/preview builds without the key are unaffected.
-    const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+    const posthogKey = clientEnv.NEXT_PUBLIC_POSTHOG_KEY
     if (!posthogKey) return tree
     return (
         <PostHogProvider
             apiKey={posthogKey}
             options={{
                 api_host:
-                    process.env.NEXT_PUBLIC_POSTHOG_HOST ||
+                    clientEnv.NEXT_PUBLIC_POSTHOG_HOST ||
                     'https://posthog.devino.ca',
                 capture_pageview: true,
                 capture_pageleave: true,
