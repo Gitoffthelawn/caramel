@@ -185,6 +185,11 @@ async function main() {
     const tag = flags.tag || tagArg || 'probe'
     const extDir = resolve(process.env.EXT_DIR || flags.ext || DEFAULT_EXT_DIR)
     const waitMs = Number(process.env.PROBE_WAIT_MS || flags.wait || 30000)
+    // The auto-apply flow only STARTS once the prompt renders (autoApply
+    // defaults on) and then runs under its own wall-clock budget. Reading the
+    // witnesses the instant the prompt exists guarantees submitted=0 on every
+    // store — three live stores demonstrated it before this wait existed.
+    const applyWaitMs = Number(process.env.PROBE_APPLY_WAIT_MS || 60000)
     const allLogs = process.env.PROBE_ALL_LOGS === '1'
     const outDir = resolve(flags['out-dir'] || join(REPO_ROOT, '.ext-probe'))
     mkdirSync(outDir, { recursive: true })
@@ -330,6 +335,9 @@ async function main() {
             }`,
         )
 
+        // Capture the prompt's geometry/CSS BEFORE activating it — clicking
+        // dismisses the host (v4 lesson: reading afterwards judged a rendered,
+        // clicked prompt as "never rendered").
         const promptReport = await page.evaluate(id => {
             const host = document.getElementById(id)
             if (!host) return { present: false }
@@ -361,6 +369,51 @@ async function main() {
             }
         }, PROMPT_HOST_ID)
         Object.assign(observation.prompt, promptReport)
+
+        // The prompt is an invitation, not a progress bar: the whole host is a
+        // role="button" waiting for the SHOPPER's click before any code is
+        // tried. A probe that only watches therefore reads submitted=0
+        // forever. Click it the way a shopper would (Playwright input is
+        // trusted), then give the apply flow room to run.
+        if (observation.prompt.appearedMs !== null) {
+            await page
+                .click(`#${PROMPT_HOST_ID}`, { timeout: 5000 })
+                .then(() => note('clicked the prompt CTA'))
+                .catch(e =>
+                    note(`  (could not click the prompt: ${e.message})`),
+                )
+        }
+
+        // Poll the attempt trail until it settles (attempts observed and no
+        // new ones for 3 consecutive polls) or the budget expires. Without
+        // this the probe always reads submitted=0 — see applyWaitMs above.
+        if (observation.prompt.appearedMs !== null) {
+            const applyDeadline = Date.now() + applyWaitMs
+            let lastCount = -1
+            let stablePolls = 0
+            while (Date.now() < applyDeadline && stablePolls < 3) {
+                await page.waitForTimeout(2000)
+                const read = await swEval(
+                    ctx,
+                    sw,
+                    key =>
+                        new Promise(r =>
+                            chrome.storage.local.get([key], v =>
+                                r(v[key] || []),
+                            ),
+                        ),
+                    TIMINGS_KEY,
+                    `${TIMINGS_KEY} (apply wait)`,
+                )
+                const count = (read.value || []).filter(
+                    e => e.event === 'AUTO_INSERT_ATTEMPT_END',
+                ).length
+                if (count > 0 && count === lastCount) stablePolls++
+                else stablePolls = 0
+                lastCount = count
+            }
+            note(`apply attempts observed: ${Math.max(lastCount, 0)}`)
+        }
 
         const promoInputs = await page
             .evaluate(countPromoInputsInPage)
@@ -450,6 +503,22 @@ async function main() {
             fetchEnd && typeof fetchEnd.meta?.count === 'number'
                 ? fetchEnd.meta.count
                 : null
+        // The storage witness dies whenever the service worker restarts
+        // mid-run; the console witness keeps logging. Fall back to it rather
+        // than reporting a completed fetch as unobserved.
+        if (observation.coupons.count === null) {
+            const m = wholeTrail
+                .map(l =>
+                    l.match(/AUTO_INSERT_FETCHCOUPONS_END \{count: (\d+)/),
+                )
+                .filter(Boolean)
+                .pop()
+            if (m) {
+                observation.coupons.count = Number(m[1])
+                observation.coupons.fetchStarted = true
+                observation.coupons.fetchEnded = true
+            }
+        }
 
         const attempts = timings.filter(
             e => e.event === 'AUTO_INSERT_ATTEMPT_END',
@@ -475,6 +544,35 @@ async function main() {
         if (totals.length) {
             observation.apply.totalBefore = Math.max(...totals)
             observation.apply.totalAfter = Math.min(...totals)
+        }
+
+        // On Shopify the extension prefers the discount-link strategy
+        // (/cart.js probe → /discount/{code} → live-total verify), which emits
+        // AUTO_INSERT_STRATEGY/STOP instead of per-code ATTEMPT_END events —
+        // counting only attempts reports a real, extension-verified win as
+        // submitted=0 (betseyjohnson: applied BABEW4BT18, saved 23.85, and the
+        // probe called it a no-show). Record that outcome from the console
+        // witness so the report carries what actually happened.
+        const stopLine = wholeTrail
+            .filter(l => l.includes('AUTO_INSERT_STOP'))
+            .pop()
+        if (stopLine) {
+            const grab = re => {
+                const m = stopLine.match(re)
+                return m ? m[1] : null
+            }
+            const bestSave = grab(/bestSave: ([\d.]+)/)
+            observation.apply.strategyStop = {
+                result: grab(/result: ([\w-]+)/),
+                via: grab(/via: ([\w-]+)/),
+                bestCode: grab(/bestCode: ([^,}\s]+)/),
+                bestSave: bestSave === null ? null : Number(bestSave),
+                considered: (n => (n === null ? null : Number(n)))(
+                    grab(/considered: (\d+)/),
+                ),
+            }
+        } else {
+            observation.apply.strategyStop = null
         }
 
         try {
