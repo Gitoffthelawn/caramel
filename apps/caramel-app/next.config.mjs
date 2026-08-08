@@ -1,10 +1,18 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveBuildSha } from './scripts/build-sha.mjs'
 
 const packageRoot = fileURLToPath(new URL('.', import.meta.url))
 const workspaceRoot = path.resolve(packageRoot, '..', '..')
+
+// Honest build stamp: the app package.json version, exposed to both server and
+// browser as NEXT_PUBLIC_APP_VERSION (env.client.ts reads it, falling back to
+// '0.0.0-dev'). Read here so it needs no build ARG / hand-set env var.
+const appVersion = JSON.parse(
+    readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+).version
 
 // Universally-safe security headers. CSP is deliberately NOT included
 // here — it's easy to break third-party scripts (Sentry, GA, RevenueCat)
@@ -46,7 +54,10 @@ const GIT_COMMIT_SHA = resolveBuildSha()
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    env: { GIT_COMMIT_SHA },
+    env: {
+        GIT_COMMIT_SHA,
+        NEXT_PUBLIC_APP_VERSION: appVersion,
+    },
     // F-016 one-root-compose: emit a self-contained server (.next/standalone)
     // so the Docker runner stage boots `node apps/caramel-app/server.js` with a
     // traced, minimal node_modules instead of the whole install. Pairs with

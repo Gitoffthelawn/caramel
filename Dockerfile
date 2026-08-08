@@ -21,14 +21,6 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 FROM base AS pruner
 WORKDIR /app
 COPY . .
-# Read the commit BEFORE the prune, which does not carry .git forward. Not a
-# build ARG: the platform builds this compose from a git checkout and has no
-# way to compute the commit into an arg (compose interpolates args from a
-# static .env), whereas the checkout itself always knows. Falls back to
-# "unknown" on stderr in a context with no git metadata (e.g. a source
-# tarball) and never fails the build — the cost is a deployment that cannot
-# confirm itself to CI's deploy gate, not a broken image.
-RUN node apps/caramel-app/scripts/build-sha.mjs > /git-sha.txt
 # Pinned turbo (never floating) — deterministic prune.
 RUN pnpm dlx turbo@2.5.4 prune caramel-app --docker
 
@@ -41,9 +33,6 @@ COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
 # Full pruned source.
 COPY --from=pruner /app/out/full/ ./
-# The commit the pruner read, carried across the stage boundary the prune
-# breaks; next.config.mjs inlines it into the bundle for /api/version.
-COPY --from=pruner /git-sha.txt /git-sha.txt
 
 # Build-time NEXT_PUBLIC_* — every var env.client.ts reads. Defaults are
 # LOCAL-SAFE or EMPTY only; NEVER a production identifier (public repo). Deploy
@@ -53,14 +42,25 @@ ARG NEXT_PUBLIC_BASE_URL=http://localhost:58000
 ARG NEXT_PUBLIC_SENTRY_DSN=
 ARG NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=
 ARG NEXT_PUBLIC_API_ENCRYPTION_ENABLED=
-ARG NEXT_PUBLIC_POSTHOG_KEY=
+# PostHog (feedback+observability). DATASET defaults to 'disabled' (safe: no
+# capture) so an image built without platform args never phones home. The
+# capture pairs are empty by default; deploy platforms pass real values via
+# --build-arg. NEXT_PUBLIC_APP_VERSION is NOT here — next.config.mjs injects it
+# from package.json, so it needs no build arg.
+ARG NEXT_PUBLIC_POSTHOG_DATASET=disabled
 ARG NEXT_PUBLIC_POSTHOG_HOST=
+ARG NEXT_PUBLIC_POSTHOG_KEY=
+ARG NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_HOST=
+ARG NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_CAPTURE_TOKEN=
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=$NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
 ENV NEXT_PUBLIC_API_ENCRYPTION_ENABLED=$NEXT_PUBLIC_API_ENCRYPTION_ENABLED
-ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_DATASET=$NEXT_PUBLIC_POSTHOG_DATASET
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
+ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_HOST=$NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_HOST
+ENV NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_CAPTURE_TOKEN=$NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_CAPTURE_TOKEN
 # Prod build: next.config.mjs only wraps Sentry when NODE_ENV=production.
 ENV NODE_ENV=production
 # Build-time-only placeholders: next build's page-data collection imports
@@ -86,7 +86,7 @@ ENV BETTER_AUTH_SECRET=build-placeholder-not-a-secret
 # this pruned single-app image the build is one task with no cache anyway
 # (caramel-app has no workspace deps, so `dependsOn: ^build` is empty in
 # practice).
-RUN GIT_COMMIT_SHA="$(cat /git-sha.txt)" pnpm --filter caramel-app run build
+RUN pnpm --filter caramel-app run build
 
 # Self-contained Prisma CLI for the runner's boot-time `migrate deploy`.
 # npm (not pnpm) gives a flat node_modules with every transitive dep real —

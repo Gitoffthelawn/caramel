@@ -1,6 +1,7 @@
 'use client'
 
 import Loader from '@/components/Loader'
+import { promptSupportOnFailure } from '@/lib/feedback/promptSupportOnFailure'
 import type { Coupon, CouponFilters } from '@/types/coupon'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -162,6 +163,12 @@ export default function CouponsSection({
                 toast.error('Failed to load coupons')
                 console.error('Failed to load coupons:', err)
                 setHasMore(false)
+                // A blocked, user-visible action → offer the feedback prompt
+                // (Sentry + PostHog once per session; rate-limited internally).
+                promptSupportOnFailure({
+                    error: err,
+                    operation: 'coupons_fetch',
+                })
             } finally {
                 const wrapUp = () => {
                     setIsLoadingMore(false)

@@ -1,13 +1,13 @@
 'use client'
 import ExtensionSessionRelay from '@/components/ExtensionSessionRelay'
+import SupportDialog from '@/components/support/SupportDialog'
 import Layout from '@/layouts/Layout/Layout'
+import PostHogClientProvider from '@/lib/analytics/PostHogClientProvider'
 import { ThemeContext } from '@/lib/contexts'
-import { clientEnv } from '@/lib/env.client'
 import * as gtag from '@/lib/gtag'
 import Hotjar from '@hotjar/browser'
 import { usePathname } from 'next/navigation'
 import Script from 'next/script'
-import { PostHogProvider } from 'posthog-js/react'
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 
@@ -77,8 +77,8 @@ export default function Providers({ children }: { children: ReactNode }) {
         <Layout>{children}</Layout>
     )
 
-    const tree = (
-        <>
+    return (
+        <PostHogClientProvider>
             <ThemeContext.Provider value={{ isDarkMode, switchTheme }}>
                 {content}
             </ThemeContext.Provider>
@@ -93,6 +93,9 @@ export default function Providers({ children }: { children: ReactNode }) {
                     },
                 }}
             />
+            {/* App-level support modal — opened via the module-level registry
+                (promptSupportOnFailure) without prop drilling. */}
+            <SupportDialog />
             {/* GA */}
             <Script
                 strategy="afterInteractive"
@@ -106,27 +109,6 @@ export default function Providers({ children }: { children: ReactNode }) {
           gtag('config', '${gtag.GA_TRACKING_ID}');
         `}
             </Script>
-        </>
-    )
-
-    // PostHog product analytics — no-op unless NEXT_PUBLIC_POSTHOG_KEY is set,
-    // so local/preview builds without the key are unaffected.
-    const posthogKey = clientEnv.NEXT_PUBLIC_POSTHOG_KEY
-    if (!posthogKey) return tree
-    return (
-        <PostHogProvider
-            apiKey={posthogKey}
-            options={{
-                api_host:
-                    clientEnv.NEXT_PUBLIC_POSTHOG_HOST ||
-                    'https://posthog.devino.ca',
-                capture_pageview: true,
-                capture_pageleave: true,
-                autocapture: true,
-                person_profiles: 'identified_only',
-            }}
-        >
-            {tree}
-        </PostHogProvider>
+        </PostHogClientProvider>
     )
 }

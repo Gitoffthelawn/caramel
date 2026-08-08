@@ -105,8 +105,11 @@ importers:
         specifier: 3.4.9
         version: 3.4.9
       posthog-js:
-        specifier: 1.399.4
-        version: 1.399.4
+        specifier: 1.405.3
+        version: 1.405.3
+      posthog-node:
+        specifier: 5.46.0
+        version: 5.46.0(rxjs@6.6.7)
       prisma:
         specifier: 6.14.0
         version: 6.14.0(typescript@5.9.2)
@@ -5542,8 +5545,17 @@ packages:
     resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
     engines: {node: '>=12'}
 
-  posthog-js@1.399.4:
-    resolution: {integrity: sha512-gl2/MxF1SsA7Jtg7EwlJJynQMYhaSRmfXqn3FA3LQKiGJaS7F4F0u4L04lYmJtZTmOWb/tC73YQahgRKhZDK1A==}
+  posthog-js@1.405.3:
+    resolution: {integrity: sha512-uedFwL6TD3YO/oH/eh6ObrJANJwdpis9I7dQZMcN0cS22vT5PfbpaLaC3RPuL5/hGDSwNJ8flxucV6hHDUz6Tw==}
+
+  posthog-node@5.46.0:
+    resolution: {integrity: sha512-Uzkth327Qxho9X55UygGUjVKCF9oaox90HQpa0o9YNjwLjbQmXttgHChzAtjAcsMw/ZKr3NnHC3xcAaS5dXwEQ==}
+    engines: {node: ^20.20.0 || >=22.22.0}
+    peerDependencies:
+      rxjs: ^7.0.0
+    peerDependenciesMeta:
+      rxjs:
+        optional: true
 
   potpack@1.0.2:
     resolution: {integrity: sha512-choctRBIV9EMT9WGAZHn3V7t0Z2pMQyl0EZE6pFc/6ml3ssw7Dlf/oAOvFwjm1HVsqfQN8GfeFyJ+d8tRzqueQ==}
@@ -13009,7 +13021,7 @@ snapshots:
 
   postgres@3.4.9: {}
 
-  posthog-js@1.399.4:
+  posthog-js@1.405.3:
     dependencies:
       '@posthog/core': 1.46.9
       '@posthog/types': 1.402.2
@@ -13021,6 +13033,12 @@ snapshots:
       web-vitals: 5.3.0
     transitivePeerDependencies:
       - preact-render-to-string
+
+  posthog-node@5.46.0(rxjs@6.6.7):
+    dependencies:
+      '@posthog/core': 1.46.9
+    optionalDependencies:
+      rxjs: 6.6.7
 
   potpack@1.0.2: {}
 
