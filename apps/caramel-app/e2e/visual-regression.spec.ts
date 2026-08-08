@@ -8,6 +8,17 @@ test.describe.configure({ timeout: 60000 })
 // but can't trigger scroll-dependent state changes.
 async function triggerInViewAnimations(page: Page) {
     await page.evaluate(async () => {
+        // Yield animation frames instead of sleeping — wall-clock sleeps
+        // (setTimeout / new Promise(setTimeout)) are banned in e2e specs
+        // (tests/unit/test-quality-guardrails.test.ts). The instant
+        // `behavior: 'auto'` scrolls have no scroll animation to wait out; the
+        // frame yields exist only so IntersectionObserver fires each section's
+        // Framer Motion whileInView before capture. IO callbacks dispatch
+        // within a frame of the scroll, and Argos freezes animations
+        // (`animations: 'disabled'`) at screenshot time — so a few frames per
+        // step deterministically reaches the final triggered state, with no
+        // guessed millisecond budget. (The frame wait is inlined, not a
+        // helper: it must run in this browser page.evaluate context.)
         const step = Math.max(Math.floor(window.innerHeight * 0.8), 1)
         const maxScroll = Math.max(
             document.documentElement.scrollHeight - window.innerHeight,
@@ -16,11 +27,19 @@ async function triggerInViewAnimations(page: Page) {
 
         for (let position = 0; position <= maxScroll; position += step) {
             window.scrollTo({ top: position, behavior: 'auto' })
-            await new Promise(resolve => setTimeout(resolve, 75))
+            for (let frame = 0; frame < 6; frame += 1) {
+                await new Promise<void>(resolve =>
+                    requestAnimationFrame(() => resolve()),
+                )
+            }
         }
 
         window.scrollTo({ top: maxScroll, behavior: 'auto' })
-        await new Promise(resolve => setTimeout(resolve, 150))
+        for (let frame = 0; frame < 10; frame += 1) {
+            await new Promise<void>(resolve =>
+                requestAnimationFrame(() => resolve()),
+            )
+        }
         window.scrollTo({ top: 0, behavior: 'auto' })
     })
 }
@@ -31,6 +50,14 @@ async function prepareVisualPage(
     readySelector?: string,
 ) {
     await page.goto(path, { waitUntil: 'domcontentloaded' })
+
+    // Wait for hydration before touching the page. Public pages server-render
+    // now, and argosScreenshot rewrites img loading/decoding attributes and
+    // stamps data-argos-* nodes; doing that while React is still hydrating
+    // makes React report attribute mismatches ("won't be patched up") into the
+    // dev-server log. data-hydrated is set from the Providers mount effect,
+    // i.e. strictly after the hydrated tree commits — see src/app/providers.tsx.
+    await page.locator('html[data-hydrated="true"]').waitFor()
 
     if (readySelector) {
         await page.locator(readySelector).first().waitFor({ state: 'visible' })

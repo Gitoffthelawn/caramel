@@ -69,53 +69,6 @@ test.describe('Extension — Manifest Validation', () => {
     })
 })
 
-test.describe('Extension — Supported Sites Validation', () => {
-    let supported: Array<Record<string, string>>
-
-    test.beforeAll(() => {
-        const raw = readFileSync(join(extensionDir, 'supported.json'), 'utf-8')
-        const data = JSON.parse(raw)
-        supported = data.supported
-    })
-
-    test('supported.json has entries', () => {
-        expect(supported).toBeDefined()
-        expect(supported.length).toBeGreaterThan(0)
-    })
-
-    test('each supported site has required selectors', () => {
-        for (const site of supported) {
-            expect(site.domain).toBeTruthy()
-            expect(site.couponInput).toBeTruthy()
-            expect(site.couponSubmit).toBeTruthy()
-            expect(site.priceContainer).toBeTruthy()
-        }
-    })
-
-    test('supported sites include expected domains', () => {
-        const domains = supported.map(s => s.domain)
-        expect(domains).toContain('amazon.com')
-        expect(domains).toContain('ebay.com')
-    })
-
-    test('content script matches align with supported domains', () => {
-        const manifest = JSON.parse(
-            readFileSync(join(extensionDir, 'manifest.json'), 'utf-8'),
-        )
-        const contentScripts = manifest.content_scripts as Array<{
-            matches: string[]
-        }>
-        const matchPatterns = contentScripts.flatMap(cs => cs.matches)
-
-        for (const site of supported) {
-            const domainInPattern = matchPatterns.some(pattern =>
-                pattern.includes(site.domain),
-            )
-            expect(domainInPattern).toBe(true)
-        }
-    })
-})
-
 test.describe('Extension — File Integrity', () => {
     const requiredFiles = [
         'manifest.json',
@@ -123,9 +76,17 @@ test.describe('Extension — File Integrity', () => {
         'popup.js',
         'background.js',
         'inject.js',
-        'shared-utils.js',
+        // F-008 split shared-utils.js into the 6 files below (load order matters
+        // in the manifests; alphabetical here — this test only checks existence).
+        'caramel-base.js',
+        'dom-utils.js',
+        'store-detect.js',
+        'coupon-apply.js',
+        'coupon-fetch.js',
+        'coupon-runner.js',
+        // F-006 codegen output, loaded before the split files.
+        'coupon-constants.generated.js',
         'UI-helpers.js',
-        'supported.json',
         'assets/styles.css',
     ]
 

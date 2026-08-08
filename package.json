@@ -1,23 +1,42 @@
 {
     "packageManager": "pnpm@9.0.0",
+    "engines": {
+        "node": ">=22"
+    },
     "workspaces": [
         "apps/*"
     ],
+    "pnpm": {
+        "overrides": {
+            "shell-quote": "1.9.0",
+            "web-ext>tmp": "0.2.7",
+            "undici": "7.29.0",
+            "effect": "3.20.0",
+            "vitest>picomatch": "4.0.4",
+            "postcss": "8.5.23",
+            "sharp": "0.35.3",
+            "fast-uri": "3.1.5",
+            "brace-expansion@5": "5.0.9",
+            "nanoid@<3.3.17": "3.3.17"
+        }
+    },
     "scripts": {
-        "compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d",
-        "compose:down": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml down",
-        "dev:compose": "docker compose --env-file local-dev/.env.ports -f local-dev/docker-compose.yml up -d --remove-orphans",
-        "dev": "pnpm run dev:compose && pnpm -r --parallel dev",
-        "dev:workspace": "pnpm -r --parallel dev",
+        "dev": "docker compose up --build",
+        "dev:next": "pnpm --filter caramel-app dev",
+        "dev:extension": "pnpm --filter caramel-extension dev",
         "build": "turbo run build",
         "lint": "turbo run lint",
+        "lint:oxlint": "oxlint",
         "test": "turbo run test",
         "prettier-write": "turbo run prettier-write",
         "prettier-check": "turbo run prettier-check",
+        "prettier-check:root": "prettier --check '*.{json,md,mjs,yaml,yml}' '.*.{json,yaml,yml}' '.github/**/*.{yml,yaml,md}' 'tools/**/*.{mjs,md}'",
+        "prettier-write:root": "prettier --write '*.{json,md,mjs,yaml,yml}' '.*.{json,yaml,yml}' '.github/**/*.{yml,yaml,md}' 'tools/**/*.{mjs,md}'",
         "prepare": "husky"
     },
     "lint-staged": {
         "*.{ts,tsx,js,jsx,mjs,cjs}": [
+            "oxlint",
             "eslint --fix",
             "prettier --write"
         ],
@@ -26,14 +45,16 @@
         ]
     },
     "devDependencies": {
-        "eslint": "^9.31.0",
+        "eslint": "9.31.0",
         "eslint-config-next": "16.0.3",
-        "eslint-config-prettier": "^10.1.2",
-        "husky": "^9.1.7",
-        "lint-staged": "^16.4.0",
-        "prettier": "^3.6.2",
-        "prettier-plugin-organize-imports": "^4.1.0",
-        "prettier-plugin-tailwindcss": "^0.6.14",
-        "turbo": "^2.5.4"
+        "eslint-config-prettier": "10.1.5",
+        "husky": "9.1.7",
+        "lint-staged": "16.4.0",
+        "oxlint": "1.73.0",
+        "playwright": "1.59.1",
+        "prettier": "3.6.2",
+        "prettier-plugin-organize-imports": "4.1.0",
+        "prettier-plugin-tailwindcss": "0.6.14",
+        "turbo": "2.5.4"
     }
 }

@@ -1,120 +1,97 @@
-import prisma from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
+import { handleRouteError } from '@/lib/api/handleRouteError'
+import { withRoute } from '@/lib/api/withRoute'
+import { attachSignals } from '@/lib/couponSignals'
+import { listCoupons } from '@/lib/couponsRepo'
+import { resolveStoreDomain } from '@/lib/storeDomain'
+import { NextResponse } from 'next/server'
 
-function getBaseDomain(raw: string): string {
-    let hostname = raw
-    try {
-        const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
-        hostname = u.hostname
-    } catch {
-        throw new Error('Could not find base domain')
-    }
-    const parts = hostname.split('.')
-    return parts.length > 2 ? parts.slice(-2).join('.') : hostname
-}
+// Registrable domain via the Public Suffix List. Replaces a local
+// "last two labels" helper that collapsed mymemory.co.uk to the bare suffix
+// co.uk and then served every UK store's coupons — see resolveStoreDomain.
+const getBaseDomain = resolveStoreDomain
 
-export async function GET(req: NextRequest) {
-    const url = new URL(req.url)
-    const site = url.searchParams.get('site') || undefined
-    const rawPage = parseInt(url.searchParams.get('page') || '1', 10)
-    const rawLimit = parseInt(url.searchParams.get('limit') || '10', 10)
-    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1
-    const limit =
-        Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 10
-    const search = url.searchParams.get('search') || undefined
-    const type = url.searchParams.get('type') || undefined
-    const key_words = url.searchParams.get('key_words') || undefined
+export const GET = withRoute(
+    { method: 'GET', routeName: 'coupons', rateLimit: 'read' },
+    async ({ req }) => {
+        const url = new URL(req.url)
+        const site = url.searchParams.get('site') || undefined
+        const rawPage = parseInt(url.searchParams.get('page') || '1', 10)
+        const rawLimit = parseInt(url.searchParams.get('limit') || '10', 10)
+        // Cap page at 500 so scrapers can't walk the catalog indefinitely
+        // with `page=999999`. Real users never paginate that far.
+        const page =
+            Number.isFinite(rawPage) && rawPage > 0 ? Math.min(rawPage, 500) : 1
+        const limit =
+            Number.isFinite(rawLimit) && rawLimit > 0
+                ? Math.min(rawLimit, 50)
+                : 10
+        // Cap search + keyword params to keep ILIKE patterns cheap.
+        const search =
+            (url.searchParams.get('search') || '').slice(0, 100) || undefined
+        const type = url.searchParams.get('type') || undefined
+        const keyWords =
+            (url.searchParams.get('key_words') || '').slice(0, 200) || undefined
 
-    try {
-        const filters: any = { expired: false }
-
-        // Site filter
+        let baseSite: string | undefined
         if (site) {
             const base = getBaseDomain(site)
-            filters.AND = [
-                { OR: [{ site: base }, { site: { endsWith: `.${base}` } }] },
-            ]
-        }
-
-        // Search filter (searches across site, title, description)
-        if (search) {
-            filters.OR = [
-                { site: { contains: search, mode: 'insensitive' } },
-                { title: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-                { code: { contains: search, mode: 'insensitive' } },
-            ]
-        }
-
-        // Keywords filter
-        if (key_words) {
-            const keywordsArray = key_words.split(',').map(k => k.trim())
-            if (!filters.OR) {
-                filters.OR = []
+            if (!base) {
+                return NextResponse.json(
+                    { error: 'Invalid site parameter' },
+                    { status: 400 },
+                )
             }
-            filters.OR.push(
-                ...keywordsArray.map(keyword => ({
-                    description: { contains: keyword, mode: 'insensitive' },
-                })),
-            )
+            baseSite = base
         }
 
-        // Discount type filter
-        if (type && type !== 'all') {
-            filters.discount_type = type
-        }
+        try {
+            const skip = Math.max(0, (page - 1) * limit)
 
-        const skip = Math.max(0, (page - 1) * limit)
-
-        console.info('[API][coupons] request', {
-            page,
-            limit,
-            skip,
-            site,
-            search,
-            type,
-            key_words,
-        })
-
-        const [coupons, total] = await prisma.$transaction([
-            prisma.coupon.findMany({
-                where: filters,
+            const { coupons, total } = await listCoupons({
+                baseSite,
+                search,
+                type,
+                keyWords,
+                limit,
                 skip,
-                take: limit,
-                orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
-                select: {
-                    id: true,
-                    code: true,
-                    site: true,
-                    title: true,
-                    description: true,
-                    rating: true,
-                    discount_type: true,
-                    discount_amount: true,
-                    expiry: true,
-                    expired: true,
-                    timesUsed: true,
+            })
+
+            const hasMore = skip + coupons.length < total
+
+            // Attach the app-owned trust signal (lastWorkedAt) from
+            // coupon_signals — a keyed lookup in OUR Postgres merged in app
+            // code, NOT a join into the external read-only catalog (which has
+            // no such column). Empty signals → each coupon gets
+            // lastWorkedAt:null, which the card simply doesn't render; that's
+            // the normal state until the extension starts reporting (W2). The
+            // 60s edge cache below is kept as-is — this signal is low-stakes,
+            // so 60s of staleness is fine.
+            const couponsWithSignals = await attachSignals(coupons)
+
+            // 60s edge cache with a 60s grace window. Coupons change on a
+            // scrape cycle (minutes-hours), so 60s staleness is invisible
+            // to users and offloads almost all scraping traffic to CDN.
+            return NextResponse.json(
+                {
+                    coupons: couponsWithSignals,
+                    page,
+                    limit,
+                    total,
+                    hasMore,
                 },
-            }),
-            prisma.coupon.count({ where: filters }),
-        ])
-
-        const hasMore = skip + coupons.length < total
-
-        console.info('[API][coupons] response', {
-            returned: coupons.length,
-            total,
-            hasMore,
-            page,
-            limit,
-        })
-
-        return NextResponse.json({ coupons, page, limit, total, hasMore })
-    } catch (error) {
-        console.error('Error fetching coupons:', error)
-        return NextResponse.json(
-            { error: 'Error fetching coupons.' },
-            { status: 500 },
-        )
-    }
-}
+                {
+                    headers: {
+                        'Cache-Control':
+                            'public, s-maxage=60, stale-while-revalidate=60',
+                    },
+                },
+            )
+        } catch (error) {
+            console.error('Error fetching coupons:', error)
+            return handleRouteError(error, {
+                req,
+                message: 'Error fetching coupons.',
+            })
+        }
+    },
+)

@@ -1,4 +1,60 @@
 import { expect, test } from '@playwright/test'
+import { seedVerifiedUser } from './support/seed-user'
+
+// E-05 — the login SUCCESS path against a REAL better-auth session (every other
+// auth spec here mocks /api/auth/** via page.route; this one does not). A
+// verified user is seeded through the real signup API + a DB email_verified
+// flip (see seed-user.ts), then we drive the real UI login and assert a
+// genuinely authenticated landmark (the /profile page rendering the session's
+// email). Gated on DATABASE_URL: the deployed-site e2e-push job has no seedable
+// DB, so this group skips itself there and only runs in e2e-pr / local.
+const SEEDABLE = !!process.env.DATABASE_URL
+const REAL_LOGIN_EMAIL = 'e2e-login@caramel.dev'
+const REAL_LOGIN_PASSWORD = 'E2ePass1234'
+const seedBaseURL =
+    process.env.PLAYWRIGHT_BASE_URL ||
+    process.env.BASE_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    'http://localhost:58000'
+
+test.describe('Auth Flows — Login (real session)', () => {
+    test.skip(!SEEDABLE, 'needs a seedable local/CI Postgres (DATABASE_URL)')
+
+    test.beforeAll(async () => {
+        if (!SEEDABLE) return
+        await seedVerifiedUser({
+            baseURL: seedBaseURL,
+            email: REAL_LOGIN_EMAIL,
+            password: REAL_LOGIN_PASSWORD,
+            name: 'E2E Login User',
+        })
+    })
+
+    test('real credentials sign in and reach an authenticated /profile', async ({
+        page,
+    }) => {
+        await page.goto('/login')
+        await page.getByPlaceholder('Enter your email').fill(REAL_LOGIN_EMAIL)
+        await page
+            .getByPlaceholder('Enter your password')
+            .fill(REAL_LOGIN_PASSWORD)
+
+        await page.getByRole('button', { name: /login/i }).click()
+
+        // On success the client sets a real session cookie then does
+        // window.location.href = '/', so we land on the homepage.
+        await expect(page).toHaveURL(/\/$/, { timeout: 15000 })
+
+        // The session cookie now carries a real authenticated user: /profile is
+        // a protected route that bounces unauthenticated visitors to /login, so
+        // seeing the profile with the seeded email proves the session is real.
+        await page.goto('/profile')
+        await expect(
+            page.getByRole('heading', { name: 'Profile' }),
+        ).toBeVisible({ timeout: 10000 })
+        await expect(page.getByText(REAL_LOGIN_EMAIL).first()).toBeVisible()
+    })
+})
 
 test.describe('Auth Flows — Login', () => {
     test('login with invalid credentials shows error toast', async ({
@@ -167,6 +223,69 @@ test.describe('Auth Flows — Signup', () => {
         await expect(
             page.getByText(/must be at least 4 characters/i),
         ).toBeVisible({ timeout: 5000 })
+    })
+})
+
+// The two tests below assert on text, and text that only exists after
+// hydration is a race the runner wins or loses depending on load. This one
+// failed CI twice in a day on commits that touched no app code at all, because
+// /verify read its params with useSearchParams() and Next served the Suspense
+// fallback — "Loading..." and nothing else — until the bundle arrived.
+//
+// The params are read on the server now, so the copy is in the HTML. Asserting
+// that with JavaScript OFF is what keeps it that way: a future edit that moves
+// the read back into the client cannot pass this, however fast the runner is.
+test.describe('Auth Flows — before any JavaScript runs', () => {
+    test.use({ javaScriptEnabled: false })
+
+    test('the expired-link alert is in the HTML, button and all', async ({
+        page,
+    }) => {
+        // This is the one that failed CI as a 5s timeout on a click: the alert
+        // was built from window.location.search inside an effect, so the button
+        // did not exist until hydration finished. A click cannot wait for that.
+        await page.goto('/login?error=token_expired')
+
+        await expect(page.getByText(/verification link expired/i)).toBeVisible()
+        await expect(
+            page.getByRole('button', { name: /request new link/i }),
+        ).toBeVisible()
+    })
+
+    test('a login with no error params shows no alert at all', async ({
+        page,
+    }) => {
+        // The alert is derived now, so "absent" has to be pinned as hard as
+        // "present" — a rule that always fires is not a rule.
+        await page.goto('/login')
+
+        await expect(
+            page.getByRole('button', { name: /request new link/i }),
+        ).toHaveCount(0)
+        await expect(page.getByText(/verification link expired/i)).toHaveCount(
+            0,
+        )
+    })
+
+    test('the signup message is server-rendered, not hydrated in', async ({
+        page,
+    }) => {
+        await page.goto('/verify?signup=success')
+
+        await expect(
+            page.getByText(/we've sent a verification email/i),
+        ).toBeVisible()
+        await expect(page.getByText(/didn't receive it/i)).toBeVisible()
+    })
+
+    test('so is the message for someone arriving without params', async ({
+        page,
+    }) => {
+        await page.goto('/verify')
+
+        await expect(
+            page.getByText(/please verify your email address/i),
+        ).toBeVisible()
     })
 })
 

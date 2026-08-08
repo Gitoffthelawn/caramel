@@ -4,34 +4,23 @@ import Loader from '@/components/Loader'
 import { AnimatePresence, motion } from 'framer-motion'
 import debounce from 'lodash.debounce'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import SiteCard from './site-card'
 import SuggestionForm from './suggestion-form'
 
-export default function SearchSection() {
+export default function SearchSection({
+    initialTopSites,
+}: {
+    /** Server-rendered "Top Supported Websites" (SEO) — same read as /api/sites/top-sites. */
+    initialTopSites: string[]
+}) {
     const [query, setQuery] = useState('')
-    const [sites, setSites] = useState([])
-    const [topSites, setTopSites] = useState([])
+    const [sites, setSites] = useState<string[]>([])
+    // No mount-time fetch: the /supported-stores server component passes the
+    // top sites down so they are already in the server-rendered HTML.
+    const topSites = initialTopSites
     const [loading, setLoading] = useState(false)
     const [searched, setSearched] = useState(false)
 
-    const loadTopSites = async () => {
-        setLoading(true)
-        setSearched(false)
-        setSites([])
-        try {
-            const res = await fetch('/api/sites/top-sites')
-            const data = await res.json()
-            setTopSites(data.sites || [])
-        } catch (err) {
-            toast.error('Failed to load top sites.')
-            console.error('Failed to load top sites:', err)
-        }
-        setLoading(false)
-    }
-    useEffect(() => {
-        loadTopSites()
-    }, [])
     const runSearch = async (q: string) => {
         setLoading(true)
         try {
@@ -71,7 +60,7 @@ export default function SearchSection() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="from-caramel dark:to-caramel mb-10 bg-gradient-to-r to-orange-600 bg-clip-text text-center text-4xl font-extrabold text-transparent md:text-3xl dark:from-orange-400"
+                    className="mb-10 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-center text-4xl font-extrabold text-transparent dark:from-orange-400 dark:to-caramel md:text-3xl"
                 >
                     Is your favourite store supported?
                 </motion.h1>
@@ -82,7 +71,8 @@ export default function SearchSection() {
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="https://example.com"
-                    className="border-caramel/30 focus:border-caramel w-full rounded-full border-2 bg-white px-6 py-4 text-lg placeholder-gray-400 shadow-md outline-none transition-all sm:text-base dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
+                    aria-label="Search for a supported store"
+                    className="w-full rounded-full border-2 border-caramel/30 bg-white px-6 py-4 text-lg placeholder-gray-400 shadow-md outline-none transition-all focus:border-caramel focus:shadow-lg dark:bg-darkSurface dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400 sm:text-base"
                 />
 
                 {/* loader */}
@@ -108,7 +98,7 @@ export default function SearchSection() {
                     >
                         {sites.length ? (
                             <div className="grid grid-cols-2 gap-6 pb-10 md:grid-cols-1">
-                                {sites.map((s, index) => (
+                                {sites.map(s => (
                                     <motion.div
                                         key={s}
                                         initial={{ opacity: 0, y: 20 }}
@@ -140,12 +130,12 @@ export default function SearchSection() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.3 }}
-                                            className="mb-10 border-b-[1px] pb-10 text-center text-2xl font-bold text-gray-800 dark:text-gray-200"
+                                            className="mb-10 border-b border-caramel/15 pb-10 text-center text-2xl font-bold text-gray-800 dark:border-white/10 dark:text-gray-200"
                                         >
                                             🏆 Top Supported Websites
                                         </motion.h2>
                                         <div className="grid grid-cols-2 gap-6 pb-10 md:grid-cols-1">
-                                            {topSites.map((s, index) => (
+                                            {topSites.map(s => (
                                                 <motion.div
                                                     key={s}
                                                     initial={{

@@ -1,0 +1,41 @@
+# Docker does NOT read .gitignore — anything not excluded here enters the build
+# context and can end up in image layers. Keep it slim; keep secrets + internal
+# archives OUT.
+
+# Dependencies / build outputs (reinstalled + rebuilt inside the image)
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+out
+
+# Secrets & local env — never bake a secret into a layer (.env.example is public)
+**/.env
+**/.env.*
+!**/.env.example
+.secrets
+
+# Internal, gitignored-local archives — secrecy forward-rule (DESIGN.md §2(k))
+audit
+.playwright-mcp
+apps/caramel-app/scripts/internal
+
+# VCS / editor / OS
+.git
+# …except the few ref files apps/caramel-app/scripts/build-sha.mjs reads to
+# stamp the build with its commit (/api/version serves it so CI can tell this
+# build apart from the one it replaced). Verified: only HEAD plus whichever of
+# refs/**, packed-refs and commondir exist enter the context — a few hundred
+# bytes, no objects and no config, and the pruner stage resolves them to one
+# line that never reaches the builder or runner layers.
+!.git/HEAD
+!.git/commondir
+!.git/packed-refs
+!.git/refs/**
+.claude
+.idea
+.vscode
+**/.DS_Store

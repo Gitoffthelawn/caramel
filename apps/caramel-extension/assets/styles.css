@@ -3,106 +3,154 @@ html,
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Arial', sans-serif;
+    font-family: var(--cm-font-sans);
+    -webkit-font-smoothing: antialiased;
     overflow: hidden; /* Keep extension popup from scrolling */
 }
 body {
+    /* NEVER size the popup with viewport units. A browser-action popup is
+       sized FROM its content, so `vw` is circular: Chrome lays out with a
+       tiny initial viewport, `100vw` resolves to that, the body shrinks to
+       match, and the popup never recovers — it renders as a ~35px column,
+       320-600px tall, filled with --cm-bg. In dark mode that reads as a
+       plain black rectangle (reported 2026-08-04; was `min(420px, 100vw)`).
+       A definite width gives Chrome something to measure; `max-width: 100%`
+       resolves against <html>, not the viewport, so narrow hosts (Firefox's
+       overflow menu) still clamp instead of clipping. */
     width: 420px;
-    height: 470px;
+    max-width: 100%;
+    /* Size the popup to its content (Chrome grows/shrinks the popup to fit the
+       body) so short lists don't waste space and long lists get room — the
+       coupon list caps its own height and scrolls. min-height keeps empty/error
+       states from looking tiny; max-height stays within Chrome's popup ceiling. */
+    min-height: 320px;
+    max-height: 600px;
     display: flex;
     justify-content: center;
     position: relative;
-    background: #ffffff;
+    background: var(--cm-bg);
 }
 
-/* --- Doodles & Wave Background --- */
-.popup-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px; /* Match body width */
-    height: 600px; /* Match body height */
-    overflow: hidden;
-    z-index: 1;
-}
-
-/* Wave shape at top */
-.popup-wave {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px;
-    height: 220px;
-    z-index: 2;
-}
-
-/* Doodles */
-.doodle {
-    position: absolute;
-    width: 420px;
-    opacity: 0.15;
-    z-index: 1;
-}
-
-/* --- Loading Overlay --- */
+/* --- Loading skeleton ---
+   Light ghost bars INSIDE the card footprint (replaces the old dark scrim +
+   pulsing logo overlay): a header bar ghost + 3 coupon-ticket ghost rows with
+   a subtle background-position shimmer. popup.js keeps the same contract —
+   sets display:none on #loading-container once the real fetch resolves. */
 .loading-container {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 420px;
-    height: 600px;
-    background: rgba(0, 0, 0, 0.35);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 20px;
+    inset: 0;
     z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px 20px;
+    box-sizing: border-box;
+    background: var(--cm-bg);
 }
-.loading-container img {
-    width: 60px;
-    height: 60px;
-    animation: fadeIn 0.5s ease-in-out infinite alternate;
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--cm-skeleton-base) 25%,
+        var(--cm-skeleton-sheen) 50%,
+        var(--cm-skeleton-base) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s var(--cm-ease-in-out) infinite;
+    border-radius: var(--cm-radius-md);
+}
+.skeleton-header {
+    height: 36px;
+    width: 60%;
+    margin: 0 auto 6px;
+}
+.skeleton-ticket {
+    height: 84px;
+    border-radius: 14px; /* matches .coupon-item */
+}
+@keyframes skeletonShimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
 }
 
-/* --- Popup Container (on top of wave) --- */
+/* --- Popup Container ---
+   Clean opaque surface (the wave/glassmorphism era is gone): tokened bg,
+   radius + card shadow, and a slim warm brand gradient bar as the top
+   accent. One fade/settle on open — no looping animations. */
 .popup-container {
     position: relative;
     z-index: 10;
-    width: 380px;
-    border-radius: 20px;
-    margin: auto; /* space from wave */
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    animation: fadeIn 0.8s ease forwards;
+    width: calc(100% - 32px);
+    max-width: 388px;
+    margin: 16px auto;
+    border-radius: var(--cm-radius-lg);
+    background: var(--cm-bg);
+    border: 1px solid var(--cm-border);
+    box-shadow: var(--cm-shadow-card);
+    overflow: hidden; /* clips the accent bar to the rounded corners */
+    animation: popupSettle var(--cm-dur-slow) var(--cm-ease-out) both;
+}
+.popup-container::before {
+    content: '';
+    display: block;
+    height: 4px;
+    background: linear-gradient(90deg, var(--cm-brand), var(--cm-brand-strong));
+}
+@keyframes popupSettle {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* --- Header --- */
 .popup-header {
     position: relative;
     text-align: center;
-    padding: 12px;
+    padding: 14px 12px 8px;
 }
 
 .popup-logo {
-    width: 140px;
+    width: 132px;
     height: auto;
-    animation: bounce 2s ease-in-out;
+    display: inline-block;
+    vertical-align: middle;
 }
-.popup-logo:hover {
-    animation: bounce 2s infinite;
-}
-/* Profile settings icon in top-right corner */
+
+/* Profile settings button in top-right corner (gear icon, 40x40 hit area
+   incl. padding ≥44 with the header inset). popup.js toggles
+   style.display = 'block' / 'none' — hidden by default here. */
 .profile-settings {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 28px;
-    height: 28px;
-    background: url('assets/default-profile.png') no-repeat center center;
-    background-size: cover;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    padding: 10px;
+    box-sizing: border-box;
+    border: none;
+    border-radius: var(--cm-radius-pill);
+    background: transparent;
+    color: var(--cm-text-secondary);
     cursor: pointer;
+    transition:
+        background var(--cm-dur-fast) var(--cm-ease),
+        color var(--cm-dur-fast) var(--cm-ease);
     display: none; /* shown only on login */
+}
+.profile-settings svg {
+    display: block;
+}
+.profile-settings:hover {
+    background: var(--cm-brand-soft-2);
+    color: var(--cm-brand);
 }
 
 /* --- Main Content --- */
@@ -112,141 +160,32 @@ body {
 }
 
 /* --- Login Prompt --- */
-.login-prompt h2 {
-    font-size: 24px;
-    color: #ea6925;
-    margin-bottom: 12px;
-}
-.login-prompt p {
-    font-size: 14px !important;
-    color: #444;
-    margin-bottom: 16px;
-}
 .login-prompt a {
-    color: #ea6925;
+    color: var(--cm-brand);
     text-decoration: none;
 }
-.login-button {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
-}
 
-/* --- Profile Card --- */
-.profile-card {
-    padding: 16px;
-}
-.profile-image {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-.welcome-message {
-    font-size: 18px;
-    color: #ea6925;
-    margin-top: 12px;
-    font-weight: bold;
-}
-.username {
-    font-size: 14px;
-    color: #555;
-    margin-bottom: 16px;
-}
-.profile-actions {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 12px;
-}
-.settings-button,
-.logout-button {
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-.settings-button {
-    background: #ea6925;
-    color: #fff;
-}
-.logout-button {
-    border: 1px solid #ea6925;
-    color: #ea6925;
-}
-.settings-button:hover {
-    background: #da7f52;
-}
-.logout-button:hover {
-    background: #ea6925;
-    color: #fff;
-}
-
-/* --- Animations --- */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-@keyframes bounce {
-    0%,
-    20%,
-    50%,
-    80%,
-    100% {
-        transform: translateY(0);
-    }
-    40% {
-        transform: translateY(-10px);
-    }
-    60% {
-        transform: translateY(-5px);
-    }
-}
+/* --- Animations ---
+   fadeIn / fadeInUp live further down (single definitions). */
 .fade-in-up {
-    animation: fadeInUp 0.6s ease forwards;
-}
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(15px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    animation: fadeInUp var(--cm-dur-slow) var(--cm-ease-out) forwards;
 }
 
 .login-prompt {
     max-width: 250px;
     margin: 0 auto;
     text-align: center;
-    font-family: sans-serif;
 }
 
 .login-prompt h2 {
     margin: 0 0 10px;
     font-size: 1.5em;
+    color: var(--cm-brand);
 }
 
 .login-prompt p {
-    font-size: 0.9em;
-    color: #555;
+    font-size: var(--cm-text-base) !important;
+    color: var(--cm-text-secondary);
     margin-bottom: 6px;
     margin-top: 5px;
 }
@@ -263,15 +202,18 @@ body {
     font-weight: 500;
     margin-bottom: 5px;
     font-size: 0.8rem;
-    color: #444;
+    color: var(--cm-text-secondary);
 }
 
 .login-form input {
     padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--cm-border);
     border-radius: 0.375rem;
     font-size: 1rem;
     outline: none;
+    background: var(--cm-surface);
+    color: var(--cm-text-primary);
+    transition: border-color var(--cm-dur-fast) var(--cm-ease);
 }
 .login-form div {
     display: flex;
@@ -279,23 +221,63 @@ body {
 }
 
 .login-form input:focus {
-    border-color: #ea6925; /* highlight border on focus */
+    border-color: var(--cm-brand); /* highlight border on focus */
+}
+
+/* Password input + show/hide toggle share a positioning context; the input
+   reserves right padding so long passwords never run under the button. */
+.password-field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.password-field input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding-right: 46px;
+}
+.password-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--cm-text-muted);
+    cursor: pointer;
+    transition: color var(--cm-dur-fast) var(--cm-ease);
+}
+.password-toggle:hover {
+    color: var(--cm-text-primary);
+}
+.password-toggle svg {
+    display: block;
 }
 
 .login-button {
     padding: 10px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--cm-radius-sm);
+    font-size: var(--cm-text-md);
     font-weight: 600;
     cursor: pointer;
-    background-color: #ea6925;
-    color: #fff;
-    transform: scale(1);
-    transition: 0.3s;
+    background-color: var(--cm-brand);
+    color: var(--cm-on-brand);
+    box-shadow: var(--cm-shadow-card);
+    transition:
+        background-color var(--cm-dur) var(--cm-ease),
+        box-shadow var(--cm-dur) var(--cm-ease);
 }
 
 .login-button:hover {
-    transform: scale(1.05);
+    background-color: var(--cm-brand-strong);
+    box-shadow: var(--cm-shadow-raised);
 }
 
 .oauth-buttons {
@@ -311,21 +293,22 @@ body {
     justify-content: center;
     gap: 8px;
     padding: 10px 16px;
-    border: 1px solid #ea6925;
-    border-radius: 4px;
-    background-color: #fff;
-    color: #333;
-    font-size: 14px;
+    border: 1px solid var(--cm-border);
+    border-radius: var(--cm-radius-sm);
+    background-color: var(--cm-surface);
+    color: var(--cm-text-primary);
+    font-size: var(--cm-text-base);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition:
+        background-color var(--cm-dur-fast) var(--cm-ease),
+        border-color var(--cm-dur-fast) var(--cm-ease);
     width: 100%;
 }
 
 .oauth-button:hover:not(:disabled) {
-    background-color: rgba(234, 105, 37, 0.1);
-    border-color: #ea6925;
-    transform: scale(1.02);
+    background-color: var(--cm-brand-soft);
+    border-color: var(--cm-brand);
 }
 
 .oauth-button:disabled {
@@ -339,20 +322,29 @@ body {
     height: 18px;
 }
 
+/* Shown only when popup OAuth is unavailable (Firefox — no identity
+   permission) and the buttons fall back to website sign-in + relay. */
+.oauth-note {
+    margin: 8px 0 0;
+    text-align: center;
+    color: var(--cm-text-muted);
+    font-size: var(--cm-text-xs);
+}
+
 .oauth-divider {
     display: flex;
     align-items: center;
     text-align: center;
     margin: 16px 0;
-    color: #666;
-    font-size: 14px;
+    color: var(--cm-text-muted);
+    font-size: var(--cm-text-base);
 }
 
 .oauth-divider::before,
 .oauth-divider::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--cm-border);
 }
 
 .oauth-divider span {
@@ -362,22 +354,22 @@ body {
 .error-message {
     padding: 8px;
     margin: 8px 0;
-    border: 1px solid #cc0000;
-    border-radius: 4px;
-    background-color: #f8d7da; /* light red background */
-    color: #721c24; /* darker red text */
+    border: 1px solid var(--cm-danger-border);
+    border-radius: var(--cm-radius-sm);
+    background-color: var(--cm-danger-bg);
+    color: var(--cm-danger-text);
 }
 
 .resend-verification-btn {
     background: none;
     border: none;
-    color: #ea6925;
-    font-size: 14px;
+    color: var(--cm-brand);
+    font-size: var(--cm-text-base);
     font-weight: 600;
     text-decoration: underline;
     cursor: pointer;
     padding: 8px;
-    transition: all 0.2s ease;
+    transition: opacity var(--cm-dur-fast) var(--cm-ease);
 }
 
 .resend-verification-btn:hover {
@@ -396,12 +388,16 @@ body {
 
 /* -------------- Overall Card -------------- */
 .coupons-profile-card {
-    /* Subtle gradient with your brand color (#ea6925) in mind */
-    background: linear-gradient(135deg, #fff 50%, #fff3ec 100%);
+    /* Subtle gradient with the brand color in mind */
+    background: linear-gradient(
+        135deg,
+        var(--cm-surface) 50%,
+        var(--cm-brand-soft-2) 100%
+    );
     padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-    animation: fadeInUp 0.3s ease forwards;
+    border-radius: var(--cm-radius-md);
+    box-shadow: var(--cm-shadow-card);
+    animation: fadeInUp var(--cm-dur-slow) var(--cm-ease-out) forwards;
     max-width: 420px;
     margin: 0 auto;
     position: relative;
@@ -440,20 +436,29 @@ body {
     border-radius: 50%;
     object-fit: cover;
     margin-right: 10px;
-    border: 2px solid #ea6925;
+    border: 2px solid var(--cm-brand);
 }
 
 /* The user label (e.g., "@username" or "Guest") */
 .coupons-user-label {
-    font-size: 14px;
+    font-size: var(--cm-text-base);
     font-weight: bold;
-    color: #333;
+    color: var(--cm-text-primary);
+}
+
+/* Signed-in note on the profile view (reuses the coupons card language) */
+.profile-signed-in-note {
+    margin: 0;
+    text-align: left;
+    font-size: var(--cm-text-sm);
+    line-height: 1.5;
+    color: var(--cm-text-secondary);
 }
 
 /* -------------- Header text for the coupon list -------------- */
 .coupon-header {
-    font-size: 16px;
-    color: #ea6925;
+    font-size: var(--cm-text-md);
+    color: var(--cm-brand);
     margin: 0 0 8px 0;
     font-weight: bold;
     text-align: center;
@@ -461,11 +466,39 @@ body {
 
 /* -------------- Coupon List + Items -------------- */
 .coupon-list {
-    max-height: 220px;
+    /* Fit the list inside the popup so the card never overflows the body
+       (overflow:hidden) and clips the header / list bottom. Adapts to the
+       popup viewport; the list scrolls internally for long lists.
+       overscroll-behavior:contain stops macOS rubber-band scroll-chaining.
+       Fixed cap (popup is content-sized now): ~3 cards, then scroll.
+
+       320, not 360: everything stacked above the list inside body's 600px
+       ceiling — header, profile row, SAVINGS BANNER, list heading — measures
+       ~279px once a user has banked a saving, so a 360px list overflowed the
+       card by ~39px. body is overflow:hidden, so that surplus wasn't merely
+       ugly: the last coupon was sliced mid-card and the bottom of the scroll
+       viewport sat below the popup, permanently unreachable. The banner is
+       the newest of those blocks, which is exactly how a cap that once fit
+       stopped fitting. tests/popup-sizing.test.mjs pins the arithmetic. */
+    max-height: 320px;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     margin: 8px 0;
-    padding-right: 4px; /* helps avoid overlap with scrollbar */
+    padding: 4px 6px 4px 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cm-scrollbar) transparent;
+}
+.coupon-list::-webkit-scrollbar {
+    width: 8px;
+}
+.coupon-list::-webkit-scrollbar-thumb {
+    background: var(--cm-scrollbar);
+    border-radius: var(--cm-radius-pill);
+    border: 2px solid var(--cm-surface);
+}
+.coupon-list::-webkit-scrollbar-thumb:hover {
+    background: var(--cm-scrollbar-hover);
 }
 
 /*
@@ -478,106 +511,209 @@ body {
         url('data:image/svg+xml;base64,PHN2Zw0KICAgICAgICB3aWR0aD0iNjAiDQogICAgICAgIGhlaWdodD0iMTYiDQogICAgICAgIHZpZXdCb3g9IjAgMCA2MCAxNiINCiAgICAgICAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIg0KPg0KICAgIDwhLS0gT3ZlcmxhcHBpbmcgc3F1YXJlcyAocmVwcmVzZW50IHRoZSAiY29weSIgaWNvbikgLS0+DQogICAgPHJlY3QNCiAgICAgICAgICAgIHg9IjAiDQogICAgICAgICAgICB5PSIzIg0KICAgICAgICAgICAgd2lkdGg9IjgiDQogICAgICAgICAgICBoZWlnaHQ9IjEwIg0KICAgICAgICAgICAgZmlsbD0ibm9uZSINCiAgICAgICAgICAgIHN0cm9rZT0iI2VhNjkyNSINCiAgICAgICAgICAgIHN0cm9rZS13aWR0aD0iMSINCiAgICAgICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCINCiAgICAgICAgICAgIHN0cm9rZS1saW5lam9pbj0icm91bmQiDQogICAgLz4NCiAgICA8cmVjdA0KICAgICAgICAgICAgeD0iMiINCiAgICAgICAgICAgIHk9IjEiDQogICAgICAgICAgICB3aWR0aD0iOCINCiAgICAgICAgICAgIGhlaWdodD0iMTAiDQogICAgICAgICAgICBmaWxsPSJub25lIg0KICAgICAgICAgICAgc3Ryb2tlPSIjZWE2OTI1Ig0KICAgICAgICAgICAgc3Ryb2tlLXdpZHRoPSIxIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIg0KICAgICAgICAgICAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCINCiAgICAvPg0KDQogICAgPCEtLSBUaGUgd29yZCAiQ29weSIgdG8gdGhlIHJpZ2h0IC0tPg0KICAgIDx0ZXh0DQogICAgICAgICAgICB4PSIxOCINCiAgICAgICAgICAgIHk9IjEyIg0KICAgICAgICAgICAgZmlsbD0iI2VhNjkyNSINCiAgICAgICAgICAgIGZvbnQtc2l6ZT0iMTAiDQogICAgICAgICAgICBmb250LWZhbWlseT0ic2Fucy1zZXJpZiINCiAgICA+DQogICAgICAgIENvcHkNCiAgICA8L3RleHQ+DQo8L3N2Zz4NCg==')
             8 8,
         copy;
-    border: 2px dashed #ea6925;
-    border-radius: 8px;
-    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--cm-border);
+    border-radius: 14px;
+    padding: 14px 15px;
     margin-bottom: 12px;
     transition:
-        background-color 0.2s,
-        box-shadow 0.2s;
-    background-color: #fff;
+        background-color var(--cm-dur-fast) var(--cm-ease),
+        border-color var(--cm-dur-fast) var(--cm-ease),
+        box-shadow var(--cm-dur-fast) var(--cm-ease),
+        opacity var(--cm-dur-fast) var(--cm-ease),
+        transform var(--cm-dur-fast) var(--cm-ease);
+    background-color: var(--cm-surface);
+    box-shadow: var(--cm-shadow-card);
     position: relative;
 }
 
-/* Subtle hover effect */
+/* Hover lifts the card and warms its edge; the code row gets the brand orange. */
 .coupon-item:hover {
-    background-color: #fff8f5;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
+    background-color: var(--cm-surface);
+    border-color: var(--cm-border-dashed-hover);
+    box-shadow: var(--cm-shadow-raised);
+    transform: translateY(-1px);
 }
 
-/* Optional "ticket notch" effect (using :before/:after) */
-.coupon-item:before,
-.coupon-item:after {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    background: #fff;
-    border: 2px solid #ea6925;
-    border-radius: 50%;
+/* Visible keyboard focus ring — cards are role="button" + tabindex="0". */
+.coupon-item:focus-visible {
+    outline: 2px solid var(--cm-brand);
+    outline-offset: 2px;
 }
 
-.coupon-item:before {
-    top: -9px;
-    left: -9px;
+/* Dead codes (invalid / expired) recede so live codes draw the eye first —
+   the visual rhythm that was missing when every card shouted equally. */
+.coupon-item-dead {
+    opacity: 0.6;
+    border-color: var(--cm-border-dim);
+    background-color: var(--cm-surface-dim);
+    box-shadow: none;
 }
-.coupon-item:after {
-    bottom: -9px;
-    right: -9px;
+.coupon-item-dead:hover {
+    opacity: 0.9;
+    border-color: var(--cm-border-dim-hover);
+    box-shadow: 0 8px 18px -12px rgba(20, 14, 10, 0.22);
+    transform: translateY(-1px);
 }
 
-/* The coupon's title */
-.coupon-title {
-    font-weight: bold;
-    font-size: 14px;
+/* Title + status tag share a flex row: the title (flex:1) shrinks and wraps
+   beside the badge, so a wide badge ("Verified · may vary") can never overlap
+   the title text regardless of length. */
+.coupon-head {
+    display: flex;
+    /* wrap lets the badge + "worked Xh ago" pair drop below the title on
+       narrow popups (≤320px) instead of crushing the title into mid-word
+       breaks via overflow-wrap:anywhere. */
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 4px 8px;
     margin-bottom: 4px;
-    color: #333;
 }
 
-/* The coupon's description text */
+/* Verification status tag — sits at the top-right of the ticket as a stamp.
+   Tier colour/background come from the .coupon-badge--<tier> classes below
+   (green=verified, amber=restricted, grey=pending, red=invalid) — popup.js
+   assigns the class from window.CaramelCoupons.STATUS_META[status].tier. */
+.coupon-badge {
+    flex: none;
+    margin-top: 1px;
+    padding: 2px 9px;
+    border-radius: var(--cm-radius-pill);
+    font-size: var(--cm-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.55;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(20, 14, 10, 0.06);
+}
+.coupon-badge--green {
+    color: var(--cm-tier-green-text);
+    background: var(--cm-tier-green-bg);
+}
+.coupon-badge--amber {
+    color: var(--cm-tier-amber-text);
+    background: var(--cm-tier-amber-bg);
+}
+.coupon-badge--grey {
+    color: var(--cm-tier-grey-text);
+    background: var(--cm-tier-grey-bg);
+}
+.coupon-badge--red {
+    color: var(--cm-tier-red-text);
+    background: var(--cm-tier-red-bg);
+}
+
+/* "worked Xh ago" trust signal beside the badge (W1) */
+.coupon-worked-ago {
+    color: var(--cm-tier-green-text);
+    font-size: var(--cm-text-xs);
+    font-weight: 600;
+}
+
+/* The coupon's title. flex-basis 60% (not 0) keeps a readable measure when a
+   badge + "worked Xh ago" share the row — below that the pair wraps under the
+   title (.coupon-head is flex-wrap:wrap) instead of crushing it into mid-word
+   breaks at 320px-wide popups. */
+.coupon-title {
+    flex: 1 1 60%;
+    min-width: 0;
+    font-weight: 700;
+    font-size: var(--cm-text-base);
+    line-height: 1.35;
+    color: var(--cm-text-primary);
+    /* Wrap even a single unbreakable string instead of overflowing the card. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* The coupon's description — muted, clamped to 2 lines so one long blurb can't
+   make a card tower over its neighbours; still wraps unbreakable strings. */
 .coupon-desc {
-    font-size: 13px;
-    color: #666;
-    margin-bottom: 6px;
+    font-size: var(--cm-text-sm);
+    line-height: 1.45;
+    color: var(--cm-text-muted);
+    margin: 0 0 11px;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
-/* A container for the copy button */
-.coupon-action {
+/* The tear-off code row — the one place the dashed "coupon" cue lives now.
+   Code on the left (monospace, truncates if huge so it never overflows), a
+   compact Copy pill on the right. The whole card stays click-to-copy. */
+.coupon-code-row {
     display: flex;
     align-items: center;
-    margin-top: 5px;
-    justify-content: flex-end;
-}
-
-/* -------------- The big, obvious Copy button -------------- */
-.copyBtn {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
+    gap: 10px;
+    margin-top: 4px;
+    padding: 7px 7px 7px 12px;
+    border: 1.5px dashed var(--cm-border-dashed);
+    border-radius: 10px;
+    background: var(--cm-brand-soft);
     transition:
-        background 0.3s ease,
-        transform 0.1s;
+        border-color var(--cm-dur-fast) var(--cm-ease),
+        background var(--cm-dur-fast) var(--cm-ease);
 }
-
-.copyBtn:hover {
-    background: #cf581f;
+.coupon-item:hover .coupon-code-row {
+    border-color: var(--cm-brand);
+    background: var(--cm-brand-soft-3);
 }
-
-.copyBtn:active {
-    transform: scale(0.97);
+.coupon-code {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--cm-font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--cm-text-primary);
+}
+.coupon-copy {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 12px;
+    border-radius: var(--cm-radius-sm);
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
+    font-size: var(--cm-text-sm);
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(234, 105, 37, 0.3);
+    transition: background var(--cm-dur-fast) var(--cm-ease);
+}
+.coupon-item:hover .coupon-copy {
+    background: var(--cm-brand-strong);
+}
+.coupon-copy svg {
+    flex: none;
 }
 
 /* -------------- Logout / Login Button -------------- */
 .coupons-logout-button {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
-    border-radius: 6px;
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+    border: 2px solid var(--cm-brand);
+    border-radius: var(--cm-radius-sm);
     padding: 6px 16px;
+    /* 44px-class tap target (iOS Safari ships this same popup). */
+    min-height: 40px;
     cursor: pointer;
     font-size: 13px;
     font-weight: bold;
-    transition: all 0.3s ease;
+    transition:
+        background var(--cm-dur-fast) var(--cm-ease),
+        color var(--cm-dur-fast) var(--cm-ease);
 }
 
 .coupons-logout-button:hover {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
 }
 
 /* -------------- Toast / Confirmation -------------- */
@@ -590,19 +726,19 @@ body {
 }
 
 .copy-toast {
-    background-color: #333;
-    color: #fff;
+    background-color: var(--cm-toast-bg);
+    color: var(--cm-toast-text);
     padding: 10px 16px;
-    border-radius: 4px;
+    border-radius: var(--cm-radius-sm);
     margin-bottom: 8px;
     opacity: 0.95;
-    animation: fadeIn 0.3s ease forwards;
-    font-size: 14px;
+    animation: fadeIn var(--cm-dur-slow) var(--cm-ease) forwards;
+    font-size: var(--cm-text-base);
 }
 
 /* Fade out after the setTimeout triggers 'fade-out' class */
 .copy-toast.fade-out {
-    animation: fadeOut 0.3s ease forwards;
+    animation: fadeOut var(--cm-dur-slow) var(--cm-ease) forwards;
 }
 
 @keyframes fadeIn {
@@ -627,180 +763,125 @@ body {
     }
 }
 
-/* -------------- Media Queries (for small screens) -------------- */
-/* only apply when viewport ≤480px AND on a touch device (no hover) */
-@media only screen and (max-width: 480px) and (hover: none) and (pointer: coarse) {
-    body,
-    .popup-bg,
-    .popup-wave {
-        width: 100%;
-        max-width: none;
-    }
-
-    .popup-container {
-        width: 90%;
-        max-width: none;
-    }
-}
-
+/* --- Unsupported-site / no-coupons view ------------------------- */
 .no-coupons-view {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    background: var(--cm-surface);
+    border-radius: var(--cm-radius-lg);
+    padding: 28px 22px;
+    box-shadow: var(--cm-shadow-card);
+    text-align: center;
 }
 
-.no-coupons-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-}
-
-.no-coupons-actions {
+/* Empty-state illustration: a brand-orange tag glyph in a soft peach disc,
+   replacing the meaningless default-avatar that used to sit here. */
+.empty-illu {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 14px;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: var(--cm-brand-soft-4);
+    border-radius: 50%;
+}
+
+.no-coupons-view h3 {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cm-text-primary);
+}
+.no-coupons-view p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--cm-text-secondary);
+}
+
+/* Stacked full-width actions read far cleaner than a wrapped icon+button row. */
+.no-coupons-actions {
+    display: flex;
+    flex-direction: column;
     gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 14px;
 }
 
 .supported-sites-btn,
 .toggle-login-btn {
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 14px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: var(--cm-text-base);
     cursor: pointer;
     text-decoration: none;
+    text-align: center;
     transition:
-        background 0.3s ease,
-        color 0.3s ease;
+        background var(--cm-dur-fast) var(--cm-ease),
+        border-color var(--cm-dur-fast) var(--cm-ease),
+        box-shadow var(--cm-dur-fast) var(--cm-ease),
+        transform var(--cm-dur-fast) var(--cm-ease);
 }
 
 .supported-sites-btn {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
     border: none;
+    box-shadow: 0 2px 8px rgba(234, 105, 37, 0.28);
 }
 .supported-sites-btn:hover {
-    background: #cf581f;
+    background: var(--cm-brand-strong);
+    box-shadow: 0 4px 12px rgba(234, 105, 37, 0.34);
+}
+.supported-sites-btn:active {
+    transform: scale(0.99);
 }
 
 .toggle-login-btn {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+    border: 1.5px solid var(--cm-border-dashed);
 }
 .toggle-login-btn:hover {
-    background: #ea6925;
-    color: #fff;
+    background: var(--cm-brand-soft);
+    border-color: var(--cm-brand);
+}
+
+/* "Open source" footer link — small GitHub mark + label, de-emphasized,
+   replacing the stray black PNG circle that used to crowd the action row. */
+.oss-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+    color: var(--cm-text-muted-2);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color var(--cm-dur-fast) var(--cm-ease);
+}
+.oss-link:hover {
+    color: var(--cm-text-secondary);
+}
+.oss-link svg {
+    opacity: 0.85;
 }
 
 .back-btn {
     background: none;
     border: none;
-    color: #ea6925;
-    font-size: 14px;
+    color: var(--cm-brand);
+    font-size: var(--cm-text-base);
     cursor: pointer;
     margin-top: 16px;
 }
 
-.github-icon {
-    width: 28px;
-    height: 28px;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
-}
-.github-icon:hover {
-    opacity: 1;
-}
-/* --- Unsupported-site section ----------------------------------- */
-
-.no-coupons-view {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.no-coupons-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-}
-
-.no-coupons-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-}
-
-.supported-sites-btn,
-.toggle-login-btn {
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    text-decoration: none;
-    transition:
-        background 0.3s ease,
-        color 0.3s ease;
-}
-
-.supported-sites-btn {
-    background: #ea6925;
-    color: #fff;
-    border: none;
-}
-.supported-sites-btn:hover {
-    background: #cf581f;
-}
-
-.toggle-login-btn {
-    background: #fff;
-    color: #ea6925;
-    border: 2px solid #ea6925;
-}
-.toggle-login-btn:hover {
-    background: #ea6925;
-    color: #fff;
-}
-
-.back-btn {
-    background: none;
-    border: none;
-    color: #ea6925;
-    font-size: 14px;
-    cursor: pointer;
-    margin-bottom: 12px;
-}
-
-.github-icon {
-    width: 28px;
-    height: 28px;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
-}
-.github-icon:hover {
-    opacity: 1;
-}
-
 @media (max-width: 480px) {
     .no-coupons-view {
-        width: 90%;
         padding: 12px;
     }
     .coupons-profile-card {
-        width: 90%;
         padding: 12px;
     }
 
@@ -813,15 +894,188 @@ body {
         font-size: 15px;
     }
 
-    .copyBtn {
-        width: 100%;
-        justify-content: center;
-        padding: 12px;
-        font-size: 15px;
-    }
-
     .coupons-logout-button {
         padding: 6px 12px;
-        font-size: 14px;
+        font-size: var(--cm-text-base);
+        /* keep the 40px tap-target floor at narrow widths too */
+        min-height: 40px;
     }
+}
+
+/* Restriction warning chip on restricted coupons */
+.coupon-item-restricted {
+    border-color: var(--cm-restriction-accent);
+    background: linear-gradient(
+        180deg,
+        var(--cm-restriction-bg) 0%,
+        var(--cm-surface) 80%
+    );
+}
+.coupon-restriction {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    margin: 6px 0 8px;
+    padding: 7px 9px;
+    font-size: 12px;
+    color: var(--cm-restriction-text);
+    background: var(--cm-restriction-bg);
+    border-left: 3px solid var(--cm-restriction-accent);
+    border-radius: 6px;
+}
+.coupon-restriction-icon {
+    color: var(--cm-restriction-strong);
+    line-height: 1;
+    display: inline-flex;
+    margin-top: 1px;
+}
+.coupon-restriction-icon svg {
+    display: block;
+}
+.coupon-restriction-text {
+    flex: 1;
+    line-height: 1.35;
+}
+.coupon-restriction-text b {
+    color: var(--cm-restriction-strong);
+}
+.coupon-restriction-detail {
+    flex-basis: 100%;
+    margin-top: 3px;
+    color: var(--cm-restriction-detail);
+    font-size: var(--cm-text-xs);
+    opacity: 0.85;
+    font-style: italic;
+}
+
+/* Respect the OS "reduce motion" setting (accessibility / vestibular sensitivity,
+   common on macOS/iOS): neutralize the settle/fade-ins, skeleton shimmer, and
+   hover/scroll transitions across the whole popup without touching static
+   layout transforms. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* --- Consistent keyboard focus for ALL popup controls ---
+ * Buttons/links previously fell back to the browser's default (black) outline
+ * on Tab; give every interactive element the same branded orange ring the
+ * coupon cards use, and suppress the ring on pointer focus. */
+.popup-container a:focus-visible,
+.popup-container button:focus-visible,
+.login-form input:focus-visible {
+    outline: 2px solid var(--cm-brand);
+    outline-offset: 2px;
+    border-radius: var(--cm-radius-sm);
+}
+.popup-container a:focus:not(:focus-visible),
+.popup-container button:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* --- Savings banner (popup views + settings) --- */
+.savings-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 4px;
+    padding: 9px 12px;
+    background: var(--cm-brand-soft-2);
+    border: 1px dashed var(--cm-border-dashed);
+    border-radius: var(--cm-radius-md);
+    color: var(--cm-text-primary);
+    font-size: var(--cm-text-sm);
+}
+.savings-banner svg {
+    flex: none;
+    color: var(--cm-brand);
+}
+.savings-banner b {
+    color: var(--cm-brand-strong);
+}
+
+/* --- Settings view --- */
+.settings-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 2px;
+}
+.settings-title {
+    margin: 2px 0 4px;
+    font-size: var(--cm-text-md);
+    color: var(--cm-text-primary);
+}
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--cm-surface);
+    border: 1px solid var(--cm-border);
+    border-radius: var(--cm-radius-md);
+    cursor: pointer;
+}
+.settings-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.settings-copy span {
+    font-size: var(--cm-text-base);
+    color: var(--cm-text-primary);
+    overflow-wrap: anywhere;
+}
+.settings-copy small {
+    font-size: var(--cm-text-xs);
+    color: var(--cm-text-secondary);
+}
+/* Checkbox drawn as a brand toggle switch. */
+.settings-switch {
+    appearance: none;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    margin: 0;
+    background: var(--cm-border-dim-hover);
+    border-radius: var(--cm-radius-pill);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--cm-dur) var(--cm-ease);
+}
+.settings-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: var(--cm-on-brand);
+    border-radius: 50%;
+    box-shadow: var(--cm-shadow-card);
+    transition: transform var(--cm-dur) var(--cm-ease);
+}
+.settings-switch:checked {
+    background: var(--cm-brand);
+}
+.settings-switch:checked::after {
+    transform: translateX(16px);
+}
+.account-link {
+    align-self: flex-start;
+    font-size: var(--cm-text-sm);
+    color: var(--cm-brand-strong);
+    text-decoration: none;
+}
+.account-link:hover {
+    text-decoration: underline;
 }

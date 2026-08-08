@@ -1,364 +1,581 @@
 /* global currentBrowser, fetchCoupons */
 
+// Dev/prod base URL via the shared _isDevInstall() (defined in
+// caramel-base.js, loaded before this script — formerly shared-utils.js,
+// split by F-008). Packed Web Store builds have a manifest update_url →
+// prod; unpacked dev installs → the DEV deployment. No `management` perm.
+const CARAMEL_BASE_URL =
+    typeof _isDevInstall === 'function' && _isDevInstall()
+        ? 'https://dev.grabcaramel.com'
+        : 'https://grabcaramel.com'
+const caramelUrl = path => new URL(path, `${CARAMEL_BASE_URL}/`).toString()
+
+// Escape coupon/API data before interpolating into innerHTML. Codes, titles and
+// messages come from the API; without this a code containing a quote/angle
+// bracket would break its `data-code` attribute (corrupting the copied value)
+// or leak stray markup into the layout.
+const escHtml = s =>
+    String(s == null ? '' : s).replace(
+        /[&<>"']/g,
+        ch =>
+            ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            })[ch],
+    )
+
+// Twin of the app's src/lib/relativeTime.ts formatWorkedAgo() — the app-owned
+// "worked Xh ago" trust signal (W1). The two live across the app/extension
+// runtime boundary and can't share a module, so this small formatter is a
+// deliberate duplicate kept in step with its app-side twin by hand. Returns
+// "worked Xh ago" / "worked Xd ago" for a recent lastWorkedAt ISO string
+// (whole hours under a day, whole days otherwise), or '' when it's absent,
+// unparseable, in the future, or older than 7 days (render nothing).
+const formatWorkedAgo = iso => {
+    if (!iso) return ''
+    const then = Date.parse(iso)
+    if (Number.isNaN(then)) return ''
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    const diffMs = Date.now() - then
+    if (diffMs < 0 || diffMs > 7 * DAY_MS) return ''
+    return diffMs < DAY_MS
+        ? `worked ${Math.floor(diffMs / HOUR_MS)}h ago`
+        : `worked ${Math.floor(diffMs / DAY_MS)}d ago`
+}
+
 /* ------------------------------------------------------------ */
 /*  Globals                                                     */
 /* ------------------------------------------------------------ */
 let returnView = null // callback for the “Back” button, set dynamically
+
+// Set when this popup was opened as a WINDOW by the checkout modal's
+// "Sign In" button (background openPopup → index.html?callerId=<tabId>).
+// Finishing login must then notify that tab so the apply flow resumes.
+const CARAMEL_CALLER_ID = new URLSearchParams(location.search).get('callerId')
+
+function afterLoginSuccess() {
+    if (CARAMEL_CALLER_ID) {
+        try {
+            const p = currentBrowser.runtime.sendMessage({
+                action: 'userLoggedInFromPopup_' + CARAMEL_CALLER_ID,
+            })
+            if (p && typeof p.then === 'function') p.catch(() => {})
+        } catch {
+            /* originating tab may be gone — still close below */
+        }
+        // Give the message a beat to reach the service worker, then close
+        // this login window; the original tab takes over.
+        setTimeout(() => window.close(), 150)
+        return
+    }
+    initPopup()
+}
+
+/* ------------------------------------------------------------ */
+/*  Savings summary                                             */
+/* ------------------------------------------------------------ */
+// Totals the recorded savings history per currency (a EUR cart and a USD
+// cart don't sum) and renders "You've saved …" into #savingsSummary when
+// there's anything to show. History comes from caramelGetSavings()
+// (caramel-base.js) — written by the apply flow on measured wins only.
+function formatSavingsTotal(list) {
+    const totals = new Map()
+    for (const e of list || []) {
+        if (!e || !(e.amount > 0)) continue
+        const cur = e.currency || 'USD'
+        totals.set(cur, (totals.get(cur) || 0) + e.amount)
+    }
+    if (!totals.size) return ''
+    return Array.from(totals.entries())
+        .map(([cur, amt]) => {
+            try {
+                return new Intl.NumberFormat(undefined, {
+                    style: 'currency',
+                    currency: cur,
+                }).format(amt)
+            } catch {
+                return `${amt.toFixed(2)} ${cur}`
+            }
+        })
+        .join(' + ')
+}
+
+async function renderSavingsSummary() {
+    const slot = document.getElementById('savingsSummary')
+    if (!slot) return
+    const list = await caramelGetSavings()
+    const total = formatSavingsTotal(list)
+    if (!total) return
+    slot.innerHTML = `
+      <div class="savings-banner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 2v20"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        <span>You've saved <b>${escHtml(total)}</b> with Caramel</span>
+      </div>`
+}
+
+/* ------------------------------------------------------------ */
+/*  Settings view                                               */
+/* ------------------------------------------------------------ */
+// In-popup extension preferences: the global checkout-prompt toggle and a
+// pause-this-site toggle (when a site is known). Persisted via
+// caramelSetSettings() (storage.sync — roams with the browser profile);
+// the checkout pill honors them in insertCaramelPrompt().
+async function renderSettingsView(backFn, domain) {
+    const container = document.getElementById('auth-container')
+    if (!container) return
+    const s = await caramelGetSettings()
+    // Dot-less "domains" are extension pages (the popup opened as a tab /
+    // login window reports its own chrome-extension host) — no site toggle.
+    const site =
+        domain && domain.includes('.')
+            ? domain.toLowerCase().replace(/^www\./, '')
+            : null
+    const sitePaused = site
+        ? s.disabledSites.some(d => site === d || site.endsWith('.' + d))
+        : false
+
+    container.innerHTML = `
+    <div class="settings-view fade-in-up">
+      <h3 class="settings-title">Settings</h3>
+
+      <label class="settings-row">
+        <span class="settings-copy">
+          <span>Checkout prompt</span>
+          <small>Offer to auto-apply the best code at checkout</small>
+        </span>
+        <input type="checkbox" id="autoApplyToggle" class="settings-switch" ${s.autoApply ? 'checked' : ''}/>
+      </label>
+
+      ${
+          site
+              ? `<label class="settings-row">
+        <span class="settings-copy">
+          <span>Pause on ${escHtml(site)}</span>
+          <small>Don't show the prompt on this site</small>
+        </span>
+        <input type="checkbox" id="siteToggle" class="settings-switch" ${sitePaused ? 'checked' : ''}/>
+      </label>`
+              : ''
+      }
+
+      <div id="savingsSummary"></div>
+
+      <a id="accountLink" class="account-link" href="${caramelUrl('profile')}" target="_blank" rel="noopener noreferrer" style="display:none;">Manage account →</a>
+
+      <button id="backBtn" class="back-btn" type="button">← Back</button>
+    </div>`
+
+    renderSavingsSummary()
+
+    const autoApplyToggle = document.getElementById('autoApplyToggle')
+    if (autoApplyToggle)
+        autoApplyToggle.addEventListener('change', e => {
+            caramelSetSettings({ autoApply: e.target.checked })
+        })
+
+    const siteToggle = document.getElementById('siteToggle')
+    if (siteToggle && site)
+        siteToggle.addEventListener('change', async e => {
+            const cur = await caramelGetSettings()
+            const rest = cur.disabledSites.filter(d => d !== site)
+            caramelSetSettings({
+                disabledSites: e.target.checked ? [...rest, site] : rest,
+            })
+        })
+
+    caramelGetSession().then(({ token }) => {
+        const link = document.getElementById('accountLink')
+        if (link && token) link.style.display = 'inline-block'
+    })
+
+    const backBtn = document.getElementById('backBtn')
+    if (backBtn && typeof backFn === 'function')
+        backBtn.addEventListener('click', backFn)
+}
+
+/* Header gear → in-popup settings (works for guests too — the checkout
+   prompt toggle matters most to signed-out users). */
+function wireSettingsGear(backFn, domain) {
+    const gear = document.getElementById('settingsIcon')
+    if (!gear) return
+    gear.style.display = 'block'
+    gear.onclick = () => renderSettingsView(backFn, domain)
+}
 
 /* ------------------------------------------------------------ */
 /*  Bootstrap                                                   */
 /* ------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loading-container')
-    if (loader) setTimeout(() => (loader.style.display = 'none'), 400)
+    // Anti-flicker floor, not a fetch-duration ceiling: a near-instant
+    // response still shows the spinner for a beat, but initPopup() (below)
+    // now actually awaits the fetch+render — so on a slow/degraded
+    // connection the spinner correctly outlives 400ms instead of leaving a
+    // blank auth-container gap while the real request is still in flight.
+    const minDisplay = new Promise(resolve => setTimeout(resolve, 400))
 
-    // If a Safari OAuth flow was in progress when the popup last closed,
-    // resume polling so the user lands signed-in instead of stuck.
-    await resumePendingSafariOauthIfAny()
+    await Promise.all([initPopup(), minDisplay])
 
-    await initPopup()
+    if (loader) loader.style.display = 'none'
 })
 
 /* ------------------------------------------------------------ */
 /*  Init                                                        */
 /* ------------------------------------------------------------ */
 async function initPopup() {
-    const { url } = await getActiveTabDomainRecord()
+    // The service worker can reply undefined on a cold start / error; never let
+    // destructuring throw and leave the user staring at a blank popup.
+    let url = null
+    try {
+        const resp = await getActiveTabDomainRecord()
+        url = resp?.url ?? null
+    } catch {
+        url = null
+    }
 
-    currentBrowser.storage.sync.get(['token', 'user'], async res => {
-        const token = res.token || null
-        const user = res.user || null
+    // Only web pages can have coupons. The service worker hands back whatever
+    // tab is active — on a new tab, a chrome:// page, or this popup itself
+    // that is a URL no store owns, and asking the coupons API about it painted
+    // "Couldn't load coupons — check your connection" over what should be the
+    // introduction view.
+    if (url && !/^https?:\/\//i.test(url)) url = null
 
-        if (url) {
-            const domain = url.replace(/^(?:https?:\/\/)?(?:www\.)?/, '')
-            const coupons = await fetchCoupons(domain, [])
+    // Wrapped in a Promise so initPopup() itself doesn't resolve until the
+    // chosen render state has actually been painted (the storage APIs are
+    // chrome-callback based, not natively awaitable) — the DOMContentLoaded
+    // bootstrap above depends on that to know when the loader can come down.
+    await new Promise(resolve => {
+        caramelGetSession().then(async session => {
+            const token = session?.token || null
+            const user = session?.user || null
 
-            if (coupons?.length) {
-                await renderCouponsView(coupons, user, domain)
-            } else {
-                renderUnsupportedSite(user)
+            // Fire the session check in PARALLEL with the coupon fetch below —
+            // it must never add latency to the coupon render. A dead session
+            // re-renders logged-out once the 401 lands.
+            if (token) validateStoredSession(token, user)
+
+            // Wrap the whole render: a fetch failure (backend down / offline) must
+            // show an honest error state with a retry, NEVER leave the popup blank.
+            try {
+                if (url) {
+                    const domain = url.replace(
+                        /^(?:https?:\/\/)?(?:www\.)?/,
+                        '',
+                    )
+                    let coupons = []
+                    try {
+                        coupons = await fetchCoupons(domain, '')
+                    } catch {
+                        renderLoadError()
+                        return
+                    }
+
+                    if (coupons?.length) {
+                        await renderCouponsView(coupons, user, domain)
+                    } else {
+                        renderUnsupportedSite(user, domain)
+                    }
+                    return
+                }
+
+                // no active tab info
+                if (token) renderProfileCard(user)
+                else renderUnsupportedSite(null)
+            } catch {
+                renderLoadError()
+            } finally {
+                resolve()
             }
+        })
+    })
+}
+
+/* Validates the stored session token against GET /api/extension/me. The
+   stored token used to be trusted forever — a revoked/expired session kept
+   showing a signed-in popup. Only a REAL 401 signs the user out (storage
+   cleared, views re-rendered logged-out via initPopup); network failures
+   and 5xx keep the session — offline must never log the user out. A 200
+   refreshes the stored user {username, image} when the profile changed. */
+function validateStoredSession(token, storedUser) {
+    fetch(caramelUrl('api/extension/me'), {
+        headers: { Authorization: `Bearer ${token}` },
+    })
+        .then(async res => {
+            if (res.status === 401) {
+                caramelClearSession(() => initPopup())
+                return
+            }
+            if (!res.ok) return // backend hiccup — not a sign-out signal
+            const data = await res.json().catch(() => null)
+            if (!data) return
+            const fresh = { username: data.username, image: data.image }
+            if (
+                !storedUser ||
+                storedUser.username !== fresh.username ||
+                storedUser.image !== fresh.image
+            ) {
+                // Profile only — the token is untouched, so write it beside
+                // the session in local rather than back into sync.
+                currentBrowser.storage.local.set({ user: fresh }, () => {})
+            }
+        })
+        .catch(() => {
+            /* offline/unreachable — keep the stored session */
+        })
+}
+
+/* Signs the user out for REAL: revokes the session server-side, then clears
+   local storage. Logout used to be storage-only, so the bearer it forgot kept
+   authenticating for the rest of its 7-day life and nothing in the product
+   could kill it — a token captured before logout still worked after.
+
+   The local clear runs whether or not the revoke succeeded: someone offline
+   pressing "log out" must still be logged out on this device. But the failure
+   is logged rather than swallowed, because a revoke that quietly never
+   happened is precisely the bug this function exists to fix.
+
+   `button`, when given, is the control the user pressed. The revoke is a real
+   network round-trip, and on a slow connection the popup sat there looking
+   dead: nothing changed, so the natural response is to press "Log out" again,
+   firing a second revoke of a token the first call is already killing. Say
+   what's happening and stop taking further presses. */
+function signOutAndRevoke(after, button) {
+    if (button) {
+        if (button.disabled) return // already signing out
+        button.disabled = true
+        button.dataset.caramelBusy = '1'
+        button.textContent = 'Signing out…'
+    }
+    caramelGetSession().then(stored => {
+        const clearLocal = () => caramelClearSession(after)
+        const token = stored?.token
+        if (!token) {
+            clearLocal()
             return
         }
-
-        // no active tab info
-        if (token) renderProfileCard(user)
-        else renderUnsupportedSite(null)
+        fetch(caramelUrl('api/extension/session'), {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => {
+                if (!res.ok) log('LOGOUT_REVOKE_REJECTED', res.status)
+            })
+            .catch(err => log('LOGOUT_REVOKE_UNREACHABLE', err?.message))
+            .finally(clearLocal)
     })
+}
+
+/* Network/backend failure state — keeps the popup from rendering blank when the
+   coupon API is unreachable. Offers a retry that re-runs the whole init. */
+function renderLoadError() {
+    const container = document.getElementById('auth-container')
+    if (!container) return
+    container.innerHTML = `
+    <div class="no-coupons-view fade-in-up">
+      <div class="empty-illu" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea6925" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h.01"/>
+          <path d="M8.5 16.4a5 5 0 0 1 7 0"/>
+          <path d="M5 12.9a10 10 0 0 1 14 0"/>
+          <path d="M2 9.5a16 16 0 0 1 20 0"/>
+          <path d="M2 2l20 20"/>
+        </svg>
+      </div>
+      <h3>Couldn't load coupons</h3>
+      <p>Check your connection and try again.</p>
+      <div class="no-coupons-actions">
+        <button id="retryBtn" class="supported-sites-btn" type="button">Try again</button>
+      </div>
+    </div>`
+    const retry = document.getElementById('retryBtn')
+    if (retry)
+        retry.addEventListener('click', () => {
+            container.innerHTML = ''
+            initPopup()
+        })
 }
 
 /* background helper */
 async function getActiveTabDomainRecord() {
-    const resp = await new Promise(resolve => {
-        currentBrowser.runtime.sendMessage(
-            { action: 'getActiveTabDomainRecord' },
-            reply => resolve(reply), // will be undefined on error
-        )
-    })
-
-    return resp
+    try {
+        // Bounded wait + closed-port detection (caramel-base.js); the raw
+        // sendMessage form could park the popup on a never-arriving reply.
+        return await caramelSendMessage({ action: 'getActiveTabDomainRecord' })
+    } catch {
+        return undefined // same contract as before: undefined on error
+    }
 }
 
 /* ------------------------------------------------------------ */
 /*  Unsupported-site view                                       */
 /* ------------------------------------------------------------ */
-function renderUnsupportedSite(user) {
+/* Is this domain one we actually cover?
+ *
+ * "We have no codes for this store right now" and "we don't cover this store"
+ * are different facts, and the view below used to render both as the latter.
+ * A QA sweep on 2026-08-05 found huel.com — fully supported, with a complete
+ * apply config — being told "No coupons for this site yet… see the ones we
+ * support", with a button sending the user to a list containing the very store
+ * they were standing on. Sampling 100 supported domains put roughly 1 in 8 in
+ * that state, because the popup branched on coupons.length alone and never
+ * consulted the supported-store list.
+ *
+ * Resolved asynchronously AFTER the view paints: this is a terminal state and
+ * the honest wording is worth a moment's wait, but not at the cost of leaving
+ * the popup blank while a network call completes.
+ */
+function caramelDomainIsSupported(domain) {
+    return new Promise(resolve => {
+        if (!domain) return resolve(false)
+        const host = String(domain)
+            .toLowerCase()
+            .replace(/^www\./, '')
+        try {
+            currentBrowser.runtime.sendMessage(
+                { action: 'fetchSupportedStores' },
+                resp => {
+                    // A failed lookup must not assert either fact — fall back
+                    // to the neutral copy rather than guessing.
+                    if (currentBrowser.runtime.lastError || !resp || resp.error)
+                        return resolve(false)
+                    const list = Array.isArray(resp.supported)
+                        ? resp.supported
+                        : []
+                    resolve(
+                        list.some(entry => {
+                            const d = String(entry?.domain || entry || '')
+                                .toLowerCase()
+                                .replace(/^www\./, '')
+                            return d && (host === d || host.endsWith('.' + d))
+                        }),
+                    )
+                },
+            )
+        } catch {
+            resolve(false)
+        }
+    })
+}
+
+function renderUnsupportedSite(user, domain) {
     const container = document.getElementById('auth-container')
-    const avatar = user?.image?.length
-        ? user.image
-        : 'assets/default-profile.png'
+
+    /* Three different facts used to arrive at the same sentence.
+     *
+     * "No coupons for this site yet" is a claim ABOUT A SITE, and this view is
+     * also where the popup lands when there is no site at all — opened on a new
+     * tab, a PDF, a settings page, anywhere we cannot read a URL. A first-time
+     * user's most likely first act is clicking the toolbar icon before going
+     * shopping, and what they got was a verdict about a store they were not
+     * standing in. (The third case, "we cover this store but nothing is working
+     * right now", is resolved asynchronously below.)
+     *
+     * It is also the only place the popup can say what Caramel IS. Nothing in
+     * this extension ever explains itself — QA's first-time users had to infer
+     * the product from a pill that appears on a checkout — and the moment
+     * someone opens it with no store in front of them is exactly when that
+     * sentence is useful rather than in the way.
+     */
+    const noSite = !domain
+    const heading = noSite
+        ? 'Ready when you are'
+        : 'No coupons for this site yet'
+    const body = noSite
+        ? 'Caramel finds coupon codes and tries them for you at checkout. Open a store’s cart and we’ll take it from there.'
+        : 'We’re adding new stores all the time — see the ones we support.'
 
     container.innerHTML = `
     <div class="no-coupons-view fade-in-up">
-      <img src="${avatar}" class="no-coupons-avatar" alt="User avatar"/>
+      <div class="empty-illu" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke="#ea6925" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/>
+          <circle cx="7.5" cy="7.5" r="1.3" fill="#ea6925" stroke="none"/>
+        </svg>
+      </div>
 
-      <h3>No coupons are available for this site.</h3>
-      <p>Click below to see which sites we support.</p>
+      <h3 id="noCouponsHeading">${heading}</h3>
+      <p id="noCouponsBody">${body}</p>
 
       <div class="no-coupons-actions">
         <a
-          href="https://grabcaramel.com/supported-stores"
+          id="supportedStoresLink"
+          href="${caramelUrl('supported-stores')}"
           class="supported-sites-btn"
           target="_blank"
           rel="noopener noreferrer"
-        >
-          View Supported Stores
-        </a>
+        >View Supported Stores</a>
 
         ${
             user
-                ? '<button id="logoutBtn" class="toggle-login-btn">Logout</button>'
-                : '<button id="loginToggleBtn" class="toggle-login-btn">Login</button>'
+                ? '<button id="logoutBtn" class="toggle-login-btn">Log out</button>'
+                : '<button id="loginToggleBtn" class="toggle-login-btn">Log in</button>'
         }
-
-        <a
-          href="https://github.com/DevinoSolutions/caramel"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="All extension code is 100% open-source."
-        >
-          <img src="assets/github.png" class="github-icon" alt="GitHub"/>
-        </a>
       </div>
+
+      <a
+        class="oss-link"
+        href="https://github.com/DevinoSolutions/caramel"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="All extension code is 100% open-source."
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.03.08-2.13 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.93.08 2.13.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+        </svg>
+        <span>Open source</span>
+      </a>
     </div>
   `
 
     /* wiring */
+    // Tell the truth once we know it: a store we DO cover but have no live
+    // codes for gets its own wording, and loses the "see the stores we
+    // support" link — that link's whole premise is that this store isn't on
+    // the list. Purely additive: if the lookup fails or the store really is
+    // unsupported, the copy painted above stands unchanged.
+    caramelDomainIsSupported(domain).then(supported => {
+        if (!supported) return
+        const headingEl = document.getElementById('noCouponsHeading')
+        const bodyEl = document.getElementById('noCouponsBody')
+        const link = document.getElementById('supportedStoresLink')
+        if (!headingEl || !bodyEl) return
+        headingEl.textContent = 'No working codes right now'
+        bodyEl.textContent = `We cover ${domain}, but none of our codes for it are working at the moment. We'll keep looking.`
+        if (link) link.remove()
+    })
+
+    wireSettingsGear(() => renderUnsupportedSite(user, domain), domain)
+
     const loginToggle = document.getElementById('loginToggleBtn')
     if (loginToggle)
         loginToggle.addEventListener('click', () =>
-            renderSignInPrompt(() => renderUnsupportedSite(user)),
+            renderSignInPrompt(() => renderUnsupportedSite(user, domain)),
         )
 
     const logout = document.getElementById('logoutBtn')
     if (logout)
         logout.addEventListener('click', () => {
-            currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                renderUnsupportedSite(null),
-            )
+            signOutAndRevoke(() => renderUnsupportedSite(null, domain), logout)
         })
-}
-
-/* ------------------------------------------------------------ */
-/*  Safari OAuth: persistent nonce + resume                     */
-/* ------------------------------------------------------------ */
-const SAFARI_OAUTH_BASE_URL = 'https://grabcaramel.com'
-const SAFARI_OAUTH_TTL_MS = 5 * 60 * 1000
-
-function safariStorageGet(keys) {
-    return new Promise(resolve => {
-        currentBrowser.storage.sync.get(keys, res => resolve(res || {}))
-    })
-}
-
-function safariStorageSet(obj) {
-    return new Promise((resolve, reject) => {
-        currentBrowser.storage.sync.set(obj, () => {
-            const err = chrome.runtime.lastError
-            if (err) reject(new Error(err.message))
-            else resolve()
-        })
-    })
-}
-
-function safariStorageRemove(keys) {
-    return new Promise(resolve => {
-        currentBrowser.storage.sync.remove(keys, () => resolve())
-    })
-}
-
-async function pollSafariOauthOnce(nonce) {
-    const pollUrl = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/poll?nonce=${encodeURIComponent(nonce)}`
-    try {
-        const resp = await fetch(pollUrl, { method: 'GET' })
-        if (resp.status === 204) return { status: 'pending' }
-        if (resp.ok) {
-            const data = await resp.json().catch(() => ({}))
-            if (data && data.token) return { status: 'ok', data }
-            return { status: 'error', error: 'Empty response from poll' }
-        }
-        const errorData = await resp.json().catch(() => ({}))
-        return {
-            status: 'error',
-            error: errorData?.error || `Poll failed (${resp.status})`,
-        }
-    } catch (e) {
-        return { status: 'pending' } // network blip — keep polling
-    }
-}
-
-async function pollSafariOauthUntilDone(nonce, deadlineMs) {
-    while (Date.now() < deadlineMs) {
-        const r = await pollSafariOauthOnce(nonce)
-        if (r.status === 'ok') return r
-        if (r.status === 'error') return r
-        await new Promise(res => setTimeout(res, 2000))
-    }
-    return { status: 'error', error: 'Sign-in timed out. Please try again.' }
-}
-
-async function applySafariOauthResult(data) {
-    const user = {
-        username: data.username || null,
-        image: data.image || null,
-    }
-    await safariStorageSet({ token: data.token, user })
-    await safariStorageRemove([
-        'pendingOauthNonce',
-        'pendingOauthExpiresAt',
-        'pendingOauthProvider',
-    ])
-}
-
-async function resumePendingSafariOauthIfAny() {
-    try {
-        const res = await safariStorageGet([
-            'pendingOauthNonce',
-            'pendingOauthExpiresAt',
-        ])
-        const nonce = res.pendingOauthNonce
-        const expiresAt = res.pendingOauthExpiresAt
-        if (!nonce) return
-        if (!expiresAt || Date.now() > expiresAt) {
-            await safariStorageRemove([
-                'pendingOauthNonce',
-                'pendingOauthExpiresAt',
-                'pendingOauthProvider',
-            ])
-            return
-        }
-
-        const errorBox = document.getElementById('loginErrorMessage')
-        if (errorBox) {
-            errorBox.textContent = 'Completing sign-in…'
-            errorBox.style.display = 'block'
-        }
-
-        // Cap the wait at 30s so popup doesn't hang. If the result is
-        // already stashed by the backend, the very first poll returns it.
-        const deadline = Math.min(expiresAt, Date.now() + 30 * 1000)
-        const result = await pollSafariOauthUntilDone(nonce, deadline)
-
-        if (result.status === 'ok') {
-            await applySafariOauthResult(result.data)
-            if (errorBox) {
-                errorBox.textContent = ''
-                errorBox.style.display = 'none'
-            }
-            return
-        }
-
-        // Either timed out within 30s (backend likely still pending — keep
-        // the nonce so a future popup open can try again, unless TTL expired)
-        // OR explicit error — clear pending state.
-        if (/timed out|timeout/i.test(result.error || '')) {
-            // Leave pendingOauthNonce in place; user can reopen popup later.
-            if (errorBox) {
-                errorBox.textContent =
-                    "Still waiting on sign-in… reopen this popup once you've finished signing in."
-                errorBox.style.display = 'block'
-            }
-        } else {
-            await safariStorageRemove([
-                'pendingOauthNonce',
-                'pendingOauthExpiresAt',
-                'pendingOauthProvider',
-            ])
-            if (errorBox) {
-                errorBox.textContent = `Sign-in failed: ${result.error || 'unknown error'}`
-                errorBox.style.display = 'block'
-            }
-        }
-    } catch (err) {
-        console.error('resumePendingSafariOauth error:', err)
-    }
-}
-
-/* ------------------------------------------------------------ */
-/*  Safari Social Sign-In (tab + nonce polling)                 */
-/* ------------------------------------------------------------ */
-async function handleSafariSocialSignIn(provider, button, errorBox) {
-    const safariRedirectUri = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/redirect`
-
-    // Generate a one-shot nonce; embedded in the signed OAuth state by the backend.
-    const nonce =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
-    const expiresAt = Date.now() + SAFARI_OAUTH_TTL_MS
-
-    try {
-        const authorizeUrl = `${SAFARI_OAUTH_BASE_URL}/api/extension/oauth/authorize?provider=${provider}&redirect_uri=${encodeURIComponent(
-            safariRedirectUri,
-        )}&nonce=${encodeURIComponent(nonce)}`
-
-        const authorizeResponse = await fetch(authorizeUrl, { method: 'GET' })
-        if (!authorizeResponse.ok) {
-            const errorData = await authorizeResponse.json().catch(() => ({}))
-            throw new Error(
-                errorData.error ||
-                    `HTTP ${authorizeResponse.status}: Failed to get OAuth authorization URL`,
-            )
-        }
-        const responseData = await authorizeResponse.json()
-        if (!responseData.authorizationUrl) {
-            throw new Error('Failed to get OAuth authorization URL')
-        }
-
-        // Persist nonce BEFORE opening the auth tab. Safari closes the popup
-        // when the new tab takes focus — without this, polling dies and the
-        // user lands at "✅ signed in" but the extension never gets the token.
-        await safariStorageSet({
-            pendingOauthNonce: nonce,
-            pendingOauthExpiresAt: expiresAt,
-            pendingOauthProvider: provider,
-        })
-
-        if (currentBrowser.tabs && currentBrowser.tabs.create) {
-            currentBrowser.tabs.create({ url: responseData.authorizationUrl })
-        } else {
-            window.open(responseData.authorizationUrl, '_blank')
-        }
-
-        if (button) {
-            const span = button.querySelector('span')
-            if (span) span.textContent = 'Waiting for sign-in…'
-        }
-        if (errorBox) {
-            errorBox.textContent =
-                'Complete sign-in in the new tab. You can close this popup — it will pick up the result when you reopen it.'
-            errorBox.style.display = 'block'
-        }
-
-        // While the popup is still open, poll up to the nonce TTL. If the
-        // popup closes (Safari often does), resumePendingSafariOauthIfAny
-        // takes over the next time the popup is opened.
-        const result = await pollSafariOauthUntilDone(nonce, expiresAt)
-
-        if (result.status === 'ok') {
-            await applySafariOauthResult(result.data)
-            if (errorBox) {
-                errorBox.textContent = ''
-                errorBox.style.display = 'none'
-            }
-            if (document.visibilityState === 'visible') {
-                initPopup()
-            }
-            return
-        }
-
-        throw new Error(result.error || 'Sign-in failed')
-    } catch (err) {
-        console.error('Safari OAuth error:', err)
-        // Don't clear pending state on a transient failure unless the user
-        // explicitly hit an error path — leave the nonce so the next popup
-        // open can resume. Only clear on hard errors.
-        if (!/timed out|timeout/i.test(err.message || '')) {
-            await safariStorageRemove([
-                'pendingOauthNonce',
-                'pendingOauthExpiresAt',
-                'pendingOauthProvider',
-            ])
-        }
-        if (errorBox) {
-            errorBox.textContent = `OAuth sign-in failed: ${err.message}`
-            errorBox.style.display = 'block'
-        }
-        if (button) {
-            button.disabled = false
-            const span = button.querySelector('span')
-            if (span) {
-                span.textContent =
-                    provider === 'google'
-                        ? 'Continue with Google'
-                        : 'Continue with Apple'
-            }
-        }
-    }
 }
 
 /* ------------------------------------------------------------ */
 /*  OAuth Social Sign-In Handler                                */
+/* The ways an engine says "the user closed the sign-in window". Chrome sends
+ * "The user did not approve access."; others word it as a cancellation. Kept
+ * broad on purpose — mislabelling a real failure as a cancel is far cheaper
+ * than telling someone who just clicked X that sign-in FAILED. */
+const CARAMEL_OAUTH_CANCEL_RE =
+    /did not approve|cancell?ed|closed by (the )?user/i
+
 /* ------------------------------------------------------------ */
 async function handleSocialSignIn(provider) {
     const errorBox = document.getElementById('loginErrorMessage')
@@ -366,9 +583,14 @@ async function handleSocialSignIn(provider) {
     const appleBtn = document.getElementById('appleSignInBtn')
     const button = provider === 'google' ? googleBtn : appleBtn
 
-    // Disable button and show loading state
+    // Disable BOTH providers, label only the one that was clicked. Disabling
+    // just the clicked button let a second click start a queued flow behind
+    // the first: both buttons read "Redirecting..." while exactly one window
+    // existed, so the UI described a state the browser was not in. Only one
+    // launchWebAuthFlow can be in flight, so the other provider is genuinely
+    // unavailable until this one settles — say so by disabling it.
+    for (const b of [googleBtn, appleBtn]) if (b) b.disabled = true
     if (button) {
-        button.disabled = true
         const span = button.querySelector('span')
         if (span) {
             span.textContent = 'Redirecting...'
@@ -381,18 +603,15 @@ async function handleSocialSignIn(provider) {
     }
 
     try {
-        // Base URL - change to 'http://localhost:58000' for local testing
-        const baseURL = 'https://grabcaramel.com'
+        const baseURL = CARAMEL_BASE_URL
 
-        // Check if identity API is available.
-        // Safari (iOS/macOS) extensions don't reliably expose launchWebAuthFlow,
-        // so we fall back to a tab-based flow that opens auth in a real Safari
-        // tab and polls our backend for the result keyed by a one-shot nonce.
+        // Check if identity API is available
         const identity =
             currentBrowser.identity || currentBrowser.chrome?.identity
         if (!identity || !identity.launchWebAuthFlow) {
-            await handleSafariSocialSignIn(provider, button, errorBox)
-            return
+            throw new Error(
+                'OAuth not supported in this browser. Please use email/password login.',
+            )
         }
 
         // Get the extension's redirect URL
@@ -441,6 +660,10 @@ async function handleSocialSignIn(provider) {
             url: authorizationUrl,
             interactive: true,
         })
+
+        // User closed the OAuth window without finishing → undefined callback.
+        // Surface a clear "cancelled" message, not a cryptic `new URL(undefined)`.
+        if (!finalCallbackUrl) throw new Error('Sign-in was cancelled.')
 
         // Extract code and state from the callback URL
         // Google redirects to the extension's redirect URI: https://[extension-id].chromiumapp.org/?code=...&state=...
@@ -491,7 +714,7 @@ async function handleSocialSignIn(provider) {
 
         // Store token and user data using Promise wrapper to ensure completion
         await new Promise((resolve, reject) => {
-            currentBrowser.storage.sync.set({ token, user }, () => {
+            caramelSetSession({ token, user }, () => {
                 if (chrome.runtime.lastError) {
                     reject(new Error(chrome.runtime.lastError.message))
                     return
@@ -503,22 +726,35 @@ async function handleSocialSignIn(provider) {
         // Small delay to ensure storage is fully persisted
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Only call initPopup if popup is still open
-        if (document.visibilityState === 'visible') {
-            initPopup()
+        // Checkout-modal logins notify the originating tab and close;
+        // toolbar-popup logins re-render (only if still open).
+        if (CARAMEL_CALLER_ID || document.visibilityState === 'visible') {
+            afterLoginSuccess()
         }
     } catch (err) {
         console.error('OAuth error:', err)
 
-        // Show error message
+        // Closing the provider window is a CANCEL, not a failure. Chrome
+        // REJECTS launchWebAuthFlow in that case rather than resolving
+        // undefined, so the `!finalCallbackUrl` guard above never runs here
+        // and its friendly copy was dead code — what users actually saw was
+        // Chrome's own third-person string, "OAuth sign-in failed: The user
+        // did not approve access.", which reads like the app broke and blames
+        // them for it. Recognise the cancel shapes and speak plainly. The
+        // guard above stays: it covers engines that resolve undefined instead.
         if (errorBox) {
-            errorBox.textContent = `OAuth sign-in failed: ${err.message}`
+            errorBox.textContent = CARAMEL_OAUTH_CANCEL_RE.test(
+                err?.message || '',
+            )
+                ? 'Sign-in was cancelled.'
+                : `OAuth sign-in failed: ${err.message}`
             errorBox.style.display = 'block'
         }
 
-        // Re-enable button
+        // Re-enable BOTH providers — the other one was disabled for the
+        // duration of this attempt and must not stay stuck.
+        for (const b of [googleBtn, appleBtn]) if (b) b.disabled = false
         if (button) {
-            button.disabled = false
             const span = button.querySelector('span')
             if (span) {
                 span.textContent =
@@ -528,6 +764,25 @@ async function handleSocialSignIn(provider) {
             }
         }
     }
+}
+
+// Popup OAuth needs identity.launchWebAuthFlow, which Firefox deliberately
+// ships without (manifest-firefox.json has no `identity` permission — see
+// the per-browser differences header in manifest-sync.test.ts). Capability
+// check, not UA sniffing.
+function popupOAuthSupported() {
+    const identity = currentBrowser.identity || currentBrowser.chrome?.identity
+    return !!(identity && identity.launchWebAuthFlow)
+}
+
+// OAuth fallback for browsers without popup OAuth (issue #139): open the
+// website's login page in a tab; once the user signs in there, the
+// website→extension session relay (coupon-runner.js caramel-ext-hello ↔
+// ExtensionSessionRelay.tsx) lands the session in storage.sync, so the
+// popup is signed in on its next open.
+function openWebsiteSignIn() {
+    currentBrowser.tabs.create({ url: caramelUrl('login') })
+    window.close()
 }
 
 /* ------------------------------------------------------------ */
@@ -553,35 +808,61 @@ function renderSignInPrompt(backFn) {
         </button>
         <button type="button" id="appleSignInBtn" class="oauth-button" disabled>
           <svg class="oauth-icon" width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#000000" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
           </svg>
           <span>Sign in with Apple</span>
         </button>
       </div>
+
+      ${
+          popupOAuthSupported()
+              ? ''
+              : '<p class="oauth-note">Sign-in opens grabcaramel.com; the extension picks it up automatically.</p>'
+      }
 
       <div class="oauth-divider">
         <span>or</span>
       </div>
 
       <form id="loginForm" class="login-form">
-        <div id="loginErrorMessage" class="error-message" style="display:none;"></div>
+        <div id="loginErrorMessage" class="error-message" role="alert" style="display:none;"></div>
 
         <div>
-          <label>Email</label>
-          <input type="email" id="email" required/>
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="email" required/>
         </div>
 
         <div>
-          <label>Password</label>
-          <input type="password" id="password" required/>
+          <label for="password">Password</label>
+          <div class="password-field">
+            <input type="password" id="password" autocomplete="current-password" required/>
+            <button
+              type="button"
+              id="togglePasswordBtn"
+              class="password-toggle"
+              aria-label="Show password"
+              aria-pressed="false"
+            >
+              <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg id="eyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <path d="m1 1 22 22"/>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <button type="submit" class="login-button">Login</button>
+        <button type="submit" class="login-button">Log in</button>
       </form>
 
       <div id="resendVerificationContainer" style="display:none; text-align:center; margin-top:12px;">
         <a
-          href="https://grabcaramel.com/verify"
+          href="${caramelUrl('verify')}"
           target="_blank"
           rel="noopener noreferrer"
           class="resend-verification-btn"
@@ -594,7 +875,7 @@ function renderSignInPrompt(backFn) {
       <p class="mt-6">
         Don't have an account?
         <a
-          href="https://grabcaramel.com/signup"
+          href="${caramelUrl('signup')}"
           target="_blank"
           rel="noopener noreferrer"
         >Sign Up</a>
@@ -614,6 +895,26 @@ function renderSignInPrompt(backFn) {
     const backBtn = document.getElementById('backBtn')
     if (backBtn && returnView) backBtn.addEventListener('click', returnView)
 
+    // Show/hide password toggle: flips the input type and keeps the
+    // button's accessible state (aria-pressed/label) + icon in sync.
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn')
+    if (togglePasswordBtn)
+        togglePasswordBtn.addEventListener('click', () => {
+            const passwordInput = document.getElementById('password')
+            const eyeIcon = document.getElementById('eyeIcon')
+            const eyeOffIcon = document.getElementById('eyeOffIcon')
+            if (!passwordInput) return
+            const reveal = passwordInput.type === 'password'
+            passwordInput.type = reveal ? 'text' : 'password'
+            togglePasswordBtn.setAttribute('aria-pressed', String(reveal))
+            togglePasswordBtn.setAttribute(
+                'aria-label',
+                reveal ? 'Hide password' : 'Show password',
+            )
+            if (eyeIcon) eyeIcon.style.display = reveal ? 'none' : ''
+            if (eyeOffIcon) eyeOffIcon.style.display = reveal ? '' : 'none'
+        })
+
     const resendVerificationContainer = document.getElementById(
         'resendVerificationContainer',
     )
@@ -625,19 +926,23 @@ function renderSignInPrompt(backFn) {
     if (googleSignInBtn) {
         googleSignInBtn.disabled = false
         googleSignInBtn.addEventListener('click', () =>
-            handleSocialSignIn('google'),
+            popupOAuthSupported()
+                ? handleSocialSignIn('google')
+                : openWebsiteSignIn(),
         )
     }
 
     if (appleSignInBtn) {
         appleSignInBtn.disabled = false
         appleSignInBtn.addEventListener('click', () =>
-            handleSocialSignIn('apple'),
+            popupOAuthSupported()
+                ? handleSocialSignIn('apple')
+                : openWebsiteSignIn(),
         )
     }
 
     const loginForm = document.getElementById('loginForm')
-    loginForm.addEventListener('submit', async e => {
+    loginForm?.addEventListener('submit', async e => {
         e.preventDefault()
 
         const errorBox = document.getElementById('loginErrorMessage')
@@ -651,14 +956,11 @@ function renderSignInPrompt(backFn) {
             const email = document.getElementById('email').value.trim()
             const password = document.getElementById('password').value
 
-            const res = await fetch(
-                'https://grabcaramel.com/api/extension/login',
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password }),
-                },
-            )
+            const res = await fetch(caramelUrl('api/extension/login'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            })
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
@@ -681,7 +983,7 @@ function renderSignInPrompt(backFn) {
             const { token, username, image } = await res.json()
             const user = { username, image }
 
-            currentBrowser.storage.sync.set({ token, user }, () => initPopup())
+            caramelSetSession({ token, user }, () => afterLoginSuccess())
         } catch (err) {
             errorBox.textContent = `Login failed: ${err.message}`
             errorBox.style.display = 'block'
@@ -698,28 +1000,30 @@ function renderProfileCard(user) {
         ? user.image
         : 'assets/default-profile.png'
 
+    // Reuses the coupons-view card language (avatar+@username row + logout)
+    // so the two signed-in surfaces read as one design.
     container.innerHTML = `
-    <div class="profile-card fade-in-up">
-      <img src="${avatar}" class="profile-image" alt="Profile"/>
-      <div class="welcome-message">Welcome back, ${user.username}!</div>
-      <div class="username">@${user.username}</div>
-
-      <div class="profile-actions">
-        <button id="logoutBtn" class="logout-button">Logout</button>
+    <div class="coupons-profile-card fade-in-up">
+      <div class="coupons-profile-row">
+        <div class="coupons-profile-info">
+          <img src="${escHtml(avatar)}" class="coupons-profile-image" alt="avatar"/>
+          <span class="coupons-user-label">@${escHtml(user.username)}</span>
+        </div>
+        <button id="logoutBtn" class="coupons-logout-button">Log out</button>
       </div>
+      <div id="savingsSummary"></div>
+      <p class="profile-signed-in-note">You're signed in — coupons appear automatically at checkout.</p>
     </div>
   `
 
-    const settingsIcon = document.getElementById('settingsIcon')
-    if (settingsIcon) {
-        settingsIcon.style.display = 'block'
-        settingsIcon.onclick = () =>
-            window.open('https://grabcaramel.com/profile', '_blank')
-    }
+    wireSettingsGear(() => renderProfileCard(user))
+    renderSavingsSummary()
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        currentBrowser.storage.sync.remove(['token', 'user'], initPopup)
-    })
+    const logoutBtn = document.getElementById('logoutBtn')
+    if (logoutBtn)
+        logoutBtn.addEventListener('click', () => {
+            signOutAndRevoke(initPopup, logoutBtn)
+        })
 }
 
 /* ------------------------------------------------------------ */
@@ -731,11 +1035,11 @@ function renderCouponsView(coupons, user, domain) {
     const headerLeft = user
         ? `
         <img
-          src="${user.image?.length ? user.image : 'assets/default-profile.png'}"
+          src="${escHtml(user.image?.length ? user.image : 'assets/default-profile.png')}"
           class="coupons-profile-image"
           alt="avatar"
         />
-        <span class="coupons-user-label">@${user.username}</span>
+        <span class="coupons-user-label">@${escHtml(user.username)}</span>
       `
         : `
         <img src="assets/default-profile.png" class="coupons-profile-image" alt="avatar"/>
@@ -743,8 +1047,8 @@ function renderCouponsView(coupons, user, domain) {
       `
 
     const headerRight = user
-        ? '<button id="logoutBtn" class="coupons-logout-button">Logout</button>'
-        : '<button id="loginToggleBtn" class="coupons-logout-button">Login</button>'
+        ? '<button id="logoutBtn" class="coupons-logout-button">Log out</button>'
+        : '<button id="loginToggleBtn" class="coupons-logout-button">Log in</button>'
 
     container.innerHTML = `
     <div class="coupons-profile-card fade-in-up">
@@ -753,41 +1057,118 @@ function renderCouponsView(coupons, user, domain) {
         ${headerRight}
       </div>
 
-      <h3 class="coupon-header">Coupons for ${domain}</h3>
+      <div id="savingsSummary"></div>
+
+      <h3 class="coupon-header">Coupons for ${escHtml(domain)}</h3>
 
       <div id="couponList" class="coupon-list">
         ${
             coupons.length === 0
-                ? '<p>No coupons found for this site</p>'
+                ? '<p>No coupons available for this store right now.</p>'
                 : coupons
-                      .map(
-                          c => `
-            <div data-code="${c.code}" class="coupon-item">
-              <div class="coupon-title">${c.title || 'Untitled Coupon'}</div>
-              <div class="coupon-desc">${c.description || ''}</div>
-              <div class="coupon-action">
-                <button class="copyBtn">Copy "${c.code}"</button>
+                      .map(c => {
+                          // Sourced from window.CaramelCoupons
+                          // (coupon-constants.generated.js, loaded before
+                          // this file — F-006) instead of a hard-coded
+                          // literal, so this can't re-drift from the app's
+                          // src/lib/coupons.ts.
+                          const restrictedSet = new Set(
+                              window.CaramelCoupons.RESTRICTED_STATUSES,
+                          )
+                          const isRestricted = restrictedSet.has(c.status)
+                          const isDead =
+                              c.status === 'invalid' || c.status === 'expired'
+                          let warning = ''
+                          if (isRestricted) {
+                              const baseMsg =
+                                  c.status === 'category_restricted'
+                                      ? 'Limited to specific categories'
+                                      : c.status === 'seller_specific'
+                                        ? 'Only for items from a specific seller'
+                                        : c.status === 'valid_with_warning'
+                                          ? 'May have restrictions'
+                                          : 'Limited to specific items'
+                              const cartHint = c.cartCategory
+                                  ? ` — your cart looks like <b>${escHtml(c.cartCategory)}</b>${c.cartCategorySecondary ? ` / ${escHtml(c.cartCategorySecondary)}` : ''}`
+                                  : ''
+                              const verifierMsg = c.verificationMessage
+                                  ? `<div class="coupon-restriction-detail">${escHtml(c.verificationMessage)}</div>`
+                                  : ''
+                              warning = `
+              <div class="coupon-restriction" title="${escHtml(c.verificationMessage || baseMsg)}">
+                <span class="coupon-restriction-icon" aria-hidden="true">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <path d="M12 9v4"/>
+                    <path d="M12 17h.01"/>
+                  </svg>
+                </span>
+                <span class="coupon-restriction-text">${baseMsg}${cartHint}</span>
+                ${verifierMsg}
+              </div>`
+                          }
+                          // Verification badge: green=verified, amber=restricted,
+                          // grey=not yet verified (grace), red=known not valid.
+                          // Labels + which status maps to which tier come from
+                          // window.CaramelCoupons.STATUS_META
+                          // (coupon-constants.generated.js, F-006); the tier
+                          // palette lives in styles.css as
+                          // .coupon-badge--<tier> classes on tokens (with dark
+                          // values — the app's coupon-card.tsx keeps its own
+                          // Tailwind equivalent; the 4-tier axis can't drift
+                          // the way the 9-status axis did).
+                          const meta =
+                              window.CaramelCoupons.STATUS_META[c.status]
+                          const badge = meta
+                              ? `<span class="coupon-badge coupon-badge--${meta.tier}" title="${escHtml(c.verificationMessage || '')}">${meta.label}</span>`
+                              : ''
+                          // App-owned trust signal (W1): "worked Xh ago" when
+                          // the extension last reported this coupon working
+                          // (<7 days). '' (unshown) until W2 wires the report.
+                          const workedAgo = formatWorkedAgo(c.lastWorkedAt)
+                          return `
+            <div data-code="${escHtml(c.code)}" role="button" tabindex="0" aria-label="${escHtml((c.title || 'Coupon') + ' — copy code ' + c.code)}" class="coupon-item${isRestricted ? ' coupon-item-restricted' : ''}${isDead ? ' coupon-item-dead' : ''}">
+              <div class="coupon-head">
+                <div class="coupon-title">${escHtml(c.title || 'Untitled Coupon')}</div>
+                ${badge}
+                ${workedAgo ? `<span class="coupon-worked-ago">${escHtml(workedAgo)}</span>` : ''}
               </div>
-            </div>`,
-                      )
+              ${c.description ? `<div class="coupon-desc">${escHtml(c.description)}</div>` : ''}
+              ${warning}
+              <div class="coupon-code-row">
+                <span class="coupon-code">${escHtml(c.code)}</span>
+                <span class="coupon-copy">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                    <path d="M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  Copy
+                </span>
+              </div>
+            </div>`
+                      })
                       .join('')
         }
       </div>
     </div>
 
-    <div id="toastContainer" class="copy-toast-container"></div>
+    <div id="toastContainer" class="copy-toast-container" aria-live="polite"></div>
   `
 
     /* save callback for login back-button */
     const selfCallback = () => renderCouponsView(coupons, user, domain)
 
+    /* Settings gear (header): in-popup settings, guests included. */
+    wireSettingsGear(selfCallback, domain)
+
+    /* lifetime savings banner (renders only when there's history) */
+    renderSavingsSummary()
+
     /* logout */
     const logoutBtn = document.getElementById('logoutBtn')
     if (logoutBtn)
         logoutBtn.addEventListener('click', () => {
-            currentBrowser.storage.sync.remove(['token', 'user'], () =>
-                renderSignInPrompt(selfCallback),
-            )
+            signOutAndRevoke(() => renderSignInPrompt(selfCallback), logoutBtn)
         })
 
     /* login toggle (guest) */
@@ -797,14 +1178,29 @@ function renderCouponsView(coupons, user, domain) {
             renderSignInPrompt(selfCallback),
         )
 
-    /* copy-to-clipboard */
+    /* copy-to-clipboard (mouse + keyboard). Robust copy: async clipboard API
+       with an execCommand fallback (shared caramelCopyText from UI-helpers.js).
+       The bare navigator.clipboard path silently did nothing when the API was
+       blocked — now the user always gets either the code on the clipboard or
+       honest feedback instead of a dead click. */
+    const copyFromItem = async item => {
+        const code = item.getAttribute('data-code')
+        const ok = await caramelCopyText(code)
+        showCopyToast(
+            ok
+                ? `Copied "${code}" to clipboard!`
+                : `Couldn't copy — code is ${code}`,
+        )
+    }
     container.querySelectorAll('.coupon-item').forEach(item => {
-        item.addEventListener('click', e => {
-            const code = e.currentTarget.getAttribute('data-code')
-            navigator.clipboard
-                .writeText(code)
-                .then(() => showCopyToast(`Copied "${code}" to clipboard!`))
-                .catch(() => {})
+        item.addEventListener('click', () => copyFromItem(item))
+        // Keyboard users / screen readers: the card is role="button", so
+        // Enter and Space must activate it like a real button.
+        item.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault()
+                copyFromItem(item)
+            }
         })
     })
 }

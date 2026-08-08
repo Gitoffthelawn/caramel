@@ -1,17 +1,31 @@
+import { withRoute } from '@/lib/api/withRoute'
 import { auth } from '@/lib/auth/auth'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
-export async function POST(req: NextRequest) {
-    const { email, password } = (await req.json().catch(() => ({}))) as {
-        email?: string
-        password?: string
-    }
-    if (!email || !password)
-        return NextResponse.json(
-            { error: 'Missing email or password' },
-            { status: 400 },
-        )
-    try {
+// Strict — previously had NO rate limit despite calling into better-auth's
+// password verification (F-007's flagged gap). Missing email/password now
+// 422s instead of the old manual 400 "Missing email or password"
+// (§Breaking); the manual check is now redundant (the wrapper guarantees
+// both fields non-empty before the handler runs) and has been dropped.
+const LoginBodySchema = z.object({
+    email: z.string().min(1),
+    password: z.string().min(1),
+})
+
+export const POST = withRoute(
+    {
+        method: 'POST',
+        routeName: 'extension/login',
+        rateLimit: 'mutation',
+        body: LoginBodySchema,
+    },
+    async ({ body }) => {
+        const { email, password } = body
+        // No inner try/catch: an unexpected throw (e.g. better-auth or a
+        // malformed upstream response) flows to withRoute's pipeline catch →
+        // handleRouteError (Sentry + x-request-id), instead of the old silent
+        // `catch {}` that swallowed it into a bare 500.
         const response = await auth.api.signInEmail({
             body: { email, password },
             asResponse: true,
@@ -58,10 +72,5 @@ export async function POST(req: NextRequest) {
                 null,
             image: data.user?.image || null,
         })
-    } catch {
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 },
-        )
-    }
-}
+    },
+)

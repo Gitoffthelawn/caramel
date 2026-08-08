@@ -1,0 +1,48 @@
+/* Caramel extension content-script styles (Phase 3: Shadow DOM).
+ *
+ * ALL visuals moved into the shadow stylesheet (assets/content-ui.css,
+ * injected per shadow root by UI-helpers.js createCaramelShadowHost). The
+ * old "host-page style hardening" !important block is gone — host-page CSS
+ * cannot cross a shadow boundary.
+ *
+ * What remains here: the three LIGHT-DOM HOST elements' positioning only.
+ * These same declarations are ALSO applied inline by
+ * createCaramelShadowHost() (CARAMEL_HOST_CSS in UI-helpers.js) — inline is
+ * the authoritative cross-browser source because manifest-firefox.json
+ * ships no content_scripts css array; this file is Chrome's light-DOM
+ * backup. Keep the two in sync. Loaded via manifest.json content_scripts.css
+ * (external file so strict-CSP sites don't block it). */
+
+/* ---- Prompt host ("Try Caramel Coupons") ---- */
+#caramel-small-prompt {
+    /* A shadow host has no light-DOM children, so it matches :empty — and
+       themes that hide empty containers therefore hide US. 1thrive.com ships
+       `div:empty { display:none }` and rendered our prompt 0x0 (measured
+       2026-08-06). See CARAMEL_HOST_CSS in UI-helpers.js. */
+    display: block !important;
+    position: fixed;
+    top: max(20px, env(safe-area-inset-top));
+    right: max(20px, env(safe-area-inset-right));
+    z-index: 2147483646;
+    width: min(88vw, 300px);
+    cursor: pointer;
+    /* The keyboard focus ring is painted on the pill INSIDE the shadow root
+       (:host(:focus-visible) — see assets/content-ui.css); suppress the
+       host's own outline so rings never double up. */
+    outline: none;
+}
+
+/* ---- Overlay hosts (testing + final modals) ---- */
+#caramel-testing-overlay,
+#caramel-final-overlay {
+    /* Same :empty exposure as the prompt host above — and worse here, because
+       hiding these two means the whole apply flow runs and shows nothing. */
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh; /* fallback */
+    height: 100dvh;
+    z-index: 2147483647;
+}

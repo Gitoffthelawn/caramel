@@ -1,0 +1,101 @@
+# One-root-compose (F-016). THE dev command is `docker compose up --build`
+# (root `pnpm dev`) — local, CI and prod run this same graph in prod-mode
+# builds, so behaviour is identical everywhere. Services are web + postgres
+# ONLY: no redis (rate limiting is in-memory single-instance by design, NF-13)
+# and no separate coupons DB — the coupon catalog now lives in the local
+# `postgres` service itself (app-owned Prisma models coupons/store_configs/
+# sources, created by `prisma migrate deploy` + the catalog seed, W4).
+name: caramel
+
+services:
+  postgres:
+    image: postgres:18.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caramel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caramel_password}
+      POSTGRES_DB: ${POSTGRES_DB:-caramel}
+    ports:
+      # Loopback-only by default. Host port matches .env.example's
+      # localhost:58005 so the `pnpm dev:next` escape hatch + host-side prisma /
+      # drift commands reach the same database.
+      - '${BIND_HOST:-127.0.0.1}:${PG_PORT:-58005}:5432'
+    volumes:
+      # Postgres 18+ stores data in a versioned subdir and declares its VOLUME
+      # at /var/lib/postgresql — mounting the classic /var/lib/postgresql/data
+      # path breaks first-boot initialisation on this image.
+      - caramel-auth-db-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-caramel} -d ${POSTGRES_DB:-caramel}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # An empty build.arg would clobber the Dockerfile's ARG default and
+        # trip env.client.ts's min(1) at build time, so the local default
+        # lives here too (platforms override via their env tab beside this
+        # file). The other three are optional strings — "" passes harmlessly.
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:58000}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${NEXT_PUBLIC_GOOGLE_ANALYTICS_ID:-}
+        NEXT_PUBLIC_API_ENCRYPTION_ENABLED: ${NEXT_PUBLIC_API_ENCRYPTION_ENABLED:-}
+    # Restart policy (both services) complements the fail-hard entrypoint — a
+    # failure still crashes loudly (visible exit + restart count climbing =
+    # crash-loop is diagnosable, never silent), but the stack self-recovers
+    # from transient boot races and survives host reboots; `unless-stopped`
+    # respects a manual stop (the retire/revert path).
+    restart: unless-stopped
+    # App secrets (auth, email, OpenRouter, extension OAuth, …) come from the
+    # env files below — later file wins on collision, so a local app .env
+    # overrides a stray root one. Both optional so a clean checkout / CI can
+    # `up` without either; env.ts still fail-fasts loudly at boot if no
+    # BETTER_AUTH_SECRET / JWT_SECRET is provided.
+    env_file:
+      # Deploy platforms write their Environment tab to a .env file BESIDE
+      # this compose file — this entry is how real secrets reach the container
+      # there. Root .env stays gitignored/untracked (compose-parity gate).
+      - path: ./.env
+        required: false
+      # Local dev's file — the same one `pnpm dev:next` and host-side prisma
+      # read. Copy apps/caramel-app/.env.example to apps/caramel-app/.env
+      # first (see README).
+      - path: ./apps/caramel-app/.env
+        required: false
+    environment:
+      # Topology only — the in-container app talks to the postgres SERVICE, so
+      # this overrides whatever localhost value the app .env ships.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-caramel}:${POSTGRES_PASSWORD:-caramel_password}@postgres:5432/${POSTGRES_DB:-caramel}
+      # COUPONS_DATABASE_URL is intentionally NOT set here: the coupon catalog
+      # lives in the postgres service above (app-owned Prisma tables + seed), so
+      # the app serves its own catalog — no external DB, no "degraded mode"
+      # (both retired in W4-D3). It is now an OPTIONAL bridge-sync-only input;
+      # when a deploy runs the out-of-repo bridge it reaches the container via
+      # the env_file above, never hardcoded here.
+    ports:
+      - '${BIND_HOST:-127.0.0.1}:${WEB_PORT:-58000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # busybox wget (node:22-alpine) — a plain unauthenticated GET on the
+      # homepage. Deliberately NOT /api/health/db: that route is bearer-gated
+      # (401 without UPKUMA_HEALTH_SECRET), so it can't serve as an
+      # unauthenticated container liveness probe.
+      test:
+        ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  caramel-auth-db-data:

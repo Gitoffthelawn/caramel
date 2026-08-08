@@ -1,0 +1,507 @@
+/* Caramel content-UI shadow stylesheet (Phase 3 of the UI modernization).
+ *
+ * Injected by UI-helpers.js createCaramelShadowHost() into each injected
+ * surface's ShadowRoot (prompt pill, testing modal, final modal), together
+ * with assets/tokens.css (rewritten ':root' → ':host, :root' so the --cm-*
+ * vars resolve inside a shadow tree — :root never matches there).
+ *
+ * Why this lives under assets/ and NOT in the manifest css array:
+ *   - manifest css applies to the HOST page's light DOM only; it cannot
+ *     style a shadow tree. caramel-content.css keeps only the host-element
+ *     positioning rules.
+ *   - assets/* is already web_accessible in BOTH manifests, so content
+ *     scripts can fetch() it in Chrome and Firefox alike.
+ *   - the summed content-script size-limit budget (.size-limit.json, 102 KB)
+ *     counts JS files; embedding this sheet as a JS string would not fit.
+ *
+ * The shadow boundary means host-page selectors can't reach these elements:
+ * the old "!important hardening" block is gone for good. Only inheritable
+ * properties (font, color) cross into a shadow tree — each surface's
+ * top-level container re-declares them below. */
+
+@keyframes caramelFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Neutralize UA/inherited styling on our own controls (no host-page rules
+ * can reach in here, so plain selectors — no !important — are enough). */
+button {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    margin: 0;
+    font-family: inherit;
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    text-decoration: none;
+    cursor: pointer;
+}
+button:focus {
+    outline: none;
+}
+
+/* ---- Prompt pill ("Try Caramel Coupons") ----
+ * The HOST (#caramel-small-prompt) owns position/size/z-index; this is the
+ * visual pill filling it. Deliberately keeps the brand gradient — it's the
+ * strongest brand moment — but on tokens now. */
+.cm-prompt {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    background: linear-gradient(
+        135deg,
+        var(--cm-brand) 0%,
+        var(--cm-brand-strong) 100%
+    );
+    padding: 14px 16px;
+    border-radius: var(--cm-radius-lg);
+    box-shadow: var(--cm-shadow-raised);
+    color: var(--cm-on-brand);
+    font-family: var(--cm-font-sans);
+    animation: caramelFadeIn 0.4s var(--cm-ease-out) both;
+    transition:
+        transform var(--cm-dur-fast) var(--cm-ease),
+        box-shadow var(--cm-dur-fast) var(--cm-ease);
+}
+:host(:hover) .cm-prompt {
+    transform: translateY(-2px);
+}
+/* Keyboard focus ring — the HOST carries role="button" + tabindex="0", so
+ * focus-visible state lives on the host and paints on the pill. */
+:host(:focus-visible) .cm-prompt {
+    outline: 3px solid var(--cm-on-brand);
+    outline-offset: 2px;
+}
+.cm-prompt .caramel-prompt-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+.cm-prompt .caramel-prompt-logo {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    object-fit: contain;
+}
+.cm-prompt .caramel-prompt-copy {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+.cm-prompt .caramel-prompt-label {
+    font-weight: 700;
+    font-size: 14.5px;
+    line-height: 1.25;
+}
+.cm-prompt small {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--cm-text-sm);
+    line-height: 1.3;
+    opacity: 0.92;
+}
+.cm-prompt .caramel-prompt-arrow {
+    flex: none;
+    opacity: 0.8;
+    transition: transform var(--cm-dur-fast) var(--cm-ease);
+}
+:host(:hover) .cm-prompt .caramel-prompt-arrow {
+    transform: translateX(2px);
+    opacity: 1;
+}
+
+/* Floating circular close (shared look: prompt × + testing-modal ×). */
+.cm-close-fab {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: var(--cm-radius-pill);
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+    box-shadow: var(--cm-shadow-overlay);
+}
+.cm-close-fab:focus-visible {
+    outline: 2px solid var(--cm-brand);
+    outline-offset: 2px;
+}
+#caramel-close-btn {
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+}
+#caramel-testing-close {
+    top: -8px;
+    right: -8px;
+}
+/* The final card scrolls (max-height + overflow-y), so a × hanging outside it
+ * would be clipped by its own scroll box. Sits inside, level with the logo. */
+#caramel-final-close {
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--cm-text-secondary);
+}
+#caramel-final-close:hover {
+    background: var(--cm-surface);
+    color: var(--cm-brand);
+}
+
+/* ---- Shared overlay scrim ----
+ * The HOST (#caramel-testing-overlay / #caramel-final-overlay) is the
+ * fixed, full-viewport, max-z-index box; the scrim fills it. */
+.cm-scrim {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100vh; /* fallback */
+    height: 100dvh;
+    background-color: rgba(15, 12, 10, 0.5);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* ---- Testing modal ("Applying coupons…") ----
+ * Was a solid-orange card; now the popup's card language — light/dark
+ * surface, primary text, brand accents. */
+#caramel-testing-modal {
+    position: relative;
+    box-sizing: border-box;
+    background-color: var(--cm-surface);
+    padding: 24px;
+    border-radius: var(--cm-radius-lg);
+    border: 1px solid var(--cm-border);
+    box-shadow: var(--cm-shadow-raised);
+    color: var(--cm-text-primary);
+    width: min(92vw, 340px);
+    font-family: var(--cm-font-sans);
+    text-align: center;
+    animation: caramelFadeIn 0.3s var(--cm-ease-out) both;
+}
+#caramel-testing-modal:focus {
+    outline: none;
+}
+#caramel-testing-modal .caramel-modal-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+}
+#caramel-testing-modal .caramel-modal-logo {
+    width: 40px;
+    height: 40px;
+    margin-right: 8px;
+}
+#caramel-testing-modal h2 {
+    margin: 0;
+    font-size: var(--cm-text-lg);
+    font-weight: 700;
+    color: var(--cm-text-primary);
+    text-align: center;
+}
+#caramel-test-status {
+    margin: 10px 0;
+    font-size: var(--cm-text-base);
+    color: var(--cm-text-secondary);
+}
+#caramel-progress-container {
+    background: var(--cm-brand-soft-3);
+    border-radius: 6px;
+    width: 100%;
+    height: 10px;
+    margin: 10px 0;
+    position: relative;
+    overflow: hidden;
+}
+#caramel-progress-bar {
+    background: var(--cm-brand);
+    width: 0%;
+    height: 100%;
+    border-radius: 6px;
+    transition: width var(--cm-dur-slow) var(--cm-ease);
+}
+
+/* ---- Final modal ----
+ * The outcome is the headline: the amount is the largest thing on the card,
+ * the code sits under it in a ticket, and everything else is support. The
+ * card itself gets a soft brand wash at the top so the panel reads as one
+ * object rather than a stack of centered paragraphs. */
+.caramel-final-modal {
+    position: relative;
+    box-sizing: border-box;
+    /* Column flex so the copy list can take whatever height the card has left
+     * over and the button stays put underneath it (see .caramel-manual-list).
+     * Children are full-width block-ish items either way; the visible change is
+     * that adjacent margins no longer collapse, which the spacing below already
+     * accounts for. */
+    display: flex;
+    flex-direction: column;
+    background-color: var(--cm-surface);
+    background-image: linear-gradient(
+        180deg,
+        var(--cm-brand-soft) 0%,
+        transparent 190px
+    );
+    padding: 26px 26px 22px;
+    border-radius: var(--cm-radius-lg);
+    border: 1px solid var(--cm-border);
+    width: min(92vw, 372px);
+    max-height: 88vh; /* fallback */
+    max-height: min(88dvh, 88vh);
+    overflow-y: auto;
+    box-shadow: var(--cm-shadow-raised);
+    color: var(--cm-text-primary);
+    font-family: var(--cm-font-sans);
+    text-align: center;
+    animation: caramelModalIn var(--cm-dur-slow) var(--cm-ease-out) both;
+}
+@keyframes caramelModalIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .caramel-final-modal {
+        animation: caramelFadeIn var(--cm-dur) var(--cm-ease-out) both;
+    }
+}
+.caramel-final-modal:focus {
+    outline: none;
+}
+/* Brand mark as a contained badge, not a 60px free-floating image. */
+.caramel-final-logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+.caramel-final-logo img {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--cm-radius-md);
+    box-shadow:
+        0 0 0 5px var(--cm-brand-soft-2),
+        var(--cm-shadow-card);
+}
+/* Heading is primary text — the ORANGE is spent on the amount, which is
+ * what the user actually came for. Two brand-colored headlines competed. */
+.caramel-final-modal h2 {
+    margin: 0 0 6px 0;
+    color: var(--cm-text-primary);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+.caramel-final-msg {
+    font-size: var(--cm-text-base);
+    line-height: 1.45;
+    color: var(--cm-text-secondary);
+    margin: 0 0 18px 0;
+}
+/* One grouped outcome panel: amount + code ticket. */
+.caramel-final-win {
+    background: var(--cm-brand-soft-2);
+    border: 1px solid var(--cm-border-dashed);
+    border-radius: var(--cm-radius-md);
+    padding: 16px 14px 14px;
+    margin: 0 0 4px;
+}
+.caramel-final-eyebrow {
+    font-size: var(--cm-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--cm-text-muted);
+}
+.caramel-final-eyebrow-sm {
+    margin-bottom: 6px;
+}
+/* The hero number. Tabular figures so 1s and 4s don't shuffle the width. */
+.caramel-final-savings {
+    font-size: 40px;
+    line-height: 1.05;
+    color: var(--cm-brand);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    margin: 2px 0 0;
+}
+.caramel-final-codewrap {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--cm-border-dashed);
+}
+.caramel-final-code {
+    font-size: 15px;
+    color: var(--cm-text-secondary);
+    margin: 0;
+}
+/* The applied/found code as a mono "coupon ticket" chip. */
+.caramel-final-code span {
+    display: inline-block;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 7px 14px;
+    color: var(--cm-brand);
+    background: var(--cm-surface);
+    border: 1px dashed var(--cm-border-dashed);
+    border-radius: var(--cm-radius-sm);
+    font-family: var(--cm-font-mono);
+    font-size: var(--cm-text-md);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    overflow-wrap: anywhere;
+}
+.caramel-final-hint {
+    font-size: 13px;
+    color: var(--cm-text-muted);
+    margin: 12px 0 0;
+}
+/* Full-width primary action — one obvious next step. */
+#caramel-final-ok-btn {
+    margin-top: 18px;
+    width: 100%;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
+    padding: 13px 24px;
+    border-radius: var(--cm-radius-sm);
+    font-size: var(--cm-text-md);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    box-shadow: var(--cm-shadow-card);
+    transition:
+        background var(--cm-dur) var(--cm-ease),
+        box-shadow var(--cm-dur) var(--cm-ease),
+        transform var(--cm-dur-fast) var(--cm-ease);
+}
+#caramel-final-ok-btn:hover {
+    background: var(--cm-brand-strong);
+    box-shadow: var(--cm-shadow-raised);
+}
+#caramel-final-ok-btn:active {
+    transform: translateY(1px);
+}
+#caramel-final-ok-btn:focus-visible {
+    outline: 3px solid var(--cm-brand);
+    outline-offset: 2px;
+}
+
+/* ---- Manual copy list ----
+ * Takes whatever height the card has spare rather than a fixed 190px.
+ *
+ * 190px is about three and a half rows, so the list ALWAYS ended on a row
+ * sliced through the middle, sitting directly under a solid button — and
+ * because Chrome hides overlay scrollbars until you scroll, there was nothing
+ * on screen saying "there is more below". A half-drawn row with no scrollbar
+ * doesn't read as a scroll hint, it reads as a rendering bug. Meanwhile the
+ * card is allowed 88dvh and was using ~620px of a 900px viewport: on the very
+ * screens with the most room to show codes, six codes were shown as three.
+ *
+ * flex:1 with min-height:0 (without it a flex item refuses to shrink below its
+ * content) hands the list the leftover space, so tall viewports show more codes
+ * and short ones still show at least one — and the button, a sibling rather
+ * than something after the scroll box, stays reachable without scrolling in
+ * both cases. scrollbar-width makes the indicator permanent instead of
+ * on-scroll, which is what tells the shopper the list continues. */
+.caramel-manual-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cm-border) transparent;
+    margin: 10px 0 2px;
+    text-align: left;
+}
+.caramel-manual-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid var(--cm-border);
+    border-radius: var(--cm-radius-sm);
+    padding: 8px 10px;
+    margin: 6px 0;
+}
+.caramel-manual-row .caramel-manual-info {
+    min-width: 0;
+    flex: 1;
+}
+.caramel-manual-row .caramel-manual-code {
+    font-family: var(--cm-font-mono);
+    font-weight: 700;
+    color: var(--cm-text-primary);
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.caramel-manual-row .caramel-manual-title {
+    font-size: var(--cm-text-xs);
+    color: var(--cm-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Codes the store turned down in its own words. Still offered (a store's
+ * "invalid" is sometimes just our synthetic input) but visibly demoted, so the
+ * list never leads with what the user just watched fail. */
+.caramel-manual-row-rejected {
+    opacity: 0.6;
+}
+.caramel-manual-row .caramel-manual-rejected {
+    font-style: italic;
+}
+.caramel-manual-copy {
+    flex: none;
+    background: var(--cm-brand);
+    color: var(--cm-on-brand);
+    padding: 8px 14px;
+    border-radius: var(--cm-radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background var(--cm-dur-fast) var(--cm-ease);
+}
+.caramel-manual-copy:hover {
+    background: var(--cm-brand-strong);
+}
+.caramel-manual-copy:focus-visible {
+    outline: 3px solid var(--cm-brand);
+    outline-offset: 2px;
+}
+/* Copied feedback — the popup's green badge pair, works in dark too. */
+.caramel-manual-copy.is-copied {
+    background: var(--cm-tier-green-bg);
+    color: var(--cm-tier-green-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cm-prompt,
+    #caramel-testing-modal,
+    .caramel-final-modal,
+    #caramel-progress-bar,
+    .cm-prompt .caramel-prompt-arrow {
+        animation: none;
+        transition: none;
+    }
+}

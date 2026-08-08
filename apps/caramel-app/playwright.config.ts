@@ -1,5 +1,20 @@
 import { createArgosReporterOptions } from '@argos-ci/playwright/reporter'
 import { defineConfig, devices } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// Load this package's .env (the same file setup:ci-env writes in CI, and the
+// one `prisma migrate deploy` reads) so DATABASE_URL reaches the DB-seeding
+// e2e specs (E-05 real-login). Guarded by existsSync exactly like
+// vitest.integration.config.ts: the e2e-push job runs against a DEPLOYED site
+// with NO local .env, so the file is simply absent there — DATABASE_URL stays
+// unset and the seed-dependent specs skip themselves (see e2e/support/seed-user.ts).
+// (Playwright transpiles this config to CJS, so __dirname is available and
+// import.meta.url is not — unlike the Vite-run vitest configs.)
+const envPath = path.resolve(__dirname, '.env')
+if (fs.existsSync(envPath)) {
+    process.loadEnvFile(envPath)
+}
 
 const baseURL =
     process.env.PLAYWRIGHT_BASE_URL ||
@@ -33,6 +48,17 @@ export default defineConfig({
         baseURL,
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
+        // The app has first-class prefers-reduced-motion support: the 3D
+        // hero/vault scenes render their static CSS posters instead of
+        // mounting WebGL, and the store marquee stops translating. Running
+        // e2e with it ON keeps CI deterministic — otherwise SwiftShader
+        // software-renders the R3F canvases on a 2-core runner and the CPU
+        // starvation flakes unrelated tests (nav toHaveURL timeouts), and
+        // the marquee translates lazy images offscreen where they never
+        // load and stall Argos. The WebGL path is verified locally/manually.
+        contextOptions: {
+            reducedMotion: 'reduce',
+        },
     },
     ...(startServer
         ? {

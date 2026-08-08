@@ -1,31 +1,42 @@
-import prisma from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
+import { handleRouteError } from '@/lib/api/handleRouteError'
+import { withRoute } from '@/lib/api/withRoute'
+import { searchSupportedSites } from '@/lib/couponsRepo'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
-export async function POST(req: NextRequest) {
-    let body: any = {}
-    try {
-        body = await req.json()
-    } catch {}
-    const q = String((body?.query ?? '') as string).trim()
-    if (!q) return NextResponse.json({ sites: [] })
-    const likePattern = `%${q}%`
-    try {
-        const rows = await prisma.$queryRaw<
-            { site: string; sim_score: number }[]
-        >`
-      SELECT DISTINCT c.site,
-             COALESCE(similarity(c.site, ${q}), 0) as sim_score
-      FROM "Coupon" c
-      WHERE c.site ILIKE ${likePattern}
-         OR similarity(c.site, ${q}) > 0.25
-      ORDER BY sim_score DESC, c.site ASC
-    `
-        const sites = rows.map(r => r.site)
-        return NextResponse.json({ sites })
-    } catch (err: any) {
-        return NextResponse.json(
-            { error: 'Search failed', details: err?.message },
-            { status: 500 },
-        )
-    }
-}
+// Lenient — `query` is coerced/defaulted by hand below exactly as before
+// (F-007's Breaking changes: this route's behavior is PRESERVED, not
+// tightened), so the schema only needs to accept whatever shape a caller
+// sends without ever 422ing. z.unknown() defers ALL type/shape handling
+// to the same String(body?.query ?? '') the route always did.
+const SearchSupportedBodySchema = z.object({
+    query: z.unknown().optional(),
+})
+
+// Store-name autocomplete. Post-DB-split this must read the coupons catalog
+// via couponsRepo (the old Prisma "Coupon" model was dropped). Surfaces any
+// store that has visible coupons (verified, restricted, or not-yet-verified).
+export const POST = withRoute(
+    {
+        method: 'POST',
+        routeName: 'sites/search-supported',
+        rateLimit: 'read',
+        body: SearchSupportedBodySchema,
+    },
+    async ({ req, body }) => {
+        const q = String(body?.query ?? '')
+            .trim()
+            .slice(0, 100)
+        if (!q) return NextResponse.json({ sites: [] })
+
+        try {
+            const rows = await searchSupportedSites(q)
+            return NextResponse.json({
+                sites: rows.map(r => r.site).filter(Boolean),
+            })
+        } catch (err) {
+            console.error('search-supported failed:', err)
+            return handleRouteError(err, { req, message: 'Search failed' })
+        }
+    },
+)

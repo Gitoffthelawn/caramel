@@ -6,7 +6,7 @@ import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import debounce from 'lodash.debounce'
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { FaFilter } from 'react-icons/fa'
-import Select from 'react-select'
+import Select, { type StylesConfig } from 'react-select'
 import AsyncSelect from 'react-select/async'
 
 interface CouponFiltersProps {
@@ -87,9 +87,9 @@ export default function CouponFilters({
             ? normalizeOptions([filters.type])[0]
             : null
 
-    const selectStyles = useMemo(
+    const selectStyles: StylesConfig<Option, false> = useMemo(
         () => ({
-            control: (base: any, state: any) => ({
+            control: (base, state) => ({
                 ...base,
                 borderColor: state.isFocused
                     ? isDarkMode
@@ -100,35 +100,38 @@ export default function CouponFilters({
                 paddingLeft: '4px',
                 paddingRight: '4px',
                 minHeight: '44px',
-                backgroundColor: isDarkMode ? '#111827' : '#ffffff',
+                // react-select can't take Tailwind classes, so these hexes must
+                // track the brand surfaces: darkSurface #1E1916 (warm charcoal,
+                // tailwind.config.ts) instead of the blue-hued gray-900/800.
+                backgroundColor: isDarkMode ? '#1E1916' : '#ffffff',
                 width: '100%',
             }),
-            menu: (base: any) => ({
+            menu: base => ({
                 ...base,
                 zIndex: 20,
-                backgroundColor: isDarkMode ? '#111827' : '#ffffff',
+                backgroundColor: isDarkMode ? '#1E1916' : '#ffffff',
             }),
-            option: (base: any, state: any) => ({
+            option: (base, state) => ({
                 ...base,
                 backgroundColor: state.isFocused
                     ? isDarkMode
-                        ? '#1f2937'
+                        ? '#2B241F' // warm hover step above darkSurface
                         : '#f3f4f6'
                     : isDarkMode
-                      ? '#111827'
+                      ? '#1E1916'
                       : '#ffffff',
                 color: isDarkMode ? '#ffffff' : '#111827',
                 cursor: 'pointer',
             }),
-            singleValue: (base: any) => ({
+            singleValue: base => ({
                 ...base,
                 color: isDarkMode ? '#ffffff' : '#111827',
             }),
-            input: (base: any) => ({
+            input: base => ({
                 ...base,
                 color: isDarkMode ? '#ffffff' : '#111827',
             }),
-            placeholder: (base: any) => ({
+            placeholder: base => ({
                 ...base,
                 color: isDarkMode ? '#6b7280' : '#9ca3af',
             }),
@@ -141,27 +144,42 @@ export default function CouponFilters({
             <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
                 <div className="min-w-[220px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-search"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Search
                     </label>
                     <div className="relative">
-                        <MagnifyingGlassIcon className="text-caramel absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" />
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-caramel" />
                         <input
+                            id="coupon-search"
                             type="text"
                             value={localSearch}
                             onChange={e => handleSearchChange(e.target.value)}
                             placeholder="Search coupons by site, title, or description..."
-                            className="border-caramel/30 focus:border-caramel w-full rounded-md border-2 bg-white px-3 py-[11px] pl-10 text-sm outline-none transition-all dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
+                            className="w-full rounded-md border-2 border-caramel/30 bg-white px-3 py-[11px] pl-10 text-sm outline-none transition-all focus:border-caramel dark:bg-darkSurface dark:text-white dark:placeholder-gray-500 dark:focus:border-orange-400"
                         />
                     </div>
                 </div>
 
                 {/* Store Filter */}
                 <div className="min-w-[220px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-store-filter"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Store
                     </label>
+                    {/* instanceId pins the ids react-select stamps on its
+                        live-region/placeholder/listbox nodes. Without it they
+                        come from a module-level counter that keeps climbing in
+                        the server process (react-select-8-… on the Nth SSR)
+                        while a fresh client starts at 1 — an id-attribute
+                        hydration mismatch on every load of this page. */}
                     <AsyncSelect
+                        instanceId="coupon-store-filter"
+                        inputId="coupon-store-filter"
                         cacheOptions
                         defaultOptions
                         loadOptions={loadStoreOptions}
@@ -178,10 +196,15 @@ export default function CouponFilters({
 
                 {/* Type Filter */}
                 <div className="min-w-[200px] flex-1">
-                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label
+                        htmlFor="coupon-type-filter"
+                        className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
                         Discount Type
                     </label>
                     <Select
+                        instanceId="coupon-type-filter"
+                        inputId="coupon-type-filter"
                         isClearable
                         isSearchable={false}
                         placeholder="All discount types"
@@ -202,13 +225,15 @@ export default function CouponFilters({
                 {/* Clear Filters Button */}
                 {(filters.search || filters.site || filters.type !== 'all') && (
                     <button
+                        type="button"
                         onClick={() => {
                             setLocalSearch('')
                             onChange({ search: '', site: '', type: 'all' })
                             onClearAll?.()
                         }}
-                        className="from-caramel flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r to-orange-600 text-white shadow-md transition hover:opacity-90"
+                        className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-caramel to-orange-600 text-white shadow-md transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:focus-visible:ring-offset-darkBg"
                         title="Clear filters"
+                        aria-label="Clear filters"
                     >
                         <XMarkIcon className="h-5 w-5" />
                     </button>
@@ -217,8 +242,10 @@ export default function CouponFilters({
 
             {/* Mobile toggle (md and down per custom breakpoints) */}
             <button
+                type="button"
+                aria-expanded={showFilters}
                 onClick={() => setShowFilters(!showFilters)}
-                className="text-caramel mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 shadow-md transition-all hover:shadow-lg md:flex dark:bg-gray-900 dark:text-orange-400"
+                className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-caramel shadow-md transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel focus-visible:ring-offset-2 dark:bg-darkSurface dark:text-orange-400 dark:focus-visible:ring-offset-darkBg md:flex"
             >
                 <FaFilter className="h-4 w-4" />
                 <span className="font-semibold">Filters</span>

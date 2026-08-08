@@ -7,13 +7,16 @@ assignees: ''
 ---
 
 ## 🏪 Store Information
+
 **Store Name:**
 **Store URL:**
 **Store Category:** (e.g., fashion, electronics, retail, marketplace, education)
 **Country/Region:** (e.g., US, EU, Global)
 
 ## 📊 Store Popularity
+
 **Why should we prioritize this store?**
+
 - [ ] Very popular in my region
 - [ ] Frequently requested by users
 - [ ] Has good coupon/discount programs
@@ -21,12 +24,15 @@ assignees: ''
 - [ ] Personal preference
 
 **Estimated demand:**
+
 - [ ] High (many users would benefit)
 - [ ] Medium (some users would benefit)
 - [ ] Low (niche audience)
 
 ## 🔗 Store Details
+
 **Does this store have:**
+
 - [ ] Regular sales/promotions
 - [ ] Coupon codes
 - [ ] Membership discounts
@@ -34,12 +40,15 @@ assignees: ''
 - [ ] Student discounts
 
 **Store size:**
+
 - [ ] Large retailer (Amazon, Walmart level)
 - [ ] Medium retailer (regional chain)
 - [ ] Small/niche retailer
 
 ## 📋 Additional Context
+
 **Any specific challenges or considerations:**
+
 - Special checkout processes
 - Regional restrictions
 - Known coupon sources
@@ -49,4 +58,5 @@ assignees: ''
 (Add any helpful context about the store)
 
 ---
-*Thank you for helping make Caramel better! 🎉*
+
+_Thank you for helping make Caramel better! 🎉_

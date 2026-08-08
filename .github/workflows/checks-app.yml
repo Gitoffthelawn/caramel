@@ -5,16 +5,17 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  schedule:
+    # Nightly re-audit of prod deps so a new CVE on an unchanged pin surfaces
+    # even with no push. Only the `audit` job runs on this trigger.
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-checks-${{ github.workflow }}-${{ github.ref }}
+  group: ci-checks-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  NEXT_PUBLIC_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
 
 jobs:
   # ─────────────────────────────────────────────────────────────
@@ -22,9 +23,20 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   test-matrix:
     name: ${{ matrix.task }}
+    # Schedule runs the nightly dependency audit only — skip the quality matrix.
+    if: github.event_name != 'schedule'
     strategy:
       matrix:
-        task: ["lint", "prettier", "typecheck", "knip"]
+        task:
+          [
+            'lint',
+            'prettier',
+            'typecheck',
+            'knip',
+            'unit',
+            'oxlint',
+            'prettier-root',
+          ]
     runs-on: ubuntu-latest
 
     steps:
@@ -36,7 +48,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -45,12 +57,31 @@ jobs:
       - name: Validate dependencies
         run: pnpm doctor
 
-      # Prisma client only for typecheck
-      - if: matrix.task == 'typecheck'
+      # Prisma client for typecheck + unit. Since W4 the coupon unit tests
+      # import @prisma/client (the `Prisma` namespace — Prisma.sql/Prisma.join)
+      # through the couponsRepo read layer, so the `unit` job needs the generated
+      # client present too or collection fails with "Cannot find module
+      # '.prisma/client/default'". (integration/e2e jobs generate explicitly.)
+      - if: matrix.task == 'typecheck' || matrix.task == 'unit'
         name: Generate Prisma Client
-        run: pnpm --filter caramel-landing exec prisma generate
+        run: pnpm --filter caramel-app exec prisma generate
 
-      - name: Run ${{ matrix.task }}
+      # oxlint runs from the repo root (both apps), not per-app like the rest
+      # of this matrix — kept in the same matrix so it reports as its own
+      # "oxlint" status check, sibling to lint/prettier/typecheck/knip.
+      - if: matrix.task == 'oxlint'
+        name: Run oxlint
+        run: pnpm lint:oxlint
+
+      # prettier-root checks repo-root + .github files (workflows YAML, root
+      # package.json, README, issue templates) that the per-app prettier task
+      # doesn't cover — runs from the repo root, like oxlint.
+      - if: matrix.task == 'prettier-root'
+        name: Run root prettier-check
+        run: pnpm prettier-check:root
+
+      - if: matrix.task != 'oxlint' && matrix.task != 'prettier-root'
+        name: Run ${{ matrix.task }}
         working-directory: ./apps/caramel-app
         run: |
           case ${{ matrix.task }} in
@@ -58,7 +89,98 @@ jobs:
             prettier)  pnpm prettier-check ;;
             typecheck) pnpm tsc --noEmit ;;
             knip)      pnpm knip ;;
+            unit)      pnpm test ;;
           esac
+
+  # ─────────────────────────────────────────────────────────────
+  # Integration (W1) — real prisma against a live Postgres
+  # ─────────────────────────────────────────────────────────────
+  # The unit job (test-matrix) mocks prisma; this is its DB-backed sibling:
+  # tests/integration/**/*.itest.ts run the real prisma client against a live
+  # Postgres so the coupon_signals read/write path is exercised for real, not
+  # mocked. Same trigger as test-matrix (PR + push, not the nightly audit) so a
+  # regression is caught on every change, not just on PRs.
+  integration:
+    name: Integration (DB)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        # Prod-matching: docker-compose.yml pins postgres:18.4. (The e2e-pr
+        # job's postgres:15 is a separate, known pin-drift punch-list item —
+        # deliberately NOT copied here.)
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Writes apps/caramel-app/.env with a DATABASE_URL pointing at the
+      # postgres service (postgres:postgres@localhost:58005/caramel) — the same
+      # value vitest.integration.config.ts's loadEnvFile('.env') reads.
+      - name: Write minimal CI env
+        run: pnpm --filter caramel-app run setup:ci-env
+
+      - name: Generate Prisma Client
+        run: pnpm --filter caramel-app exec prisma generate
+
+      - name: Apply Prisma migrations
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Run integration tests
+        run: pnpm --filter caramel-app test:integration
+
+  # ─────────────────────────────────────────────────────────────
+  # Dependency Vulnerability Audit (prod deps, high + critical)
+  # ─────────────────────────────────────────────────────────────
+  # FLAG-02: `pnpm audit` calls npm's retired quick-audit endpoint (HTTP 410 on
+  # pnpm 9 and 10), so it reddened on the transport, never on a real advisory.
+  # Replaced by a prod-scoped OSV.dev gate that keeps the same contract:
+  # production closure only (`pnpm -r list --prod`), fail on HIGH/CRITICAL.
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies (high + critical)
+        run: pnpm --filter caramel-app run audit:prod
 
   # ─────────────────────────────────────────────────────────────
   # Schema Drift Check (only when prisma files change)
@@ -95,7 +217,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Cache Prisma engines
@@ -175,20 +297,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+        run: pnpm --filter caramel-app exec playwright install --with-deps chromium
 
       - name: Write minimal CI env
-        run: pnpm --filter caramel-landing run setup:ci-env
+        run: pnpm --filter caramel-app run setup:ci-env
 
       - name: Generate Prisma Client
-        run: pnpm --filter caramel-landing exec prisma generate
+        run: pnpm --filter caramel-app exec prisma generate
 
       - name: Apply Prisma migrations
         working-directory: ./apps/caramel-app
@@ -219,10 +341,17 @@ jobs:
     name: E2E & Visual Regression (push)
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20 of these belong to the deploy gate below, which waits out a full
+    # Dokploy Docker build before a single test runs; the rest is the old
+    # budget. 20 rather than 10 is measured: on 2026-08-07 a three-push burst
+    # queued builds back-to-back and 0a57362's deploy was still building when
+    # the 10-minute window closed — the gate refused correctly, but the red
+    # was queue latency, not a defect.
+    timeout-minutes: 35
     env:
       ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
       ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
+      NEXT_PUBLIC_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -233,14 +362,35 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter caramel-landing exec playwright install --with-deps chromium
+        run: pnpm --filter caramel-app exec playwright install --with-deps chromium
+
+      # The step below tests the LIVE deployment, so this push races Dokploy's
+      # autodeploy of the same commit. Proven 2026-08-06: a625be9's own test
+      # failed at 14:40:44Z, two seconds before the deploy carrying its fix
+      # finished at 14:40:46Z. Wait for the site to report this exact commit.
+      #
+      # dev only: dev.grabcaramel.com is the root docker-compose/Dockerfile
+      # build, whose context carries the git metadata /api/version is stamped
+      # from. Prod is a Dokploy *Nixpacks* app built from apps/caramel-app,
+      # whose context excludes the repo's .git — it answers "unknown" and this
+      # gate could never pass there. Drop the condition when prod moves onto
+      # the root compose (RUNBOOK "Deploys & rollback").
+      - name: Wait for the deployment to carry this commit
+        if: github.ref == 'refs/heads/dev'
+        env:
+          VERSION_URL: https://dev.grabcaramel.com/api/version
+          EXPECTED_SHA: ${{ github.sha }}
+          # One full Docker build is ~10 min; a push burst queues builds
+          # back-to-back, so one queued-behind build fits inside 20.
+          DEPLOY_WAIT_TIMEOUT_SECONDS: '1200'
+        run: bash .github/workflows/scripts/wait-for-deploy.sh
 
       - name: Run E2E tests
         working-directory: ./apps/caramel-app
@@ -256,3 +406,154 @@ jobs:
           name: playwright-report-push
           path: apps/caramel-app/playwright-report/
           retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # Lighthouse (PR – prod build, SEO/a11y budgets)
+  # ─────────────────────────────────────────────────────────────
+  # Locks in the coupon-page SEO elevation (2026-07-30): a production build is
+  # served against the hermetic seeded Postgres and lighthouserc.json asserts
+  # category budgets (SEO ≥0.95 + a11y ≥0.9 error; perf/best-practices warn) on
+  # /, /coupons, a seeded store page, /supported-stores and /pricing.
+  lighthouse:
+    name: Lighthouse (SEO & a11y budgets)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Same known pin-drift as e2e-pr (postgres:15 vs compose 18.4) —
+        # deliberately mirrored, not fixed here.
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caramel
+        ports: ['58005:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caramel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Production origin ON PURPOSE: robots.ts and next.config's X-Robots-Tag
+      # noindex every non-production BASE_URL, which fails Lighthouse's
+      # heavily-weighted is-crawlable audit and caps the SEO score — the very
+      # category this job gates. The server still listens on localhost; only
+      # origin-derived strings (canonicals, robots ruleset) see prod.
+      NEXT_PUBLIC_BASE_URL: https://grabcaramel.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write minimal CI env
+        run: pnpm --filter caramel-app run setup:ci-env
+
+      - name: Generate Prisma Client
+        run: pnpm --filter caramel-app exec prisma generate
+
+      - name: Apply Prisma migrations (seeds the synthetic catalog)
+        working-directory: ./apps/caramel-app
+        run: pnpm exec prisma migrate deploy
+
+      - name: Build production bundle
+        working-directory: ./apps/caramel-app
+        run: pnpm build
+
+      - name: Run Lighthouse CI
+        working-directory: ./apps/caramel-app
+        run: pnpm lighthouse
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-reports
+          path: apps/caramel-app/lighthouse-reports/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # One-root-compose build (F-016) — clean-volume build + boot + migrate proof
+  # ─────────────────────────────────────────────────────────────
+  compose-build:
+    name: One-root-compose build
+    # PR-only + heavy, like e2e-pr. checks-app.yml is a shared workflow, so it
+    # can't use on.push.paths without gating every other job — a first `git
+    # diff` step path-filters this job instead (mirrors the intent of
+    # ai-evals.yml's path filter). A clean runner gives clean volumes.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect compose-relevant changes
+        id: filter
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}" || true
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" || git diff --name-only "origin/${{ github.base_ref }}" HEAD)"
+          echo "changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -Eq '^(Dockerfile|\.dockerignore|docker-compose\.yml|docker-entrypoint\.sh|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|apps/caramel-app/package\.json|apps/caramel-app/next\.config\.mjs|apps/caramel-app/prisma/|apps/caramel-app/\.env\.example)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No compose-relevant paths changed — skipping the heavy build."
+          fi
+
+      - name: Provide a throwaway app env (auth secret only; compose env overrides the DB URLs)
+        if: steps.filter.outputs.run == 'true'
+        run: printf 'BETTER_AUTH_SECRET=ci_compose_build_throwaway_secret\n' > apps/caramel-app/.env
+
+      - name: Build and boot the stack
+        if: steps.filter.outputs.run == 'true'
+        run: docker compose up -d --build
+
+      - name: Wait for web to become healthy
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          cid="$(docker compose ps -q web)"
+          for i in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo starting)"
+            echo "attempt $i: web=$status"
+            case "$status" in
+              healthy) exit 0 ;;
+              unhealthy)
+                echo '::error::web became unhealthy'
+                docker compose logs web
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+          echo '::error::web did not become healthy in time'
+          docker compose logs web
+          exit 1
+
+      - name: Assert the entrypoint ran prisma migrate deploy
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          docker compose logs web | grep -F '[entrypoint] applying prisma migrate deploy'
+          docker compose logs web | grep -F '[entrypoint] migrations applied'
+
+      - name: Assert the homepage serves 200
+        if: steps.filter.outputs.run == 'true'
+        run: curl -fsS -o /dev/null -w 'homepage HTTP %{http_code}\n' http://127.0.0.1:58000/
+
+      - name: Tear down (clean volumes)
+        if: ${{ always() && steps.filter.outputs.run == 'true' }}
+        run: docker compose down -v
