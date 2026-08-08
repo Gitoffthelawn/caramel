@@ -48,6 +48,40 @@ const PROMPT_HOST_ID = 'caramel-small-prompt'
 
 const note = (...args) => console.error(...args)
 
+// A service worker that restarted (or whose execution context died to a page
+// navigation) orphans the original Playwright handle: evaluate() on it can hang
+// FOREVER — it neither resolves nor rejects, so .catch() never fires. Two live
+// stores proved it (100percentpure: "Execution context was destroyed";
+// betseyjohnson: "Service worker restarted" — both froze the probe until an
+// external kill). Every storage read therefore takes the freshest worker the
+// context knows about and races a hard timeout around the call.
+const SW_EVAL_TIMEOUT_MS = 8000
+async function swEval(ctx, fallbackSw, pageFunction, arg, label) {
+    const sw = ctx.serviceWorkers()[0] || fallbackSw
+    if (!sw) return { ok: false, value: null }
+    try {
+        const value = await Promise.race([
+            sw.evaluate(pageFunction, arg),
+            new Promise((_, reject) => {
+                const t = setTimeout(
+                    () =>
+                        reject(
+                            new Error(
+                                `evaluate hung > ${SW_EVAL_TIMEOUT_MS}ms (dead worker handle)`,
+                            ),
+                        ),
+                    SW_EVAL_TIMEOUT_MS,
+                )
+                if (typeof t.unref === 'function') t.unref()
+            }),
+        ])
+        return { ok: true, value }
+    } catch (e) {
+        note(`  (could not read ${label}: ${e.message})`)
+        return { ok: false, value: null }
+    }
+}
+
 function parseArgs(argv) {
     const positional = []
     const flags = {}
@@ -336,33 +370,32 @@ async function main() {
         // Read promptly: recordTiming keeps only the newest 50 entries, so a
         // chatty run can evict AUTO_INSERT_FETCHCOUPONS_START before we look.
         let timings = []
+        let timingsReadOk = false
         let servedRecord = null
-        if (sw) {
-            timings = await sw
-                .evaluate(
-                    key =>
-                        new Promise(r =>
-                            chrome.storage.local.get([key], v =>
-                                r(v[key] || []),
-                            ),
-                        ),
-                    TIMINGS_KEY,
-                )
-                .catch(e => {
-                    note(`  (could not read ${TIMINGS_KEY}: ${e.message})`)
-                    return []
-                })
-            const cached = await sw
-                .evaluate(
-                    key =>
-                        new Promise(r =>
-                            chrome.storage.local.get([key], v =>
-                                r(v[key] || null),
-                            ),
-                        ),
-                    STORE_CACHE_KEY,
-                )
-                .catch(() => null)
+        if (sw || ctx.serviceWorkers().length) {
+            const timingsRead = await swEval(
+                ctx,
+                sw,
+                key =>
+                    new Promise(r =>
+                        chrome.storage.local.get([key], v => r(v[key] || [])),
+                    ),
+                TIMINGS_KEY,
+                TIMINGS_KEY,
+            )
+            timingsReadOk = timingsRead.ok
+            timings = timingsRead.value || []
+            const cachedRead = await swEval(
+                ctx,
+                sw,
+                key =>
+                    new Promise(r =>
+                        chrome.storage.local.get([key], v => r(v[key] || null)),
+                    ),
+                STORE_CACHE_KEY,
+                STORE_CACHE_KEY,
+            )
+            const cached = cachedRead.value
             const host = new URL(url).hostname
             servedRecord =
                 (cached?.data || []).find(rec =>
@@ -376,7 +409,11 @@ async function main() {
         const witnesses = {
             console: { available: true, trail: consoleTrail },
             serviceWorker: { available: !!sw, trail: swTrail },
-            timings: { available: !!sw, trail: timings },
+            // available reflects whether the read actually SUCCEEDED — a live
+            // worker whose storage could not be read is not a usable witness,
+            // and reporting it as one turns "read failed" into a fabricated
+            // "zero timings" disagreement.
+            timings: { available: timingsReadOk, trail: timings },
             disagreement: diffWitnesses(wholeTrail, timings),
         }
 
