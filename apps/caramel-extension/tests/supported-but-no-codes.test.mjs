@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initCaramelBase } from '../caramel-base.js'
-import { caramelDomainIsSupported } from '../popup.js'
+import { caramelDomainIsSupported } from '../popup-core.js'
 
 // "We have no codes for this store right now" and "we don't cover this store"
 // are different facts. The popup used to branch on coupons.length alone, so a
