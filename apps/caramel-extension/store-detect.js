@@ -1,5 +1,58 @@
 // owns: supported-store cache, checkout detection, init hook (STORE_CACHE_*, _getCacheTtl, getDomainRecord, _hostMatchesDomain, isCheckout, getCachedCodes, tryInitialize, startCheckoutDetection).
-// load after: caramel-env.js, caramel-base.js, dom-utils.js
+//
+// An ES module since the WXT P1 port (2026-08-12). The old "load after:
+// caramel-env.js, caramel-base.js, dom-utils.js" manifest ordering is now
+// structural — every symbol this file reads arrives through an import below.
+//
+// There is no init() export because there is nothing to initialize: this file
+// registers no listener, touches no DOM and calls no browser API at module
+// scope. Its two column-0 statements (`getDomainRecord.cache = null` and the
+// `_caramelCodes` guard) seed module-private caches and MUST stay at module
+// scope — coupon-fetch and coupon-runner call getDomainRecord/getCachedCodes
+// without this file being "started" first. The detection work all hangs off
+// startCheckoutDetection(), which inject.js and coupon-runner.js call.
+//
+// The real cycles through this file are with coupon-fetch and coupon-runner
+// (both import from here and are imported here). dom-utils is NOT one of
+// them — it imports only caramel-base; the old claim of a dom-utils cycle was
+// comment noise in the pre-port sources. Every imported binding below is read
+// at CALL time, never during module evaluation, so no TDZ hazard exists.
+import {
+    caramelRecordSaving,
+    caramelSendMessage,
+    currentBrowser,
+    log,
+    logError,
+    recordTiming,
+    sleep,
+} from './caramel-base.js'
+import { CARAMEL_ENV } from './caramel-env.js'
+import {
+    _getTriedCodes,
+    caramelPostNavigationVerdict,
+    caramelSinkTriedCodes,
+    probeCartJson,
+} from './coupon-apply.js'
+import { fetchCoupons } from './coupon-fetch.js'
+import { reportOutcome, startApplyingCoupons } from './coupon-runner.js'
+import {
+    caramelBaselineFor,
+    caramelClaimRunHop,
+    caramelCouponAnchors,
+    caramelCurrencyCode,
+    caramelDisclosureFor,
+    caramelEndRun,
+    caramelSetCurrencySymbol,
+    caramelTakePendingSubmit,
+    getPrice,
+    pickBestMatch,
+    waitForElement,
+} from './dom-utils.js'
+import {
+    hideTestingModal,
+    insertCaramelPrompt,
+    showFinalModal,
+} from './UI-helpers.js'
 
 /* --------------------------------------------------  config cache */
 const STORE_CACHE_KEY = 'caramel_supported_stores'
@@ -17,7 +70,7 @@ function _getCacheTtl() {
     return CARAMEL_ENV.isProduction ? STORE_CACHE_PROD_TTL : STORE_CACHE_DEV_TTL
 }
 
-async function getDomainRecord(domain) {
+export async function getDomainRecord(domain) {
     if (!getDomainRecord.cache) {
         const ttl = _getCacheTtl()
         // Check chrome.storage.local for a recent cached copy first
@@ -166,7 +219,9 @@ function _shopifyShopHostMatches(host, domain) {
     return !!brandLabel && shop === brandLabel
 }
 
-function _hostMatchesDomain(host, domain) {
+// Exported for tests/host-matches-domain.test.mjs, which pins this boundary
+// directly (the rest of the file reaches it through getDomainRecord).
+export function _hostMatchesDomain(host, domain) {
     if (!host || !domain) return false
     host = String(host).toLowerCase()
     domain = String(domain).toLowerCase()
@@ -269,7 +324,8 @@ function _caramelReferrerCartBounce() {
  * CARAMEL_CART_PATH_RE, and only the FIRST label — a cart word deeper in the
  * host (secure.cart.example) is not what this page calls itself. Still a rule
  * about URL shape, never about one store. */
-function _caramelCartHostname(hostname) {
+// Exported for tests/cart-capability-gate.test.mjs (the host-vocabulary pins).
+export function _caramelCartHostname(hostname) {
     return /^(cart|carts|basket|checkout|checkouts)\./i.test(hostname)
 }
 
@@ -336,11 +392,16 @@ async function _platformCartUsable() {
  * a promo box and hands the codes over to copy. So there is nothing to flag and
  * nothing to special-case; a record carrying just the domain is the whole
  * difference between helping here and staying silent. */
-function caramelConfiglessRecord(hostname) {
+// Exported for tests/configless-store.test.mjs, which drives the apply flow
+// with exactly this record.
+export function caramelConfiglessRecord(hostname) {
     return { domain: hostname }
 }
 
-async function isCheckout() {
+// Exported for tests/cart-capability-gate.test.mjs,
+// tests/cart-host-intent.test.mjs and tests/disclosure-reveal.test.mjs, which
+// pin this gate directly.
+export async function isCheckout() {
     const rec = await getDomainRecord(location.hostname)
     /* No config row is not the same as nothing we can do.
      *
@@ -418,7 +479,14 @@ async function isCheckout() {
 if (typeof _caramelCodes === 'undefined') {
     var _caramelCodes = null // { domain, list }
 }
-async function getCachedCodes(rec) {
+/* Test seam (WXT P1, 2026-08-12): the cache used to be a script global the
+   suites reset with `globalThis._caramelCodes = null`; module scope made it
+   unreachable, and an import binding cannot be assigned from outside. Only
+   tests/store-detect.test.mjs + tests/configless-store.test.mjs call this. */
+export function _caramelResetCachedCodes() {
+    _caramelCodes = null
+}
+export async function getCachedCodes(rec) {
     if (_caramelCodes && _caramelCodes.domain === rec.domain)
         return _caramelCodes.list
     let list = []
@@ -435,7 +503,7 @@ async function getCachedCodes(rec) {
 }
 
 /* --------------------------------------------------  init hook */
-async function tryInitialize() {
+export async function tryInitialize() {
     if (!(await isCheckout())) return
     // isCheckout() has already answered yes. With no config row the only way it
     // could have is the platform-cart capability check, so a stand-in record is
@@ -630,10 +698,8 @@ async function _resumePendingSubmit() {
    promo box is right there. Re-detect it: observe the DOM and show the prompt
    the moment the coupon field appears. Debounced + self-disconnects after it
    fires once, so it costs ~nothing and never nags. */
-// Called from inject.js (see UI-helpers.js's insertCaramelPrompt for why
-// per-file analysis misses cross-file content-script calls).
-// oxlint-disable-next-line no-unused-vars
-async function startCheckoutDetection() {
+// Called from inject.js and from coupon-runner.js's URL-change re-detection.
+export async function startCheckoutDetection() {
     // A discount-link apply reloads the page so the store's own UI shows the
     // applied code; finish that flow on the fresh document by showing the
     // result modal instead of re-prompting.
