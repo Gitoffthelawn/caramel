@@ -29,6 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  id-token: write
   contents: read
 
 env:
@@ -290,7 +291,7 @@ jobs:
         run: pnpm run package
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: DevinoSolutions/artifact/upload@v1
         with:
           name: extension-package
           path: ${{ env.WORKING_DIRECTORY }}/extension.zip
@@ -302,7 +303,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-package
           path: .
@@ -349,7 +350,7 @@ jobs:
         with:
           xcode-version: latest-stable
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-package
           path: ${{ env.WORKING_DIRECTORY }}
@@ -621,10 +622,11 @@ jobs:
     if: ${{ !inputs.dry_run && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-package
           path: .
