@@ -47,15 +47,15 @@
 # Settings -> Advanced Security, this file is inert and costs nothing.
 version: 2
 updates:
-  - package-ecosystem: "npm" # covers npm, pnpm and yarn lockfiles
-    directory: "/"
+  - package-ecosystem: 'npm' # covers npm, pnpm and yarn lockfiles
+    directory: '/'
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: 'weekly'
+      day: 'monday'
     # Version updates OFF. Security updates are exempt from this limit.
     open-pull-requests-limit: 0
     groups:
       npm-security:
         applies-to: security-updates
         patterns:
-          - "*"
+          - '*'
