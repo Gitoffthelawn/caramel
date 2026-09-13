@@ -282,6 +282,12 @@ jobs:
     name: '📦 Package Extension'
     needs: guard
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/upload@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
@@ -396,6 +402,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Download artifact
         uses: DevinoSolutions/artifact/download@v1
@@ -428,6 +440,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       # 'true' only when the run actually submitted to AMO. The GitHub Release
       # body reads this so it never claims a Firefox release that did not happen.
@@ -726,6 +744,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       # 'true' only when the run actually submitted to Edge. The GitHub Release
       # body reads this so it never claims an Edge release that did not happen.
@@ -840,6 +864,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: macos-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -1210,7 +1240,11 @@ jobs:
       ]
     if: ${{ !inputs.dry_run && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write` on top of the
+    # `contents: write` it already held for creating the release.
     permissions:
+      id-token: write
       contents: write
     steps:
       - name: Download Chrome store package
