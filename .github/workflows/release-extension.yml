@@ -282,6 +282,12 @@ jobs:
     name: '📦 Package Extension'
     needs: guard
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/upload@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
@@ -354,7 +360,7 @@ jobs:
           done
 
       - name: Upload Chrome store package
-        uses: actions/upload-artifact@v4
+        uses: DevinoSolutions/artifact/upload@v1
         with:
           name: extension-chrome
           path: ${{ env.WORKING_DIRECTORY }}/.output/caramel-extension-${{ needs.guard.outputs.version }}-chrome.zip
@@ -364,7 +370,7 @@ jobs:
       # a directory of extension files, so shipping the zip would only mean
       # unzipping it again in publish_safari.
       - name: Upload unpacked Chrome build for the Safari converter
-        uses: actions/upload-artifact@v4
+        uses: DevinoSolutions/artifact/upload@v1
         with:
           name: extension-chrome-unpacked
           path: ${{ env.WORKING_DIRECTORY }}/.output/chrome-mv3
@@ -374,7 +380,7 @@ jobs:
       # itself (it hashes that build to decide whether to re-upload), so handing
       # it a zip would only mean unzipping it again in publish_firefox.
       - name: Upload unpacked Firefox build
-        uses: actions/upload-artifact@v4
+        uses: DevinoSolutions/artifact/upload@v1
         with:
           name: extension-firefox
           path: ${{ env.WORKING_DIRECTORY }}/.output/firefox-mv3
@@ -383,7 +389,7 @@ jobs:
       # The Firefox store zip is what the GitHub Release attaches; the sources
       # zip is what web-ext hands AMO's reviewers alongside the signed build.
       - name: Upload Firefox store and sources zips
-        uses: actions/upload-artifact@v4
+        uses: DevinoSolutions/artifact/upload@v1
         with:
           name: extension-firefox-zips
           path: |
@@ -396,9 +402,15 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-chrome
           path: .
@@ -428,6 +440,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       # 'true' only when the run actually submitted to AMO. The GitHub Release
       # body reads this so it never claims a Firefox release that did not happen.
@@ -652,14 +670,14 @@ jobs:
 
       - name: Download Firefox build artifact
         if: steps.credentials.outputs.configured == 'true'
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-firefox
           path: firefox-src
 
       - name: Download Firefox sources artifact
         if: steps.credentials.outputs.configured == 'true'
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-firefox-zips
           path: firefox-zips
@@ -726,6 +744,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       # 'true' only when the run actually submitted to Edge. The GitHub Release
       # body reads this so it never claims an Edge release that did not happen.
@@ -796,7 +820,7 @@ jobs:
       # works through chrome.identity just like Chrome's.
       - name: Download artifact
         if: steps.credentials.outputs.configured == 'true'
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-chrome
           path: .
@@ -840,6 +864,12 @@ jobs:
     needs: [guard, package]
     if: ${{ !inputs.dry_run }}
     runs-on: macos-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write`. A job-level block
+    # REPLACES the workflow-level one, hence `contents: read` is restated here.
+    permissions:
+      id-token: write
+      contents: read
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -866,7 +896,7 @@ jobs:
       # job — safari-web-extension-converter reads a directory of extension
       # files, so nothing is unzipped here.
       - name: Download unpacked Chrome build
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-chrome-unpacked
           path: ${{ env.WORKING_DIRECTORY }}/.output/chrome-mv3
@@ -1210,11 +1240,15 @@ jobs:
       ]
     if: ${{ !inputs.dry_run && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
+    # DevinoSolutions/artifact/download@v1 authenticates to the self-hosted store with a
+    # GitHub OIDC token, so this job needs `id-token: write` on top of the
+    # `contents: write` it already held for creating the release.
     permissions:
+      id-token: write
       contents: write
     steps:
       - name: Download Chrome store package
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-chrome
           path: .
@@ -1222,7 +1256,7 @@ jobs:
       # Only the Firefox store zip is attached below; the sources zip in this
       # artifact is a Mozilla review input, not a release download.
       - name: Download Firefox store package
-        uses: actions/download-artifact@v4
+        uses: DevinoSolutions/artifact/download@v1
         with:
           name: extension-firefox-zips
           path: .
