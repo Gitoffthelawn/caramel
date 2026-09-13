@@ -47,7 +47,34 @@ with `ls` or a repo search without knowing the doc structure first.
   its dashboard URL and which monitor entry it is — not present in this
   repo.
 
+## Edge cache (Cloudflare)
+
+Cloudflare sits in front of Traefik and, by default, only caches static
+file extensions — `s-maxage` on an API JSON response is ignored
+(`cf-cache-status: DYNAMIC`). A zone **Cache Rule** ("Cache
+/api/extension/supported-stores and /api/coupons per origin
+Cache-Control", phase `http_request_cache_settings`, created 2026-09-04)
+makes those two paths cache-eligible with edge TTL = respect origin, so
+the route's `s-maxage=300` / `s-maxage=60` actually applies. Verify with
+`curl -sI https://grabcaramel.com/api/extension/supported-stores | grep
+cf-cache-status` — the second hit must say `HIT`. `/api/extension/
+supported-stores` additionally keeps a 5-min in-process cache of its
+serialized 1.2 MB body (`src/lib/supportedStoresCache.ts`, invalidated by
+an ingest push that upserts store_configs), so origin stays cheap even
+when the edge misses.
+
 ## Health checks
+
+`GET /api/health` — container **liveness** (`src/app/api/health/route.ts`),
+the target of the compose `web` healthcheck. No DB, no rate limit, no auth,
+`Cache-Control: no-store`; answers `{"status":"ok"}` whenever the Node
+process accepts requests. It decides ROUTING (Traefik's docker provider
+stops routing to an `unhealthy` container → users get 404), so it must
+only fail when the process is dead or wedged — never because a request
+elsewhere is slow. The Aug 13 - Sep 4 2026 "Caramel is offline" streak was
+exactly that: the probe used to hit the homepage with a 5s timeout and
+flipped the container unhealthy whenever the app was merely slow.
+Do not point the healthcheck back at `/` or at `/api/health/db`.
 
 `GET /api/health/db` — probes the two data dependencies of this app
 (auth_db via Prisma `SELECT 1`, and the app-owned coupon catalog's
@@ -74,8 +101,9 @@ Response shape:
 
 The `catalog` check is `ok` iff the aggregate query succeeds AND the catalog is
 NON-EMPTY (`count > 0`); its `details` is the structured freshness object above
-(or the raw error string on an unexpected throw). `stale` (newest row older than
-48h) is observability only — it NEVER flips the check to error.
+(or the raw error string on an unexpected throw). `stale` (newest row older
+than 48h by default, tunable per deploy via `CATALOG_MAX_AGE_HOURS`) is
+observability only — it NEVER flips the check to error.
 
 HTTP status: `200` iff **both** checks are `"ok"`; `503` if **either** is
 down; `401` unauthenticated. The monitor's contract (HTTP status code +
@@ -272,8 +300,9 @@ mass-expiry is legitimate (e.g. a genuine large delisting), then re-runs with
 
 **Catalog freshness.** Check it any time via `GET /api/health/db` — the
 `catalog` check's `details` carries `{count, freshestUpdatedAt, ageMinutes,
-stale}`. `stale: true` (newest row older than 48h) is observability only; it
-never fails the check. Only an empty or unreachable catalog is a `503`.
+stale}`. `stale: true` (newest row older than 48h by default, tunable per
+deploy via `CATALOG_MAX_AGE_HOURS`) is observability only; it never fails the
+check. Only an empty or unreachable catalog is a `503`.
 
 ## Post-deploy smoke check
 

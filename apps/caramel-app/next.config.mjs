@@ -1,10 +1,18 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveBuildSha } from './scripts/build-sha.mjs'
 
 const packageRoot = fileURLToPath(new URL('.', import.meta.url))
 const workspaceRoot = path.resolve(packageRoot, '..', '..')
+
+// Honest build stamp: the app package.json version, exposed to both server and
+// browser as NEXT_PUBLIC_APP_VERSION (env.client.ts reads it, falling back to
+// '0.0.0-dev'). Read here so it needs no build ARG / hand-set env var.
+const appVersion = JSON.parse(
+    readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+).version
 
 // Universally-safe security headers. CSP is deliberately NOT included
 // here — it's easy to break third-party scripts (Sentry, GA, RevenueCat)
@@ -46,7 +54,10 @@ const GIT_COMMIT_SHA = resolveBuildSha()
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    env: { GIT_COMMIT_SHA },
+    env: {
+        GIT_COMMIT_SHA,
+        NEXT_PUBLIC_APP_VERSION: appVersion,
+    },
     // F-016 one-root-compose: emit a self-contained server (.next/standalone)
     // so the Docker runner stage boots `node apps/caramel-app/server.js` with a
     // traced, minimal node_modules instead of the whole install. Pairs with
@@ -54,6 +65,17 @@ const nextConfig = {
     // workspace deps correctly.
     output: 'standalone',
     outputFileTracingRoot: workspaceRoot,
+    // The visual-regression job screenshots a `next dev` server, and dev mode
+    // paints Next's on-screen dev indicator (a dark "N" badge, position:fixed
+    // bottom-left) INTO every full-page capture. It shows or hides depending on
+    // compile activity at capture time, so it landed in some baselines and not
+    // others — 918 of the 1145 changed pixels in Snapvisor build #254's
+    // home-page diff were that badge alone. That is why builds on branches which
+    // touch no app code at all (PR #160 changed one workflow file) still
+    // reported 8/8 snapshots changed: the visual gate was reporting its own
+    // overlay, not the product. Hidden only under CI so local dev keeps it;
+    // compile/runtime errors are still reported either way.
+    ...(process.env.CI ? { devIndicators: false } : {}),
     turbopack: {
         root: workspaceRoot,
     },

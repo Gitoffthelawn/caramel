@@ -1,22 +1,22 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import {
-    backStorageArea,
-    loadExtensionSource,
-    loadExtensionSources,
-} from './_load.mjs'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { initCaramelBase } from '../caramel-base.js'
+import { initCouponConstants } from '../coupon-constants.generated.js'
+import { initCouponRunner } from '../coupon-runner.js'
+import { resolvePopupState } from '../popup-core.js'
 
 // Pins the popup's session validation: a stored token is no longer trusted
-// forever. initPopup() fires GET /api/extension/me with the bearer IN
-// PARALLEL with the coupon fetch — a real 401 clears token+user from
-// storage.sync and re-renders the logged-out variant; a 200 keeps the
-// signed-in state (and refreshes the stored user when the profile
-// changed). Network errors are NOT a logout — offline must never sign the
-// user out.
+// forever. resolvePopupState() (P2 successor to initPopup — it returns the
+// view instead of painting it) fires GET /api/extension/me with the bearer IN
+// PARALLEL with the coupon fetch — a real 401 clears token+user from storage
+// and invokes the onSessionInvalid callback (the React app's re-resolve; the
+// logged-out REPAINT half of the old pin lives with the React shell's own
+// suite); a 200 keeps the signed-in state (and refreshes the stored user when
+// the profile changed). Network errors are NOT a logout — offline must never
+// sign the user out.
 //
-// Harness mirrors popup-settings-view.test.mjs: real load order, one
-// shared chrome stub, only the messaging transport + storage + fetch
+// Harness: the popup realm's own inits in entrypoints/popup/main.tsx order,
+// one shared chrome stub, only the messaging transport + storage + fetch
 // stubbed.
-let initPopup
 let syncData
 let meResponse
 let meInit
@@ -27,24 +27,81 @@ const flush = async () => {
     }
 }
 
+/* Realm stub, lifted from tests/_load.mjs (installChromeStub), which the ESM
+ * port retires. Permissive Proxy: any unknown property materializes as a
+ * callable no-op, so a source file touching an API this suite doesn't care
+ * about cannot abort it. Two deliberate exceptions, exactly as _load.mjs had
+ * them — storage.*.get/set/remove invoke their callbacks like the real API
+ * (empty storage), and runtime.lastError stays UNDEFINED outside a failing
+ * callback, because the proxy would otherwise auto-create a truthy callable
+ * that caramelSendMessage reads as a closed port. */
+function installChromeStub() {
+    const cache = new WeakMap()
+    const wrap = target => {
+        if (cache.has(target)) return cache.get(target)
+        const proxy = new Proxy(target, {
+            get(obj, prop) {
+                if (prop === 'then' || typeof prop === 'symbol')
+                    return undefined
+                if (!(prop in obj)) obj[prop] = wrap(function () {})
+                return obj[prop]
+            },
+            apply: () => undefined,
+        })
+        cache.set(target, proxy)
+        return proxy
+    }
+    const stub = wrap(function chromeStubRoot() {})
+    for (const area of ['sync', 'local', 'session']) {
+        stub.storage[area].get = (_keys, cb) => {
+            if (typeof cb === 'function') cb({})
+        }
+        stub.storage[area].set = (_items, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+        stub.storage[area].remove = (_keys, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+    }
+    stub.runtime.lastError = undefined
+    globalThis.chrome = stub
+    globalThis.browser = undefined
+    window.chrome = stub
+    window.browser = undefined
+    return stub
+}
+
+/** Backs one storage area with a real object, so a test can assert on what the
+ * code actually stored instead of on which API it called (lifted from
+ * tests/_load.mjs). */
+function backStorageArea(area, data = {}) {
+    const store = (globalThis.currentBrowser ?? globalThis.chrome).storage[area]
+    store.get = (_keys, cb) => {
+        if (typeof cb === 'function') cb({ ...data })
+    }
+    store.set = (items, cb) => {
+        Object.assign(data, items)
+        if (typeof cb === 'function') cb()
+    }
+    store.remove = (keys, cb) => {
+        for (const key of [].concat(keys)) delete data[key]
+        if (typeof cb === 'function') cb()
+    }
+    return data
+}
+
 beforeAll(() => {
     document.body.innerHTML =
         '<div id="loading-container"></div>' +
         '<button id="settingsIcon" style="display:none"></button>' +
         '<div id="auth-container"></div>'
 
-    loadExtensionSource('coupon-constants.generated.js', [])
-    loadExtensionSources(
-        [
-            'caramel-base.js',
-            'dom-utils.js',
-            'store-detect.js',
-            'coupon-apply.js',
-            'coupon-fetch.js',
-            'coupon-runner.js',
-        ],
-        [],
-    )
+    // The realm's effects, in entrypoints/popup/main.ts order — the successor
+    // to the <script> list this suite used to eval.
+    installChromeStub()
+    initCouponConstants()
+    initCaramelBase()
+    initCouponRunner()
 
     globalThis.currentBrowser.runtime.sendMessage = (message, cb) => {
         if (message?.action === 'getActiveTabDomainRecord') {
@@ -57,7 +114,6 @@ beforeAll(() => {
             cb(undefined)
         }
     }
-    ;({ initPopup } = loadExtensionSource('popup.js', ['initPopup']))
 })
 
 beforeEach(() => {
@@ -77,7 +133,13 @@ beforeEach(() => {
     }
 })
 
-describe('popup.js initPopup — stored-token validation via /api/extension/me', () => {
+const onSessionInvalid = vi.fn()
+
+describe('popup-core resolvePopupState — stored-token validation via /api/extension/me', () => {
+    beforeEach(() => {
+        onSessionInvalid.mockClear()
+    })
+
     // /api/extension/me is declared `auth: 'session'`, and better-auth's
     // session gate accepts a website COOKIE as readily as a bearer token. That
     // is only harmless because this probe never sends one: the popup runs on a
@@ -94,7 +156,7 @@ describe('popup.js initPopup — stored-token validation via /api/extension/me',
     it('authenticates with the bearer token ALONE and never opts into sending cookies', async () => {
         meResponse = { ok: true, status: 200, json: async () => ({}) }
 
-        await initPopup()
+        await resolvePopupState(onSessionInvalid)
         await flush()
 
         expect(meInit, 'the /me probe was made').not.toBeNull()
@@ -102,15 +164,16 @@ describe('popup.js initPopup — stored-token validation via /api/extension/me',
         expect(meInit.credentials).toBeUndefined()
     })
 
-    it('a token the backend 401s clears token+user from storage and re-renders the logged-out variant', async () => {
+    it('a token the backend 401s clears token+user from storage and fires the re-resolve', async () => {
         meResponse = { ok: false, status: 401 }
-        await initPopup()
+        await resolvePopupState(onSessionInvalid)
         await flush()
         expect(syncData.token).toBeUndefined()
         expect(syncData.user).toBeUndefined()
-        const html = document.getElementById('auth-container').innerHTML
-        expect(html).toContain('Guest')
-        expect(html).not.toContain('caramel-fan')
+        // The React app registers its re-resolve here — this callback firing
+        // IS what repaints the logged-out variant (the paint itself is the
+        // React shell suite's pin).
+        expect(onSessionInvalid).toHaveBeenCalledTimes(1)
     })
 
     it('a token the backend accepts (200) keeps the signed-in state and the stored token', async () => {
@@ -119,12 +182,12 @@ describe('popup.js initPopup — stored-token validation via /api/extension/me',
             status: 200,
             json: async () => ({ username: 'caramel-fan', image: '' }),
         }
-        await initPopup()
+        const state = await resolvePopupState(onSessionInvalid)
         await flush()
         expect(syncData.token).toBe('tok-1')
-        expect(document.getElementById('auth-container').innerHTML).toContain(
-            '@caramel-fan',
-        )
+        expect(state.view).toBe('coupons')
+        expect(state.user).toEqual({ username: 'caramel-fan', image: '' })
+        expect(onSessionInvalid).not.toHaveBeenCalled()
     })
 
     it('a 200 with a changed profile refreshes the stored user', async () => {
@@ -133,7 +196,7 @@ describe('popup.js initPopup — stored-token validation via /api/extension/me',
             status: 200,
             json: async () => ({ username: 'renamed', image: 'pic.png' }),
         }
-        await initPopup()
+        await resolvePopupState(onSessionInvalid)
         await flush()
         expect(syncData.user).toEqual({ username: 'renamed', image: 'pic.png' })
         expect(syncData.token).toBe('tok-1')
@@ -143,11 +206,11 @@ describe('popup.js initPopup — stored-token validation via /api/extension/me',
         globalThis.fetch = async () => {
             throw new TypeError('Failed to fetch')
         }
-        await initPopup()
+        const state = await resolvePopupState(onSessionInvalid)
         await flush()
         expect(syncData.token).toBe('tok-1')
-        expect(document.getElementById('auth-container').innerHTML).toContain(
-            '@caramel-fan',
-        )
+        expect(state.view).toBe('coupons')
+        expect(state.user).toEqual({ username: 'caramel-fan', image: '' })
+        expect(onSessionInvalid).not.toHaveBeenCalled()
     })
 })

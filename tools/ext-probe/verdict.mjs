@@ -12,6 +12,14 @@
 // mistake here is reading "the prompt never appeared" as a defect when the cart
 // was empty the whole time and silence was the CORRECT behaviour.
 
+import { SEEDABLE_PLATFORMS } from './seed.mjs'
+
+// Still `ext-probe/1`. The widening of the seeder past Shopify only ADDED
+// fields to `observation.platform` (`detected`, `productFeedOk`, `cartApiOk`);
+// nothing was renamed or removed, so every consumer written against v1 keeps
+// reading exactly what it read before. The two Shopify-shaped fields it used
+// to carry alone are kept beside the new ones for the same reason — reports
+// recorded before the widening stay comparable field-for-field.
 export const SCHEMA = 'ext-probe/1'
 
 /**
@@ -39,6 +47,19 @@ export const VERDICTS = Object.freeze([
  */
 export const PROBE_ERROR = 'PROBE_ERROR'
 
+/**
+ * The probe was pointed at a directory that is not a loadable extension, so
+ * Chromium would have started with NOTHING installed. Its own sentinel rather
+ * than a flavour of PROBE_ERROR because the failure is silent by nature: a
+ * browser with no extension answers every question with "nothing happened",
+ * which reads exactly like a broken config. Days of ext-QA measurements were
+ * taken that way after the WXT migration moved the manifest to
+ * `.output/chrome-mv3` — the only tell in the whole report was `vnull` in the
+ * log header. A probe that cannot load the extension must never produce a
+ * verdict.
+ */
+export const PROBE_NO_EXTENSION = 'PROBE_NO_EXTENSION'
+
 // Exit codes are the machine contract for shell callers, so they are stable
 // numbers, not indexes into the array above. 0 is GREEN and nothing else.
 // 1 and 2 are avoided on purpose (node's own uncaught-throw / bad-usage codes),
@@ -56,6 +77,7 @@ export const EXIT_CODES = Object.freeze({
     INCONCLUSIVE_PLATFORM: 31,
     INCONCLUSIVE_CONFIG_STALE: 32,
     [PROBE_ERROR]: 70,
+    [PROBE_NO_EXTENSION]: 71,
 })
 
 export function exitCodeFor(verdict) {
@@ -92,12 +114,57 @@ export const TIMINGS_CAP = 50
 export function emptyObservation() {
     return {
         seed: { ok: null, detail: '', rejectedAdds: 0, adds: 0 },
-        platform: { productsJsonOk: null, cartJsOk: null },
+        platform: {
+            // Which platform's cart mechanism was used, named from markup the
+            // platform itself emits. `unknown` means no seeder speaks for this
+            // store — an honest abandon, never a Shopify-shaped guess.
+            detected: null,
+            // The platform-neutral facts the classifier reads: its product
+            // source listed something addable, and its cart endpoint answered.
+            productFeedOk: null,
+            cartApiOk: null,
+            // The literal Shopify legs, set only on a Shopify run. Kept beside
+            // the two above so reports recorded before the seeder widened past
+            // Shopify stay comparable field-for-field.
+            productsJsonOk: null,
+            cartJsOk: null,
+            // WHY the answer above is the answer. `unknown` used to arrive with
+            // one sentence — "no platform marker found" — that a blocked store,
+            // a challenge page and a genuinely unrecognised platform all
+            // produced, which is why 11 of 24 stores in the 2026-08-14 batch
+            // were unreadable. These carry the difference.
+            signal: null,
+            // 'markup' | 'capability' | null — which leg decided.
+            source: null,
+            // The caller's platform hint and whether the evidence agreed with
+            // it. A hint never decides on its own; see resolvePlatform.
+            hint: null,
+            hintAgreed: null,
+            // Every cart-API probe refused (401/403/429/503/network). We did
+            // not learn the store is on another platform; we learned nothing.
+            blocked: null,
+            // The HTTP status of the navigation the detection ran against.
+            navigationStatus: null,
+            // The document we were actually looking at, recorded only when the
+            // platform came back unknown.
+            document: null,
+            // Present only when a second look was taken: what the first one saw.
+            firstLook: null,
+        },
         // Read BEFORE the wait window. See probe.mjs for why that ordering is
         // load-bearing rather than incidental.
         cartItemsAtArrival: null,
         config: {
+            // "the domain list under test was fetched from the API during
+            // THIS run". Established from the extension's own storage — the
+            // cache key the probe removed coming back — because the console
+            // line it used to be read from is compiled out of a production
+            // build and its silence therefore proves nothing.
             servedFromApi: null,
+            // Whether that removal actually happened. Without it a repopulated
+            // key could just be yesterday's cache, so the proof above is only
+            // a proof when this is true.
+            cacheClearedBeforeRun: null,
             expected: null,
             served: null,
             matches: null,
@@ -150,6 +217,41 @@ export function normalizeObservation(partial) {
                 : incoming
     }
     return base
+}
+
+/**
+ * Did the extension fetch the domain list from the API during THIS run?
+ *
+ * Two independent witnesses to one fact, and they are not interchangeable.
+ *
+ * The STORAGE witness is load-bearing. The probe removes the extension's
+ * supported-stores cache key before the run, and the extension rewrites that
+ * key only on the branch that just fetched from the API — so a key that comes
+ * back holding data IS the fetch. It works on the production build, which is
+ * the build ext-QA measures.
+ *
+ * The CONSOLE witness can only CONFIRM, never deny. `log` in caramel-base.js
+ * is `CARAMEL_ENV.verbose ? console.log : noop` and the production stamp sets
+ * `verbose: false` on purpose — content scripts run on every https origin, so
+ * a shipped build must never write into a shopper's store console (verified in
+ * the artifacts: `.output/chrome-mv3` carries `verbose:!1`, the dev build
+ * `verbose:!0`, 2026-08-14). Its absence therefore says nothing at all, and
+ * reading that silence as `false` is what pinned every production run at
+ * INCONCLUSIVE_CONFIG_STALE and meant the served-vs-expected comparison never
+ * once ran.
+ *
+ * @returns {boolean|null} `null` when neither witness could speak — not
+ *   observed, which is not the same as "it did not happen".
+ */
+export function deriveServedFromApi({
+    cacheCleared = false,
+    cacheReadOk = false,
+    cacheHasData = false,
+    loggedApiLoad = false,
+} = {}) {
+    if (cacheCleared && cacheReadOk) return cacheHasData
+    if (loggedApiLoad) return true
+    return null
 }
 
 const SELECTOR_FIELDS = ['priceContainer', 'successIndicator', 'errorIndicator']
@@ -221,12 +323,22 @@ export function classify(partialObservation) {
             'cart held 0 items when the extension arrived — "no prompt" is the correct behaviour here, not a defect',
         )
 
-    // 2 — the Shopify-shaped seed path cannot speak for a store that is not
-    // Shopify-shaped.
-    if (o.platform.productsJsonOk !== true || o.platform.cartJsOk !== true)
+    // 2 — the seed path can only speak for a platform it implements. A store
+    // whose platform is unrecognised, or whose product/cart endpoints did not
+    // answer, produces no evidence about its config either way.
+    if (!SEEDABLE_PLATFORMS.includes(o.platform.detected))
         return done(
             'INCONCLUSIVE_PLATFORM',
-            `store is not Shopify-shaped (products.json ok=${o.platform.productsJsonOk}, cart.js ok=${o.platform.cartJsOk})`,
+            `store platform is ${
+                o.platform.detected === null
+                    ? 'unobserved'
+                    : `"${o.platform.detected}"`
+            } — the seeder speaks ${SEEDABLE_PLATFORMS.join('/')} and cannot seed a cart here`,
+        )
+    if (o.platform.productFeedOk !== true || o.platform.cartApiOk !== true)
+        return done(
+            'INCONCLUSIVE_PLATFORM',
+            `the ${o.platform.detected} endpoints did not answer (product feed ok=${o.platform.productFeedOk}, cart ok=${o.platform.cartApiOk})`,
         )
 
     // 3 — the config an agent edits is several hops from what the extension
@@ -237,7 +349,9 @@ export function classify(partialObservation) {
     if (o.config.servedFromApi !== true)
         return done(
             'INCONCLUSIVE_CONFIG_STALE',
-            'the "Loaded supported domains from API" line never appeared — the run may have been served a cached domain list',
+            o.config.cacheClearedBeforeRun === true
+                ? 'the supported-domain cache was cleared before the run and never came back — the extension did not fetch the domain list from the API'
+                : 'the supported-domain cache could not be cleared and no API load was observed — the run may have been served a stale domain list',
         )
     if (o.config.matches === false)
         return done(
@@ -394,21 +508,27 @@ export function buildReport({
     observation = null,
     witnesses = null,
     logFile = null,
+    reportFile = null,
     screenshot = null,
     durationMs = null,
     error = null,
+    // Which non-verdict sentinel the error is. Defaults to PROBE_ERROR so
+    // every existing caller keeps its behaviour; the probe passes
+    // PROBE_NO_EXTENSION when it never had an extension to measure.
+    errorVerdict = PROBE_ERROR,
 } = {}) {
     if (error) {
         return {
             schema: SCHEMA,
-            verdict: PROBE_ERROR,
-            exitCode: exitCodeFor(PROBE_ERROR),
+            verdict: errorVerdict,
+            exitCode: exitCodeFor(errorVerdict),
             reasons: [String(error)],
             target,
             build,
             observation: observation ? normalizeObservation(observation) : null,
             witnesses,
             logFile,
+            reportFile,
             screenshot,
             durationMs,
         }
@@ -425,6 +545,7 @@ export function buildReport({
         observation: normalized,
         witnesses,
         logFile,
+        reportFile,
         screenshot,
         durationMs,
     }

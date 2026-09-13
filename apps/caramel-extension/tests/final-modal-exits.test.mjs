@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import {
-    EXT_ROOT,
-    loadExtensionSource,
-    loadExtensionSources,
-} from './_load.mjs'
+import { initCaramelBase } from '../caramel-base.js'
+import { showFinalModal } from '../UI-helpers.js'
 
 // The result card covers the whole viewport, and for a long time it had exactly
 // one way out: the Esc key.
@@ -28,7 +26,7 @@ import {
 // coupon descriptions at their visual left — cutting off the discount rate,
 // which is the only part a shopper scans for.
 
-let showFinalModal
+const EXT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const root = () =>
     document.getElementById('caramel-final-overlay')?.shadowRoot ?? null
@@ -40,23 +38,21 @@ const click = el =>
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }))
 
 beforeAll(() => {
-    loadExtensionSource('coupon-constants.generated.js', [])
-    ;({ showFinalModal } = loadExtensionSources(
-        [
-            'caramel-base.js',
-            'dom-utils.js',
-            'store-detect.js',
-            'coupon-apply.js',
-            'coupon-fetch.js',
-            'coupon-runner.js',
-            'UI-helpers.js',
-        ],
-        ['showFinalModal'],
-    ))
-    globalThis.currentBrowser.runtime.getURL = p => p
+    // The bootstrap resolves `currentBrowser` off the chrome global; an
+    // identity getURL plus a disk-backed fetch serves the packaged stylesheets
+    // (public/assets in the repo, assets/ in the build).
+    globalThis.chrome = {
+        runtime: { getURL: p => p, lastError: undefined },
+        storage: {
+            local: { get: (_keys, cb) => cb?.({}), set: (_i, cb) => cb?.() },
+            sync: { get: (_keys, cb) => cb?.({}), set: (_i, cb) => cb?.() },
+        },
+    }
+    initCaramelBase()
     globalThis.fetch = async relPath => ({
         ok: true,
-        text: async () => readFileSync(join(EXT_ROOT, relPath), 'utf8'),
+        text: async () =>
+            readFileSync(join(EXT_ROOT, 'public', relPath), 'utf8'),
     })
 })
 
@@ -138,10 +134,13 @@ describe('the button only promises what happened', () => {
         expect(label()).toBe('Proceed to Checkout')
     })
 
-    it('says Done when the card is a list of codes to copy', async () => {
+    it('drops the primary button entirely on a list-of-codes card (lighter UI)', async () => {
+        // The card carries its own controls (copy buttons, the report link) and
+        // three ways out (×, scrim, Esc) — a generic "Done" under all that is
+        // just clutter.
         await showFinalModal(0, null, null, false, [{ code: 'SAVE10' }])
 
-        expect(label()).toBe('Done')
+        expect(root().querySelector('#caramel-final-ok-btn')).toBeNull()
     })
 
     it('says Sign In when that is the ask', async () => {

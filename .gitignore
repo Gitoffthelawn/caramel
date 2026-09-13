@@ -5,6 +5,11 @@
 .turbo/*
 node_modules
 dist
+# Fossils of the retired hand-rolled build (pre-WXT, deleted P1 2026-08-12):
+# local clones may still carry these untracked outputs, and wxt.config.ts's
+# zip.excludeSources keeps them out of the AMO sources archive.
+dist-firefox
+dist-guards
 build
 coverage
 .vscode

@@ -38,6 +38,8 @@ import {
     CouponListRowSchema,
     type DiscountTypeRow,
     DiscountTypeRowSchema,
+    type RecentStoreRow,
+    RecentStoreRowSchema,
     type SiteCountRow,
     SiteCountRowSchema,
     type SiteRow,
@@ -73,8 +75,21 @@ import { randomUUID } from 'node:crypto'
 const visibleCouponsWhere = () =>
     Prisma.sql`status IN (${Prisma.join([...VISIBLE_COUPON_STATUSES])}) AND expired = FALSE`
 
-/** Shared ranking order — the list query and the marketing store page both sort by this identical order. */
-const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC`
+/**
+ * Shared ranking order — the list query and the marketing store page both sort
+ * by this identical order.
+ *
+ * `id` is a TIEBREAKER, not a ranking signal, and it is load-bearing for
+ * OFFSET pagination. `rating DESC, created_at DESC` alone is not a total order:
+ * a store's coupons routinely share a rating (0 is the default) and can share a
+ * created_at down to the ingest batch, and Postgres is free to return tied rows
+ * in a different physical order per query. Two requests that differ only by
+ * OFFSET are two separate queries, so a tied row could be returned by both
+ * (a duplicate) or by neither (a row the shopper can never reach — the failure
+ * mode a client-side dedupe cannot see). Appending the primary key makes the
+ * sort total, so page N+1 resumes exactly where page N stopped.
+ */
+const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC, id DESC`
 
 /**
  * coupons/stats/route.ts's census predicate. Deliberately NOT
@@ -232,6 +247,47 @@ export async function getCouponStats(): Promise<StatsRow> {
     return rows[0] ?? { total: 0, expired: 0 }
 }
 
+/**
+ * api/account/overview GET — live "12 codes right now" counts for the stores a
+ * user follows, one query for the whole list.
+ *
+ * Lives here rather than in the account route for the same reason every other
+ * catalog read does: it must share `visibleCouponsWhere()` and the
+ * `site = store OR site LIKE '%.' || store` store-matching predicate with
+ * listStoreCoupons, or the count under a favorite would disagree with the
+ * store page that favorite links to. A second hand-written copy of either
+ * predicate is exactly the F-006 drift this module exists to prevent.
+ *
+ * `stores` are already-normalized registrable domains (resolveStoreDomain
+ * output, the same vocabulary favorite_stores.store_name stores). UNNEST turns
+ * the array into rows so a LEFT JOIN can report a genuine 0 for a followed
+ * store with no live codes — the caller distinguishes "0 codes" from "no count
+ * available" and the UI renders neither as a placeholder.
+ */
+export async function countCouponsForStores(
+    stores: string[],
+): Promise<Map<string, number>> {
+    if (stores.length === 0) return new Map()
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
+        SELECT f.store AS site, COUNT(c.id)::int AS coupon_count
+        FROM UNNEST(${stores}::text[]) AS f(store)
+        LEFT JOIN coupons c
+               ON (c.site = f.store OR c.site LIKE '%.' || f.store)
+              AND ${visibleCouponsWhere()}
+        GROUP BY f.store
+    `)
+    const rows = parseCouponRows(
+        SiteCountRowSchema,
+        rawRows,
+        'account.favorite-counts',
+    )
+    const counts = new Map<string, number>()
+    for (const row of rows) {
+        if (row.site) counts.set(row.site, row.coupon_count)
+    }
+    return counts
+}
+
 /** api/coupons/stores/route.ts GET — store-name autocomplete; q-present/absent branch is a genuinely different query (ILIKE vs. no filter), not just an optional param. */
 export async function listStoreOptions(
     q: string,
@@ -300,6 +356,45 @@ export async function listTopSites(): Promise<SiteCountRow[]> {
         LIMIT 4
     `)
     return parseCouponRows(SiteCountRowSchema, rawRows, 'sites.top-sites')
+}
+
+/**
+ * supported-stores/page.tsx — the newest `limit` stores to become supported,
+ * newest first. See RecentStoreRowSchema for why `store_configs.created_at` is
+ * the signal and `MIN(coupons.created_at)` is not.
+ *
+ * The EXISTS gate is not decoration: `store_configs` and the page's store
+ * universe are different populations (the page searches `coupons.site`, and
+ * every tile links to `/coupons/<site>`), so a config whose store has no
+ * visible coupons would render a tile that claims coupons and lands the
+ * shopper on an empty page. Gating on the SAME visibility predicate every
+ * other listing read uses keeps the two in step by construction. Measured on
+ * prod: 28ms, index-only probes via `coupons_site_idx`, against the 145ms the
+ * page's existing listTopSites read already costs — and the page issues both
+ * concurrently, so first paint waits on the slower one, unchanged.
+ *
+ * Unqualified `status`/`expired` inside the subquery resolve to `coupons` (its
+ * innermost FROM); `store_configs` has neither column, so there is nothing for
+ * them to bind to in the outer scope either.
+ */
+export async function listRecentlyAddedStores(
+    limit: number,
+): Promise<RecentStoreRow[]> {
+    const rawRows = await prisma.$queryRaw(Prisma.sql`
+        SELECT sc.store_name, sc.created_at AS added_at
+        FROM store_configs sc
+        WHERE EXISTS (
+            SELECT 1 FROM coupons c
+            WHERE c.site = sc.store_name AND ${visibleCouponsWhere()}
+        )
+        ORDER BY sc.created_at DESC
+        LIMIT ${limit}
+    `)
+    return parseCouponRows(
+        RecentStoreRowSchema,
+        rawRows,
+        'sites.recently-added',
+    )
 }
 
 /** api/sites/search-supported/route.ts POST — fixed LIMIT 20. The route's empty-query early return (`{sites:[]}` without querying) stays there; this fn assumes a non-empty `q`. */

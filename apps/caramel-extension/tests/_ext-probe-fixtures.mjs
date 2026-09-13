@@ -15,10 +15,17 @@ export function greenObservation(overrides = {}) {
             rejectedAdds: 0,
             adds: 1,
         },
-        platform: { productsJsonOk: true, cartJsOk: true },
+        platform: {
+            detected: 'shopify',
+            productFeedOk: true,
+            cartApiOk: true,
+            productsJsonOk: true,
+            cartJsOk: true,
+        },
         cartItemsAtArrival: 1,
         config: {
             servedFromApi: true,
+            cacheClearedBeforeRun: true,
             expected: { couponInput: '#code' },
             served: { couponInput: '#code' },
             matches: true,

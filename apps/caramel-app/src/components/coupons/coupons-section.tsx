@@ -1,6 +1,7 @@
 'use client'
 
 import Loader from '@/components/Loader'
+import { promptSupportOnFailure } from '@/lib/feedback/promptSupportOnFailure'
 import type { Coupon, CouponFilters } from '@/types/coupon'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -22,6 +23,14 @@ interface CouponsSectionProps {
     disableInitialFetch?: boolean
     heroTitle?: string
     heroSubtitle?: string
+    /** Optional control rendered under the hero subtitle — the store page's
+     * "follow this store" star. A SLOT rather than a prop the section knows
+     * about, so this shared component stays ignorant of accounts and favorites.
+     *
+     * Omitting it renders NOTHING extra: /coupons (a visual-regression
+     * baseline) passes no slot and its DOM is byte-identical to before. Only
+     * /coupons/[store], which has no baseline, fills it. */
+    heroAction?: React.ReactNode
 }
 
 const ITEMS_PER_PAGE = 5
@@ -33,6 +42,7 @@ export default function CouponsSection({
     disableInitialFetch = false,
     heroTitle = 'All Coupons',
     heroSubtitle = 'Browse verified coupon codes, promo codes, and offers.',
+    heroAction,
 }: CouponsSectionProps) {
     const MIN_LOADING_DELAY_MS = 350
 
@@ -162,6 +172,12 @@ export default function CouponsSection({
                 toast.error('Failed to load coupons')
                 console.error('Failed to load coupons:', err)
                 setHasMore(false)
+                // A blocked, user-visible action → offer the feedback prompt
+                // (Sentry + PostHog once per session; rate-limited internally).
+                promptSupportOnFailure({
+                    error: err,
+                    operation: 'coupons_fetch',
+                })
             } finally {
                 const wrapUp = () => {
                     setIsLoadingMore(false)
@@ -273,6 +289,7 @@ export default function CouponsSection({
                         {heroSubtitle}
                     </p>
                 ) : null}
+                {heroAction ?? null}
             </motion.div>
 
             <div className="flex gap-8 md:flex-col">

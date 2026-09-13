@@ -37,10 +37,14 @@ export default defineConfig({
         [
             '@argos-ci/playwright/reporter',
             createArgosReporterOptions({
-                uploadToArgos: !!process.env.CI,
+                // Upload permanently OFF (2026-08-13, issue #194): the Argos
+                // account is retired and the end-of-run upload threw APIError
+                // AFTER a green 108-test suite, keeping the whole workflow
+                // red on every main push. Snapvisor owns visual diffs now;
+                // the argosScreenshot specs stay as deterministic render
+                // smoke + local screenshot artifacts.
+                uploadToArgos: false,
                 buildName: 'caramel-app',
-                token: process.env.ARGOS_TOKEN,
-                apiBaseUrl: process.env.ARGOS_API_BASE_URL,
             }),
         ],
     ],
@@ -67,6 +71,22 @@ export default defineConfig({
                   url: baseURL,
                   timeout: webServerTimeout,
                   reuseExistingServer: !process.env.CI,
+                  // Playwright launches the app server with { ...process.env,
+                  // ...webServer.env }, so this MERGES over the inherited env.
+                  // In the PostHog real-ingestion e2e mode the Playwright
+                  // process carries POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_
+                  // PERSONAL_API_KEY (the Query API read key — used ONLY by
+                  // e2e/support/posthog.ts). env.ts fail-fasts at boot if that
+                  // key is present in an app/server env, so we blank it for the
+                  // app process ONLY: '' is falsy, so env.ts's presence guard
+                  // passes, while the Playwright test process keeps the real
+                  // value in its own process.env for the Query API calls. The
+                  // dataset switches (POSTHOG_DATASET / NEXT_PUBLIC_POSTHOG_*)
+                  // are inherited from the parent env unchanged.
+                  env: {
+                      POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_PERSONAL_API_KEY:
+                          '',
+                  },
               },
           }
         : {}),

@@ -1,7 +1,9 @@
 import ThemeToggle from '@/components/ThemeToggle'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
 import { useWindowSize } from '@/hooks/useWindowSize'
+import { resetPosthogIdentity } from '@/lib/analytics/identity'
 import { signOut, useSession } from '@/lib/auth/client'
+import { userInitial } from '@/lib/userInitial'
 import { AnimatePresence, motion } from 'framer-motion'
 import Image from 'next/image'
 import L from 'next/link'
@@ -27,6 +29,7 @@ const links: NavLink[] = [
     { name: 'Pricing', url: '/pricing' },
     { name: 'Privacy', url: '/privacy' },
     { name: 'Stores', url: '/supported-stores', ariaLabel: 'Supported Stores' },
+    { name: 'Support', url: '/support' },
 ]
 
 const Link = motion.create(L)
@@ -58,11 +61,14 @@ export default function Header({ scrollRef }: HeaderProps) {
     }, [])
 
     const handleSignOut = async () => {
+        // Clear the PostHog identity BEFORE the session goes away so the reset
+        // isn't attributed to the logged-in person.
+        resetPosthogIdentity()
         await signOut()
         window.location.href = '/'
     }
 
-    const userInitial = session?.user?.name?.charAt(0).toUpperCase() || 'U'
+    const avatarLetter = session?.user ? userInitial(session.user) : 'U'
 
     useEffect(() => {
         if (isScrollingDown) {
@@ -90,7 +96,7 @@ export default function Header({ scrollRef }: HeaderProps) {
             >
                 <Image
                     src="/full-logo.png"
-                    alt="logo"
+                    alt="Caramel"
                     height={120}
                     width={120}
                     className="mb-auto mt-auto w-4/5 cursor-pointer sm:w-5/12"
@@ -131,7 +137,7 @@ export default function Header({ scrollRef }: HeaderProps) {
                             aria-label="Account menu"
                             className="flex h-8 w-8 items-center justify-center rounded-full bg-caramel text-sm font-semibold text-white ring-2 ring-caramel/20 transition hover:scale-105 hover:ring-caramel/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-caramel/60"
                         >
-                            {userInitial}
+                            {avatarLetter}
                         </button>
                         <AnimatePresence>
                             {isUserMenuOpen && (

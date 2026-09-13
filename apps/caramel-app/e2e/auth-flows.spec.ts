@@ -34,12 +34,12 @@ test.describe('Auth Flows — Login (real session)', () => {
         page,
     }) => {
         await page.goto('/login')
-        await page.getByPlaceholder('Enter your email').fill(REAL_LOGIN_EMAIL)
+        await page.getByPlaceholder('you@example.com').fill(REAL_LOGIN_EMAIL)
         await page
             .getByPlaceholder('Enter your password')
             .fill(REAL_LOGIN_PASSWORD)
 
-        await page.getByRole('button', { name: /login/i }).click()
+        await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
         // On success the client sets a real session cookie then does
         // window.location.href = '/', so we land on the homepage.
@@ -49,8 +49,12 @@ test.describe('Auth Flows — Login (real session)', () => {
         // a protected route that bounces unauthenticated visitors to /login, so
         // seeing the profile with the seeded email proves the session is real.
         await page.goto('/profile')
+        // /profile is an account HOME now: its <h1> is the user's own name, not
+        // the word "Profile". "Account details" is the stable landmark to wait
+        // on — it renders straight from the session, so it does not depend on
+        // the overview fetch resolving.
         await expect(
-            page.getByRole('heading', { name: 'Profile' }),
+            page.getByRole('heading', { name: 'Account details' }),
         ).toBeVisible({ timeout: 10000 })
         await expect(page.getByText(REAL_LOGIN_EMAIL).first()).toBeVisible()
     })
@@ -61,7 +65,7 @@ test.describe('Auth Flows — Login', () => {
         page,
     }) => {
         await page.goto('/login')
-        await page.getByPlaceholder('Enter your email').fill('bad@example.com')
+        await page.getByPlaceholder('you@example.com').fill('bad@example.com')
         await page.getByPlaceholder('Enter your password').fill('WrongPass1!')
 
         // Intercept the auth API to return an error without hitting real server
@@ -76,7 +80,7 @@ test.describe('Auth Flows — Login', () => {
             }),
         )
 
-        await page.getByRole('button', { name: /login/i }).click()
+        await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
         // Sonner toast with error message
         await expect(
@@ -91,7 +95,7 @@ test.describe('Auth Flows — Login', () => {
     }) => {
         await page.goto('/login')
         await page
-            .getByPlaceholder('Enter your email')
+            .getByPlaceholder('you@example.com')
             .fill('unverified@example.com')
         await page.getByPlaceholder('Enter your password').fill('Test@12345')
 
@@ -106,7 +110,7 @@ test.describe('Auth Flows — Login', () => {
             }),
         )
 
-        await page.getByRole('button', { name: /login/i }).click()
+        await page.getByRole('button', { name: 'Sign in', exact: true }).click()
         await expect(page).toHaveURL(/\/verify/, { timeout: 10000 })
     })
 
@@ -154,15 +158,24 @@ test.describe('Auth Flows — Login', () => {
 })
 
 test.describe('Auth Flows — Signup', () => {
+    // slow() = triple the 30s default. The waitForURL below already carries a
+    // 30s budget of its own, so the DEFAULT test timeout expired first and
+    // silently capped it — the redirect test died at exactly 30000ms on
+    // 2026-08-10 (third signup flake that week; failOnFlakyTests turns one
+    // slow CI boot into a red gate). The app is measured-fast (signup POST
+    // 0.8s live); what's slow is a cold CI runner hydrating /signup and
+    // loading /verify.
+    test.slow()
+
     test('successful signup redirects to /verify?signup=success', async ({
         page,
     }) => {
         await page.goto('/signup')
 
         await page.getByPlaceholder('@nickname').fill('testuser')
-        await page.getByPlaceholder('Enter your email').fill('new@example.com')
+        await page.getByPlaceholder('you@example.com').fill('new@example.com')
         await page.getByPlaceholder('Create a password').fill('Test@12345')
-        await page.getByPlaceholder('Re-type Password').fill('Test@12345')
+        await page.getByPlaceholder('Re-type your password').fill('Test@12345')
 
         // Intercept signup API to return success
         await page.route('**/api/auth/sign-up/email', route =>
@@ -176,21 +189,42 @@ test.describe('Auth Flows — Signup', () => {
             }),
         )
 
-        await page.getByRole('button', { name: 'Sign Up', exact: true }).click()
+        // Click-until-the-POST-fires, because the budget-bump lineage below
+        // never addressed the actual failure: on a cold deployed /signup the
+        // click can land BEFORE React hydration attaches the submit handler,
+        // so the click is silently swallowed, the request never leaves, and no
+        // navigation timeout — 10s (flaky 2026-08-09), 30s + test.slow()
+        // (flaky 2026-08-10 and twice on 2026-08-15) — can rescue a click
+        // that did nothing. Each attempt re-clicks and gives the mocked POST
+        // 3s to appear; a swallowed pre-hydration click just retries.
+        await expect(async () => {
+            const signupRequest = page.waitForRequest(
+                '**/api/auth/sign-up/email',
+                { timeout: 3000 },
+            )
+            await page
+                .getByRole('button', { name: 'Create account', exact: true })
+                .click()
+            await signupRequest
+        }).toPass({ timeout: 30000 })
 
-        // Uses window.location.href so wait for navigation
-        await page.waitForURL('**/verify?signup=success', { timeout: 10000 })
+        // `commit`, not `load`: the redirect goes through window.location.href
+        // and the claim under test is "the app navigated to /verify" — the
+        // full `load` event additionally waits for the deployed site's fonts
+        // and analytics, which is the other half of the old flakiness.
+        await page.waitForURL('**/verify?signup=success', {
+            timeout: 30000,
+            waitUntil: 'commit',
+        })
     })
 
     test('signup with existing email shows error toast', async ({ page }) => {
         await page.goto('/signup')
 
         await page.getByPlaceholder('@nickname').fill('testuser')
-        await page
-            .getByPlaceholder('Enter your email')
-            .fill('taken@example.com')
+        await page.getByPlaceholder('you@example.com').fill('taken@example.com')
         await page.getByPlaceholder('Create a password').fill('Test@12345')
-        await page.getByPlaceholder('Re-type Password').fill('Test@12345')
+        await page.getByPlaceholder('Re-type your password').fill('Test@12345')
 
         await page.route('**/api/auth/sign-up/email', route =>
             route.fulfill({
@@ -203,11 +237,27 @@ test.describe('Auth Flows — Signup', () => {
             }),
         )
 
-        await page.getByRole('button', { name: 'Sign Up', exact: true }).click()
+        // Same click-until-the-POST-fires shape as the redirect test above,
+        // and for the same reason: a pre-hydration click is swallowed
+        // silently, and the toast this test waits for can only appear after
+        // the (mocked) 422 actually round-trips. Flaky at 5s on 2026-08-09,
+        // and again at 15s on 2026-08-15 — the budget was never the problem.
+        await expect(async () => {
+            const signupRequest = page.waitForRequest(
+                '**/api/auth/sign-up/email',
+                { timeout: 3000 },
+            )
+            await page
+                .getByRole('button', { name: 'Create account', exact: true })
+                .click()
+            await signupRequest
+        }).toPass({ timeout: 30000 })
 
+        // The response is mocked (fulfilled 422 above), so once the request
+        // has fired this only measures the client rendering the toast.
         await expect(
             page.getByText(/unable to create your account/i),
-        ).toBeVisible({ timeout: 5000 })
+        ).toBeVisible({ timeout: 15000 })
     })
 
     test('username too short shows validation error', async ({ page }) => {
@@ -217,12 +267,12 @@ test.describe('Auth Flows — Signup', () => {
         await nickname.fill('ab')
         await nickname.blur()
 
-        await page.getByPlaceholder('Enter your email').click()
+        await page.getByPlaceholder('you@example.com').click()
 
         // Formik shows error after blur
-        await expect(
-            page.getByText(/must be at least 4 characters/i),
-        ).toBeVisible({ timeout: 5000 })
+        await expect(page.getByText(/at least 4 characters/i)).toBeVisible({
+            timeout: 5000,
+        })
     })
 })
 
@@ -273,9 +323,9 @@ test.describe('Auth Flows — before any JavaScript runs', () => {
         await page.goto('/verify?signup=success')
 
         await expect(
-            page.getByText(/we've sent a verification email/i),
+            page.getByText(/we've sent a verification link/i),
         ).toBeVisible()
-        await expect(page.getByText(/didn't receive it/i)).toBeVisible()
+        await expect(page.getByText(/didn't get it/i)).toBeVisible()
     })
 
     test('so is the message for someone arriving without params', async ({
@@ -296,9 +346,9 @@ test.describe('Auth Flows — Verify Page', () => {
         await page.goto('/verify?signup=success')
 
         await expect(
-            page.getByText(/we've sent a verification email/i),
+            page.getByText(/we've sent a verification link/i),
         ).toBeVisible()
-        await expect(page.getByText(/didn't receive it/i)).toBeVisible()
+        await expect(page.getByText(/didn't get it/i)).toBeVisible()
     })
 
     test('verify page without params shows default messaging', async ({
@@ -319,7 +369,7 @@ test.describe('Auth Flows — Verify Page', () => {
     test('verify page has email input and send button', async ({ page }) => {
         await page.goto('/verify')
 
-        await expect(page.getByPlaceholder('Enter your email')).toBeVisible()
+        await expect(page.getByPlaceholder('you@example.com')).toBeVisible()
         await expect(
             page.getByRole('button', { name: /send verification email/i }),
         ).toBeVisible()
@@ -395,9 +445,16 @@ test.describe('Auth Flows — Protected Routes', () => {
 
         await page.goto('/profile')
 
-        await expect(page.getByText('Profile')).toBeVisible({ timeout: 5000 })
+        // The user's own name is the page's <h1> — the standalone "Profile"
+        // heading is gone. Both assertions below render from the session
+        // alone, which is the point: this test stubs only get-session, so
+        // /api/account/overview genuinely fails here and the page must still
+        // show real account content rather than collapsing to an error.
         await expect(
-            page.getByRole('heading', { name: 'carameluser' }),
+            page.getByRole('heading', { name: 'carameluser', level: 1 }),
+        ).toBeVisible({ timeout: 5000 })
+        await expect(
+            page.getByRole('heading', { name: 'Account details' }),
         ).toBeVisible()
         await expect(page.getByText('test@example.com').first()).toBeVisible()
     })

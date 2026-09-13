@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Caramel</title>
+
+        <!-- Design tokens MUST load before the main stylesheet. Absolute
+             paths = public/ assets, untouched by the bundler — the shadow-DOM
+             UI fetches the same files via chrome.runtime.getURL, so they must
+             stay real files at assets/*. -->
+        <link rel="stylesheet" href="/assets/tokens.css" />
+        <!-- Main stylesheet -->
+        <link rel="stylesheet" href="/assets/styles.css" />
+    </head>
+
+    <body>
+        <!-- React owns everything below (WXT P2, 2026-08-13): header, loader,
+             views, toasts all render into this mount point. -->
+        <div id="root"></div>
+        <script type="module" src="./main.tsx"></script>
+    </body>
+</html>

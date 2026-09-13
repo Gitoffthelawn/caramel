@@ -6,7 +6,9 @@ on:
   pull_request:
 
 env:
-  WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY }}
+  # Fork PRs never receive repository `vars`, so this must fall back to the real
+  # package directory — not the workspace root, where every `pnpm run` 404s.
+  WORKING_DIRECTORY: ${{ vars.WORKING_DIRECTORY || 'apps/caramel-extension' }}
 
 jobs:
   lint_and_build:
@@ -14,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIRECTORY || github.workspace }}
+        working-directory: ${{ env.WORKING_DIRECTORY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,9 +41,19 @@ jobs:
         run: pnpm run test
       - name: Check bundle size
         run: pnpm run size
-      # Proves the allowlist in scripts/build-dist.mjs actually produces a
-      # loadable package — tests/package-contents.test.mjs checks the file list,
-      # this checks the build runs and lands the files it promises.
+      # WXT migration parity harness (P0, 2026-08-12): builds the old dist AND
+      # the WXT .output per browser, then asserts semantic manifest parity
+      # (scripts/parity-expected-diffs.json is the shrink-only allowlist),
+      # NEVER_SHIP file inventory, and the build-time env stamp in both build
+      # systems. Every migration phase must keep this green.
+      - name: Run WXT parity harness
+        run: pnpm run test:parity
+      # TypeScript gate for the WXT surfaces (wxt.config.ts, entrypoints/) —
+      # strict tsc, no any; `wxt prepare` generates .wxt/ types first.
+      - name: Type-check WXT surfaces
+        run: pnpm run type-check
+      # Proves the WXT build runs and lands the files the manifest promises
+      # (the parity harness above asserts the manifest references resolve).
       - name: Build the store package
         run: pnpm run build
 
@@ -158,7 +170,23 @@ jobs:
       - name: Build the store package
         run: pnpm --filter caramel-extension run build
 
-      - name: Run extension guard suite (packaged build)
-        env:
-          CARAMEL_EXT_DIR: ./dist
+      # Loads that PRODUCTION package in a real Chrome and asserts which
+      # deployment it resolved to. Nothing else in CI does: the guards below
+      # need a development stamp, and the e2e suite points its copy at the
+      # local app — so without this, no browser ever sees what actually ships.
+      # This is the check that would have caught the update_url heuristic.
+      - name: Smoke the store package (production stamp, real browser)
+        run: xvfb-run --auto-servernum pnpm --filter caramel-extension exec node scripts/smoke-package.mjs ./.output/chrome-mv3 production
+
+      # …and a second, DEVELOPMENT-stamped build for the guards to drive.
+      # Several guard checks assert on the extension's own diagnostic markers
+      # (AUTO_INSERT_BASELINE_NARROWED, _REFUSED_CONTROL, _EARLY_EXIT), which
+      # a shipped build deliberately does not print — console-silence.test.mjs
+      # exists to keep our internals out of a shopper's store console. Same
+      # module graph either way; only the __CARAMEL_ENV__ stamp differs, and
+      # the production build is still smoked above.
+      - name: Build the bundle the guards drive (development stamp)
+        run: pnpm --filter caramel-extension run build:dev
+
+      - name: Run extension guard suite (dev-stamped build)
         run: xvfb-run --auto-servernum pnpm --filter caramel-extension test:guards

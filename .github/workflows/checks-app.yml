@@ -11,7 +11,6 @@ on:
     - cron: '17 3 * * *'
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -184,8 +183,14 @@ jobs:
         run: pnpm --filter caramel-app run audit:prod
 
   # ─────────────────────────────────────────────────────────────
-  # Schema Drift Check (only when prisma files change)
+  # Schema Drift Check (every PR — there is no path filter)
   # ─────────────────────────────────────────────────────────────
+  # This job was DECORATIVE until 2026-08-10: every check ended in
+  # `--exit-code || echo "No drift detected"`, so the `||` turned a real failure
+  # into a reassuring log line and the job was green no matter what the checks
+  # found. It was also failing all three checks in a row, invisibly, because the
+  # shadow "database" was a shadow SCHEMA (see the SHADOW_DATABASE_URL note).
+  # Rule: no `|| echo` in this job. A check that cannot go red is not a gate.
   schema-drift:
     name: Schema Drift
     if: github.event_name == 'pull_request'
@@ -193,7 +198,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        # Prod-matching: docker-compose.yml pins postgres:18.4, and a *drift*
+        # gate measuring against a different engine version is measuring the
+        # wrong database. (The e2e-pr job's postgres:15 stays a separate
+        # punch-list item.)
+        image: postgres:18.4
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -207,7 +216,17 @@ jobs:
 
     env:
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/caramel_ci'
-      SHADOW_DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/caramel_ci?schema=__shadow'
+      # A dedicated shadow DATABASE, never a shadow SCHEMA. Under
+      # `?schema=__shadow` the migration history genuinely cannot replay: the
+      # older migrations create unqualified tables (which land in __shadow)
+      # while the newer, newer-Prisma ones emit `"public"."…"`-qualified DDL, so
+      # the first public-qualified FK to an older table dies with
+      # P3006 / P1014 "the underlying table for model `public.users` does not
+      # exist". The partial replay then leaves objects behind in caramel_ci,
+      # which made the following `migrate deploy` fail P3005 ("database schema
+      # is not empty") and left the last check diffing against an empty public
+      # schema. A separate database replays the identical history clean.
+      SHADOW_DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/caramel_ci_shadow'
 
     steps:
       - uses: actions/checkout@v4
@@ -236,33 +255,45 @@ jobs:
         working-directory: ./apps/caramel-app
         run: npx prisma validate
 
-      - name: Prepare shadow schema
+      # Prisma resets this database itself before each replay, so the two drift
+      # checks below can share it; it only has to exist.
+      - name: Create shadow database
         run: |
+          set -euo pipefail
           sudo apt-get -yqq install postgresql-client
-          psql "postgresql://postgres:postgres@localhost:5432/caramel_ci" \
-            -c "CREATE SCHEMA IF NOT EXISTS __shadow;"
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" \
+            -c "DROP DATABASE IF EXISTS caramel_ci_shadow;"
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" \
+            -c "CREATE DATABASE caramel_ci_shadow;"
 
+      # Replays every migration into the shadow database and diffs the result
+      # against schema.prisma. Exit 2 = a schema.prisma change shipped without
+      # its migration (or a hand-edited migration). It fails the job.
       - name: Drift check (schema ⇄ migrations)
         working-directory: ./apps/caramel-app
         run: |
+          set -euo pipefail
           npx prisma migrate diff \
             --from-migrations prisma/migrations \
             --to-schema-datamodel prisma/schema.prisma \
             --shadow-database-url "$SHADOW_DATABASE_URL" \
-            --exit-code || echo "No drift detected or no migrations yet"
+            --exit-code
 
+      # A migration that does not apply to an empty database is a broken
+      # migration, so this failing must fail the job.
       - name: Apply migrations
         working-directory: ./apps/caramel-app
-        run: npx prisma migrate deploy --preview-feature || echo "No migrations to apply"
+        run: npx prisma migrate deploy
 
       - name: Drift check (migrations ⇄ Postgres)
         working-directory: ./apps/caramel-app
         run: |
+          set -euo pipefail
           npx prisma migrate diff \
             --from-migrations prisma/migrations \
             --to-url "$DATABASE_URL" \
             --shadow-database-url "$SHADOW_DATABASE_URL" \
-            --exit-code || echo "No drift detected"
+            --exit-code
 
   # ─────────────────────────────────────────────────────────────
   # E2E & Visual Regression (PR – local dev server)
@@ -271,7 +302,10 @@ jobs:
     name: E2E & Visual Regression (PR)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Raised from 15: support-flow.spec.ts verifies REAL PostHog ingestion, and
+    # the shared self-hosted PostHog's ingestion lag can spike to ~340s per
+    # ingestion test (they run serially here — workers=1 in CI).
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:15
@@ -285,10 +319,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
-      ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -325,6 +355,22 @@ jobs:
           PLAYWRIGHT_WEB_COMMAND: pnpm dev
           PLAYWRIGHT_START_SERVER: 'true'
           PLAYWRIGHT_WEB_TIMEOUT: '300000'
+          # PostHog REAL-INGESTION verification (support-flow.spec.ts). The app
+          # server (next dev, launched by Playwright's webServer) and the
+          # Playwright runner share this step's env. CRITICAL: env.ts fail-fasts
+          # at BOOT if the read-only Query key is present in an app/server env,
+          # so playwright.config.ts blanks POSTHOG_E2E_TEST_PROJECT_QUERY_READ_
+          # ONLY_PERSONAL_API_KEY in its webServer.env for the app process ONLY
+          # (Playwright merges { ...process.env, ...webServer.env }, and '' is
+          # falsy so the guard passes). The Playwright process keeps the real
+          # value — e2e/support/posthog.ts uses it to poll the PostHog Query API.
+          # Dataset=e2e routes captures to the isolated shared test project.
+          POSTHOG_DATASET: e2e
+          NEXT_PUBLIC_POSTHOG_DATASET: e2e
+          NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_HOST }}
+          NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_CAPTURE_TOKEN: ${{ secrets.NEXT_PUBLIC_POSTHOG_E2E_TEST_PROJECT_CAPTURE_TOKEN }}
+          POSTHOG_E2E_TEST_PROJECT_ID: ${{ secrets.POSTHOG_E2E_TEST_PROJECT_ID }}
+          POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_PERSONAL_API_KEY: ${{ secrets.POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_PERSONAL_API_KEY }}
         run: pnpm test:e2e
 
       - name: Upload test report
@@ -350,8 +396,6 @@ jobs:
     # was queue latency, not a defect.
     timeout-minutes: 35
     env:
-      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
-      ARGOS_API_BASE_URL: ${{ vars.ARGOS_API_BASE_URL }}
       NEXT_PUBLIC_BASE_URL: ${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com' || 'https://grabcaramel.com' }}
 
     steps:
@@ -372,25 +416,43 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter caramel-app exec playwright install --with-deps chromium
 
+      # NOTE: the PostHog real-ingestion env is deliberately NOT set here yet.
+      # The deployed dev site does not have PostHog baked into its bundle until
+      # this branch merges + redeploys, so support-flow.spec.ts's ingestion
+      # tests SKIP themselves against the deployed site (no DATABASE_URL, and the
+      # verification creds are absent). TODO: once dev.grabcaramel.com ships with
+      # NEXT_PUBLIC_POSTHOG_DATASET=e2e, add the same POSTHOG_E2E_* env here to
+      # verify ingestion against the real deployed bundle.
       # The step below tests the LIVE deployment, so this push races Dokploy's
       # autodeploy of the same commit. Proven 2026-08-06: a625be9's own test
       # failed at 14:40:44Z, two seconds before the deploy carrying its fix
       # finished at 14:40:46Z. Wait for the site to report this exact commit.
       #
-      # dev only: dev.grabcaramel.com is the root docker-compose/Dockerfile
-      # build, whose context carries the git metadata /api/version is stamped
-      # from. Prod is a Dokploy *Nixpacks* app built from apps/caramel-app,
-      # whose context excludes the repo's .git — it answers "unknown" and this
-      # gate could never pass there. Drop the condition when prod moves onto
-      # the root compose (RUNBOOK "Deploys & rollback").
+      # Both branches now, not dev only. The old condition existed because prod
+      # was a Dokploy *Nixpacks* app whose build context excluded the repo's
+      # .git, so /api/version answered "unknown" and this gate could never pass
+      # — with the standing note to drop it "when prod moves onto the root
+      # compose". That happened on 2026-08-08: grabcaramel.com IS the compose
+      # stack and answers a real sha.
+      #
+      # The two branches need OPPOSITE timeouts, because they deploy in
+      # opposite ways:
+      #   dev  — autodeploy ON. Wait out a real build (a push burst can queue
+      #          one behind another), so 1200s.
+      #   main — autoDeploy is OFF BY DESIGN on the prod compose. No deploy is
+      #          coming, so waiting is pure latency: poll once and fail with the
+      #          exact reason. Before this, a merge that changed any asserted
+      #          copy surfaced as ~13 `locator.fill: Test timeout` errors after
+      #          ~30 minutes (2026-08-09, the auth redesign) — all of which
+      #          meant only "prod is still serving an older commit".
       - name: Wait for the deployment to carry this commit
-        if: github.ref == 'refs/heads/dev'
         env:
-          VERSION_URL: https://dev.grabcaramel.com/api/version
-          EXPECTED_SHA: ${{ github.sha }}
-          # One full Docker build is ~10 min; a push burst queues builds
-          # back-to-back, so one queued-behind build fits inside 20.
-          DEPLOY_WAIT_TIMEOUT_SECONDS: '1200'
+          VERSION_URL: "${{ github.ref == 'refs/heads/dev' && 'https://dev.grabcaramel.com/api/version' || 'https://grabcaramel.com/api/version' }}"
+          EXPECTED_SHA: '${{ github.sha }}'
+          DEPLOY_WAIT_TIMEOUT_SECONDS: "${{ github.ref == 'refs/heads/dev' && '1200' || '0' }}"
+          # Quoted: the prod branch of this expression contains ': ', which YAML
+          # would otherwise read as a nested mapping key.
+          DEPLOY_WAIT_HINT: "${{ github.ref == 'refs/heads/dev' && '' || 'Prod deploys are MANUAL: the Dokploy prod compose has autoDeploy OFF by design, so merging to main never reaches grabcaramel.com. This is not a failed deploy and not a broken build — the E2E suite runs against the LIVE site, so it cannot verify a commit prod is not serving. Deploy the prod compose, then re-run this job.' }}"
         run: bash .github/workflows/scripts/wait-for-deploy.sh
 
       - name: Run E2E tests

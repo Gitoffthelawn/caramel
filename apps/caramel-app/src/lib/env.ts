@@ -36,6 +36,12 @@ const serverObjectSchema = z.object({
     COUPONS_DATABASE_URL: z.string().min(1).optional(),
     BETTER_AUTH_URL: z.string().min(1).optional(),
     BCRYPT_SALT_ROUNDS: z.coerce.number().int().positive().default(10),
+    // Catalog freshness window read by GET /api/health/db's checkCatalog
+    // (hours, not ms — an ops-facing knob should be set in a unit a human
+    // reaches for). Staleness alone never fails the health check; this only
+    // tunes when `details.stale` flips true. Default (48h) matches the
+    // previously-hardcoded CATALOG_STALE_THRESHOLD_MS.
+    CATALOG_MAX_AGE_HOURS: z.coerce.number().int().positive().default(48),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     APPLE_CLIENT_ID: z.string().optional(),
@@ -65,9 +71,45 @@ const serverObjectSchema = z.object({
     USESEND_API_KEY: z.string().optional(),
     USESEND_FROM_EMAIL: z.string().default('no_reply@grabcaramel.com'),
     USESEND_FROM_NAME: z.string().default('Caramel'),
+    // Destination inbox(es) for the user support/feedback flow (POST
+    // /api/support). Accepts a COMMA-SEPARATED list ("a@x.com,b@y.com" — split
+    // by parseRecipientList at the send site) so adding a teammate is a deploy
+    // env edit, never a code change; the real recipient list lives in the
+    // deploy env, not in this public repo.
+    // aladdin@devino.ca, NOT support@unotes.net: the old default was a
+    // copy-paste from uNotes and BOUNCES (same defect PR #150 fixed in the
+    // sites/suggest route — a real visitor's mail was lost to it).
+    // Set-but-EMPTY (`SUPPORT_EMAIL_TO=`) resolves to '' and makes the support
+    // route report email status 'skipped' (analytics still captured) rather
+    // than mailing a blank recipient.
+    // TODO(sendly): when Sendly custom-domain inboxes are ready, point this at
+    // a per-app address (support@grabcaramel.com) hosted on Sendly so support
+    // requests become MCP-readable with per-app permission delegation, instead
+    // of landing in personal mailboxes.
+    SUPPORT_EMAIL_TO: z.string().default('aladdin@devino.ca'),
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_MODEL: z.string().default('openai/gpt-5-mini'),
     API_ENCRYPTION_ENABLED: z.string().optional(),
+    // Which PostHog project this deploy's SERVER-side captures target (the
+    // feedback+observability foundation). 'production' → the real project;
+    // 'e2e' → the shared E2E test project (synthetic Playwright traffic, kept
+    // isolated by this very dataset switch); 'disabled' → no capture at all.
+    // Defaults to 'disabled' so a deploy that doesn't configure PostHog silently
+    // no-ops instead of erroring. Must AGREE with the client's
+    // NEXT_PUBLIC_POSTHOG_DATASET when both are explicitly set (parseServerEnv
+    // fail-fasts on a mismatch).
+    POSTHOG_DATASET: z
+        .enum(['production', 'e2e', 'disabled'])
+        .default('disabled'),
+    // Browser URL of THIS deploy's PostHog project UI, project id included
+    // (e.g. "https://posthog.example.com/project/123"). Used ONLY to build the
+    // operator-facing deep link in support emails (the support_request_submitted
+    // event filtered by feedback_id — src/lib/analytics/posthogLinks.ts).
+    // Distinct from NEXT_PUBLIC_POSTHOG_HOST, which is the ingestion endpoint
+    // and carries no project id — the reason the email previously had no link.
+    // Unset → support emails simply carry no PostHog link. The real value lives
+    // in the deploy env, not in this public repo.
+    POSTHOG_PROJECT_UI_URL: z.string().optional(),
 })
 
 const serverSchema = serverObjectSchema.refine(
@@ -105,7 +147,33 @@ export function parseServerEnv(
             .join('; ')
         throw new Error(`Invalid environment configuration — ${details}`)
     }
-    return result.data
+    const data = result.data
+
+    // ---- Cross-surface PostHog guards (fail-fast at boot) ----------------
+    // (a) The server dataset and the client dataset must not silently
+    // disagree. Compared on the RAW source (not the defaulted values) so this
+    // only fires when BOTH are explicitly set to different datasets — the case
+    // that would ship server events to one project and browser events to
+    // another.
+    const serverDataset = source.POSTHOG_DATASET
+    const clientDataset = source.NEXT_PUBLIC_POSTHOG_DATASET
+    if (serverDataset && clientDataset && serverDataset !== clientDataset) {
+        throw new Error(
+            `Invalid environment configuration — POSTHOG_DATASET (${serverDataset}) and NEXT_PUBLIC_POSTHOG_DATASET (${clientDataset}) disagree; both must name the same PostHog dataset.`,
+        )
+    }
+    // (b) The read-only personal API key is a Playwright/CI-only credential
+    // (the eval/verification harness uses it to QUERY PostHog). It must NEVER
+    // live in an app/server/container env in ANY dataset mode — its presence
+    // here is a key-hygiene violation, so boot fails loudly rather than
+    // shipping a query-capable key into a running container.
+    if (source.POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_PERSONAL_API_KEY) {
+        throw new Error(
+            'Invalid environment configuration — POSTHOG_E2E_TEST_PROJECT_QUERY_READ_ONLY_PERSONAL_API_KEY must never be set in an app/server/container env; it is a Playwright/CI-only read key.',
+        )
+    }
+
+    return data
 }
 
 // Eager singleton — importing this module (see instrumentation.ts) throws

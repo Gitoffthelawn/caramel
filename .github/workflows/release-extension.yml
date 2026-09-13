@@ -1,14 +1,46 @@
 name: Release – Extension
 
-# TODO: Firefox has NO release path in this workflow.
-# `apps/caramel-extension/manifest-firefox.json` exists and is built + packaged,
-# but nothing signs or publishes it to addons.mozilla.org, so every Firefox
-# release is manual and the AMO listing drifts silently behind the tag.
-# Closing the gap needs two repository secrets that do not exist today —
-# AMO_JWT_ISSUER and AMO_JWT_SECRET — plus an `publish_firefox` job running
-# `web-ext sign`. Deliberately not added here: a job referencing unset secrets
-# resolves them to empty strings and fails deep inside the upload instead of
-# up front.
+# Every store package here is built by WXT (P4, 2026-08-13): `wxt zip` per
+# browser, out of apps/caramel-extension into .output/. The manifest is
+# generated, so package.json's "version" is the single version authority and
+# the built manifests are cross-checked against it rather than maintained
+# beside it.
+
+# Firefox/AMO IS automated now — `package` builds the Firefox variant and
+# `publish_firefox` signs and submits it to addons.mozilla.org — but the job is
+# DORMANT until the owner creates two repository secrets:
+#
+#   AMO_JWT_ISSUER   ("JWT issuer")
+#   AMO_JWT_SECRET   ("JWT secret")
+#
+# both minted at https://addons.mozilla.org/en-US/developers/addon/api/key/
+# (one pair per AMO account; the secret is shown exactly once).
+#
+# Until they exist, publish_firefox's FIRST step notices they are empty, writes
+# a ::warning:: plus a run-summary block saying Firefox was not published and
+# why, and every later step in that job is gated off — the release stays green
+# and Chrome/Safari are untouched. That gate is the whole reason the Firefox leg
+# was missing here: a job referencing unset secrets resolves them to empty
+# strings and fails deep inside the upload instead of up front. The cost of
+# leaving it out was real — the AMO listing (public slug `grabcaramel`) served
+# 1.0.3, reviewed 2025-07-12, to ~829 daily users while Chrome and Safari moved
+# on.
+#
+# Once the secrets exist the job runs for real: it proves the credentials
+# against the AMO API, refuses to ship a version AMO already lists, and fails
+# loudly on any upload or validation error. It never degrades to a silent pass.
+# Still manual afterwards: Mozilla's human review of the submitted version.
+#
+# Microsoft Edge follows the SAME dormant-until-secrets pattern (`publish_edge`),
+# reusing the Chrome store zip untouched — Edge is Chromium. It stays skipped
+# and GREEN until three repository secrets exist:
+#
+#   EDGE_PRODUCT_ID  — the add-on Product ID (Partner Center dashboard)
+#   EDGE_CLIENT_ID   — Publish API v1.1 client id (Partner Center → Publish API)
+#   EDGE_API_KEY     — Publish API v1.1 key (shown once at creation)
+#
+# Edge developer registration and publishing are free; registering the item once
+# in Partner Center to obtain the Product ID is the only human step.
 
 on:
   push:
@@ -29,7 +61,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write
   contents: read
 
 env:
@@ -61,54 +92,42 @@ jobs:
             echo "::warning::Running from ${GITHUB_REF_TYPE} '${GITHUB_REF_NAME}', not a tag. Store uploads may still run, but no GitHub Release will be created and the store version will not be traceable to a tag."
           fi
 
-      # ONE version authority: apps/caramel-extension/manifest.json. Every other
-      # version field in the extension package must agree with it, and the tag
-      # must be `v` + that version. Nothing in this workflow computes, bumps or
-      # infers a version any more — the Safari marketing version is this value
-      # too, and only the numeric TestFlight build number is derived at runtime.
+      # ONE version authority: apps/caramel-extension/package.json. WXT
+      # generates each browser's manifest from it, so there is no second
+      # version field to keep in sync here — what used to be a three-file
+      # agreement check is now a build-output check, in the `package` job,
+      # against the manifests WXT actually stamped. The tag must be `v` + this
+      # version. Nothing in this workflow computes, bumps or infers a version —
+      # the Safari marketing version is this value too, and only the numeric
+      # TestFlight build number is derived at runtime.
       - name: Assert one version authority
         id: version
         run: |
           set -euo pipefail
           dir="${WORKING_DIRECTORY}"
           if [ -z "$dir" ]; then
-            echo "::error::Repository variable WORKING_DIRECTORY is unset — cannot locate the extension manifest."
+            echo "::error::Repository variable WORKING_DIRECTORY is unset — cannot locate the extension package."
             exit 1
           fi
-          for f in manifest.json manifest-firefox.json package.json; do
-            if [ ! -f "$dir/$f" ]; then
-              echo "::error::Expected $dir/$f to exist. Check the WORKING_DIRECTORY repository variable."
-              exit 1
-            fi
-          done
+          if [ ! -f "$dir/package.json" ]; then
+            echo "::error::Expected $dir/package.json to exist. Check the WORKING_DIRECTORY repository variable."
+            exit 1
+          fi
 
-          version=$(jq -er '.version' "$dir/manifest.json")
-          firefox_version=$(jq -er '.version' "$dir/manifest-firefox.json")
-          package_version=$(jq -er '.version' "$dir/package.json")
-
-          echo "manifest.json          $version"
-          echo "manifest-firefox.json  $firefox_version"
-          echo "package.json           $package_version"
+          version=$(jq -er '.version' "$dir/package.json")
+          echo "package.json  $version"
 
           if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::manifest.json version '$version' is not a plain X.Y.Z version."
-            exit 1
-          fi
-          if [ "$firefox_version" != "$version" ]; then
-            echo "::error::manifest-firefox.json version '$firefox_version' disagrees with manifest.json '$version'."
-            exit 1
-          fi
-          if [ "$package_version" != "$version" ]; then
-            echo "::error::package.json version '$package_version' disagrees with manifest.json '$version'."
+            echo "::error::package.json version '$version' is not a plain X.Y.Z version."
             exit 1
           fi
 
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-              echo "::error::Tag '${GITHUB_REF_NAME}' does not match manifest version — expected 'v${version}'."
+              echo "::error::Tag '${GITHUB_REF_NAME}' does not match the package version — expected 'v${version}'."
               exit 1
             fi
-            echo "Tag ${GITHUB_REF_NAME} matches manifest version $version"
+            echo "Tag ${GITHUB_REF_NAME} matches package version $version"
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -250,9 +269,9 @@ jobs:
           print(f"Chrome Web Store currently publishes {published}; manifest is {manifest}")
           if manifest_parts <= published_parts:
               fail(
-                  f"Manifest version {manifest} is not greater than the published Chrome "
-                  f"Web Store version {published}. Bump apps/caramel-extension "
-                  "manifest.json (and the matching version fields) before tagging."
+                  f"Version {manifest} is not greater than the published Chrome "
+                  f"Web Store version {published}. Bump the \"version\" field in "
+                  "apps/caramel-extension/package.json before tagging."
               )
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
@@ -284,17 +303,93 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: pnpm install --frozen-lockfile
 
-      - name: Build extension
-        run: pnpm run build
+      # The release gate, run BEFORE anything is packaged so a bad build costs
+      # seconds instead of a store upload. The harness builds both browsers and
+      # asserts semantic manifest parity, the NEVER_SHIP file inventory (no
+      # package.json, tests/, scripts/ or configs reaching a store package) and
+      # — the part a release depends on — that both builds carry the PRODUCTION
+      # env stamp. That is why no step in this workflow may pass `--mode`:
+      # production is WXT's default, and a development-stamped package would
+      # point real users' extensions at the dev deployment.
+      - name: Assert both builds are production-stamped and ship-clean
+        run: pnpm run test:parity
 
-      - name: Package extension
+      # `wxt zip` builds and zips in one step. Chrome's zip is what the Chrome
+      # Web Store and Edge (Chromium, same package) receive; the Firefox run
+      # additionally emits a -sources.zip, which AMO requires because the
+      # submitted bundle is generated/minified and its reviewers need readable
+      # source.
+      - name: Package extension for Chrome
         run: pnpm run package
 
-      - name: Upload build artifact
+      - name: Package extension for Firefox
+        run: pnpm exec wxt zip -b firefox --mv3
+
+      # The manifests are GENERATED, so this is the check that used to be a
+      # three-file version agreement in the guard job: it proves what WXT
+      # actually stamped into each shipping package matches the version the
+      # guard resolved, tagged and freeze-checked against the stores. A silent
+      # disagreement here would publish a package whose version is not the one
+      # the guards cleared.
+      - name: Assert the built manifests carry the released version
+        env:
+          RELEASE_VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          for build in chrome-mv3 firefox-mv3; do
+            stamped=$(jq -er '.version' ".output/${build}/manifest.json")
+            echo "${build}  ${stamped}"
+            if [ "$stamped" != "${RELEASE_VERSION}" ]; then
+              echo "::error::.output/${build}/manifest.json is version '${stamped}' but this release is '${RELEASE_VERSION}'."
+              exit 1
+            fi
+          done
+          for zip in ".output/caramel-extension-${RELEASE_VERSION}-chrome.zip" \
+                     ".output/caramel-extension-${RELEASE_VERSION}-firefox.zip" \
+                     ".output/caramel-extension-${RELEASE_VERSION}-sources.zip"; do
+            if [ ! -f "$zip" ]; then
+              echo "::error::Expected $zip to exist — wxt zip did not produce the version-named artifact this release expects."
+              exit 1
+            fi
+          done
+
+      - name: Upload Chrome store package
         uses: DevinoSolutions/artifact/upload@v1
         with:
-          name: extension-package
-          path: ${{ env.WORKING_DIRECTORY }}/extension.zip
+          name: extension-chrome
+          path: ${{ env.WORKING_DIRECTORY }}/.output/caramel-extension-${{ needs.guard.outputs.version }}-chrome.zip
+          if-no-files-found: error
+
+      # An unpacked directory, not the zip: safari-web-extension-converter takes
+      # a directory of extension files, so shipping the zip would only mean
+      # unzipping it again in publish_safari.
+      - name: Upload unpacked Chrome build for the Safari converter
+        uses: DevinoSolutions/artifact/upload@v1
+        with:
+          name: extension-chrome-unpacked
+          path: ${{ env.WORKING_DIRECTORY }}/.output/chrome-mv3
+          if-no-files-found: error
+
+      # Also a directory: `web-ext sign` takes --source-dir and builds the xpi
+      # itself (it hashes that build to decide whether to re-upload), so handing
+      # it a zip would only mean unzipping it again in publish_firefox.
+      - name: Upload unpacked Firefox build
+        uses: DevinoSolutions/artifact/upload@v1
+        with:
+          name: extension-firefox
+          path: ${{ env.WORKING_DIRECTORY }}/.output/firefox-mv3
+          if-no-files-found: error
+
+      # The Firefox store zip is what the GitHub Release attaches; the sources
+      # zip is what web-ext hands AMO's reviewers alongside the signed build.
+      - name: Upload Firefox store and sources zips
+        uses: DevinoSolutions/artifact/upload@v1
+        with:
+          name: extension-firefox-zips
+          path: |
+            ${{ env.WORKING_DIRECTORY }}/.output/caramel-extension-${{ needs.guard.outputs.version }}-firefox.zip
+            ${{ env.WORKING_DIRECTORY }}/.output/caramel-extension-${{ needs.guard.outputs.version }}-sources.zip
+          if-no-files-found: error
 
   publish_chrome:
     name: '🚀 Publish to Chrome Web Store'
@@ -305,13 +400,13 @@ jobs:
       - name: Download artifact
         uses: DevinoSolutions/artifact/download@v1
         with:
-          name: extension-package
+          name: extension-chrome
           path: .
 
       - name: Upload to Chrome Web Store (upload-only)
         uses: mnao305/chrome-extension-upload@v5.0.0
         with:
-          file-path: extension.zip
+          file-path: caramel-extension-${{ needs.guard.outputs.version }}-chrome.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
           client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
@@ -328,6 +423,418 @@ jobs:
             echo "Until that happens the store keeps serving the previous version, and the next release's freeze-guard will still compare against the old one."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  publish_firefox:
+    name: '🚀 Publish to Firefox Add-ons (AMO)'
+    needs: [guard, package]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    outputs:
+      # 'true' only when the run actually submitted to AMO. The GitHub Release
+      # body reads this so it never claims a Firefox release that did not happen.
+      submitted: ${{ steps.credentials.outputs.configured }}
+    steps:
+      # THE GATE. `secrets` is not available in a job-level `if:` (only github,
+      # needs, vars and inputs are), so the skip is a first step that publishes
+      # a boolean every later step keys off. The job still ends GREEN when the
+      # secrets are absent — that is the point: an unconfigured Firefox leg must
+      # never redden a Chrome/Safari release — but it is impossible to miss,
+      # because it writes both an annotation and a run-summary block.
+      #
+      # What it deliberately does NOT do: guess, retry, or continue with empty
+      # credentials. Every publishing step below is gated on configured=true.
+      - name: Detect AMO credentials
+        id: credentials
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          RELEASE_VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in AMO_JWT_ISSUER AMO_JWT_SECRET; do
+            # `${!name:-}`, not `${!name}`: indirect expansion of a genuinely
+            # unset variable aborts under `set -u`, which would fail this job —
+            # the exact outcome this step exists to prevent. GitHub does define
+            # a declared env var as an empty string when its secret is missing,
+            # but the whole point here is not to bet the skip path on that.
+            if [ -z "${!name:-}" ]; then
+              missing="${missing:+${missing}, }${name}"
+            fi
+          done
+
+          if [ -z "$missing" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "AMO credentials present — the Firefox submission will run."
+            exit 0
+          fi
+
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Firefox was NOT published to addons.mozilla.org: repository secret(s) ${missing} are unset, so this run cannot authenticate to AMO. Chrome and Safari were unaffected."
+          {
+            echo "### Firefox Add-ons (AMO) — NOT PUBLISHED"
+            echo ""
+            echo "Version \`${RELEASE_VERSION}\` was **not** submitted to addons.mozilla.org."
+            echo ""
+            echo "Why: repository secret(s) **${missing}** are unset, so nothing could authenticate to the AMO API."
+            echo "Firefox users stay on whatever version the listing already serves; Chrome and Safari were unaffected by this."
+            echo ""
+            echo "To activate this job, create both secrets from an AMO API key pair"
+            echo "(<https://addons.mozilla.org/en-US/developers/addon/api/key/>) and re-run the release:"
+            echo ""
+            echo "- \`AMO_JWT_ISSUER\` — the key pair's *JWT issuer*"
+            echo "- \`AMO_JWT_SECRET\` — the key pair's *JWT secret* (shown only once at creation)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Same doctrine as "Assert Chrome Web Store credentials are live": prove
+      # the credentials work BEFORE uploading anything, so a revoked or mistyped
+      # key surfaces here instead of somewhere inside web-ext's upload.
+      #
+      # An AMO API key is a JWT issuer/secret pair, not a bearer token — the API
+      # wants a short-lived HS256 token signed with the secret (AMO caps its
+      # lifetime at 5 minutes; 60s is plenty). accounts/profile is the cheapest
+      # authenticated read there is: it answers 401 both unauthenticated and
+      # with a bad token, so a 200 is real proof the pair is live.
+      - name: Assert AMO credentials are live
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          token=$(python3 - <<'PY'
+          import base64
+          import hashlib
+          import hmac
+          import json
+          import os
+          import secrets
+          import time
+
+
+          def b64(raw):
+              return base64.urlsafe_b64encode(raw).rstrip(b"=")
+
+
+          now = int(time.time())
+          header = b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+          payload = b64(
+              json.dumps(
+                  {
+                      "iss": os.environ["AMO_JWT_ISSUER"],
+                      "jti": secrets.token_hex(16),
+                      "iat": now,
+                      "exp": now + 60,
+                  },
+                  separators=(",", ":"),
+              ).encode()
+          )
+          signing_input = header + b"." + payload
+          signature = b64(hmac.new(os.environ["AMO_JWT_SECRET"].encode(), signing_input, hashlib.sha256).digest())
+          print((signing_input + b"." + signature).decode())
+          PY
+          )
+          # The token is derived from a secret, so it is not masked automatically.
+          echo "::add-mask::${token}"
+
+          http=$(curl -sS -o /tmp/amo-profile.json -w '%{http_code}' \
+            -H "Authorization: JWT ${token}" \
+            "https://addons.mozilla.org/api/v5/accounts/profile/")
+          if [ "$http" != "200" ]; then
+            echo "::error::addons.mozilla.org accounts/profile returned HTTP $http — the AMO API key pair is wrong, revoked or expired."
+            cat /tmp/amo-profile.json
+            exit 1
+          fi
+          echo "AMO credentials verified as $(jq -er '.username' /tmp/amo-profile.json)."
+
+      # FREEZE-GUARD — refuse to ship a version AMO already lists.
+      #
+      # The add-on slug `grabcaramel` is PUBLIC (it is literally the store URL,
+      # https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/), not a
+      # secret, so this read needs no authentication and no extra repository
+      # variable. `current_version.version` is the version AMO currently serves
+      # to installed users; the job fails unless the manifest version is
+      # strictly greater.
+      #
+      # It lives HERE, not in the guard job, on purpose: an AMO-side freeze must
+      # not be able to fail a Chrome/Safari release, and it is meaningless on a
+      # run that is skipping Firefox anyway.
+      #
+      # NOT guaranteed by this guard:
+      #   * A version already submitted and awaiting Mozilla review is invisible
+      #     — the listing keeps reporting the approved one, so two tags pushed
+      #     back to back can both pass (the Chrome guard has the same blind
+      #     spot, for the same reason).
+      #   * Unlisted/self-distributed versions are not represented here at all.
+      #   * A delisted or disabled add-on makes the endpoint 404, which fails
+      #     the job rather than passing an unverifiable release.
+      # Any transport error, unparseable body, missing field or non-numeric
+      # version is a hard failure: this guard never degrades to a pass.
+      - name: AMO publish freeze-guard
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          MANIFEST_VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          curl -sS --fail-with-body -o /tmp/amo-addon.json \
+            -H 'Accept: application/json' \
+            "https://addons.mozilla.org/api/v5/addons/addon/grabcaramel/"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+
+          def fail(message):
+              print(f"::error::{message}")
+              sys.exit(1)
+
+
+          def parse(version, label):
+              parts = version.split(".")
+              if not all(part.isdigit() for part in parts):
+                  fail(f"{label} version {version!r} is not numeric-dotted; cannot compare.")
+              return [int(part) for part in parts]
+
+
+          try:
+              with open("/tmp/amo-addon.json", encoding="utf-8") as handle:
+                  addon = json.load(handle)
+          except (OSError, ValueError) as exc:
+              fail(f"addons.mozilla.org returned an unreadable add-on detail response: {exc}")
+
+          listed = (addon.get("current_version") or {}).get("version")
+          if not listed:
+              fail(
+                  "addons.mozilla.org add-on detail carried no current_version.version. "
+                  "Either the slug is wrong or the listing has no approved version, so "
+                  "the published version cannot be verified."
+              )
+
+          manifest = os.environ["MANIFEST_VERSION"]
+          listed_parts = parse(listed, "listed")
+          manifest_parts = parse(manifest, "manifest")
+          width = max(len(listed_parts), len(manifest_parts))
+          listed_parts += [0] * (width - len(listed_parts))
+          manifest_parts += [0] * (width - len(manifest_parts))
+
+          print(f"AMO currently lists {listed}; manifest is {manifest}")
+          if manifest_parts <= listed_parts:
+              fail(
+                  f"Version {manifest} is not greater than the version "
+                  f"addons.mozilla.org already lists ({listed}). Bump the "
+                  '"version" field in apps/caramel-extension/package.json before tagging.'
+              )
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(f"\nAMO listed version: `{listed}` → submitting `{manifest}`\n")
+          PY
+
+      # Checkout before download-artifact, never after: actions/checkout cleans
+      # the workspace and would delete a downloaded artifact. Nothing is rebuilt
+      # here — the checkout exists so the web-ext version comes from the repo's
+      # own pin instead of a second copy of the number living in this file.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        if: steps.credentials.outputs.configured == 'true'
+
+      - name: Resolve the pinned web-ext version
+        id: webext
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          version=$(jq -er '.devDependencies["web-ext"]' "${WORKING_DIRECTORY}/package.json")
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::web-ext is pinned as '$version' in ${WORKING_DIRECTORY}/package.json — an exact X.Y.Z pin is required (no ranges, no @latest)."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Signing with web-ext@$version (pinned by the extension package)."
+
+      - name: Download Firefox build artifact
+        if: steps.credentials.outputs.configured == 'true'
+        uses: DevinoSolutions/artifact/download@v1
+        with:
+          name: extension-firefox
+          path: firefox-src
+
+      - name: Download Firefox sources artifact
+        if: steps.credentials.outputs.configured == 'true'
+        uses: DevinoSolutions/artifact/download@v1
+        with:
+          name: extension-firefox-zips
+          path: firefox-zips
+
+      - name: Setup Node.js
+        if: steps.credentials.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `--channel=listed` submits the version to the public AMO listing, which
+      # is what the 829 daily users on that listing actually receive.
+      #
+      # `--approval-timeout=0` is load-bearing, not a shortcut: by default
+      # web-ext waits for the version to be APPROVED and then downloads the
+      # signed xpi. Listed submissions go to human review at Mozilla, which
+      # takes hours to days, so the default would time out and paint a
+      # perfectly successful submission red. What is NOT skipped is AMO's
+      # automated validation — web-ext still waits for it and throws (non-zero
+      # exit) when it fails, so a broken package is still a red job.
+      #
+      # `--upload-source-code` satisfies AMO's source-code requirement: the
+      # submitted bundle is generated and minified by WXT, and Mozilla's policy
+      # requires readable source whenever a reviewer cannot read what was
+      # uploaded. `wxt zip -b firefox` emits that archive next to the store zip
+      # precisely for this.
+      #
+      # Credentials go through WEB_EXT_API_KEY/WEB_EXT_API_SECRET (web-ext maps
+      # WEB_EXT_* env vars onto the current command's options) rather than CLI
+      # flags, so they never appear in a process command line.
+      - name: Sign and submit to addons.mozilla.org
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          WEB_EXT_VERSION: ${{ steps.webext.outputs.version }}
+          RELEASE_VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          sources="firefox-zips/caramel-extension-${RELEASE_VERSION}-sources.zip"
+          if [ ! -f "$sources" ]; then
+            echo "::error::Expected $sources from the package job — refusing to submit a generated bundle to AMO without the source archive its reviewers require."
+            exit 1
+          fi
+          npx --yes "web-ext@${WEB_EXT_VERSION}" sign \
+            --source-dir=firefox-src \
+            --artifacts-dir=firefox-artifacts \
+            --upload-source-code="$sources" \
+            --channel=listed \
+            --approval-timeout=0
+
+      - name: Note that the version is queued for Mozilla review
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          {
+            echo "### Firefox Add-ons (AMO)"
+            echo ""
+            echo "Version \`${{ needs.guard.outputs.version }}\` was **submitted** to the \`listed\` channel of <https://addons.mozilla.org/en-US/firefox/addon/grabcaramel/>."
+            echo "No manual upload is needed — but **Mozilla review still gates it**: until the version is approved the listing keeps serving the previous one, and the next release's freeze-guard will still compare against that older version."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish_edge:
+    name: '🚀 Publish to Microsoft Edge Add-ons'
+    needs: [guard, package]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    outputs:
+      # 'true' only when the run actually submitted to Edge. The GitHub Release
+      # body reads this so it never claims an Edge release that did not happen.
+      submitted: ${{ steps.credentials.outputs.configured }}
+    steps:
+      # THE GATE — identical doctrine to publish_firefox. `secrets` cannot be
+      # read in a job-level `if:`, so the skip is a first step that publishes a
+      # boolean every later step keys off. The job ends GREEN when the secrets
+      # are absent — an unconfigured Edge leg must never redden a
+      # Chrome/Firefox/Safari release — but it writes both an annotation and a
+      # run-summary block so it is impossible to miss. It never guesses, retries,
+      # or continues with empty credentials.
+      #
+      # The three secrets come from Partner Center's "Publish API" page
+      # (Create API credentials → Client ID + API key) plus the add-on's Product
+      # ID from its Edge Add-ons dashboard:
+      #   EDGE_PRODUCT_ID  — the add-on Product ID
+      #   EDGE_CLIENT_ID   — the Publish API v1.1 client id
+      #   EDGE_API_KEY     — the Publish API v1.1 key (shown once at creation)
+      # Registering the item once in Partner Center to obtain the Product ID is
+      # the only human step; Edge developer registration and publishing are free.
+      - name: Detect Edge credentials
+        id: credentials
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          RELEASE_VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in EDGE_PRODUCT_ID EDGE_CLIENT_ID EDGE_API_KEY; do
+            # `${!name:-}`, not `${!name}`: indirect expansion of a genuinely
+            # unset variable aborts under `set -u`, which would fail this job —
+            # the exact outcome this gate exists to prevent.
+            if [ -z "${!name:-}" ]; then
+              missing="${missing:+${missing}, }${name}"
+            fi
+          done
+
+          if [ -z "$missing" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Edge credentials present — the Edge submission will run."
+            exit 0
+          fi
+
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Microsoft Edge Add-ons was NOT published: repository secret(s) ${missing} are unset, so this run cannot authenticate to the Edge Publish API. Chrome, Firefox and Safari were unaffected."
+          {
+            echo "### Microsoft Edge Add-ons — NOT PUBLISHED"
+            echo ""
+            echo "Version \`${RELEASE_VERSION}\` was **not** submitted to Microsoft Edge Add-ons."
+            echo ""
+            echo "Why: repository secret(s) **${missing}** are unset, so nothing could authenticate to the Edge Publish API."
+            echo "Edge users stay on whatever the listing already serves (or install the Chrome Web Store build directly); Chrome, Firefox and Safari were unaffected."
+            echo ""
+            echo "To activate this job, register the add-on once in Partner Center, then create these repository secrets and re-run the release:"
+            echo ""
+            echo "- \`EDGE_PRODUCT_ID\` — the add-on Product ID (Partner Center dashboard)"
+            echo "- \`EDGE_CLIENT_ID\` — the Publish API *Client ID* (Partner Center → Publish API → Create API credentials)"
+            echo "- \`EDGE_API_KEY\` — the Publish API *key* (shown only once at creation)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Edge is Chromium: the SAME chrome zip Chrome uploads (the standard
+      # manifest.json, `identity` permission and all) is exactly what Edge wants
+      # — no separate Firefox-style build. So this leg consumes the `package`
+      # job's `extension-chrome` artifact untouched, and Edge's popup OAuth
+      # works through chrome.identity just like Chrome's.
+      - name: Download artifact
+        if: steps.credentials.outputs.configured == 'true'
+        uses: DevinoSolutions/artifact/download@v1
+        with:
+          name: extension-chrome
+          path: .
+
+      # FREEZE-GUARD GAP (deliberate, documented): unlike the Chrome and AMO
+      # legs there is no unauthenticated public read mapping our Product ID to
+      # the version Edge currently serves — the public getproductdetailsbycrxid
+      # endpoint keys off the CRX id, which differs from the submission Product
+      # ID we hold. The Edge Publish API itself rejects re-publishing an
+      # unchanged/older package with a non-zero error, so the action below fails
+      # loudly rather than mis-publishing; a pre-flight "manifest > live" guard
+      # like the other two stores is a TODO once a Product-ID→version read
+      # exists.
+      #
+      # wdzeng/edge-addon is pinned to a full commit SHA (not a moving tag)
+      # because it handles publish credentials. It authenticates with the v1.1
+      # API key + client id, uploads the package, and — upload-only unset —
+      # submits it for Microsoft certification. It exits non-zero on any
+      # auth/upload/publish error, so it never degrades to a silent pass.
+      - name: Publish to Microsoft Edge Add-ons
+        if: steps.credentials.outputs.configured == 'true'
+        uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6 # v2.1.1
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          zip-path: caramel-extension-${{ needs.guard.outputs.version }}-chrome.zip
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+          api-key: ${{ secrets.EDGE_API_KEY }}
+
+      - name: Note that the version is queued for Microsoft certification
+        if: steps.credentials.outputs.configured == 'true'
+        run: |
+          {
+            echo "### Microsoft Edge Add-ons"
+            echo ""
+            echo "Version \`${{ needs.guard.outputs.version }}\` was **submitted** to Microsoft Edge Add-ons."
+            echo "No manual upload is needed — but **Microsoft certification still gates it**: until it passes, the listing keeps serving the previous version."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish_safari:
     name: '🚀 Publish to Apple App Store (Safari & iOS)'
     needs: [guard, package]
@@ -339,6 +846,12 @@ jobs:
       ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       RELEASE_VERSION: ${{ needs.guard.outputs.version }}
+      # The MV3 floor, in one place: read by both archive steps as a build
+      # setting and by the post-archive assertion. See the comment above
+      # "Build & archive (macOS)" for why these numbers and not the
+      # converter's iOS 15.0 / macOS 10.14 defaults.
+      IOS_DEPLOYMENT_FLOOR: '16.4'
+      MACOS_DEPLOYMENT_FLOOR: '13.0'
     timeout-minutes: 30
     defaults:
       run:
@@ -349,13 +862,14 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-      - name: Download artifact
+      # The unpacked Chrome build, restored to the path it had in the package
+      # job — safari-web-extension-converter reads a directory of extension
+      # files, so nothing is unzipped here.
+      - name: Download unpacked Chrome build
         uses: DevinoSolutions/artifact/download@v1
         with:
-          name: extension-package
-          path: ${{ env.WORKING_DIRECTORY }}
-      - name: Unzip extension
-        run: unzip -q extension.zip
+          name: extension-chrome-unpacked
+          path: ${{ env.WORKING_DIRECTORY }}/.output/chrome-mv3
       - name: Install ImageMagick and jq
         run: |
           if ! command -v convert >/dev/null 2>&1; then brew install imagemagick; fi
@@ -367,7 +881,7 @@ jobs:
           cp ${{ github.workspace }}/.github/workflows/scripts/update-safari-icons.sh   /tmp/safari-icon-scripts/
           chmod +x /tmp/safari-icon-scripts/*.sh
       - name: Generate Safari icons
-        run: /tmp/safari-icon-scripts/generate-safari-icons.sh icons/original.png
+        run: /tmp/safari-icon-scripts/generate-safari-icons.sh brand/original.png
       - name: Install App Store Connect API key
         run: |
           echo "${ASC_API_KEY_BASE64}" | base64 --decode > "/tmp/AuthKey_${ASC_KEY_ID}.p8"
@@ -479,7 +993,7 @@ jobs:
 
       - name: Convert to Safari app (macOS & iOS)
         run: |
-          xcrun safari-web-extension-converter dist \
+          xcrun safari-web-extension-converter .output/chrome-mv3 \
             --project-location SafariExtProject \
             --app-name "${{ env.APP_NAME }}" \
             --bundle-identifier "${SAFARI_BUNDLE_ID}" \
@@ -500,6 +1014,16 @@ jobs:
             /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType ${MAC_CATEGORY}" "$plist"
           done
 
+      # MV3 deployment floor. safari-web-extension-converter stamps its own
+      # defaults (iOS 15.0 / macOS 10.14) onto the generated project, and both
+      # are below what this extension can actually run on: MV3 web extensions
+      # need Safari 15.4, and the service-worker background only became usable
+      # at Safari 16.4 (background ES modules, storage.session, the
+      # importScripts fix). macOS 10.14 Mojave tops out at Safari 14.1 and has
+      # no MV3 at all — that default would ship an app whose extension Safari
+      # can never load. Floors below are the 16.4 era: iOS 16.4, and macOS 13.0
+      # (Ventura, which bundles 16.1 and auto-updates past 16.4).
+      # Asserted after archive by "Assert MV3 deployment floor".
       - name: Build & archive (macOS)
         run: |
           xcodebuild archive \
@@ -511,6 +1035,7 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${RELEASE_VERSION}" \
             CURRENT_PROJECT_VERSION="${{ env.MACOS_BUILD_NUM }}" \
+            MACOSX_DEPLOYMENT_TARGET="${MACOS_DEPLOYMENT_FLOOR}" \
             ARCHS="arm64 x86_64" \
             VALID_ARCHS="arm64 x86_64" \
             ONLY_ACTIVE_ARCH=NO \
@@ -532,11 +1057,67 @@ jobs:
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             MARKETING_VERSION="${RELEASE_VERSION}" \
             CURRENT_PROJECT_VERSION="${{ env.IOS_BUILD_NUM }}" \
+            IPHONEOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_FLOOR}" \
             ENABLE_HARDENED_RUNTIME=YES \
             -allowProvisioningUpdates \
             -authenticationKeyPath "/tmp/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "${ASC_KEY_ID}" \
             -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
+
+      # The floor is a build SETTING on the two archive commands above, which is
+      # only worth anything if it actually landed in the shipped bundles — and
+      # the one that matters most is the .appex, since the extension is what
+      # Safari refuses to load below 16.4. Command-line settings apply to every
+      # target in the build, so this reads the archives back and proves it,
+      # rather than trusting that they did. A missing key or a path change that
+      # finds nothing is a failure too: a gate that inspects zero files passes
+      # forever and tells you nothing.
+      - name: Assert MV3 deployment floor
+        run: |
+          set -euo pipefail
+
+          # true when A < B, comparing version components numerically.
+          ver_lt() {
+            awk -v a="$1" -v b="$2" 'BEGIN {
+              split(a, x, "."); split(b, y, ".")
+              for (i = 1; i <= 3; i++) {
+                xi = (x[i] == "" ? 0 : x[i] + 0); yi = (y[i] == "" ? 0 : y[i] + 0)
+                if (xi < yi) exit 0
+                if (xi > yi) exit 1
+              }
+              exit 1
+            }'
+          }
+
+          fail=0
+          checked=0
+          check_archive() {
+            archive="$1"; key="$2"; floor="$3"
+            while IFS= read -r -d '' plist; do
+              value=$(/usr/libexec/PlistBuddy -c "Print :${key}" "$plist" 2>/dev/null || true)
+              [ -n "$value" ] || continue
+              checked=$((checked + 1))
+              bundle=${plist#"${archive}/Products/"}
+              if ver_lt "$value" "$floor"; then
+                echo "::error::${bundle} declares ${key} ${value}, below the MV3 floor ${floor}"
+                fail=1
+              else
+                echo "ok: ${bundle} ${key}=${value} (floor ${floor})"
+              fi
+            done < <(find "${archive}/Products" -name Info.plist -print0)
+          }
+
+          check_archive "SafariExtProject/${{ env.APP_NAME }}-ios.xcarchive" \
+            MinimumOSVersion "${IOS_DEPLOYMENT_FLOOR}"
+          check_archive "SafariExtProject/${{ env.APP_NAME }}-macos.xcarchive" \
+            LSMinimumSystemVersion "${MACOS_DEPLOYMENT_FLOOR}"
+
+          if [ "$checked" -eq 0 ]; then
+            echo "::error::No archived Info.plist declared a deployment target — the floor gate inspected nothing."
+            exit 1
+          fi
+          echo "Checked ${checked} bundle(s) against the MV3 deployment floor."
+          exit "$fail"
 
       - name: Write exportOptions (macOS)
         run: |
@@ -618,17 +1199,32 @@ jobs:
 
   github_release:
     name: '🏷️ Publish GitHub Release'
-    needs: [guard, package, publish_chrome, publish_safari]
+    needs:
+      [
+        guard,
+        package,
+        publish_chrome,
+        publish_firefox,
+        publish_safari,
+        publish_edge,
+      ]
     if: ${{ !inputs.dry_run && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: write
     steps:
-      - name: Download artifact
+      - name: Download Chrome store package
         uses: DevinoSolutions/artifact/download@v1
         with:
-          name: extension-package
+          name: extension-chrome
+          path: .
+
+      # Only the Firefox store zip is attached below; the sources zip in this
+      # artifact is a Mozilla review input, not a release download.
+      - name: Download Firefox store package
+        uses: DevinoSolutions/artifact/download@v1
+        with:
+          name: extension-firefox-zips
           path: .
 
       - name: Create GitHub Release
@@ -636,7 +1232,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Extension ${{ needs.guard.outputs.version }}
-          files: extension.zip
+          files: |
+            caramel-extension-${{ needs.guard.outputs.version }}-chrome.zip
+            caramel-extension-${{ needs.guard.outputs.version }}-firefox.zip
           fail_on_unmatched_files: true
           body: |
             Extension version `${{ needs.guard.outputs.version }}` built from `${{ github.sha }}`.
@@ -645,4 +1243,5 @@ jobs:
 
             - **Chrome Web Store** — uploaded as a draft, manual publish required.
             - **Apple App Store** — uploaded to TestFlight, manual submit required.
-            - **Firefox / AMO** — not automated (see the TODO at the top of `.github/workflows/release-extension.yml`).
+            - **Firefox / AMO** — ${{ needs.publish_firefox.outputs.submitted == 'true' && 'submitted to the listed channel, awaiting Mozilla review.' || 'NOT published — the AMO_JWT_ISSUER / AMO_JWT_SECRET repository secrets are unset (see the run summary and the header of `.github/workflows/release-extension.yml`).' }}
+            - **Microsoft Edge Add-ons** — ${{ needs.publish_edge.outputs.submitted == 'true' && 'submitted to Edge, awaiting Microsoft certification.' || 'NOT published — the EDGE_PRODUCT_ID / EDGE_CLIENT_ID / EDGE_API_KEY repository secrets are unset (see the run summary and the header of `.github/workflows/release-extension.yml`).' }}

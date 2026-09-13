@@ -1,5 +1,12 @@
 //UI HELPERS
 //
+// ES module since the WXT P1 port (2026-08-12). No top-level statement in this
+// file DOES anything — it is all declarations — so there is no `init` export;
+// every surface is built on call. The two `if (typeof X === 'undefined') var X`
+// re-injection guards are gone with the script realm that needed them (a
+// bundled module evaluates once per injection into its own scope, so there is
+// nothing left to redeclare); their state is now plain module-scope `let`.
+//
 // Phase 3: each injected surface is a LIGHT-DOM HOST <div> with the
 // historical id (caramel-small-prompt / caramel-testing-overlay /
 // caramel-final-overlay) on document.body — store-detect.js getElementById
@@ -10,6 +17,20 @@
 // Embedding the CSS as a JS string was rejected: the summed content-script
 // size budget (.size-limit.js) counts JS bytes, not fetched CSS.
 
+import {
+    caramelGetSession,
+    caramelPromptAllowed,
+    currentBrowser,
+    log,
+    logError,
+} from './caramel-base.js'
+import { CARAMEL_ENV } from './caramel-env.js'
+// coupon-runner.js imports showTestingModal/updateTestingModal/hideTestingModal/
+// showFinalModal back from here. The cycle is fine: neither side READS the
+// other's binding during module evaluation, only inside functions.
+import { startApplyingCoupons } from './coupon-runner.js'
+import { caramelCancelRun, caramelCurrencySymbol } from './dom-utils.js'
+
 // Inline SVG close glyph (stroke follows the button's currentColor).
 const CARAMEL_X_ICON =
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>'
@@ -17,6 +38,15 @@ const CARAMEL_X_ICON =
 // Upper bound on the manual copy list. 20 = the per-store limit background.js
 // asks the API for, so in practice this shows everything we fetched.
 const CARAMEL_MANUAL_LIST_MAX = 20
+
+// Guests get the SAME teaser cap here as the popup's coupon list
+// (popup-core.js GUEST_COUPON_LIMIT). Without it the manual fallback quietly
+// hands a signed-out shopper up to 20 codes while the popup shows them 6 —
+// leaking the gated value and skipping the sign-in nudge. Kept as a LITERAL
+// twin on purpose: importing popup-core here would pull the popup's logic
+// module into the content bundle (size + console-silence closure both pin
+// that boundary). Keep in sync with popup-core.js.
+const CARAMEL_MANUAL_GUEST_LIMIT = 6
 
 // Functional-minimum styles used ONLY when the stylesheet fetch fails.
 const CARAMEL_UI_FALLBACK_CSS =
@@ -44,24 +74,24 @@ const CARAMEL_UI_FALLBACK_CSS =
 
 const CARAMEL_OVERLAY_HOST_CSS =
     'display:block !important;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:2147483647;direction:ltr;'
-const CARAMEL_HOST_CSS = {
+export const CARAMEL_HOST_CSS = {
     'caramel-small-prompt':
         'display:block !important;position:fixed;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));z-index:2147483646;width:min(88vw,300px);cursor:pointer;outline:none;direction:ltr;',
     'caramel-testing-overlay': CARAMEL_OVERLAY_HOST_CSS,
     'caramel-final-overlay': CARAMEL_OVERLAY_HOST_CSS,
 }
 
-// Cached across all three surfaces. Guarded `var` (re-injection convention).
-if (typeof _caramelShadowCssPromise === 'undefined') {
-    var _caramelShadowCssPromise = null
-}
+// Cached across all three surfaces. Exported because whether this cache is
+// still held after a race is exactly what tests/content-css-timer.test.mjs
+// pins — it read the pre-ESM script global of the same name.
+export let _caramelShadowCssPromise = null
 /* Every injected surface AWAITS this before appending itself, so a fetch that
  * never settles isn't a missing stylesheet — it's an extension that silently
  * never appears at all. A rejection already falls back loudly; a hang couldn't
  * reach that path. Bounded, and the cached promise is dropped on timeout so a
  * later surface can still get the real CSS. */
 const CARAMEL_UI_CSS_TIMEOUT_MS = 4000
-function _caramelGetShadowCss() {
+export function _caramelGetShadowCss() {
     if (!_caramelShadowCssPromise) {
         const grab = async file => {
             const res = await fetch(currentBrowser.runtime.getURL(file))
@@ -117,7 +147,7 @@ function _caramelGetShadowCss() {
  */
 const CARAMEL_PROMPT_BASE_TOP = 20
 const CARAMEL_PROMPT_MAX_DODGE = 200
-function caramelPromptTopFor(barBottom) {
+export function caramelPromptTopFor(barBottom) {
     const bottom = Number(barBottom)
     if (!Number.isFinite(bottom) || bottom <= CARAMEL_PROMPT_BASE_TOP)
         return CARAMEL_PROMPT_BASE_TOP
@@ -152,7 +182,7 @@ const CARAMEL_BAR_MIN_WIDTH_RATIO = 0.5
 // Measured with the real stylesheets: 81px at 1440, 390 and 360 alike — the
 // copy is fixed English and does not wrap even on the narrowest phone.
 const CARAMEL_PROMPT_HEIGHT = 81
-function _caramelBarQualifies(style, rect, vw, isBanner) {
+export function _caramelBarQualifies(style, rect, vw, isBanner) {
     if (!style || !rect) return false
     const pinned = style.position === 'fixed' || style.position === 'sticky'
     if (!pinned && !isBanner) return false
@@ -181,7 +211,7 @@ function _caramelBarQualifies(style, rect, vw, isBanner) {
  * to it; a store hiding a decorative <header> above its real one yields nothing
  * and falls back to the pinned sweep, which is the conservative direction.
  */
-function _caramelPageBanner() {
+export function _caramelPageBanner() {
     const el = document.querySelector('header, [role="banner"]')
     if (!el) return null
     if (el.parentElement?.closest('article, aside, main, nav, section'))
@@ -210,7 +240,7 @@ function _caramelPageBanner() {
  */
 const CARAMEL_BAR_SCAN_DEPTH = 4
 const CARAMEL_BAR_SCAN_NODES = 400
-function caramelTopBarBottom() {
+export function caramelTopBarBottom() {
     try {
         if (!document.body) return NaN
         const vw = window.innerWidth || 0
@@ -314,9 +344,7 @@ function _caramelRestoreFocus(host) {
 
 // Concurrency guard: the shadow-host await lets two near-simultaneous
 // inserts both pass the getElementById check before either host appends.
-if (typeof _caramelPromptInFlight === 'undefined') {
-    var _caramelPromptInFlight = false
-}
+let _caramelPromptInFlight = false
 
 /* "Not now" — remembered for this tab and origin.
  *
@@ -337,7 +365,7 @@ if (typeof _caramelPromptInFlight === 'undefined') {
  * prompt reaches the page, so the observer needs no separate check.
  */
 const CARAMEL_DISMISSED_KEY = 'caramel_prompt_dismissed'
-function caramelPromptDismissedHere() {
+export function caramelPromptDismissedHere() {
     try {
         return sessionStorage.getItem(CARAMEL_DISMISSED_KEY) === '1'
     } catch {
@@ -346,7 +374,7 @@ function caramelPromptDismissedHere() {
         return false
     }
 }
-function caramelMarkPromptDismissed() {
+export function caramelMarkPromptDismissed() {
     try {
         sessionStorage.setItem(CARAMEL_DISMISSED_KEY, '1')
     } catch {
@@ -354,10 +382,8 @@ function caramelMarkPromptDismissed() {
     }
 }
 
-// Called from store-detect.js — content_scripts share one global scope
-// (manifest order, no ES modules), so per-file analysis misses the call.
-// oxlint-disable-next-line no-unused-vars
-async function insertCaramelPrompt(domainRecord) {
+// Called from store-detect.js.
+export async function insertCaramelPrompt(domainRecord) {
     if (
         document.getElementById('caramel-small-prompt') ||
         _caramelPromptInFlight
@@ -461,9 +487,8 @@ async function insertCaramelPrompt(domainRecord) {
     document.body.appendChild(host)
 }
 
-// Called from coupon-runner.js (cross-file, see insertCaramelPrompt).
-// oxlint-disable-next-line no-unused-vars
-async function showTestingModal(title = '', noLoading = false) {
+// Called from coupon-runner.js.
+export async function showTestingModal(title = '', noLoading = false) {
     const prevFocus = document.activeElement
     const { host, root } = await createCaramelShadowHost(
         'caramel-testing-overlay',
@@ -504,7 +529,16 @@ ${noLoading ? '' : loadingHTML}`
      * that survives the reload or the shopper's ✕ would be undone by the very
      * navigation they were trying to stop. */
     const _cancel = () => {
-        _caramelCancelled = true
+        // CROSS-MODULE WRITE (reviewed and settled, WXT P1 2026-08-12): an ES
+        // module import binding is read-only, so the old bare
+        // `_caramelCancelled = true` cannot survive the port as an assignment.
+        // coupon-runner.js owns the flag and deliberately stores it ON
+        // globalThis (its docblock records why: the cancel-path suites drive
+        // that exact global, and it must survive realm quirks a module-scope
+        // binding wouldn't). Written explicitly here so the seam is visible at
+        // both ends; a setter export was considered and rejected — no invented
+        // API when the existing seam is behavior-identical to what ships.
+        globalThis._caramelCancelled = true
         caramelCancelRun()
         hideTestingModal()
     }
@@ -527,9 +561,8 @@ ${noLoading ? '' : loadingHTML}`
 }
 
 /* Updates the testing modal's status text + progress bar width. */
-// Called from coupon-runner.js (cross-file, see insertCaramelPrompt).
-// oxlint-disable-next-line no-unused-vars
-async function updateTestingModal(currentIndex, total, code) {
+// Called from coupon-runner.js.
+export async function updateTestingModal(currentIndex, total, code) {
     const host = document.getElementById('caramel-testing-overlay')
     const root = host && host.shadowRoot
     if (!root) return
@@ -545,7 +578,8 @@ async function updateTestingModal(currentIndex, total, code) {
         progressBar.style.width = `${progressPercent}%`
     }
 }
-function hideTestingModal() {
+// Called from coupon-runner.js + store-detect.js.
+export function hideTestingModal() {
     const host = document.getElementById('caramel-testing-overlay')
     if (host) {
         if (host.__caramelOnKey)
@@ -557,7 +591,8 @@ function hideTestingModal() {
 
 /* Copies an exact coupon code: async clipboard API first, hidden
  * textarea + execCommand fallback for pages that block it. */
-async function caramelCopyText(text) {
+// Also used by the popup realm's coupon list (React CouponsView).
+export async function caramelCopyText(text) {
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(text)
@@ -603,7 +638,7 @@ function caramelSavingsCurrency() {
  * Drop those rather than invent a replacement claim — the code alone is
  * honest. The extension must stay presentable on bad data; fixing the row
  * upstream is a separate, slower job. */
-function _caramelUsableTitle(title, code) {
+export function _caramelUsableTitle(title, code) {
     if (typeof title !== 'string') return ''
     const t = title.trim()
     if (!t) return ''
@@ -633,10 +668,8 @@ function _caramelUsableTitle(title, code) {
     return t
 }
 
-// Called from coupon-runner.js + store-detect.js (cross-file, see
-// insertCaramelPrompt).
-// oxlint-disable-next-line no-unused-vars
-async function showFinalModal(
+// Called from coupon-runner.js + store-detect.js.
+export async function showFinalModal(
     savingsAmount,
     code,
     message,
@@ -644,6 +677,10 @@ async function showFinalModal(
     couponList = [],
 ) {
     hideTestingModal()
+    // Login state drives the manual-list teaser cap below — same gate as the
+    // popup's coupon list. Signed-out ⇒ 6-code teaser + sign-in nudge.
+    const _session = await caramelGetSession()
+    const loggedIn = !!_session?.token
     const prevFocus = document.activeElement
     const { host, root } = await createCaramelShadowHost(
         'caramel-final-overlay',
@@ -674,7 +711,7 @@ async function showFinalModal(
     // sometimes just our synthetic input not registering, so hiding them could
     // bury a code that works when pasted by hand — but leading with the codes
     // the user just watched fail reads as if we learned nothing.
-    const manualCodes = (
+    const _manualAll = (
         !isSuccess && Array.isArray(couponList) ? couponList : []
     )
         .filter(c => c && c.code)
@@ -684,10 +721,18 @@ async function showFinalModal(
                 (a.c.rejected ? 1 : 0) - (b.c.rejected ? 1 : 0) || a.i - b.i,
         )
         .map(x => x.c)
-        // Matches the API's own per-store fetch limit, so the list shows every
-        // code we have rather than a second, tighter cap on top of the
-        // attempt cap. The list scrolls; hiding codes helps nobody.
-        .slice(0, CARAMEL_MANUAL_LIST_MAX)
+    // The catalog count for this store — the number the sign-in nudge promises,
+    // matching the popup's "of N codes" gate.
+    const manualTotal = _manualAll.length
+    // Members see the full list (API's own per-store fetch limit); guests see
+    // the same teaser the popup shows. The gate only bites when it actually
+    // hides something (a store with ≤ the guest cap looks identical to both).
+    const manualGuestGated =
+        !loggedIn && manualTotal > CARAMEL_MANUAL_GUEST_LIMIT
+    const manualCodes = _manualAll.slice(
+        0,
+        manualGuestGated ? CARAMEL_MANUAL_GUEST_LIMIT : CARAMEL_MANUAL_LIST_MAX,
+    )
     const hasManual = manualCodes.length > 0
 
     const esc = s =>
@@ -769,6 +814,21 @@ ${
               .join('')}</div>`
         : ''
 
+    // Guest teaser gate — same shape as the popup's couponGuestGateHtml: name
+    // what's hidden, offer the one action that reveals it (opens the popup to
+    // sign in, mirroring the isSignIn primary button below).
+    const manualGateHtml = manualGuestGated
+        ? `<div class="caramel-manual-gate">
+<button type="button" id="caramel-manual-login" class="caramel-manual-gate-btn">Sign in for all ${manualTotal} codes</button>
+</div>`
+        : ''
+
+    // Graceful escape hatch when auto-apply didn't land: a quiet link to the
+    // prod support/feedback form so a shopper can report a broken store or code.
+    const feedbackHtml = hasManual
+        ? `<a id="caramel-manual-feedback" class="caramel-manual-feedback" href="${esc(CARAMEL_ENV.baseUrl)}/support" target="_blank" rel="noopener noreferrer">Report a problem</a>`
+        : ''
+
     // Success states group the outcome into ONE panel so the amount reads as
     // the headline and the code sits under it as a ticket. `.caramel-final-code`
     // keeps the code as its FIRST <span> — the label is a sibling, never a span
@@ -799,9 +859,12 @@ ${savedMoney ? '' : `<p class="caramel-final-hint">Discount visible in your cart
         ? 'Sign In'
         : isSuccess
           ? 'Proceed to Checkout'
-          : hasManual
-            ? 'Done'
-            : 'Got it'
+          : 'Got it'
+    // The manual "Grab a code" card carries its own actions (copy buttons, the
+    // unlock nudge, the report link) and three ways out (×, scrim, Esc) — a
+    // generic "Done" button under all that is just clutter, so drop it. Sign-in
+    // and success states still need their promise-button.
+    const showPrimary = isSignIn || isSuccess || !hasManual
 
     modal.innerHTML = `
 <button id="caramel-final-close" class="cm-close-fab" title="Close" aria-label="Close">${CARAMEL_X_ICON}</button>
@@ -809,8 +872,10 @@ ${savedMoney ? '' : `<p class="caramel-final-hint">Discount visible in your cart
 <h2>${heading}</h2>
 <p class="caramel-final-msg">${esc(finalMessage)}</p>
 ${manualBlock}
+${manualGateHtml}
+${feedbackHtml}
 ${winBlock}
-<button id="caramel-final-ok-btn">${primaryLabel}</button>
+${showPrimary ? `<button id="caramel-final-ok-btn">${primaryLabel}</button>` : ''}
 `
 
     scrim.appendChild(modal)
@@ -859,6 +924,15 @@ ${winBlock}
     scrim.addEventListener('click', ev => {
         if (ev.target === scrim) closeFinal()
     })
+
+    // Guest teaser gate: same destination as the isSignIn button — open the
+    // popup so the shopper signs in, then the full list is theirs.
+    const manualLoginBtn = modal.querySelector('#caramel-manual-login')
+    if (manualLoginBtn)
+        manualLoginBtn.addEventListener('click', () => {
+            closeFinal()
+            currentBrowser.runtime.sendMessage({ action: 'openPopup' })
+        })
 
     // Close on the primary button; Esc closes too (keyboard).
     const okBtn = modal.querySelector('#caramel-final-ok-btn')

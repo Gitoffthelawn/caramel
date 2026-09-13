@@ -1,5 +1,7 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { loadExtensionSources } from './_load.mjs'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { initCaramelBase } from '../caramel-base.js'
+import { removeAppliedCoupon } from '../coupon-apply.js'
+import { startApplyingCoupons } from '../coupon-runner.js'
 
 // A cart that ALREADY has a discount on it is the most expensive thing this
 // flow can get wrong, and the DOM path got it wrong twice over.
@@ -15,10 +17,53 @@ import { loadExtensionSources } from './_load.mjs'
 //    real carts (goodr -$8.00, 1thrive -$20.00); this is the same honesty for
 //    the path that drives the form.
 
-let startApplyingCoupons
-let removeAppliedCoupon
+// Collaborators the old suite replaced by assigning over a global are replaced
+// through module mocks now; a factory forwards to a per-test slot so a
+// beforeEach still reads as one assignment. removeAppliedCoupon is deliberately
+// NOT among them — the cleanup path it drives is what this file pins.
+const stubs = vi.hoisted(() => ({
+    applyCoupon: null,
+    getCoupons: null,
+    finalModalCalls: [],
+}))
+
+vi.mock('../caramel-base.js', async importOriginal => {
+    const actual = await importOriginal()
+    return {
+        ...actual,
+        // Assigned by initCaramelBase(); a spread would freeze it at undefined.
+        get currentBrowser() {
+            return actual.currentBrowser
+        },
+        // The cleanup path waits ~600ms after each click for the cart to settle,
+        // and the loop pauses between codes — see the note in beforeEach.
+        sleep: async () => {},
+        caramelRecordSaving: () => {},
+    }
+})
+vi.mock('../coupon-apply.js', async importOriginal => ({
+    ...(await importOriginal()),
+    applyCoupon: (...args) => stubs.applyCoupon(...args),
+    probeCartJson: async () => null, // non-Shopify: DOM path
+    _getTriedCodes: () => ({}),
+    _markTriedCode: () => {},
+    _unmarkTriedCode: () => {},
+}))
+vi.mock('../coupon-fetch.js', async importOriginal => ({
+    ...(await importOriginal()),
+    getCoupons: (...args) => stubs.getCoupons(...args),
+}))
+vi.mock('../UI-helpers.js', async importOriginal => ({
+    ...(await importOriginal()),
+    showTestingModal: async () => {},
+    updateTestingModal: async () => {},
+    hideTestingModal: () => {},
+    showFinalModal: (...args) => stubs.finalModalCalls.push(args),
+}))
+
 let finalModalCalls
 let removedRows
+let reportedOutcomes
 
 const REC = {
     domain: 'example.com',
@@ -51,21 +96,32 @@ function addAppliedRow(code) {
     return row
 }
 
+/** jsdom implements no layout, so nothing reports itself visible. */
+function alwaysVisible() {
+    return true
+}
+
 beforeAll(() => {
-    loadExtensionSources(
-        [
-            'coupon-constants.generated.js',
-            'caramel-base.js',
-            'dom-utils.js',
-            'store-detect.js',
-            'coupon-apply.js',
-            'coupon-fetch.js',
-            'coupon-runner.js',
-        ],
-        ['startApplyingCoupons'],
-    )
-    startApplyingCoupons = globalThis.startApplyingCoupons
-    removeAppliedCoupon = globalThis.removeAppliedCoupon
+    // reportOutcome() lives in coupon-runner.js and is called from inside
+    // coupon-runner.js, so no module mock can stand in front of it. What it
+    // DOES is send one runtime message — so the message is what gets recorded,
+    // and "no verdict was sent" is pinned as "no message was sent".
+    globalThis.chrome = {
+        runtime: {
+            sendMessage: msg => {
+                if (msg?.action !== 'reportOutcome') return
+                reportedOutcomes.push({
+                    id: msg.id,
+                    outcome: msg.outcome,
+                    storeReason: msg.storeReason,
+                })
+            },
+        },
+    }
+    initCaramelBase()
+    // jsdom has no layout, so the real _isVisible fails closed on every element.
+    const { Element } = globalThis.window ?? globalThis
+    Element.prototype.checkVisibility = alwaysVisible
 })
 
 beforeEach(() => {
@@ -73,33 +129,17 @@ beforeEach(() => {
         '<input id="promo" /><button id="apply">Apply</button><div id="total"></div>'
     setTotalText('Order Total $80.00')
     removedRows = []
-    finalModalCalls = []
+    finalModalCalls = stubs.finalModalCalls = []
+    reportedOutcomes = []
     globalThis._caramelCancelled = false
-    // The cleanup path waits ~600ms after each click for the cart to settle,
-    // and the loop pauses between codes. Under a full-suite run that real time
-    // is enough to trip the default per-test timeout, and none of it is what
-    // these tests are about — which button gets clicked is.
-    globalThis.sleep = async () => {}
 
-    globalThis.getCoupons = async () => [
+    stubs.getCoupons = async () => [
         { code: 'TRYME', id: 'c1' },
         { code: 'ORME', id: 'c2' },
     ]
-    globalThis._getTriedCodes = () => ({})
-    globalThis._markTriedCode = () => {}
-    globalThis._unmarkTriedCode = () => {}
-    globalThis.probeCartJson = async () => null // non-Shopify: DOM path
-    globalThis._isVisible = el => !!el // jsdom has no layout
-    globalThis.waitUntilReady = async () => {}
-    globalThis.showTestingModal = async () => {}
-    globalThis.updateTestingModal = async () => {}
-    globalThis.hideTestingModal = () => {}
-    globalThis.reportOutcome = () => {}
-    globalThis.caramelRecordSaving = () => {}
-    globalThis.showFinalModal = (...args) => finalModalCalls.push(args)
     // Every code "commits" a row and then errors — the exact state that
     // triggers cleanup.
-    globalThis.applyCoupon = async code => {
+    stubs.applyCoupon = async code => {
         addAppliedRow(code)
         return {
             success: false,
@@ -128,7 +168,7 @@ describe('cleanup never removes a discount we did not add', () => {
         // the code (some checkouts render a generic "Discount" line). Removing
         // the only identifiable row would take theirs.
         addAppliedRow('SHOPPER50')
-        globalThis.applyCoupon = async () => ({
+        stubs.applyCoupon = async () => ({
             success: false,
             newTotal: 80,
             committed: true,
@@ -202,7 +242,7 @@ describe('an already-discounted cart is not reported as a failure', () => {
     })
 
     it('says nothing about a pre-existing discount on a clean cart', async () => {
-        globalThis.applyCoupon = async () => ({
+        stubs.applyCoupon = async () => ({
             success: false,
             newTotal: 80,
             committed: false,
@@ -214,5 +254,99 @@ describe('an already-discounted cart is not reported as a failure', () => {
         expect(finalModalCalls[0][2] ?? '').not.toMatch(
             /already has a discount/i,
         )
+    })
+})
+
+// The modal told this shopper the truth; the BACKEND was told a lie. Same run,
+// same rejection text, two different audiences — and only one of them was
+// fixed. A store that refuses a second code ("cannot be combined with the
+// discount already applied") produces error text with no rejection vocabulary
+// in it, which coupon-apply.js hands back verbatim, and the no-win path spent
+// it as a 'failed' verdict on a coupon that is in perfect health. That verdict
+// outlives the session and follows the code to every future shopper.
+describe('a rejection caused by the shopper’s own discount is not a coupon verdict', () => {
+    it('sends no failure verdict when the cart already carried a discount', async () => {
+        addAppliedRow('SHOPPER50')
+
+        await startApplyingCoupons(REC)
+
+        // The run still ends with no win, and the shopper still sees why.
+        expect(finalModalCalls[0][2]).toMatch(/already has a discount/i)
+        expect(reportedOutcomes).toEqual([])
+    })
+
+    it("withholds it even when the store's words sound like a code problem", async () => {
+        // The exact trap: wording that reads as a verdict on the code, on a
+        // cart where it cannot be one. There is no neutral outcome to send in
+        // its place — the endpoint takes 'worked' or 'failed' and nothing else
+        // — so the honest report is no report.
+        addAppliedRow('SHOPPER50')
+        stubs.applyCoupon = async () => ({
+            success: false,
+            newTotal: 80,
+            committed: true,
+            errorMsg:
+                'This code cannot be combined with the discount already applied',
+            errorIsNew: true,
+        })
+
+        await startApplyingCoupons(REC)
+
+        expect(reportedOutcomes).toEqual([])
+    })
+
+    it('still reports the failure when the cart arrived clean', async () => {
+        // Guards the guard. The suppression is scoped to the one situation
+        // that makes the evidence unattributable; everywhere else the trust
+        // loop must keep learning, or the fix costs more signal than the bug.
+        await startApplyingCoupons(REC)
+
+        expect(reportedOutcomes).toEqual([
+            {
+                id: 'c2', // the last code to produce real rejection text
+                outcome: 'failed',
+                storeReason: 'Not valid for these items',
+            },
+        ])
+    })
+})
+
+// The other half of the same cart: our code went in, the store took it, and
+// the total never moved — which on an already-discounted cart is what "they
+// won't combine" looks like from the winning side. This branch knew about the
+// live discount (it had the same snapshot) and still hedged at the shopper
+// with "a discount you already have", then sent them off to paste codes
+// without the warning its sibling treats as mandatory.
+describe('a code that changed nothing on a discounted cart says so plainly', () => {
+    beforeEach(() => {
+        // Accepted, committed, total identical → the zero-effect branch.
+        stubs.applyCoupon = async code => {
+            addAppliedRow(code)
+            return { success: true, newTotal: 80, committed: true }
+        }
+    })
+
+    it('names the live discount and warns what pasting another costs', async () => {
+        addAppliedRow('SHOPPER50')
+
+        await startApplyingCoupons(REC)
+
+        const message = finalModalCalls[0][2] ?? ''
+        expect(message).toMatch(/already has a discount/i)
+        expect(message).toMatch(/may replace/i)
+        // The guess is gone: we can SEE the discount, so we stop offering a
+        // minimum spend as the likely explanation.
+        expect(message).not.toMatch(/minimum spend/i)
+        // The codes are still handed over — a shopper may want to swap.
+        expect(finalModalCalls[0][4]?.length).toBeGreaterThan(0)
+    })
+
+    it('keeps the original hedge when no discount was on the cart', async () => {
+        await startApplyingCoupons(REC)
+
+        const message = finalModalCalls[0][2] ?? ''
+        expect(message).toMatch(/minimum spend/i)
+        expect(message).not.toMatch(/may replace/i)
+        expect(message).not.toMatch(/already has a discount/i)
     })
 })

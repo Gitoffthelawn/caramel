@@ -1,51 +1,93 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-    backStorageArea,
-    loadExtensionSource,
-    loadExtensionSources,
-} from './_load.mjs'
+import { initCaramelBase } from '../caramel-base.js'
+import { initCouponConstants } from '../coupon-constants.generated.js'
+import { initCouponRunner } from '../coupon-runner.js'
+import { runSocialSignIn } from '../popup-core.js'
 
-// The OAuth SUCCESS path — everything the extension does once the provider
-// hands back a callback URL. Until now this was the only auth path with no
-// coverage at all, because proving it live requires signing into a real
-// Google account (the QA rule forbids it, and the account password is
-// deliberately not stored anywhere).
-//
-// So the live leg and this suite split the work honestly:
-//   * live (needs a human): the provider window itself, and whether the
-//     BACKEND can exchange the code for a session.
-//   * here (deterministic): that the extension sends the right exchange
-//     request, and that a successful exchange lands the session in storage
-//     rather than being dropped on the floor.
-// The seam is launchWebAuthFlow's resolved callback URL, which is exactly
-// what Chrome hands back — so this stubs the provider, not our own code.
-let renderSignInPrompt
-let syncData
+// Pins the popup OAuth SUCCESS path (P2-ported 2026-08-13 to runSocialSignIn
+// — the wire flow extracted from the vanilla handleSocialSignIn): the
+// provider code is exchanged with the state and redirectUri the backend needs
+// to verify it, the returned session is persisted, a provider error means no
+// exchange and no session, and the backend's own refusal reasons reach the
+// user verbatim through ui.onError. Apple's half is pinned separately below —
+// its server leg is genuinely different (form_post hop, JWT identity, no
+// avatar ever) and had NO success-path coverage before P0.
+
 let lastExchange
+let syncData
+
+/* Realm stub, lifted from tests/_load.mjs (installChromeStub), which the ESM
+ * port retires. Permissive Proxy: any unknown property materializes as a
+ * callable no-op, so a source file touching an API this suite doesn't care
+ * about cannot abort it. Two deliberate exceptions, exactly as _load.mjs had
+ * them — storage.*.get/set/remove invoke their callbacks like the real API
+ * (empty storage), and runtime.lastError stays UNDEFINED outside a failing
+ * callback, because the proxy would otherwise auto-create a truthy callable
+ * that caramelSendMessage reads as a closed port. */
+function installChromeStub() {
+    const cache = new WeakMap()
+    const wrap = target => {
+        if (cache.has(target)) return cache.get(target)
+        const proxy = new Proxy(target, {
+            get(obj, prop) {
+                if (prop === 'then' || typeof prop === 'symbol')
+                    return undefined
+                if (!(prop in obj)) obj[prop] = wrap(function () {})
+                return obj[prop]
+            },
+            apply: () => undefined,
+        })
+        cache.set(target, proxy)
+        return proxy
+    }
+    const stub = wrap(function chromeStubRoot() {})
+    for (const area of ['sync', 'local', 'session']) {
+        stub.storage[area].get = (_keys, cb) => {
+            if (typeof cb === 'function') cb({})
+        }
+        stub.storage[area].set = (_items, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+        stub.storage[area].remove = (_keys, cb) => {
+            if (typeof cb === 'function') cb()
+        }
+    }
+    stub.runtime.lastError = undefined
+    globalThis.chrome = stub
+    globalThis.browser = undefined
+    window.chrome = stub
+    window.browser = undefined
+    return stub
+}
+
+/** Backs one storage area with a real object, so a test can assert on what the
+ * code actually stored instead of on which API it called (lifted from
+ * tests/_load.mjs). Pass the SAME object for 'local' and 'sync' when a test
+ * wants one merged view of storage. */
+function backStorageArea(area, data = {}) {
+    const store = (globalThis.currentBrowser ?? globalThis.chrome).storage[area]
+    store.get = (_keys, cb) => {
+        if (typeof cb === 'function') cb({ ...data })
+    }
+    store.set = (items, cb) => {
+        Object.assign(data, items)
+        if (typeof cb === 'function') cb()
+    }
+    store.remove = (keys, cb) => {
+        for (const key of [].concat(keys)) delete data[key]
+        if (typeof cb === 'function') cb()
+    }
+    return data
+}
 
 beforeAll(() => {
-    document.body.innerHTML =
-        '<div id="loading-container"></div>' +
-        '<button id="settingsIcon" style="display:none"></button>' +
-        '<div id="auth-container"></div>'
+    installChromeStub()
+    initCouponConstants()
+    initCaramelBase()
+    initCouponRunner()
 
-    loadExtensionSource('coupon-constants.generated.js', [])
-    loadExtensionSources(
-        [
-            'caramel-base.js',
-            'dom-utils.js',
-            'store-detect.js',
-            'coupon-apply.js',
-            'coupon-fetch.js',
-            'coupon-runner.js',
-        ],
-        [],
-    )
     globalThis.currentBrowser.tabs.create = () => {}
     window.close = vi.fn()
-    ;({ renderSignInPrompt } = loadExtensionSource('popup.js', [
-        'renderSignInPrompt',
-    ]))
 })
 
 const withIdentity = callbackUrl => {
@@ -79,14 +121,24 @@ const stubBackend = (exchange = { ok: true, body: {} }) => {
     }
 }
 
-const clickProvider = async id => {
-    document.getElementById(id).click()
-    for (let i = 0; i < 8; i++) await new Promise(r => setTimeout(r, 20))
+/** Recording ui half — what the React SignInView hands runSocialSignIn. */
+const makeUi = () => {
+    const rec = { errors: [] }
+    return {
+        rec,
+        onPending: () => {},
+        onError: message => {
+            rec.errors.push(message)
+        },
+    }
 }
-const clickGoogle = () => clickProvider('googleSignInBtn')
-const clickApple = () => clickProvider('appleSignInBtn')
 
-beforeEach(async () => {
+const signIn = async (provider, ui = makeUi()) => {
+    await runSocialSignIn(provider, ui)
+    return ui
+}
+
+beforeEach(() => {
     lastExchange = null
     // The session is written to storage.LOCAL now, and the write also sweeps
     // the same keys out of sync to retire any pre-migration roaming copy. The
@@ -95,7 +147,6 @@ beforeEach(async () => {
     syncData = {}
     backStorageArea('local', syncData)
     backStorageArea('sync', {})
-    await renderSignInPrompt()
 })
 
 describe('popup OAuth — the success path', () => {
@@ -108,7 +159,7 @@ describe('popup OAuth — the success path', () => {
             body: { token: 'sess-token', username: 'aladdin', image: null },
         })
 
-        await clickGoogle()
+        await signIn('google')
 
         expect(lastExchange, 'the exchange request was made').not.toBeNull()
         expect(lastExchange.method).toBe('POST')
@@ -130,7 +181,7 @@ describe('popup OAuth — the success path', () => {
             body: { token: 'sess-token', username: 'aladdin', image: null },
         })
 
-        await clickGoogle()
+        await signIn('google')
 
         expect(syncData.token).toBe('sess-token')
         expect(syncData.user).toEqual({ username: 'aladdin', image: null })
@@ -142,13 +193,11 @@ describe('popup OAuth — the success path', () => {
         )
         stubBackend()
 
-        await clickGoogle()
+        const ui = await signIn('google')
 
         expect(lastExchange, 'no code means no exchange attempt').toBeNull()
         expect(syncData.token).toBeUndefined()
-        expect(
-            document.getElementById('loginErrorMessage').textContent,
-        ).toMatch(/access_denied/)
+        expect(ui.rec.errors[0]).toMatch(/access_denied/)
     })
 
     // Apple had NO success-path coverage at all — only cancel and the website
@@ -168,7 +217,7 @@ describe('popup OAuth — the success path', () => {
             },
         })
 
-        await clickApple()
+        await signIn('apple')
 
         expect(lastExchange, 'the exchange request was made').not.toBeNull()
         expect(lastExchange.body).toMatchObject({
@@ -193,7 +242,7 @@ describe('popup OAuth — the success path', () => {
             },
         })
 
-        await clickApple()
+        await signIn('apple')
 
         expect(syncData.token).toBe('apple-token')
         expect(syncData.user).toEqual({
@@ -214,23 +263,19 @@ describe('popup OAuth — the success path', () => {
             },
         })
 
-        await clickApple()
+        const ui = await signIn('apple')
 
         expect(syncData.token).toBeUndefined()
-        expect(
-            document.getElementById('loginErrorMessage').textContent,
-        ).toMatch(/not verified/i)
+        expect(ui.rec.errors[0]).toMatch(/not verified/i)
     })
 
     it("surfaces the backend's own reason when the exchange is rejected, and stays signed out", async () => {
         withIdentity('https://ext-id.chromiumapp.org/?code=C&state=S')
         stubBackend({ ok: false, body: { error: 'Invalid OAuth state' } })
 
-        await clickGoogle()
+        const ui = await signIn('google')
 
         expect(syncData.token).toBeUndefined()
-        expect(
-            document.getElementById('loginErrorMessage').textContent,
-        ).toMatch(/Invalid OAuth state/)
+        expect(ui.rec.errors[0]).toMatch(/Invalid OAuth state/)
     })
 })

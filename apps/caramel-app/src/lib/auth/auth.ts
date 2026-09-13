@@ -1,9 +1,11 @@
+import ResetPasswordTemplate from '@/emails/ResetPasswordTemplate'
 import VerificationRequestTemplate from '@/emails/VerificationRequestTemplate'
 import { sendEmail } from '@/lib/email'
 import { env } from '@/lib/env'
 import { BASE_URL, clientEnv } from '@/lib/env.client'
 import prisma from '@/lib/prisma'
 import { render } from '@react-email/render'
+import * as Sentry from '@sentry/nextjs'
 import bcrypt from 'bcryptjs'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
@@ -36,6 +38,34 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         requireEmailVerification: true,
+        // Until this landed there was NO password recovery at all: no
+        // sendResetPassword here, no /forgot-password route, and no client
+        // call to forgetPassword — so an email+password user who forgot their
+        // password was permanently locked out of their account with no
+        // self-serve way back in and no support flow to hand them.
+        //
+        // The send failure is handled exactly like the verification email
+        // above, and for the same reason: Better Auth swallows what this
+        // callback throws, so a broken mailer would otherwise look like a
+        // successful request to both the shopper and to us.
+        sendResetPassword: async ({ user, url }) => {
+            try {
+                const html = await render(ResetPasswordTemplate({ url }))
+                await sendEmail({
+                    to: user.email,
+                    subject: 'Reset your Caramel password',
+                    html,
+                })
+            } catch (error) {
+                console.error('reset password email send failed:', error)
+                Sentry.captureException(error, {
+                    tags: { surface: 'auth-reset-password-email' },
+                    extra: { userEmail: user.email },
+                })
+                await Sentry.flush(2000)
+                throw error
+            }
+        },
         password: {
             hash: async (password: string) => bcrypt.hash(password, saltRounds),
             verify: async ({
@@ -51,12 +81,29 @@ export const auth = betterAuth({
         sendOnSignUp: true,
         autoSignInAfterVerification: true,
         sendVerificationEmail: async ({ user, url }) => {
-            const html = await render(VerificationRequestTemplate({ url }))
-            await sendEmail({
-                to: user.email,
-                subject: 'Verify your email for Caramel',
-                html,
-            })
+            // Better Auth swallows errors thrown here (signup still returns
+            // 200), which during the 2026-08-08 prod cutover hid a completely
+            // broken verification-email path for hours. The send can stay
+            // non-blocking for the shopper, but the failure itself must be
+            // LOUD: report to Sentry with enough context to act on, then
+            // rethrow so any future Better Auth version that does surface it
+            // still sees the real error.
+            try {
+                const html = await render(VerificationRequestTemplate({ url }))
+                await sendEmail({
+                    to: user.email,
+                    subject: 'Verify your email for Caramel',
+                    html,
+                })
+            } catch (error) {
+                console.error('verification email send failed:', error)
+                Sentry.captureException(error, {
+                    tags: { surface: 'auth-verification-email' },
+                    extra: { userEmail: user.email },
+                })
+                await Sentry.flush(2000)
+                throw error
+            }
         },
         callbackOnError: '/verify?error=token_expired',
     },

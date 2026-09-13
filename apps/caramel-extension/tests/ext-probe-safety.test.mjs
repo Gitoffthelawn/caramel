@@ -21,9 +21,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+    detectPlatformInPage,
     MAX_REJECTED_ADDS,
     readCartStateInPage,
+    seedBigCommerceCartInPage,
     seedShopifyCartInPage,
+    seedWooCommerceCartInPage,
 } from '../../../tools/ext-probe/seed.mjs'
 
 const TOOL_DIR = join(
@@ -44,6 +47,21 @@ const probeCode = probeSource
     .split('\n')
     .map(l => l.replace(/(^|[^:])\/\/.*$/, '$1'))
     .join('\n')
+
+describe('the comment-stripped view still contains the code', () => {
+    it('keeps most of the source, so the bans below are not testing an empty string', () => {
+        // The stripper opens a block comment at any `/*`, including one that
+        // occurs INSIDE a line comment — writing the literal match pattern
+        // `https:` + `//*` + `/*` in a prose comment once swallowed 25K of the
+        // 34K file, and every source assertion in this suite silently passed
+        // against the remains. A hollow view is a suite that tests nothing.
+        expect(probeCode.length).toBeGreaterThan(probeSource.length * 0.6)
+        // Spot-check both ends: truncation from a runaway open-comment shows up
+        // as a missing tail long before the ratio does.
+        expect(probeCode).toContain('async function main()')
+        expect(probeCode).toContain('process.exit(code)')
+    })
+})
 
 const originalFetch = globalThis.fetch
 afterEach(() => {
@@ -161,7 +179,7 @@ describe('the seed stops before it can rate-limit a store', () => {
 describe('the cart is read before the wait window', () => {
     it('the cart read appears earlier in probe.mjs than the wait deadline', () => {
         const cartRead = probeSource.indexOf(
-            'page.evaluate(readCartStateInPage)',
+            'page.evaluate(readCartStateInPage, platform)',
         )
         const waitLoop = probeSource.indexOf(
             'const deadline = Date.now() + waitMs',
@@ -201,14 +219,16 @@ describe('the cart is read before the wait window', () => {
             status: 200,
             json: async () => ({ item_count: 3 }),
         })
-        await expect(readCartStateInPage()).resolves.toEqual({
+        await expect(readCartStateInPage('shopify')).resolves.toEqual({
+            cartApiOk: true,
             cartJsOk: true,
             itemCount: 3,
             detail: '',
         })
 
         globalThis.fetch = async () => ({ ok: false, status: 404 })
-        await expect(readCartStateInPage()).resolves.toEqual({
+        await expect(readCartStateInPage('shopify')).resolves.toEqual({
+            cartApiOk: false,
             cartJsOk: false,
             itemCount: null,
             detail: 'cart.js 404',
@@ -217,8 +237,8 @@ describe('the cart is read before the wait window', () => {
         globalThis.fetch = async () => {
             throw new Error('network down')
         }
-        const thrown = await readCartStateInPage()
-        expect(thrown.cartJsOk).toBe(false)
+        const thrown = await readCartStateInPage('shopify')
+        expect(thrown.cartApiOk).toBe(false)
         expect(thrown.itemCount).toBeNull()
     })
 })
@@ -237,6 +257,31 @@ describe('the probe is platform-portable', () => {
             expect(probeSource).toContain(knob)
     })
 
+    it('persists the report beside the log, whatever the caller does with stdout', () => {
+        // `observation.config.served` — the served config, the exact datum a
+        // staleness diagnosis needs — existed only on stdout and was discarded
+        // by every caller that did not ask for it. A diagnosis a week later
+        // cannot ask a pipe what it saw.
+        expect(probeCode).toMatch(
+            /const reportFile = join\(\s*outDir,\s*`ext-probe-\$\{tag\}-\$\{width\}\.json`/,
+        )
+        expect(probeCode).toContain('writeFileSync(reportFile, json,')
+        // Unconditional: not inside the `if (flags.out)` branch that decides
+        // where the caller's copy goes.
+        const persist = probeCode.indexOf('writeFileSync(reportFile, json,')
+        const stdoutBranch = probeCode.indexOf('if (flags.out)')
+        expect(persist).toBeGreaterThan(-1)
+        expect(persist).toBeLessThan(stdoutBranch)
+    })
+
+    it('takes the FRESHEST service worker, as its own comment has always claimed', () => {
+        // `[0]` is the oldest handle. After a worker restart every storage
+        // read went to the dead one the timeout exists to survive, and the
+        // witness came back empty.
+        expect(probeCode).toContain('ctx.serviceWorkers().at(-1)')
+        expect(probeCode).not.toContain('ctx.serviceWorkers()[0]')
+    })
+
     it('sends the report to stdout and every word of prose to stderr', () => {
         expect(probeCode).toContain('process.stdout.write')
         expect(probeCode).toMatch(/const note = \([^)]*\) =>\s*console\.error/)
@@ -247,19 +292,26 @@ describe('the probe is platform-portable', () => {
 
 describe('the page functions stay serialisable', () => {
     it.each([
+        ['detectPlatformInPage', detectPlatformInPage],
         ['seedShopifyCartInPage', seedShopifyCartInPage],
+        ['seedWooCommerceCartInPage', seedWooCommerceCartInPage],
+        ['seedBigCommerceCartInPage', seedBigCommerceCartInPage],
         ['readCartStateInPage', readCartStateInPage],
     ])('%s closes over nothing from module scope', (name, fn) => {
         // Playwright serialises a function by its source text, so anything
         // captured from this module would arrive `undefined` in the page. The
         // same property is what lets the tests above call them directly.
+        // SEEDABLE_PLATFORMS is the trap the widening added: it is exactly the
+        // kind of shared constant a new seeder wants to reference.
         const src = fn.toString()
         expect(src).not.toContain('MAX_REJECTED_ADDS')
         expect(src).not.toContain('DEFAULT_PRODUCT_LIMIT')
+        expect(src).not.toContain('SEEDABLE_PLATFORMS')
+        expect(src).not.toContain('seedersByPlatform')
         expect(src).not.toMatch(/\bimport\b/)
         // A plain named declaration — not a bound wrapper and not `[native
         // code]`, either of which would serialise into something the page
         // cannot run.
-        expect(src.startsWith(`async function ${name}`)).toBe(true)
+        expect(src).toMatch(new RegExp(`^(async )?function ${name}\\s*\\(`))
     })
 })
