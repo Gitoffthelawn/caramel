@@ -109,6 +109,7 @@ jobs:
     needs: eval
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       issues: write
