@@ -12,13 +12,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-export default function VerifyPageClient({
-    signup,
-    error,
-}: {
-    signup?: string
-    error?: string
-}) {
+export default function VerifyPageClient({ signup }: { signup?: string }) {
     const [email, setEmail] = useState('')
     const [resendingEmail, setResendingEmail] = useState(false)
     const isNewSignup = signup === 'success'
@@ -31,16 +25,11 @@ export default function VerifyPageClient({
                     'Account created! Please check your email to verify your account.',
                     { duration: 6000 },
                 )
-            } else if (error === 'token_expired') {
-                toast.error(
-                    'Verification link has expired. Please request a new one.',
-                    { duration: 5000 },
-                )
             }
         }, 100)
 
         return () => clearTimeout(timer)
-    }, [signup, error])
+    }, [signup])
 
     const handleResendVerification = async () => {
         if (!email) {
