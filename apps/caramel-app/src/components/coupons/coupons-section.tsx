@@ -276,12 +276,12 @@ export default function CouponsSection({
 
     return (
         <div className="mx-auto w-full max-w-7xl">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-8 text-center"
-            >
+            {/* globals.css .hero-enter: a framer-motion
+                `initial={{ opacity: 0 }}` ships as style="opacity:0" in the
+                server HTML, so this text could not paint (and could not be
+                the LCP) until hydration — mobile LCP 4.7-8.6 s. CSS,
+                transform only, paints on the first frame. */}
+            <div className="hero-enter mb-8 text-center">
                 <h1 className="mb-4 bg-gradient-to-r from-caramel to-orange-600 bg-clip-text text-5xl font-extrabold text-transparent dark:from-orange-400 dark:to-caramel md:text-4xl sm:text-3xl">
                     {heroTitle}
                 </h1>
@@ -291,7 +291,7 @@ export default function CouponsSection({
                     </p>
                 ) : null}
                 {heroAction ?? null}
-            </motion.div>
+            </div>
 
             <div className="flex gap-8 md:flex-col">
                 {/* Main Content */}
@@ -317,7 +317,9 @@ export default function CouponsSection({
                         </div>
                     ) : coupons.length === 0 ? (
                         <motion.div
-                            initial={{ opacity: 0 }}
+                            // Server-rendered for a store with no coupons:
+                            // never opacity 0 in the HTML (see the header note).
+                            initial={false}
                             animate={{ opacity: 1 }}
                             className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border-2 border-dashed border-caramel/25 bg-white p-12 text-center shadow-sm dark:border-caramel/30 dark:bg-darkSurface"
                         >
@@ -346,7 +348,9 @@ export default function CouponsSection({
                             }
                             endMessage={
                                 <motion.div
-                                    initial={{ opacity: 0 }}
+                                    // Server-rendered when every coupon fits
+                                    // the first page: start at rest.
+                                    initial={false}
                                     animate={{ opacity: 1 }}
                                     className="mt-8 rounded-3xl bg-gradient-to-r from-caramel to-orange-600 p-8 text-center text-white shadow-xl"
                                 >
@@ -360,7 +364,14 @@ export default function CouponsSection({
                             }
                         >
                             <div className="space-y-4 pb-12">
-                                <AnimatePresence mode="popLayout">
+                                {/* initial={false}: the server-rendered
+                                    cards must not ship at opacity 0 (see the
+                                    header note above); cards appended by
+                                    infinite scroll still animate in. */}
+                                <AnimatePresence
+                                    mode="popLayout"
+                                    initial={false}
+                                >
                                     {coupons.map((coupon, index) => (
                                         <CouponCard
                                             key={`${coupon.id}-${index}`}
