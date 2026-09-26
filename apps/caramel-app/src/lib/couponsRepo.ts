@@ -52,6 +52,7 @@ import {
     StatsRowSchema,
     type StoreConfigRow,
     StoreConfigRowSchema,
+    StoreCouponAggregateRowSchema,
     TotalCountRowSchema,
     parseCouponRows,
 } from '@/lib/couponsDb'
@@ -102,6 +103,20 @@ const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC, id DESC`
  * yet a verified fact) — the opposite shape from the visibility predicate.
  */
 const verifiedCensusSql = () => Prisma.sql`status = 'valid'`
+
+/**
+ * The store FAQ's coupon kinds (storeFaq.ts), close to coupon-card.tsx's
+ * badge rule. Percent-off: discount_type PERCENTAGE (the read boundary
+ * upper-cases the producer's open vocabulary, so the SQL does too) with an
+ * amount above 0 and below 100. The card badges any PERCENTAGE amount "N%",
+ * but "100% off" is a producer error, not a claim to repeat, so those rows
+ * fall into the FAQ's "other offers". Fixed amount: any other type WITH an
+ * amount, which the card badges "$N".
+ */
+const percentOffSql = () =>
+    Prisma.sql`UPPER(discount_type) = 'PERCENTAGE' AND discount_amount > 0 AND discount_amount < 100`
+const fixedAmountOffSql = () =>
+    Prisma.sql`UPPER(discount_type) IS DISTINCT FROM 'PERCENTAGE' AND discount_amount > 0`
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -200,11 +215,26 @@ export async function listCoupons(
     return { coupons, total: totalRow[0]?.total ?? 0 }
 }
 
+/** What the store page's FAQ may state about a store, all read from the
+ *  catalog in the count query below (never per-store invented copy). */
+export type StoreCouponFacts = {
+    percentOffCodes: number
+    /** Largest percent-off amount, or null when there is no percent-off code. */
+    bestPercentOff: number | null
+    fixedAmountCodes: number
+    /** Newest `updated_at` among the store's visible codes. */
+    lastUpdated: Date | null
+}
+
 /** (marketing)/coupons/[store]/page.tsx — SSR store page, fixed PAGE_SIZE, no pagination/search/type/keyword. */
 export async function listStoreCoupons(
     baseSite: string,
     limit: number,
-): Promise<{ coupons: CouponListRow[]; total: number }> {
+): Promise<{
+    coupons: CouponListRow[]
+    total: number
+    facts: StoreCouponFacts
+}> {
     // Match /api/coupons: same visibility predicate, so SSR HTML and the
     // client fetch agree (no hydration flash) — see lib/coupons.ts's
     // VISIBLE_COUPON_STATUSES doc comment for the full rationale.
@@ -226,8 +256,15 @@ export async function listStoreCoupons(
             ORDER BY ${rankingOrderSql()}
             LIMIT ${limit}
         `),
+        // One aggregate: the count every store page needs, plus the facts
+        // its FAQ states, so the store's rows are read once, not twice.
         prisma.$queryRaw(Prisma.sql`
-            SELECT COUNT(*)::int AS total FROM coupons
+            SELECT COUNT(*)::int AS total,
+                   COUNT(*) FILTER (WHERE ${percentOffSql()})::int AS percent_off_codes,
+                   MAX(discount_amount) FILTER (WHERE ${percentOffSql()}) AS best_percent_off,
+                   COUNT(*) FILTER (WHERE ${fixedAmountOffSql()})::int AS fixed_amount_codes,
+                   MAX(updated_at) AS last_updated
+            FROM coupons
             WHERE ${visible}
               AND (site = ${base} OR site LIKE ${'%.' + base})
         `),
@@ -235,13 +272,22 @@ export async function listStoreCoupons(
     const coupons = forShoppers(
         parseCouponRows(CouponListRowSchema, rawCoupons, 'store-page.coupons'),
     )
-    const totalRow = parseCouponRows(
-        TotalCountRowSchema,
+    const [aggregate] = parseCouponRows(
+        StoreCouponAggregateRowSchema,
         rawTotalRow,
         'store-page.count',
     )
 
-    return { coupons, total: totalRow[0]?.total ?? 0 }
+    return {
+        coupons,
+        total: aggregate?.total ?? 0,
+        facts: {
+            percentOffCodes: aggregate?.percent_off_codes ?? 0,
+            bestPercentOff: aggregate?.best_percent_off ?? null,
+            fixedAmountCodes: aggregate?.fixed_amount_codes ?? 0,
+            lastUpdated: aggregate?.last_updated ?? null,
+        },
+    }
 }
 
 /**
