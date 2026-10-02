@@ -111,6 +111,17 @@ export const CouponListRowSchema = z.object({
 export type CouponListRow = z.infer<typeof CouponListRowSchema>
 
 /**
+ * couponsRepo.listStoreCoupons's list rows: CouponListRow plus `isSupplier`
+ * (`submission_source IS NULL`, i.e. NOT a shopper-submitted row). Only the
+ * store page's list read selects it, so CouponListRowSchema itself stays strict
+ * for every other read; listStoreCoupons strips the flag after reading it, so it
+ * never reaches a component prop or an API payload.
+ */
+export const StoreListRowSchema = CouponListRowSchema.extend({
+    isSupplier: z.boolean(),
+})
+
+/**
  * couponsRepo.ts listRecentlyWorkedCoupons — the landing page's "Codes that
  * just worked": a visible coupon joined to its app-owned coupon_signals row.
  * The coupon fields reuse CouponListRowSchema's own definitions (same id
@@ -134,6 +145,17 @@ export const RecentlyWorkedCouponRowSchema = CouponListRowSchema.pick({
 export type RecentlyWorkedCouponRow = z.infer<
     typeof RecentlyWorkedCouponRowSchema
 >
+
+/** `SELECT id` / `... RETURNING id` — couponsRepo.submitShopperCoupon's dedupe
+ *  lookup and its INSERT's returned id. */
+export const CouponIdRowSchema = z.object({
+    id: couponIdSchema,
+})
+
+/** `SELECT (EXISTS(...) OR EXISTS(...)) AS known` — couponsRepo.isKnownStore. */
+export const KnownStoreRowSchema = z.object({
+    known: z.boolean(),
+})
 
 /** `SELECT COUNT(*)::int AS total` — coupons/route.ts + [store]/page.tsx. */
 export const TotalCountRowSchema = z.object({
