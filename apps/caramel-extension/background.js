@@ -265,13 +265,25 @@ export async function submitShopperCode(message) {
     if (!(await _shopperCaptureEnabled())) return { skipped: 'disabled' }
     // A failed storage read rejects (loud, answered as `{ error }`): refusing
     // to send is the safe side, and it must not look like a plain "no".
-    if (!codeSharingAccepted(await readCodeSharingConsent(currentBrowser)))
-        return { skipped: 'no-consent' }
+    // The SAME record gates the send and is the proof sent with it: the server
+    // refuses a checkout submission without an accepted consent (403
+    // `consent-required`), so a build that omits the field can never capture.
+    const consentRecord = await readCodeSharingConsent(currentBrowser)
+    if (!codeSharingAccepted(consentRecord)) return { skipped: 'no-consent' }
 
     const r = await fetchCaramelApi(caramelUrl('api/coupons/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site, code, source: 'checkout' }),
+        body: JSON.stringify({
+            site,
+            code,
+            source: 'checkout',
+            consent: {
+                choice: consentRecord.choice,
+                promptVersion: consentRecord.promptVersion,
+                at: consentRecord.at,
+            },
+        }),
     })
     // On a refusal the body is only used to NAME it; one we cannot read just
     // falls back to the generic reason below.
@@ -292,6 +304,13 @@ export async function submitShopperCode(message) {
         _forgetFeatures()
         return { skipped: 'disabled' }
     }
+    // The server's own consent gate refused the proof we just sent (e.g. its
+    // prompt-version floor moved above ours). Quiet, nothing was stored. NOT
+    // `no-consent`: that answer is the page's cue to show the consent card
+    // (code-capture.js _submitWithConsent), and a shopper who already said yes
+    // must not be asked again because the server disagrees with the record.
+    if (r.status === 403 && body?.error === 'consent-required')
+        return { skipped: 'consent-rejected' }
     if (r.status === 422) {
         // Expected refusals (not a store we know, not a plausible code).
         if (CARAMEL_ENV.verbose)
