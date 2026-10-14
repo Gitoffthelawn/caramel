@@ -42,7 +42,16 @@ module.exports = [
         // (owner rule 2026-10-06) — the consent card (UI-helpers.js
         // showCodeSharingPrompt) and the consent record module
         // (code-sharing-consent.js). Measured 76.66 kB: one new UI surface.
-        limit: '80 KB',
+        // 2026-10-13, raised 80 -> 117 kB: coupon-box-discovery.js, the
+        // promo-box finder for stores with no usable config (off behind a
+        // server flag). 91.74 → 107.8 kB: the finder itself (nine-language
+        // vocabularies, field/button/toggle scoring, the total-row reader) was
+        // 91.74 kB at its first push; the rest is hardening against live
+        // stores and review fixes (re-find after a re-draw, hidden label
+        // cells, the coupon-line reader, the finder-run verdict gate, and the
+        // lookbehind-free text readers Safari 16.0-16.3 needs). 8.5%
+        // headroom, so the next capability trips the ratchet.
+        limit: '117 KB',
         brotli: false,
     },
     {
@@ -106,7 +115,12 @@ module.exports = [
         // checkoutCodeSharingConsent record (code-sharing-consent.js) and
         // answers no-consent, so nothing is sent before an explicit yes.
         // Measured 9.29 kB.
-        limit: '10 KB',
+        // 2026-10-09, raised 10 -> 10.7 kB: the features cache now carries the
+        // couponBoxDiscovery flag too, answered to the content script on its
+        // own message route. Measured 9.85 kB (re-measured 2026-10-13; first
+        // recorded as 9.67); raised rather than left at 1.5%
+        // headroom (see the 2026-08-10 note above).
+        limit: '10.7 KB',
         brotli: false,
     },
 ]
