@@ -49,8 +49,12 @@ module.exports = [
         // 91.74 kB at its first push; the rest is hardening against live
         // stores and review fixes (re-find after a re-draw, hidden label
         // cells, the coupon-line reader, the finder-run verdict gate, and the
-        // lookbehind-free text readers Safari 16.0-16.3 needs). 8.5%
-        // headroom, so the next capability trips the ratchet.
+        // lookbehind-free text readers Safari 16.0-16.3 needs). Same date, the
+        // finder's server pick (own flag, couponBoxLlm): the asking and the
+        // checking of the answer live here, 107.8 -> 111.27 kB; the outline
+        // builder is NOT in this bundle, it ships as assets/coupon-box-outline.js
+        // and has its own budget below. 4.9% headroom over 111.27 kB, so the
+        // next capability trips the ratchet.
         limit: '117 KB',
         brotli: false,
     },
@@ -120,7 +124,20 @@ module.exports = [
         // own message route. Measured 9.85 kB (re-measured 2026-10-13; first
         // recorded as 9.67); raised rather than left at 1.5%
         // headroom (see the 2026-08-10 note above).
-        limit: '10.7 KB',
+        // 2026-10-13, raised 10.7 -> 11.3 kB: the coupon-box pick request (its
+        // flag, its message route, and one deadline over the flag read, the
+        // token read and the request). Measured 10.52 kB.
+        limit: '11.3 KB',
+        brotli: false,
+    },
+    {
+        name: 'coupon-box-outline.js (loaded on demand, minified)',
+        path: '.size-cache/coupon-box-outline.min.js',
+        // 2026-10-13 — measured 8.30 kB minified. Not injected on every page:
+        // the finder imports it only when it is about to ask the server for a
+        // box. About half of it is the word allowlist every name is filtered
+        // through, which is data the server's eval was measured with.
+        limit: '9.2 KB',
         brotli: false,
     },
 ]
