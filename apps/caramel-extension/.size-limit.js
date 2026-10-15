@@ -135,7 +135,18 @@ module.exports = [
         // 2026-10-13, raised 10.7 -> 11.3 kB: the coupon-box pick request (its
         // flag, its message route, and one deadline over the flag read, the
         // token read and the request). Measured 10.52 kB.
-        limit: '11.3 KB',
+        // 2026-10-15, raised 11.3 -> 13.4 kB: the opt-in code-sharing funnel
+        // diagnostics (1.4.14): reportCodeShareFunnel, the consent + telemetry
+        // id module (usage-diagnostics-consent.js), the payload allowlist
+        // (code-share-funnel.js) and the shared permissions wrapper
+        // (permissions-api.js) for the Firefox data-collection grant. Measured
+        // 12.24 kB.
+        // 2026-10-15 (review of PR #353), tightened 13.4 -> 12.7 kB: the 2 kB of
+        // slack the first raise left would have let the next unrelated growth
+        // through unnoticed. Measured 12.38 kB after the review fixes (id minted
+        // only on accept, the consent re-read, device-local consent), so the
+        // limit is measured + ~0.3 kB.
+        limit: '12.7 KB',
         brotli: false,
     },
     {

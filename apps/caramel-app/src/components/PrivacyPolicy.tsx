@@ -140,6 +140,32 @@ const PrivacyPolicy = () => {
                                 Caramel, and your savings-sync and
                                 checkout-sharing choices.
                             </>,
+                            <>
+                                <strong>
+                                    Anonymous usage diagnostics, only if you opt
+                                    in.
+                                </strong>{' '}
+                                If you press Allow on the extension&apos;s
+                                &quot;Help improve Caramel?&quot; card, or
+                                switch on &quot;Send anonymous usage
+                                diagnostics&quot; in its settings (it is off by
+                                default; Firefox also asks for its own
+                                permission), the extension sends anonymous
+                                diagnostics when you are at checkout on a
+                                supported store: which store, whether the
+                                code-sharing offer appeared, and why a code
+                                wasn&apos;t shared, along with the extension
+                                version and your browser. These events go to our
+                                self-hosted analytics under a random ID created
+                                on this device when you opt in, not linked to
+                                your account or install ID. They never include
+                                your codes, your cart, the other pages you
+                                visit, or anything that identifies you. You can
+                                change this anytime in the extension&apos;s
+                                settings. Switching it off deletes this
+                                device&apos;s random diagnostics ID; anything
+                                already sent can&apos;t be linked back to you.
+                            </>,
                         ]}
                     />
                     <Sub>If you create an account or sign in</Sub>
