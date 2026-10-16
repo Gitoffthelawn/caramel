@@ -3,18 +3,15 @@ import { initCaramelBase } from '../caramel-base.js'
 import { initCouponConstants } from '../coupon-constants.generated.js'
 import { initCouponRunner } from '../coupon-runner.js'
 import { INSTALL_ATTRIBUTION_KEY } from '../install-attribution.js'
-import {
-    runSafariSocialSignIn,
-    runSocialSignIn,
-    setAfterLoginRerender,
-} from '../popup-core.js'
+import { runSocialSignIn, setAfterLoginRerender } from '../popup-core.js'
 
 // A sign-in from the extension used to reach the server with no idea where the
 // install came from. The sign-in now hands over what the install stored
-// (install-attribution.js): { iid, firstTouch } in the code-exchange body for
-// Chrome/Edge/Firefox, and as authorize query params for Safari, whose
-// exchange happens server-side. Old installs (nothing stored) send exactly
-// what they always did.
+// (install-attribution.js): { iid, firstTouch } in the code-exchange body.
+// Safari and Firefox sign in on the website instead (popup-core.js
+// openWebsiteSignIn), where /welcome already tied the install to that
+// browser's PostHog person. Old installs (nothing stored) send exactly what
+// they always did.
 
 const IID = '3f2b8c1e-5a47-4d6b-9e10-7c2d4a8b9f01'
 const FIRST_TOUCH = {
@@ -26,7 +23,6 @@ const FIRST_TOUCH = {
 
 let storageLocal
 let lastExchange
-let lastAuthorizeUrl
 
 const keyList = keys =>
     Array.isArray(keys)
@@ -35,7 +31,7 @@ const keyList = keys =>
           ? [keys]
           : Object.keys(keys || {})
 
-/* Realm stub, same shape as popup-oauth-safari-poll.test.mjs: permissive
+/* Realm stub, same shape as popup-oauth-safari-website.test.mjs: permissive
  * Proxy, callbacks invoked, storage.local really stores. */
 function installChromeStub() {
     const cache = new WeakMap()
@@ -92,7 +88,6 @@ beforeAll(() => {
 beforeEach(() => {
     storageLocal = {}
     lastExchange = null
-    lastAuthorizeUrl = null
     setAfterLoginRerender(() => {})
 })
 
@@ -108,31 +103,15 @@ const chromeShape = () => {
     globalThis.currentBrowser.tabs.create = () => {}
 }
 
-const safariShape = () => {
-    globalThis.currentBrowser.identity = undefined
-    globalThis.currentBrowser.chrome = undefined
-    globalThis.currentBrowser.runtime.getURL = path =>
-        `safari-web-extension://ABCD-1234/${path}`
-    globalThis.currentBrowser.tabs.create = () => {}
-}
-
 const installFetch = () => {
     globalThis.fetch = vi.fn(async (url, init) => {
         const href = String(url)
         if (href.includes('/api/extension/oauth/authorize')) {
-            lastAuthorizeUrl = new URL(href)
             return {
                 ok: true,
                 json: async () => ({
                     authorizationUrl: 'https://accounts.google.com/o/oauth2',
                 }),
-            }
-        }
-        if (href.includes('/api/extension/oauth/poll')) {
-            return {
-                ok: true,
-                status: 200,
-                json: async () => ({ token: 'safari-token', username: 'S' }),
             }
         }
         if (href.endsWith('/api/extension/oauth')) {
@@ -148,7 +127,7 @@ const installFetch = () => {
 
 const noUi = () => ({ onPending: vi.fn(), onError: vi.fn(), onNotice: vi.fn() })
 
-describe('the code exchange (Chrome, Edge, Firefox)', () => {
+describe('the code exchange (Chrome, Edge)', () => {
     it('carries the install id and the first-touch record the install stored', async () => {
         chromeShape()
         installFetch()
@@ -221,33 +200,5 @@ describe('the code exchange (Chrome, Edge, Firefox)', () => {
             expect.anything(),
         )
         consoleError.mockRestore()
-    })
-})
-
-describe('the Safari sign-in (server-side exchange: attribution rides authorize)', () => {
-    it('adds iid and the JSON first-touch record to the authorize call', async () => {
-        safariShape()
-        installFetch()
-        storageLocal[INSTALL_ATTRIBUTION_KEY] = {
-            iid: IID,
-            firstTouch: FIRST_TOUCH,
-        }
-
-        await runSafariSocialSignIn('google', noUi())
-
-        expect(lastAuthorizeUrl.searchParams.get('iid')).toBe(IID)
-        expect(JSON.parse(lastAuthorizeUrl.searchParams.get('ft'))).toEqual(
-            FIRST_TOUCH,
-        )
-    })
-
-    it('an older install adds nothing to the authorize call', async () => {
-        safariShape()
-        installFetch()
-
-        await runSafariSocialSignIn('google', noUi())
-
-        expect(lastAuthorizeUrl.searchParams.has('iid')).toBe(false)
-        expect(lastAuthorizeUrl.searchParams.has('ft')).toBe(false)
     })
 })
