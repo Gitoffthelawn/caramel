@@ -159,4 +159,14 @@ module.exports = [
         limit: '9.2 KB',
         brotli: false,
     },
+    {
+        name: 'porkbun-alert-shim.js (porkbun.com checkout only, minified)',
+        path: '.size-cache/porkbun-alert.min.js',
+        // 2026-10-15 (T-2480) — own MAIN-world content script for porkbun.com's
+        // native coupon-failure alert(). Measured 1.18 kB minified after the review
+        // fixes (duplicate-Enter drop, shopper-only disarm); the shipped WXT
+        // wrapper adds a little on top.
+        limit: '1.3 KB',
+        brotli: false,
+    },
 ]
