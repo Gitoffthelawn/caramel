@@ -52,6 +52,12 @@
 // the stored row's primary key. The ON CONFLICT clause repeats the check, so a
 // concurrent write cannot slip a different coupon onto the id.
 //
+// store_configs has a second, insert-only writer in this module:
+// insertAutoDetectedStoreConfig (a promo box the extension found and proved on
+// a store with no config, `origin = 'auto_detect'`). A pipeline push for such a
+// store replaces all eight selectors and clears `origin`, whatever the saved
+// row's `updated_at`; pipeline-on-pipeline upserts are unchanged.
+//
 // Safety gate: a single push that would tombstone/expire more than 20% of the
 // currently-visible catalog is REFUSED (409, `gated`) unless `force: true`.
 // This guards against a broken producer wiping the catalog with one bad push;
@@ -294,6 +300,34 @@ function pgTextArray(values: readonly string[]): Prisma.Sql {
  * being clobbered by an older one regardless.
  */
 /**
+ * `store_configs.origin` of a row the extension saved (insertAutoDetectedStoreConfig). A
+ * pipeline row's origin is NULL. A pipeline push replaces a saved row whatever its
+ * `updated_at` (see SELECTOR_UPSERT_ASSIGNMENTS and the store_configs upsert below).
+ */
+export const AUTO_DETECT_ORIGIN = 'auto_detect'
+
+/**
+ * How long a saved box is served before it must be proven again. A served
+ * config switches the finder off for its store, so without an end a wrong
+ * first save (a buggy client, or a forged request in the accepted format)
+ * would close auto-detect on that store for good: nothing else replaces a
+ * saved row except a pipeline push for that exact store. After this many days
+ * the row stops being served, the store behaves as one with no config again
+ * (the finder runs), and the next proven box replaces the row
+ * (insertAutoDetectedStoreConfig). A box that still works is simply saved
+ * again. A pipeline row never expires.
+ */
+export const AUTO_DETECT_CONFIG_MAX_AGE_DAYS = 30
+
+/**
+ * SQL condition, over the `store_configs` row in scope, that the row is still
+ * served: a pipeline row always, a saved box only while it is younger than
+ * AUTO_DETECT_CONFIG_MAX_AGE_DAYS. GET /api/extension/supported-stores and the
+ * save's "already has a config" check both use it, so the two never disagree.
+ */
+export const STORE_CONFIG_STILL_SERVED_SQL = Prisma.sql`(store_configs.origin IS DISTINCT FROM ${AUTO_DETECT_ORIGIN} OR store_configs.updated_at > now() - make_interval(days => ${AUTO_DETECT_CONFIG_MAX_AGE_DAYS}::int))`
+
+/**
  * The eight extension-consumed selector columns, in the order the upsert writes them.
  */
 const SELECTOR_COLUMNS = [
@@ -326,12 +360,18 @@ const SELECTOR_COLUMNS = [
  * empty string is an explicit tombstone and clears the column. Plain COALESCE was rejected for
  * exactly that reason — it would have made a wrong selector unremovable by any push.
  *
+ * One exception, the first WHEN: a row the extension saved (`origin = 'auto_detect'`, see
+ * AUTO_DETECT_ORIGIN below) is REPLACED whole by a pipeline push. Every selector takes the
+ * pushed value, a NULL stays NULL and '' clears, so a pipeline config never mixes with the
+ * saved one. A pipeline row (`origin` NULL) never reaches that branch.
+ *
  * Column names come from the const array above, never from input, so `Prisma.raw` is safe here.
  */
 const SELECTOR_UPSERT_ASSIGNMENTS = Prisma.raw(
     SELECTOR_COLUMNS.map(
         col =>
             `${col} = CASE` +
+            ` WHEN store_configs.origin = '${AUTO_DETECT_ORIGIN}' THEN NULLIF(excluded.${col}, '')` +
             ` WHEN excluded.${col} IS NULL THEN store_configs.${col}` +
             ` WHEN excluded.${col} = '' THEN NULL` +
             ` ELSE excluded.${col} END`,
@@ -534,8 +574,10 @@ export async function applyCatalogRows(
                             VALUES ${Prisma.join(tuples)}
                             ON CONFLICT (store_name) DO UPDATE SET
                                 ${SELECTOR_UPSERT_ASSIGNMENTS},
-                                updated_at = excluded.updated_at
+                                updated_at = excluded.updated_at,
+                                origin = NULL
                             WHERE excluded.updated_at >= store_configs.updated_at
+                                OR store_configs.origin = ${AUTO_DETECT_ORIGIN}
                         `,
                     )
                 }
@@ -610,4 +652,53 @@ export async function applyCatalogRows(
         // routes it to Sentry. NEVER swallowed.
         throw error
     }
+}
+
+/** The four selectors of a box the extension saved, in store_configs terms. */
+export interface AutoDetectedStoreConfig {
+    /** The store's catalog name (couponBoxSave.resolveSaveStoreName). */
+    storeName: string
+    couponInputXpath: string
+    applyButtonXpath: string
+    showInputXpath: string | null
+    priceContainerXpath: string | null
+}
+
+/**
+ * Write a coupon box the extension found and proved on a store with no config
+ * as that store's `store_configs` row (POST /api/extension/coupon-box-save).
+ * The same row and the same columns the pipeline's push writes, read back by
+ * the same GET /api/extension/supported-stores. The other four selectors are
+ * NULL, `origin` is AUTO_DETECT_ORIGIN and `updated_at` is now, so a later
+ * pipeline push replaces the row whole (applyCatalogRows above).
+ *
+ * Never over a pipeline row (served or not) or a saved box still being served
+ * (an earlier save that won a race included): then nothing is written and the
+ * answer is `{ inserted: false }`. The one row it may replace is a saved box
+ * past AUTO_DETECT_CONFIG_MAX_AGE_DAYS, which is no longer served.
+ */
+export async function insertAutoDetectedStoreConfig(
+    config: AutoDetectedStoreConfig,
+): Promise<{ inserted: boolean }> {
+    const rows = await prisma.$queryRaw<Array<{ store_name: string }>>(
+        Prisma.sql`
+            INSERT INTO store_configs (store_name, show_input_xpath, dismiss_button_xpath, coupon_input_xpath, apply_button_xpath, price_container_xpath, success_indicator_xpath, error_indicator_xpath, coupon_remove_xpath, origin, created_at, updated_at)
+            VALUES (${config.storeName}, ${config.showInputXpath}, NULL, ${config.couponInputXpath}, ${config.applyButtonXpath}, ${config.priceContainerXpath}, NULL, NULL, NULL, ${AUTO_DETECT_ORIGIN}, now(), now())
+            ON CONFLICT (store_name) DO UPDATE SET
+                show_input_xpath = excluded.show_input_xpath,
+                dismiss_button_xpath = NULL,
+                coupon_input_xpath = excluded.coupon_input_xpath,
+                apply_button_xpath = excluded.apply_button_xpath,
+                price_container_xpath = excluded.price_container_xpath,
+                success_indicator_xpath = NULL,
+                error_indicator_xpath = NULL,
+                coupon_remove_xpath = NULL,
+                created_at = now(),
+                updated_at = now()
+            WHERE store_configs.origin = ${AUTO_DETECT_ORIGIN}
+              AND NOT ${STORE_CONFIG_STILL_SERVED_SQL}
+            RETURNING store_name
+        `,
+    )
+    return { inserted: rows.length === 1 }
 }
