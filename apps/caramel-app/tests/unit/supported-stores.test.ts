@@ -113,5 +113,15 @@ describe('GET /api/extension/supported-stores — qualification predicate (D1 fi
         // The flattened table has no metadata column — extension_compatible is
         // resolved at ingest, so it must NOT appear as a query predicate.
         expect(queryCapture.sql).not.toMatch(/extension_compatible/)
+        // Who wrote a row (store_configs.origin: the pipeline or the
+        // extension's coupon-box save) never reaches the extension: a saved
+        // row is served exactly like a pipeline row. origin is read only by
+        // the WHERE that stops serving a saved box once it is
+        // AUTO_DETECT_CONFIG_MAX_AGE_DAYS old.
+        const selected = queryCapture.sql.split(/\bFROM\b/)[0] ?? ''
+        expect(selected).not.toMatch(/\borigin\b/)
+        expect(queryCapture.sql).toMatch(
+            /store_configs\.origin IS DISTINCT FROM .* OR store_configs\.updated_at > now\(\) - make_interval/,
+        )
     })
 })

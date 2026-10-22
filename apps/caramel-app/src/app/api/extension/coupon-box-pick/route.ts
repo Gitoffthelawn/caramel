@@ -168,13 +168,14 @@ async function handlePick(req: NextRequest): Promise<PickExit> {
             modelStartedAt = performance.now()
         })
         return exit(json(result), outcomeOf(result), {
-            // A `disabled` no_pick never looked at the cache.
+            // A `disabled` no_pick never looked at the cache; a refused
+            // button is a model answer, cached like one.
             cached:
-                result.outcome === 'no_pick'
-                    ? result.reason === 'disabled'
-                        ? null
-                        : false
-                    : result.cached,
+                'cached' in result
+                    ? result.cached
+                    : result.reason === 'disabled'
+                      ? null
+                      : false,
             modelMs: modelMs(),
             store,
         })
@@ -205,10 +206,10 @@ async function handlePick(req: NextRequest): Promise<PickExit> {
         return exit(
             handleRouteError(error, {
                 req,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : 'coupon-box pick failed',
+                // Never the error's own text: it can carry database, driver
+                // or model-provider detail, and this route answers anonymous
+                // callers.
+                message: 'coupon-box pick failed',
                 status: 500,
             }),
             'server_error',

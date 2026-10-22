@@ -34,6 +34,7 @@
 // `getBaseDomain`/domain-validation 400s, response envelopes, cache
 // headers, `hasMore`/`active` computed fields, and auth/rate-limit/origin
 // gates all stay in the calling route (`withRoute` config + the route body).
+import { STORE_CONFIG_STILL_SERVED_SQL } from '@/lib/catalog/applyCatalogRows'
 import {
     FAILING_MIN_FAIL_COUNT,
     FAILING_WINDOW_DAYS,
@@ -42,6 +43,8 @@ import {
     VISIBLE_COUPON_STATUSES,
 } from '@/lib/coupons'
 import {
+    CatalogStoreNameRowSchema,
+    CouponExistsRowSchema,
     CouponIdRowSchema,
     type CouponListRow,
     CouponListRowSchema,
@@ -52,6 +55,7 @@ import {
     RecentStoreRowSchema,
     type RecentlyWorkedCouponRow,
     RecentlyWorkedCouponRowSchema,
+    ServedStoreConfigRowSchema,
     type SiteAggregateRow,
     SiteAggregateRowSchema,
     type SiteCountRow,
@@ -811,6 +815,7 @@ export async function listSupportedStoreConfigs(): Promise<StoreConfigRow[]> {
         FROM store_configs
         WHERE coupon_input_xpath IS NOT NULL
           AND apply_button_xpath IS NOT NULL
+          AND ${STORE_CONFIG_STILL_SERVED_SQL}
         ORDER BY store_name
     `)
     return parseCouponRows(
@@ -878,6 +883,36 @@ export async function expireCoupons(ids: string[]): Promise<number> {
         WHERE id IN (${Prisma.join(ids)}) AND expired = FALSE
     `)
     return affected
+}
+
+/**
+ * Is `id` a row of the app-owned catalog? The gate the two signal writers
+ * (POST /api/coupons/[id]/report, POST /api/coupons/increment) run BEFORE
+ * writing coupon_signals, which carries no FK to `coupons` on purpose (so an
+ * aggregate can outlive a tombstoned coupon) and so would otherwise upsert a row
+ * for ANY numeric id: unbounded table growth, and a failure count pre-seeded on
+ * an id the catalog (or the shopper sequence) has not issued yet.
+ *
+ * Status-agnostic on purpose: any `coupons` row counts, hidden ('invalid'),
+ * 'expired' and `expired = TRUE` rows included. A signal never changes
+ * visibility (DESIGN.md (q): it only reorders what visibleCouponsWhere() already
+ * lists), so one on a hidden row is harmless and bounded by the catalog size,
+ * while refusing it would 404 an honest shopper whose cached store page (or an
+ * in-flight apply) predates a tombstone, and drop the evidence if ingest later
+ * revives the row. Only an id that is not a catalog row at all is refused.
+ */
+export async function couponExists(id: string): Promise<boolean> {
+    const [row] = parseCouponRows(
+        CouponExistsRowSchema,
+        await prisma.$queryRaw(
+            Prisma.sql`SELECT EXISTS (SELECT 1 FROM coupons WHERE id = ${id}) AS known`,
+        ),
+        'coupon-signal.coupon-exists',
+    )
+    if (!row) {
+        throw new Error('couponExists: existence query returned no row')
+    }
+    return row.known
 }
 
 /**
@@ -959,6 +994,140 @@ export async function isKnownStore(
         throw new Error('isKnownStore: known-store query returned no row')
     }
     return row.known
+}
+
+// The hyphen-joined checkout prefixes the extension's own host match accepts
+// (store-detect.js HYPHEN_CHECKOUT_PREFIXES: `secure-athleta.gap.com` serves
+// `athleta.gap.com`).
+const SERVED_HYPHEN_PREFIXES = ['secure', 'checkout', 'www', 'shop', 'store']
+const SHOPIFY_HOST_SUFFIX = '.myshopify.com'
+
+/**
+ * Store names whose served config the extension would apply on `host`: the
+ * host itself and every parent domain of 2+ labels (www./checkout.<domain>),
+ * plus the domain behind a hyphen checkout prefix, each also with a `www.` in
+ * front (the extension reads a `www.x.com` row as the store `x.com`).
+ * Over-inclusive on purpose: a false "served" only means an auto-detected box
+ * is not saved.
+ */
+function servedConfigCandidates(host: string): string[] {
+    const labels = host.split('.')
+    const out = new Set<string>()
+    for (let i = 0; i <= labels.length - 2; i++) {
+        out.add(labels.slice(i).join('.'))
+    }
+    const [first = '', ...rest] = labels
+    const dash = first.indexOf('-')
+    if (dash > 0 && SERVED_HYPHEN_PREFIXES.includes(first.slice(0, dash))) {
+        out.add([first.slice(dash + 1), ...rest].join('.'))
+    }
+    for (const name of Array.from(out)) {
+        if (!name.startsWith('www.')) out.add(`www.${name}`)
+    }
+    return Array.from(out)
+}
+
+/**
+ * Does `host` have a SERVED store config: a `store_configs` row with the
+ * coupon input and apply xpaths, i.e. exactly what GET
+ * /api/extension/supported-stores lists (listSupportedStoreConfigs' filter)?
+ * The coupon-box save (couponBoxSave.ts) never writes for such a store, so
+ * the extension keeps behaving byte-for-byte on it. A `<shop>.myshopify.com` host
+ * counts as served when any served store's first label is `<shop>` (the
+ * extension's own Shopify-host rule). `host` must be a clean lowercase
+ * hostname (throws a plain Error otherwise).
+ */
+export async function hasServedStoreConfig(host: string): Promise<boolean> {
+    const lowered = host.toLowerCase()
+    if (!SHOPPER_STORE_BASE_PATTERN.test(lowered)) {
+        throw new Error(
+            `hasServedStoreConfig: invalid host "${host.slice(0, 64)}"`,
+        )
+    }
+    const shop = lowered.endsWith(SHOPIFY_HOST_SUFFIX)
+        ? lowered.slice(0, -SHOPIFY_HOST_SUFFIX.length)
+        : ''
+    const shopLabel = shop && !shop.includes('.') ? shop : null
+    const [row] = parseCouponRows(
+        ServedStoreConfigRowSchema,
+        await prisma.$queryRaw(Prisma.sql`
+            SELECT EXISTS (
+                SELECT 1 FROM store_configs
+                WHERE coupon_input_xpath IS NOT NULL
+                  AND apply_button_xpath IS NOT NULL
+                  AND ${STORE_CONFIG_STILL_SERVED_SQL}
+                  AND (
+                      store_name = ANY(${servedConfigCandidates(lowered)}::text[])
+                      OR split_part(store_name, '.', 1) = ${shopLabel}
+                  )
+            ) AS served
+        `),
+        'coupon-box-save.served-config',
+    )
+    if (!row) {
+        throw new Error('hasServedStoreConfig: query returned no row')
+    }
+    return row.served
+}
+
+/**
+ * Which of `names` are stores Caramel knows (the isKnownStore notion, but by
+ * EXACT name: a supplier-sourced coupon whose `site` is the name, or a
+ * `store_configs` row named it), plus, when `shopLabel` is set, every known
+ * store whose first label is `shopLabel` (the extension's
+ * `<shop>.myshopify.com` rule). The coupon-box save (couponBoxSave.ts) picks
+ * the store an auto-detected box belongs to from these. Every name must be a
+ * clean lowercase hostname (throws a plain Error otherwise). The shop-label
+ * match reads every catalog row, so it is only asked for a myshopify host.
+ */
+export async function findCatalogStoreNames(
+    names: readonly string[],
+    shopLabel: string | null,
+): Promise<string[]> {
+    for (const name of [...names, ...(shopLabel ? [shopLabel] : [])]) {
+        if (!SHOPPER_STORE_BASE_PATTERN.test(name)) {
+            throw new Error(
+                `findCatalogStoreNames: invalid store name "${name.slice(0, 64)}"`,
+            )
+        }
+    }
+    if (names.length === 0 && !shopLabel) return []
+    const byName =
+        names.length === 0
+            ? Prisma.empty
+            : Prisma.sql`
+                SELECT n.name
+                FROM (VALUES ${Prisma.join(names.map(name => Prisma.sql`(${name})`))}) AS n(name)
+                WHERE EXISTS (
+                        SELECT 1 FROM coupons
+                        WHERE site = n.name AND submission_source IS NULL
+                    )
+                   OR EXISTS (
+                        SELECT 1 FROM store_configs WHERE store_name = n.name
+                    )
+            `
+    const byShopLabel = shopLabel
+        ? Prisma.sql`
+            SELECT site AS name FROM coupons
+            WHERE split_part(site, '.', 1) = ${shopLabel}
+              AND submission_source IS NULL
+            UNION
+            SELECT store_name AS name FROM store_configs
+            WHERE split_part(store_name, '.', 1) = ${shopLabel}
+        `
+        : Prisma.empty
+    const union =
+        names.length > 0 && shopLabel ? Prisma.sql`UNION` : Prisma.empty
+    const rows = parseCouponRows(
+        CatalogStoreNameRowSchema,
+        await prisma.$queryRaw(Prisma.sql`
+            ${byName}
+            ${union}
+            ${byShopLabel}
+        `),
+        'coupon-box-save.catalog-store-names',
+    )
+    return Array.from(new Set(rows.map(row => row.name)))
 }
 
 export type SubmitShopperCouponArgs = {

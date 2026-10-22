@@ -156,9 +156,24 @@ export const CouponIdRowSchema = z.object({
     id: couponIdSchema,
 })
 
+/** `SELECT EXISTS(...) AS known` — couponsRepo.couponExists. */
+export const CouponExistsRowSchema = z.object({
+    known: z.boolean(),
+})
+
 /** `SELECT (EXISTS(...) OR EXISTS(...)) AS known` — couponsRepo.isKnownStore. */
 export const KnownStoreRowSchema = z.object({
     known: z.boolean(),
+})
+
+/** `SELECT ... AS name` — couponsRepo.findCatalogStoreNames. */
+export const CatalogStoreNameRowSchema = z.object({
+    name: z.string(),
+})
+
+/** `SELECT EXISTS(...) AS served` — couponsRepo.hasServedStoreConfig. */
+export const ServedStoreConfigRowSchema = z.object({
+    served: z.boolean(),
 })
 
 /** `SELECT COUNT(*)::int AS total` — coupons/route.ts + [store]/page.tsx. */
