@@ -132,13 +132,17 @@ const SHAPES: [string, () => string][] = [
     ['many page footers', footersOutline],
 ]
 
-const timed = async (outline: string) => {
-    expect(new TextEncoder().encode(outline).length).toBeLessThanOrEqual(
-        MAX_OUTLINE_BYTES,
-    )
-    chatMock.mockImplementation(async () =>
-        JSON.stringify({ input: 1, button: 2, toggle: 3, confidence: 90 }),
-    )
+// Wall-clock time on a shared CI runner only ever gets NOISIER, never faster
+// (T-6204: 53.7ms and 62ms were seen against a 50ms limit on a pick that takes
+// a few ms). So each input is run RUNS times and the FASTEST run is judged: a
+// runner hiccup hits one run, while a backtracking or quadratic rule is slow
+// on every run (hundreds of ms to seconds at this input size), so the minimum
+// still blows through the limit. The limit stays 50ms.
+const RUNS = 5
+
+// Each run uses a fresh `shop-<uuid>` domain, so no run can be answered from
+// the pick cache; that, not any budget state, keeps every run honest.
+const timedOnce = async (outline: string) => {
     const started = performance.now()
     await pickCouponBox({
         domain: `shop-${randomUUID().slice(0, 8)}.example`,
@@ -147,7 +151,46 @@ const timed = async (outline: string) => {
     return performance.now() - started
 }
 
+/** The fastest of `runs` calls: the one rule `timed` judges by. */
+const fastestOf = async (
+    runner: () => Promise<number>,
+    runs = RUNS,
+): Promise<number> => {
+    const results: number[] = []
+    for (let i = 0; i < runs; i++) results.push(await runner())
+    return Math.min(...results)
+}
+
+const timed = async (outline: string) => {
+    expect(new TextEncoder().encode(outline).length).toBeLessThanOrEqual(
+        MAX_OUTLINE_BYTES,
+    )
+    chatMock.mockImplementation(async () =>
+        JSON.stringify({ input: 1, button: 2, toggle: 3, confidence: 90 }),
+    )
+    return fastestOf(() => timedOnce(outline))
+}
+
+const sleepMs = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 describe('a crafted outline cannot block the server', () => {
+    // Self-check of the rule `timed` uses (fastestOf), both halves: slowness
+    // on every run still fails, one noisy run among fast ones is tolerated.
+    it('fails when every run is slow, tolerates one slow run', async () => {
+        const slow = LIMIT_MS + 30
+        expect(
+            await fastestOf(async () => {
+                await sleepMs(slow)
+                return slow
+            }),
+        ).toBeGreaterThanOrEqual(LIMIT_MS)
+
+        let call = 0
+        expect(
+            await fastestOf(async () => (call++ === 0 ? slow : 1)),
+        ).toBeLessThan(LIMIT_MS)
+    })
+
     it.each(NAMES)(
         `a name of %s is read in under ${LIMIT_MS}ms`,
         async (_, name) => {

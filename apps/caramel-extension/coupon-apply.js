@@ -18,7 +18,7 @@ import {
     pickBestMatch,
     qAll,
     qOne,
-    waitForTextChange,
+    waitForTotalChange,
     waitForVisible,
 } from './dom-utils.js'
 
@@ -534,7 +534,7 @@ function _caramelSmallestSaying(scope, priorText) {
     return best && best.length <= 200 ? best : null
 }
 
-function detectCouponError(rec, baseline, code, priorText) {
+function detectCouponError(rec, baseline, code, priorText, alertsBefore) {
     // baseline is what snapshotErrorState() returned BEFORE the apply.
     // code is the coupon string we just tried.
     //
@@ -601,6 +601,47 @@ function detectCouponError(rec, baseline, code, priorText) {
                 .trim()
         }
         scope = scope.parentElement
+    }
+    return rec.caramelFound ? _caramelPageAlertSaying(alertsBefore) : null
+}
+
+// A page's alert regions: where a cart that answers far from the box puts its
+// answer.
+const _CARAMEL_PAGE_ALERTS =
+    '[role="alert"], [aria-live="assertive"], [aria-live="polite"]'
+
+// The store refusing a code in an alert region of the page rather than beside
+// the box. pureformulas.com, measured live 2026-10-22: a refused code is
+// answered only by one banner at the top of the cart ("Oops! This code can't
+// be applied. …"), outside the five levels read around the box, so the run saw
+// no answer and stopped after two codes. Only for a box the finder picked (a
+// config names its own errorIndicator), and only a sentence that is about a
+// code and was not there before we submitted: a stock or shipping notice in
+// the same region is not the store's answer to us.
+//
+// "Not there before" is judged per alert element, not by the page's text: the
+// same cart removes the banner on every submit and draws a NEW one with the
+// very same sentence for the next refused code, which a text comparison would
+// read as the old answer. An alert that was already showing keeps counting
+// only for words it did not hold before.
+function _caramelPageAlertsNow() {
+    const now = new Map()
+    for (const el of document.querySelectorAll(_CARAMEL_PAGE_ALERTS))
+        now.set(el, _isVisible(el) ? el.innerText || '' : '')
+    return now
+}
+function _caramelPageAlertSaying(alertsBefore) {
+    if (!alertsBefore) return null
+    for (const el of document.querySelectorAll(_CARAMEL_PAGE_ALERTS)) {
+        if (!_isVisible(el)) continue
+        const before = alertsBefore.get(el) ?? ''
+        const said = _caramelSmallestSaying(el, before)
+        if (
+            said &&
+            _caramelNamesCoupon(said) &&
+            caramelQuoteIsAttributable(said, before)
+        )
+            return said
     }
     return null
 }
@@ -675,6 +716,7 @@ export function caramelSnapshotCart(rec, code = '') {
     const beforeAppliedNodes = caramelAcceptedRowCount(appliedSel)
     const errorBaseline = snapshotErrorState(rec)
     const priorAreaText = _caramelCouponAreaText(rec)
+    const alertsBefore = rec?.caramelFound ? _caramelPageAlertsNow() : null
     return {
         hasPriceCfg,
         original,
@@ -683,6 +725,7 @@ export function caramelSnapshotCart(rec, code = '') {
         beforeAppliedNodes,
         errorBaseline,
         priorAreaText,
+        alertsBefore,
     }
 }
 
@@ -709,6 +752,7 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         beforeAppliedNodes,
         errorBaseline,
         priorAreaText,
+        alertsBefore,
     } = snapshot
 
     /* 4] wait for result — smart waiter: poll DOM up to APPLY_WAIT_MS for the
@@ -736,14 +780,14 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         }
         return 'timeout-' + maxMs + 'ms'
     }
-    let priceEl = null
-    if (hasPriceCfg) {
-        priceEl =
-            qOne(rec.priceContainer) ||
-            document.getElementById(
-                rec.priceContainer.match(/\[id=['"]([^'"]+)['"]\]/)?.[1] || '',
-            )
-    }
+    // Looked up again on every read (waitForTotalChange): a store may answer
+    // by drawing a new total element.
+    const findPriceEl = () =>
+        qOne(rec.priceContainer) ||
+        document.getElementById(
+            rec.priceContainer.match(/\[id=['"]([^'"]+)['"]\]/)?.[1] || '',
+        )
+    const priceEl = hasPriceCfg ? findPriceEl() : null
     const waiters = [waitForCartSignal(APPLY_WAIT_MS)]
     // A box the finder picked has no error or success selector of its own.
     // Two waiters stand in for them:
@@ -804,6 +848,20 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
             })(),
         )
     }
+    // A found box whose store answers in a page alert instead
+    // (_caramelPageAlertSaying): that answer ends the wait too.
+    if (rec.caramelFound) {
+        waiters.push(
+            (async () => {
+                const startedAt = performance.now()
+                while (performance.now() - startedAt < APPLY_WAIT_MS) {
+                    await sleep(200)
+                    if (_caramelPageAlertSaying(alertsBefore)) return 'answered'
+                }
+                return 'alert-timeout'
+            })(),
+        )
+    }
     if (rec.caramelFound && hasPriceCfg) {
         waiters.push(
             (async () => {
@@ -819,18 +877,15 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         )
     }
     // A price-watch timeout means "the total didn't change" — that's a
-    // no-signal outcome, NOT a coupon error. Let it RESOLVE (swallow the
-    // reject) so a failed apply falls through to the real committed / error-
-    // text detection below, instead of aborting into the catch with a
-    // synthetic "waitForTextChange timeout" errorMsg. That synthetic error
-    // was being misread by the loop as a cart "signal" (sawSignal=true),
-    // defeating the no-signal early-exit and making dead checkouts churn all
-    // 8 codes (~80-100s) instead of bailing after ~2 (~20s).
+    // no-signal outcome, NOT a coupon error, so the waiter RESOLVES
+    // 'price-nochange' and a failed apply falls through to the real
+    // committed / error-text detection below. A synthetic timeout error was
+    // once misread by the loop as a cart "signal" (sawSignal=true), defeating
+    // the no-signal early-exit and making dead checkouts churn all 8 codes
+    // (~80-100s) instead of bailing after ~2 (~20s).
     if (priceEl)
         waiters.push(
-            waitForTextChange(priceEl, APPLY_WAIT_MS).catch(
-                () => 'price-nochange',
-            ),
+            waitForTotalChange(findPriceEl, priceEl.textContent, APPLY_WAIT_MS),
         )
 
     const via = await Promise.race(waiters)
@@ -892,7 +947,13 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
     }
     // The store's answer is read around the box: the one it drew, if it did.
     if (rec.caramelFound) caramelRemarkFoundBox(false, rec)
-    const errorMsg = detectCouponError(rec, errorBaseline, code, priorAreaText)
+    const errorMsg = detectCouponError(
+        rec,
+        errorBaseline,
+        code,
+        priorAreaText,
+        alertsBefore,
+    )
     // Quotable only if the store said it BECAUSE of us (see
     // _caramelCouponAreaText). Detection above is deliberately untouched.
     const errorIsNew = caramelQuoteIsAttributable(errorMsg, priorAreaText)
