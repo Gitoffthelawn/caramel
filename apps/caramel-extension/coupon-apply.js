@@ -534,7 +534,7 @@ function _caramelSmallestSaying(scope, priorText) {
     return best && best.length <= 200 ? best : null
 }
 
-function detectCouponError(rec, baseline, code, priorText) {
+function detectCouponError(rec, baseline, code, priorText, alertsBefore) {
     // baseline is what snapshotErrorState() returned BEFORE the apply.
     // code is the coupon string we just tried.
     //
@@ -601,6 +601,47 @@ function detectCouponError(rec, baseline, code, priorText) {
                 .trim()
         }
         scope = scope.parentElement
+    }
+    return rec.caramelFound ? _caramelPageAlertSaying(alertsBefore) : null
+}
+
+// A page's alert regions: where a cart that answers far from the box puts its
+// answer.
+const _CARAMEL_PAGE_ALERTS =
+    '[role="alert"], [aria-live="assertive"], [aria-live="polite"]'
+
+// The store refusing a code in an alert region of the page rather than beside
+// the box. pureformulas.com, measured live 2026-10-22: a refused code is
+// answered only by one banner at the top of the cart ("Oops! This code can't
+// be applied. …"), outside the five levels read around the box, so the run saw
+// no answer and stopped after two codes. Only for a box the finder picked (a
+// config names its own errorIndicator), and only a sentence that is about a
+// code and was not there before we submitted: a stock or shipping notice in
+// the same region is not the store's answer to us.
+//
+// "Not there before" is judged per alert element, not by the page's text: the
+// same cart removes the banner on every submit and draws a NEW one with the
+// very same sentence for the next refused code, which a text comparison would
+// read as the old answer. An alert that was already showing keeps counting
+// only for words it did not hold before.
+function _caramelPageAlertsNow() {
+    const now = new Map()
+    for (const el of document.querySelectorAll(_CARAMEL_PAGE_ALERTS))
+        now.set(el, _isVisible(el) ? el.innerText || '' : '')
+    return now
+}
+function _caramelPageAlertSaying(alertsBefore) {
+    if (!alertsBefore) return null
+    for (const el of document.querySelectorAll(_CARAMEL_PAGE_ALERTS)) {
+        if (!_isVisible(el)) continue
+        const before = alertsBefore.get(el) ?? ''
+        const said = _caramelSmallestSaying(el, before)
+        if (
+            said &&
+            _caramelNamesCoupon(said) &&
+            caramelQuoteIsAttributable(said, before)
+        )
+            return said
     }
     return null
 }
@@ -675,6 +716,7 @@ export function caramelSnapshotCart(rec, code = '') {
     const beforeAppliedNodes = caramelAcceptedRowCount(appliedSel)
     const errorBaseline = snapshotErrorState(rec)
     const priorAreaText = _caramelCouponAreaText(rec)
+    const alertsBefore = rec?.caramelFound ? _caramelPageAlertsNow() : null
     return {
         hasPriceCfg,
         original,
@@ -683,6 +725,7 @@ export function caramelSnapshotCart(rec, code = '') {
         beforeAppliedNodes,
         errorBaseline,
         priorAreaText,
+        alertsBefore,
     }
 }
 
@@ -709,6 +752,7 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         beforeAppliedNodes,
         errorBaseline,
         priorAreaText,
+        alertsBefore,
     } = snapshot
 
     /* 4] wait for result — smart waiter: poll DOM up to APPLY_WAIT_MS for the
@@ -804,6 +848,20 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
             })(),
         )
     }
+    // A found box whose store answers in a page alert instead
+    // (_caramelPageAlertSaying): that answer ends the wait too.
+    if (rec.caramelFound) {
+        waiters.push(
+            (async () => {
+                const startedAt = performance.now()
+                while (performance.now() - startedAt < APPLY_WAIT_MS) {
+                    await sleep(200)
+                    if (_caramelPageAlertSaying(alertsBefore)) return 'answered'
+                }
+                return 'alert-timeout'
+            })(),
+        )
+    }
     if (rec.caramelFound && hasPriceCfg) {
         waiters.push(
             (async () => {
@@ -892,7 +950,13 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
     }
     // The store's answer is read around the box: the one it drew, if it did.
     if (rec.caramelFound) caramelRemarkFoundBox(false, rec)
-    const errorMsg = detectCouponError(rec, errorBaseline, code, priorAreaText)
+    const errorMsg = detectCouponError(
+        rec,
+        errorBaseline,
+        code,
+        priorAreaText,
+        alertsBefore,
+    )
     // Quotable only if the store said it BECAUSE of us (see
     // _caramelCouponAreaText). Detection above is deliberately untouched.
     const errorIsNew = caramelQuoteIsAttributable(errorMsg, priorAreaText)
