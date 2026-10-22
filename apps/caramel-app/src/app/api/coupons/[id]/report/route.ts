@@ -7,10 +7,12 @@ import {
 import {
     recordFailed,
     recordWorked,
-    type CouponSignalWriter,
+    sweepExpiredReporters,
+    type CouponFailureWriter,
 } from '@/lib/couponSignals'
 import { couponExists } from '@/lib/couponsRepo'
 import prisma from '@/lib/prisma'
+import type { PrismaClient } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -115,14 +117,20 @@ export const POST = withRoute(
             // The aggregate signal write — identical for every caller, so the
             // signed-in path can never end up writing a DIFFERENT signal than the
             // anonymous one.
-            const writeSignal = (client: CouponSignalWriter) =>
+            const writeSignal = (client: CouponFailureWriter | PrismaClient) =>
                 body.outcome === 'worked'
-                    ? recordWorked(id, client)
-                    : recordFailed(id, body.storeReason ?? null, client)
+                    ? recordWorked(id, reporter, client)
+                    : recordFailed(
+                          id,
+                          body.storeReason ?? null,
+                          reporter,
+                          client,
+                      )
 
             if (!userId) {
-                // Anonymous: ONE signal statement, no transaction (after the
-                // catalog check above, a PK lookup). Nothing is written to
+                // Anonymous: no transaction opened HERE (both writers wrap
+                // their own quorum bookkeeping in one), after the catalog check
+                // above. Nothing is written to
                 // coupon_reports for an anonymous report — DELIBERATE, not an
                 // oversight: coupon_reports is ATTRIBUTION, and every row in it
                 // names a user. Anonymous volume is already fully counted by the
@@ -132,6 +140,10 @@ export const POST = withRoute(
                 // because the schema was written before this call; a reader may
                 // assume user_id IS NOT NULL for every row this route creates.)
                 await writeSignal(prisma)
+                // Retention of reporter rows, AFTER the write committed. Not
+                // awaited: the response never waits for retention, and the sweep
+                // never rejects (a failure is captured to Sentry and retried).
+                void sweepExpiredReporters()
                 return NextResponse.json({ ok: true })
             }
 
@@ -169,6 +181,7 @@ export const POST = withRoute(
                     data: { couponId: id, userId, outcome: body.outcome },
                 })
             })
+            void sweepExpiredReporters()
 
             return NextResponse.json({ ok: true })
         } catch (error) {

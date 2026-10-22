@@ -36,9 +36,9 @@
 // gates all stay in the calling route (`withRoute` config + the route body).
 import { STORE_CONFIG_STILL_SERVED_SQL } from '@/lib/catalog/applyCatalogRows'
 import {
-    FAILING_MIN_FAIL_COUNT,
+    FAILING_MIN_FAIL_WEIGHT,
     FAILING_WINDOW_DAYS,
-    KEEPS_FAILING_MIN_FAIL_COUNT,
+    KEEPS_FAILING_MIN_FAIL_WEIGHT,
     RESTRICTED_COUPON_STATUSES,
     VISIBLE_COUPON_STATUSES,
 } from '@/lib/coupons'
@@ -123,9 +123,9 @@ const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC, id DESC`
 
 /**
  * SQL twin of coupons.ts's isRecentlyFailing(): true for a coupon whose
- * coupon_signals row holds at least FAILING_MIN_FAIL_COUNT failures, the latest
- * within FAILING_WINDOW_DAYS and newer than the last success (or no success
- * ever). The numbers come from coupons.ts, so the ordering and the card's hint
+ * coupon_signals row holds a failure quorum of at least FAILING_MIN_FAIL_WEIGHT, the latest
+ * within FAILING_WINDOW_DAYS. Successes are folded into fail_weight when they
+ * are reported (couponSignals.recomputeFailWeight). The numbers come from coupons.ts, so the ordering and the card's hint
  * cannot drift apart.
  *
  * A hashed uncorrelated `id IN (SELECT ...)`, not a JOIN: coupon_signals has
@@ -135,22 +135,21 @@ const rankingOrderSql = () => Prisma.sql`rating DESC, created_at DESC, id DESC`
  * ambiguous. The window compares against UTC because Prisma writes these
  * timestamp-WITHOUT-time-zone columns as UTC.
  */
-const failingSinkSql = () => failingSignalIdsSql(FAILING_MIN_FAIL_COUNT)
+const failingSinkSql = () => failingSignalIdsSql(FAILING_MIN_FAIL_WEIGHT)
 
 /**
  * SQL twin of coupons.ts's keepsFailing(): the same predicate at
- * KEEPS_FAILING_MIN_FAIL_COUNT. A subset of failingSinkSql(), used as the
+ * KEEPS_FAILING_MIN_FAIL_WEIGHT. A subset of failingSinkSql(), used as the
  * SECOND ORDER BY key so the codes the web page and the popup collapse are the
  * very last rows of the list, behind the merely-failing ones: the collapsed
  * group is then one contiguous tail, however the list is paginated.
  */
-const keepsFailingSql = () => failingSignalIdsSql(KEEPS_FAILING_MIN_FAIL_COUNT)
+const keepsFailingSql = () => failingSignalIdsSql(KEEPS_FAILING_MIN_FAIL_WEIGHT)
 
-const failingSignalIdsSql = (minFailCount: number) => Prisma.sql`(id IN (
+const failingSignalIdsSql = (minFailWeight: number) => Prisma.sql`(id IN (
     SELECT s.coupon_id FROM coupon_signals s
-    WHERE s.fail_count >= ${minFailCount}
+    WHERE s.fail_weight >= ${minFailWeight}
       AND s.last_failed_at > (NOW() AT TIME ZONE 'UTC') - (${FAILING_WINDOW_DAYS}::int * INTERVAL '1 day')
-      AND (s.last_worked_at IS NULL OR s.last_failed_at > s.last_worked_at)
 ))`
 
 /**
