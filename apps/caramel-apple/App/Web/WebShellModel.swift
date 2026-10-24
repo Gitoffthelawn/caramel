@@ -39,7 +39,8 @@ final class WebShellModel: NSObject, ObservableObject {
     /// A non-fatal problem (e.g. Safari could not be opened). Shown as a dismissible banner.
     @Published var notice: String?
 
-    let webView: WKWebView
+    /// Replaced (not reused) by resetToHome so no back-forward list or page cache survives a sign-out.
+    @Published private(set) var webView: WKWebView
 
     /// Set by ShellRouter: a /login or /signup navigation asks the app to run the native sign-in.
     var onSignInRequested: () -> Void = {}
@@ -54,24 +55,33 @@ final class WebShellModel: NSObject, ObservableObject {
 
     init(home: URL) {
         self.home = home
+        webView = Self.makeWebView()
+        super.init()
+        attach(webView)
+    }
+
+    private static func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        configuration.applicationNameForUserAgent = ShellUserAgent.applicationName(version: Self.marketingVersion())
+        configuration.applicationNameForUserAgent = ShellUserAgent.applicationName(version: marketingVersion())
         configuration.websiteDataStore = .default()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
-        webView = WKWebView(frame: .zero, configuration: configuration)
-        super.init()
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = true
+        return WKWebView(frame: .zero, configuration: configuration)
+    }
+
+    /// Wires delegates, gestures and the URL observation onto `view` (the first one and every replacement).
+    private func attach(_ view: WKWebView) {
+        view.navigationDelegate = self
+        view.uiDelegate = self
+        view.allowsBackForwardNavigationGestures = true
         let refresh = UIRefreshControl()
         refresh.addTarget(self, action: #selector(pullToRefresh), for: .valueChanged)
-        webView.scrollView.refreshControl = refresh
+        view.scrollView.refreshControl = refresh
 #if DEBUG
-        webView.isInspectable = true
+        view.isInspectable = true
 #endif
         // Client-side routing (history.pushState / router.push) never reaches
         // decidePolicyFor, so the shell also reacts to the URL itself changing.
-        urlObservation = webView.publisher(for: \.url)
+        urlObservation = view.publisher(for: \.url)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] url in
                 Task { @MainActor in self?.urlChanged(url) }
@@ -102,9 +112,27 @@ final class WebShellModel: NSObject, ObservableObject {
     }
 
     /// Back to the guarded home page (after sign-out or account deletion, once the web data is cleared).
+    /// Discards the WKWebView for a fresh one: reloading the old one would keep its
+    /// back-forward list (and WebKit's page cache), so the next person on the device
+    /// could swipe back to a signed-in page. Android's resetWebSession does the same.
     func resetToHome() {
+        let old = webView
+        old.stopLoading()
+        // Take the old view off screen BEFORE dropping its delegates: a web view with no
+        // navigation delegate lets WebKit allow every navigation, so it must never stay visible.
+        old.scrollView.refreshControl = nil
+        old.removeFromSuperview()
+        old.navigationDelegate = nil
+        old.uiDelegate = nil
+        urlObservation = nil
+        lastObservedURL = nil
         lastRequestedURL = nil
-        open(home)
+        pageState = .idle
+        // Not started: the visible tab's onAppear (loadHomeIfNeeded) loads home. Loading all four
+        // shells eagerly would let a signed-out /profile redirect to /login and pop the native sign-in.
+        didStartLoading = false
+        webView = Self.makeWebView()
+        attach(webView)
     }
 
     func retry() {
@@ -292,7 +320,9 @@ struct WebShellView: View {
     @ObservedObject var model: WebShellModel
 
     var body: some View {
+        // .id forces SwiftUI to build a new host (makeUIView) when resetToHome replaces the web view.
         WebViewHost(webView: model.webView)
+            .id(ObjectIdentifier(model.webView))
             .overlay(alignment: .top) {
                 if model.pageState == .loading {
                     ProgressView().padding(8)
