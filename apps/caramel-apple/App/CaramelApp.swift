@@ -6,13 +6,14 @@ struct CaramelApp: App {
     @StateObject private var session: SessionStore
     @StateObject private var favorites: FavoritesStore
     @StateObject private var extensionStatus = ExtensionStatus()
-    @StateObject private var router = ShellRouter()
+    @StateObject private var router: ShellRouter
 
     init() {
         ScreenshotLaunch.seedSavedStoresIfRequested() // App Store screenshot capture only; inert without its launch argument
         let session = SessionStore()
         _session = StateObject(wrappedValue: session)
         _favorites = StateObject(wrappedValue: FavoritesStore(session: session))
+        _router = StateObject(wrappedValue: ShellRouter(session: session))
     }
 
     var body: some Scene {
@@ -30,11 +31,10 @@ struct CaramelApp: App {
                 }
                 .onChange(of: session.token) { _ in
                     Task { await favorites.sessionChanged() }
-                    // Every way the session ends (sign-out, account deletion, a 401 expiry in
-                    // validate()/deleteAccount()) wipes the web data; AccountView no longer does it itself.
-                    if session.token == nil {
-                        Task { await router.resetWebState() }
-                    }
+                    // Every token change reaches the web views here: the web data is wiped when a token
+                    // goes or is replaced (sign-out, deletion, a 401, A to B) and a present token gets
+                    // its web session handoff (T-7852). AccountView no longer does any of it itself.
+                    router.sessionTokenChanged(to: session.token)
                 }
                 .onChange(of: scenePhase) { phase in
                     switch phase {
