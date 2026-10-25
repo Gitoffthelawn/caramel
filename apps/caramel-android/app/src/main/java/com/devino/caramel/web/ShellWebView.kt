@@ -28,6 +28,9 @@ interface ShellHost {
      */
     fun interceptSignInRoute(url: String): Boolean
 
+    /** A page tried to navigate to the handoff redeem route, which only the shell may load; it was cancelled. Main thread. */
+    fun onRefusedRedeemNavigation()
+
     /** The page started loading: clears the last load error. */
     fun onLoadStarted()
 
@@ -69,6 +72,12 @@ class ShellWebViewClient(private val host: ShellHost) : WebViewClient() {
                 // Cancelled on purpose: nothing the shopper tapped asked for this. No URL in the log (it may carry a token).
                 Log.w(TAG, "Cancelled an off-origin navigation that had no user gesture")
             }
+            return true
+        }
+        if (NavigationPolicy.isPageInitiatedRedeem(allowed)) {
+            // No URL in the log: it carries the one-time code.
+            Log.w(TAG, "Cancelled a page navigation to the web-session redeem route")
+            host.onRefusedRedeemNavigation()
             return true
         }
         return host.interceptSignInRoute(allowed)
@@ -133,8 +142,10 @@ fun WebView.loadGuarded(url: String): Boolean {
 
 /**
  * Forgets the web session the WebView holds: cookies (flushed to disk) and DOM storage. Called on
- * sign-out and on account deletion so the next person on the device does not inherit it.
- * TODO(T-7852): once the web-session handoff exists, also end the session server-side.
+ * sign-out and on account deletion so the next person on the device does not inherit it. The
+ * server-side session ends separately: sign-out revokes the bearer's session row (DELETE
+ * /api/extension/session) and account deletion removes every session, which kills the cookie the
+ * web-session handoff minted (it signs that same session).
  */
 fun clearWebSessionState() {
     val cookies = CookieManager.getInstance()

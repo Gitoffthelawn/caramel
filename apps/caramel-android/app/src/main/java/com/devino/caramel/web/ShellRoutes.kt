@@ -3,11 +3,11 @@ package com.devino.caramel.web
 import java.io.ByteArrayOutputStream
 
 /** The bottom tabs; each one is a grabcaramel.com route shown in the WebView. */
-enum class ShellTab(val label: String, val startPath: String) {
+enum class ShellTab(val label: String, val startPath: String, val needsWebSession: Boolean = false) {
     DEALS("Deals", "/coupons"),
     SEARCH("Search", "/coupons/stores"),
-    SAVED("Saved", "/profile#favorites"),
-    ACCOUNT("Account", "/profile"),
+    SAVED("Saved", "/profile#favorites", needsWebSession = true),
+    ACCOUNT("Account", "/profile", needsWebSession = true),
 }
 
 /** What the shell does when the WebView heads for /login or /signup. */
@@ -18,11 +18,12 @@ enum class AuthAction {
     /** Signed out natively: show the native sign-in (Google blocks OAuth inside a WebView). */
     START_NATIVE_SIGN_IN,
 
-    /** The web session ended while the app still holds a token: drop the token, then sign in again. */
-    SIGN_OUT_NATIVE_THEN_SIGN_IN,
-
-    /** Signed in natively but the WebView has no web session yet (T-7852): say so, do not loop. */
-    WEB_SESSION_UNAVAILABLE,
+    /**
+     * Signed in natively but the page bounced to /login (no web session, or it ended). The shell never
+     * signs the native session out because of it; WebSessionHandoff.retryAfterLoginBounce relinks once,
+     * then falls back to native sign-in.
+     */
+    LINK_WEB_SESSION,
 }
 
 /** Pure route logic for the shell (JVM-testable). Every function takes the URL string the WebView reports. */
@@ -55,15 +56,14 @@ object ShellRoutes {
     }
 
     /**
-     * What to do with a navigation to [url]. [webSessionActive] is true only once the native
-     * sign-in has been handed to the WebView (TODO(T-7852), see AppContainer.webSessionActive);
-     * until then a /login visit while signed in is the web page lacking a session, not a sign-out.
+     * What to do with a navigation to [url]. A /login visit while signed in is the page lacking a web
+     * session (or having lost it), never proof that the shopper signed out of the app. That covers
+     * `/login?error=handoff_expired`, which a failed redeem answers with.
      */
-    fun authAction(url: String?, nativeSignedIn: Boolean, webSessionActive: Boolean): AuthAction = when {
+    fun authAction(url: String?, nativeSignedIn: Boolean): AuthAction = when {
         !isSignInRoute(url) -> AuthAction.NONE
         !nativeSignedIn -> AuthAction.START_NATIVE_SIGN_IN
-        webSessionActive -> AuthAction.SIGN_OUT_NATIVE_THEN_SIGN_IN
-        else -> AuthAction.WEB_SESSION_UNAVAILABLE
+        else -> AuthAction.LINK_WEB_SESSION
     }
 
     /**
