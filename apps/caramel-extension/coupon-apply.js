@@ -743,6 +743,12 @@ export function caramelSnapshotCart(rec, code = '') {
     // Snapshot DOM signals BEFORE we apply, so we can compare after.
     const appliedSel = findAppliedSelector(rec)
     const beforeAppliedNodes = caramelAcceptedRowCount(appliedSel)
+    // Which rows were already there, and what they said: the verdict's
+    // appliedRows lists only the ones the store drew for this submission (by
+    // node, and by text, since a re-render replaces every node).
+    const beforeEls = qAll(appliedSel)
+    const beforeAppliedRows = new Set(beforeEls)
+    const beforeAppliedTexts = new Set(beforeEls.map(_caramelRowOwnText))
     const errorBaseline = snapshotErrorState(rec)
     const priorAreaText = _caramelCouponAreaText(rec)
     const alertsBefore = _caramelReadsLikeFound(rec)
@@ -754,15 +760,44 @@ export function caramelSnapshotCart(rec, code = '') {
         originalPrices,
         appliedSel,
         beforeAppliedNodes,
+        beforeAppliedRows,
+        beforeAppliedTexts,
         errorBaseline,
         priorAreaText,
         alertsBefore,
     }
 }
 
+function _caramelRowOwnText(row) {
+    return ((row.innerText ?? row.textContent) || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+// An applied row's own text, and that text with up to two enclosing levels
+// (stopping below the one that holds the promo box, whose label would speak
+// for every row): a config can point at an element holding only the code,
+// while the line around it says "Gift Certificate". `levels`: how many were
+// read (0 = the promo box's own container held the row). Shopify measured
+// live 2026-10-26: #reduction-tags li reads "ADRIANR15 AdrianR15", and the
+// box's container is five levels up.
+function _caramelRowWithContext(row, input) {
+    const own = _caramelRowOwnText(row)
+    const parts = [own]
+    let el = row.parentElement
+    for (let d = 0; d < 2 && el && el !== document.body; d++) {
+        if (input && el.contains(input)) break
+        parts.push((el.innerText ?? el.textContent) || '')
+        el = el.parentElement
+    }
+    return { text: own, context: parts.join(' '), levels: parts.length - 1 }
+}
+
 /* Waits for the store's answer to `opts.code`, then applies the success rules.
  * Resolves { success, priceDropped, newTotal, committed, errorMsg, errorIsNew,
- * appliedRowsText }.
+ * appliedRows (each row node drawn for THIS submission: { text, context,
+ * levels, textSeenBefore }),
+ * appliedRowsText (every applied row's text, joined) }.
  * `opts.timeoutMs` bounds the wait for the FIRST observable signal (default
  * 10s). `opts.redact` keeps the code and page text out of this helper's log
  * lines (used for shopper-typed codes). Callers must invoke this synchronously after the submission (or, for
@@ -781,6 +816,8 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         originalPrices,
         appliedSel,
         beforeAppliedNodes,
+        beforeAppliedRows,
+        beforeAppliedTexts,
         errorBaseline,
         priorAreaText,
         alertsBefore,
@@ -1113,12 +1150,21 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         : priceDropped || (committed && stuck) || (committed && !errorMsg)
     // What the applied rows SAY (only read when something committed): lets a
     // caller tell a row that names the code from a generic "redeemed" row.
-    const appliedRowsText = committed
-        ? qAll(appliedSel)
-              .filter(el => !caramelRowReadsRejected(el))
-              .map(el => (el.innerText ?? el.textContent) || '')
-              .join(' ')
-        : ''
+    const appliedEls = committed
+        ? qAll(appliedSel).filter(el => !caramelRowReadsRejected(el))
+        : []
+    const appliedRowsText = appliedEls
+        .map(el => (el.innerText ?? el.textContent) || '')
+        .join(' ')
+    const input = committed ? pickBestMatch(rec.couponInput) : null
+    // `textSeenBefore`: a new node saying what a row already said before the
+    // submission (a re-render, or the store re-drawing a code applied again).
+    const appliedRows = appliedEls
+        .filter(el => !beforeAppliedRows?.has(el))
+        .map(el => ({
+            ..._caramelRowWithContext(el, input),
+            textSeenBefore: !!beforeAppliedTexts?.has(_caramelRowOwnText(el)),
+        }))
     return {
         success,
         priceDropped,
@@ -1126,6 +1172,7 @@ export async function caramelAwaitCouponVerdict(rec, snapshot, opts) {
         committed,
         errorMsg,
         errorIsNew,
+        appliedRows,
         appliedRowsText,
     }
 }
