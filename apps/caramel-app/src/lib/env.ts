@@ -17,6 +17,7 @@ import {
     isValidFallbackKey,
     isValidFallbackModel,
 } from '@/lib/proxy-fallback-headers'
+import { isValidWallClockPeriodMinutes } from '@/lib/wallClockSchedule'
 import 'server-only'
 import { z } from 'zod'
 
@@ -117,12 +118,22 @@ const serverObjectSchema = z.object({
     // "it was never running" is exactly the failure this monitor exists to end.
     EMAIL_DELIVERY_HEALTH_ENABLED: z.enum(['true', 'false']).optional(),
     // How often the monitor runs AND how far back each run looks (one window
-    // per interval, no gaps, no overlap). Minutes, because an ops knob should
-    // be set in the unit a human reaches for.
+    // per slot; a missed slot, such as a restart across it, leaves that window
+    // unread). Minutes, because an ops knob should be set in the unit a human
+    // reaches for. Runs sit on the UTC wall clock
+    // (wallClockSchedule.ts), so the period must tile the day: a divisor of 60
+    // below an hour (5 minutes at the least), otherwise a whole number of hours
+    // dividing 24 (60, 120, 180, 240, 360, 480, 720, 1440). A bad value fails
+    // the boot.
     EMAIL_DELIVERY_HEALTH_INTERVAL_MINUTES: z.coerce
         .number()
         .int()
         .positive()
+        .refine(isValidWallClockPeriodMinutes, {
+            // parseServerEnv prefixes the variable name, so it is not repeated here.
+            error: issue =>
+                `got ${String(issue.input)}; allowed: a divisor of 60 that is at least 5 (5, 6, 10, 12, 15, 20, 30), or whole hours dividing 24 (60, 120, 180, 240, 360, 480, 720, 1440)`,
+        })
         .default(60),
     // Destination inbox(es) for the user support/feedback flow (POST
     // /api/support). Accepts a COMMA-SEPARATED list ("a@x.com,b@y.com" — split
