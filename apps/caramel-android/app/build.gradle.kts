@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -12,7 +11,7 @@ val releaseKeystorePath: String? = System.getenv("CARAMEL_KEYSTORE_PATH")
 
 android {
     namespace = "com.devino.caramel"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.devino.caramel"
@@ -83,6 +82,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.browser)
+    // Pins the transitive androidx.fragment (old, via Play services) past 1.3.0: AGP 9 lint InvalidFragmentVersionForActivityResult.
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
