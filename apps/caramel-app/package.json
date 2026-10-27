@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "npx prisma generate && next dev -p 58000",
+        "dev": "npx prisma generate && next dev -p 28000",
         "build": "npx prisma generate && next build",
         "start": "next start",
         "lint": "eslint .",
@@ -47,6 +47,7 @@
         "better-auth": "1.7.12",
         "formik": "2.4.9",
         "framer-motion": "14.6.0",
+        "jose": "6.2.3",
         "lodash.debounce": "4.0.8",
         "next": "16.4.2",
         "postgres": "3.4.9",
