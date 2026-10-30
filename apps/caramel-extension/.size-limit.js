@@ -177,7 +177,12 @@ module.exports = [
         // cache is written packed (each selector once) so Safari's
         // storage.local quota accepts it, and a refused write is reported.
         // Measured 96.74 kB.
-        limit: '97 KB',
+        // 2026-10-30 (T-10668), raised 97 -> 97.5 kB: a finder flag question
+        // the background leaves unanswered is asked once more, then answered
+        // from the last flag the server gave (under 30 minutes old,
+        // finder-flag-memory.js), instead of turning the finder off for the
+        // page. Measured 97.34 kB.
+        limit: '97.5 KB',
         brotli: false,
     },
     {
@@ -313,7 +318,12 @@ module.exports = [
         // Measured 20.44 kB bundled (16.91 kB was background.js by itself);
         // the production build's background.js is 21.1 kB with WXT's
         // wrapper. The limit is measured + ~1.06 kB.
-        limit: '21.5 KB',
+        // 2026-10-30 (T-10668), raised 21.5 -> 21.8 kB: one features read is
+        // bounded (8s, session cache 3s), the fetched finder flag is
+        // remembered in storage.local, and a failed or late read answers that
+        // remembered flag (read alongside the features) instead of a hard
+        // "off". Measured 21.54 kB.
+        limit: '21.8 KB',
         brotli: false,
     },
     {
