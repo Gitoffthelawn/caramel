@@ -77,9 +77,12 @@ import {
     tryInitialize,
 } from './store-detect.js'
 import {
+    CODES_AT_CHECKOUT_MESSAGE,
     hideTestingModal,
+    setTestingModalStatus,
     showFinalModal,
     showTestingModal,
+    STORE_NOT_SET_UP_STATUS,
     updateTestingModal,
 } from './UI-helpers.js'
 import {
@@ -158,6 +161,28 @@ export function caramelStoreWords(text) {
     return String(text)
         .replace(/[\s×✕✖✗⨯]+$/u, '')
         .trim()
+}
+
+/* Does a cart read on the discount-link path show a saving the code made?
+ *
+ * The total alone cannot say. A cart that empties mid-run (the store drops
+ * the items, the session expires) or that the shopper empties reads a total
+ * of 0, and "the total fell" then credited the whole order to whichever code
+ * was probed: a live card said "You saved £65.00" for a code that does
+ * nothing when typed by hand. So the cart has to still hold items, and a
+ * total of 0 counts only when the cart names the code as applied (a code
+ * that makes the order free). A cart with no items is never a saving, even
+ * when a discount is still attached to the session. */
+function _linkCartHoldsTheSaving(cart, code) {
+    if (!cart || !(cart.item_count > 0)) return false
+    if (cart.total_price > 0) return true
+    const want = String(code).toUpperCase()
+    return (Array.isArray(cart.discount_codes) ? cart.discount_codes : []).some(
+        e =>
+            e &&
+            String(e.code ?? '').toUpperCase() === want &&
+            e.applicable !== false,
+    )
 }
 
 export async function startApplyingCoupons(rec, options) {
@@ -319,6 +344,19 @@ export async function startApplyingCoupons(rec, options) {
             // unreadable — we learned nothing about this code, so don't leave
             // it blacklisted for the rest of the session (see _unmarkTriedCode).
             if (!after) _unmarkTriedCode(code)
+            if (
+                after &&
+                after.total_price < bestTotal &&
+                !_linkCartHoldsTheSaving(after, code)
+            ) {
+                log('AUTO_INSERT_DROP_ON_EMPTY_CART', {
+                    code,
+                    total: after.total_price,
+                    items: after.item_count,
+                    reason: 'the total fell because the cart holds nothing the code could discount — not a saving',
+                })
+                continue
+            }
             if (after && after.total_price < bestTotal) {
                 bestTotal = after.total_price
                 bestCode = code
@@ -352,7 +390,11 @@ export async function startApplyingCoupons(rec, options) {
             // decides the verdict, so this can only turn a lost win into a
             // measured one.
             confirmed = await _caramelPutCodeOnCart(bestCode)
-            if (!confirmed || confirmed.total_price >= _cart0.total_price) {
+            if (
+                !confirmed ||
+                confirmed.total_price >= _cart0.total_price ||
+                !_linkCartHoldsTheSaving(confirmed, bestCode)
+            ) {
                 // Nothing is riding on the cart now. Say so rather than claim a
                 // win, and let the no-win branch below hand over the codes.
                 log('AUTO_INSERT_REAPPLY_LOST', {
@@ -666,12 +708,16 @@ export async function startApplyingCoupons(rec, options) {
     // answer. A store with a config never runs it, even when its box is not
     // on this page: its config is the only box we act on. Never while the
     // store list is unknown either: this may be a configured store.
+    let codesAtCheckout = false
     if (
         (!_box || !_isVisible(_box)) &&
         rec.caramelNoConfig === true &&
         caramelStoreListKnown() &&
         (await caramelCouponBoxDiscoveryOn())
     ) {
+        // The look can take a few seconds (the server may be asked), so the
+        // card says what is happening instead of sitting on "Checking…".
+        setTestingModalStatus(STORE_NOT_SET_UP_STATUS)
         // A finder that did not load, or that fails, found nothing: the codes
         // to copy.
         const finder = await caramelLoadFinder()
@@ -679,6 +725,10 @@ export async function startApplyingCoupons(rec, options) {
         if (finder)
             try {
                 found = await finder.caramelDiscoveredRecord(rec)
+                // Looked on the cart and found nothing: the codes go in at
+                // checkout, where the finder looks again.
+                codesAtCheckout =
+                    !found && finder.caramelFinderPageKind() === 'cart'
             } catch (e) {
                 log('FINDER_FAILED', { error: String(e) })
             }
@@ -690,12 +740,15 @@ export async function startApplyingCoupons(rec, options) {
     if (!_box || !_isVisible(_box)) {
         log('AUTO_INSERT_STOP', {
             result: 'no-coupon-box',
+            codesAtCheckout,
             t: performance.now(),
         })
         showFinalModal(
             0,
             null,
-            "We couldn't find the promo box on this page — copy a code below and paste it where the store asks for a promo code.",
+            codesAtCheckout
+                ? CODES_AT_CHECKOUT_MESSAGE
+                : "We couldn't find the promo box on this page — copy a code below and paste it where the store asks for a promo code.",
             false,
             coupons,
         )

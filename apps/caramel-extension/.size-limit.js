@@ -189,7 +189,11 @@ module.exports = [
         // 2026-10-30 (T-10544), raised 99.5 -> 99.8 kB: those tags are also
         // read on Shopify's current checkout (a tag group whose button removes
         // a discount code), which has no #reduction-tags. Measured 99.61 kB.
-        limit: '99.8 KB',
+        // 2026-10-30, raised 99.8 -> 101 kB: a cart with no promo box says
+        // the codes go in at checkout and the finder asks once more there,
+        // and on the discount-link path a total that falls because the cart
+        // emptied is not credited as a saving. Measured 100.7 kB.
+        limit: '101 KB',
         brotli: false,
     },
     {
@@ -367,9 +371,14 @@ module.exports = [
         // subtotal rows in 17 more languages (Danish to Arabic), partial
         // totals refused ("Totale parziale"), and the won, yuan, rupiah,
         // hryvnia and koruna amounts. Measured 38.31 kB.
+        // 2026-10-30 (T-10535), raised 38.8 -> 41.3 kB: a toggle click from
+        // which no box is used is undone (the popup it opened closed by its
+        // own close control, Escape, or the toggle again), and the server's
+        // pick never clicks the toggle the rules already tried. Measured
+        // 38.36 -> 40.59 kB.
         // It is written only here: tests/finder-module-build.test.mjs reads
         // it.
-        limit: '38.8 KB',
+        limit: '41.3 KB',
         brotli: false,
     },
     {
